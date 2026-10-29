@@ -52,3 +52,15 @@ export function isWorkspaceFolder(cwd: string): boolean {
 export function resolvePath(file: string, cwd: string): string {
   return file.startsWith("~/") ? path.join(os.homedir(), file.slice(2)) : path.resolve(cwd, file);
 }
+
+/** Glob of the folders `files.exclude` and `search.exclude` hide; ignore files are not read. */
+export function excludeGlob(): string {
+  const config = vscode.workspace.getConfiguration();
+  const globs = new Set(["**/.git"]);
+  for (const key of ["files.exclude", "search.exclude"]) {
+    for (const [glob, on] of Object.entries(config.get<Record<string, unknown>>(key) ?? {})) {
+      if (on === true) globs.add(glob);
+    }
+  }
+  return `{${[...globs].join(",")}}`;
+}

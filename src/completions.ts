@@ -2,6 +2,7 @@ import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect
 import * as os from "node:os";
 import * as vscode from "vscode";
 import { thenable, type VscodeError } from "./runtime";
+import { excludeGlob } from "./workspace";
 
 /** A workspace file or folder offered after "@". */
 export interface FileSuggestion {
@@ -41,18 +42,6 @@ function frontMatter(text: string): Record<string, string> {
     if (m) fields[m[1]!] = m[2]!.trim().replace(/^(["'])(.*)\1$/, "$2");
   }
   return fields;
-}
-
-/** Glob of the folders `files.exclude` and `search.exclude` hide; ignore files are not read. */
-function excludeGlob(): string {
-  const config = vscode.workspace.getConfiguration();
-  const globs = new Set(["**/.git"]);
-  for (const key of ["files.exclude", "search.exclude"]) {
-    for (const [glob, on] of Object.entries(config.get<Record<string, unknown>>(key) ?? {})) {
-      if (on === true) globs.add(glob);
-    }
-  }
-  return `{${[...globs].join(",")}}`;
 }
 
 /** How well `query` (lower case) matches a path; lower is better, undefined is no match. */

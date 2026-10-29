@@ -31,7 +31,7 @@ import {
   type Tab,
 } from "./tabs";
 import { replayedParts } from "./replay";
-import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
+import { cwdForNewTab, defaultCwd, excludeGlob, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
 
 /** `_meta` key on Claude agents' `usage_update` naming the model the usage belongs to. */
 const CLAUDE_MODEL_META = "_claude/model";
@@ -457,15 +457,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /**
    * Opens a file in an editor (at `line` when given) or reveals a folder in the Explorer. Relative paths come
-   * from the shown conversation, so they start at the active tab's folder.
+   * from the shown conversation, so they start at the active tab's folder. A relative path missing there (agents
+   * often write a bare `protocol.ts`) is looked up in the workspace; several matches are offered in a pick.
    */
   private readonly openFile = Effect.fn("ChatView.openFile")(function* (
     this: ChatViewProvider,
     file: string,
     line: number | undefined,
   ) {
-    const uri = vscode.Uri.file(resolvePath(file, this.tabs.active.cwd));
-    const stat = yield* thenable(() => vscode.workspace.fs.stat(uri)).pipe(Effect.option);
+    let uri = vscode.Uri.file(resolvePath(file, this.tabs.active.cwd));
+    let stat = yield* thenable(() => vscode.workspace.fs.stat(uri)).pipe(Effect.option);
+    if (Option.isNone(stat) && !path.isAbsolute(file) && !file.startsWith("~/")) {
+      const found = yield* this.findInWorkspace(file);
+      if (found) {
+        uri = found;
+        stat = yield* thenable(() => vscode.workspace.fs.stat(uri)).pipe(Effect.option);
+      } else if (found === null) {
+        return;
+      }
+    }
     if (Option.isNone(stat)) {
       vscode.window.setStatusBarMessage(t("chat.fileNotFound", file), 4000);
       return;
@@ -478,6 +488,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     // `vscode.open` picks the editor by file type, so images and other binaries open in their viewer.
     const options: vscode.TextDocumentShowOptions = position ? { selection: new vscode.Range(position, position) } : {};
     yield* thenable(() => vscode.commands.executeCommand("vscode.open", uri, options));
+  });
+
+  /** Workspace files ending in `file`: the only match, the picked one, `null` if the pick was dismissed. */
+  private readonly findInWorkspace = Effect.fn("ChatView.findInWorkspace")(function* (file: string) {
+    const name = file.replace(/^\.\//, "").replace(/\/$/, "");
+    if (!name || name.split("/").includes("..")) {
+      return undefined;
+    }
+    // Brackets and braces in a name are glob syntax; `[x]` matches the character itself.
+    const glob = `**/${name.replace(/[[\]{}]/g, "[$&]")}`;
+    const uris = yield* thenable(() => vscode.workspace.findFiles(glob, excludeGlob(), 50));
+    if (uris.length <= 1) {
+      return uris[0];
+    }
+    const items = uris
+      .map((uri) => ({ label: vscode.workspace.asRelativePath(uri), uri }))
+      .sort((a, b) => a.label.length - b.label.length || a.label.localeCompare(b.label));
+    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("chat.pickFile", name) }));
+    return picked?.uri ?? null;
   });
 
   /** The agent `tab` runs on: its pick while it exists, else the default (last picked). */

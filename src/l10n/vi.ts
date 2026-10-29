@@ -167,6 +167,7 @@ const vi: Record<MessageKey, string> = {
   "chat.openInTab": "Đang mở",
   "chat.reopenFailed": "Không mở lại được cuộc trò chuyện này; bắt đầu cuộc mới.",
   "chat.fileNotFound": "Không tìm thấy file: {0}",
+  "chat.pickFile": "Các file tên {0}",
 
   "drop.label": "Thả file / thư mục vào đây",
   "drop.tooltip": "**Lỗi đã biết:** từ VS Code 1.140, kéo thả từ Explorer không còn tới được ô chat ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nHãy thả file hoặc thư mục vào đây, hoặc dán vào ô chat.",
