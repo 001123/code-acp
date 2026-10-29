@@ -3,8 +3,9 @@
   "displayName": "Code ACP",
   "description": "%description%",
   "version": "0.0.1",
-  "publisher": "duybk",
-  "license": "Apache-2.0",
+  "publisher": "001123",
+  "icon": "media/extension-icon.png",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.144.0"
   },

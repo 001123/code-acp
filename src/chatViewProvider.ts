@@ -1,5 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { Clock, Deferred, Effect, Exit, FileSystem, Option, PlatformError, Predicate, Schema, Scope, Semaphore } from "effect";
+import { createHash } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -23,6 +24,8 @@ export type FromWebview =
   | { type: "pinTab"; tab: number; pinned: boolean }
   /** `index` is the tab's position after the move; it stays inside its pinned or unpinned group. */
   | { type: "moveTab"; tab: number; index: number }
+  /** The composer's unsent content, kept so it survives a reload. */
+  | { type: "draft"; tab: number; draft: Draft }
   | { type: "history" }
   | { type: "openSession"; sessionId: string; cwd: string; title?: string }
   | { type: "login" }
@@ -48,6 +51,15 @@ export interface TabInfo {
   pinned: boolean;
   /** The installed agent picked for the tab; undefined until it has one. */
   agentId?: string;
+  /** Unsent composer content; the webview only uses it for tabs it has no draft for yet. */
+  draft?: Draft;
+}
+
+/** What the composer holds before sending: text, the attachments placed in it as tokens, and the others. */
+export interface Draft {
+  text: string;
+  inline: { token: string; attachment: Attachment }[];
+  attachments: Attachment[];
 }
 
 /** Something dropped or pasted into the composer. */
@@ -131,6 +143,29 @@ const SavedUsage = Schema.Struct({
 });
 type SavedUsage = typeof SavedUsage.Type;
 
+/** A draft attachment as saved; raw bytes live in a file of the drafts folder, named by their hash. */
+const SavedAttachment = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("uri"), uri: Schema.String, name: Schema.String }),
+  Schema.Struct({
+    kind: Schema.Literal("snippet"),
+    uri: Schema.String,
+    name: Schema.String,
+    languageId: Schema.String,
+    startLine: Schema.Int,
+    endLine: Schema.Int,
+    text: Schema.String,
+  }),
+  Schema.Struct({ kind: Schema.Literal("stored"), name: Schema.String, mimeType: Schema.String, file: Schema.String }),
+]);
+type SavedAttachment = typeof SavedAttachment.Type;
+
+const SavedDraft = Schema.Struct({
+  text: Schema.String,
+  inline: Schema.Array(Schema.Struct({ token: Schema.String, attachment: SavedAttachment })),
+  attachments: Schema.Array(SavedAttachment),
+});
+type SavedDraft = typeof SavedDraft.Type;
+
 const SavedTabs = Schema.Struct({
   active: Schema.Int,
   tabs: Schema.Array(
@@ -141,6 +176,7 @@ const SavedTabs = Schema.Struct({
       agentId: Schema.optional(Schema.String),
       usage: Schema.optional(SavedUsage),
       pinned: Schema.optional(Schema.Boolean),
+      draft: Schema.optional(SavedDraft),
     }),
   ),
 });
@@ -162,6 +198,10 @@ interface Tab {
   cwd?: string;
   /** The installed agent picked for the tab; the codeAcp.agentCommand override wins over it. */
   agentId?: string;
+  /** Unsent composer content; undefined when empty, or until `savedDraft` is loaded. */
+  draft?: Draft;
+  /** `draft` as saved in workspaceState. */
+  savedDraft?: SavedDraft;
   reopen?: Reopen;
   /** Last usage of the session `usageSessionId`, shown again when that session is reloaded. */
   usage?: SavedUsage;
@@ -195,7 +235,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private nextTabId = 1;
   private readonly tabs: Tab[] = [];
   private active: Tab;
+  /** Serializes writing draft files with removing the unused ones. */
+  private readonly draftLock = Semaphore.makeUnsafe(1);
   private nextPermissionId = 1;
+  /** Bumped per history request so a slower, older listing does not replace a newer one. */
+  private historyRequest = 0;
   private readonly pendingPermissions = new Map<number, PendingPermission>();
   /** Attachments added before the webview was ready; flushed on "ready". */
   private queuedAttachments: Attachment[] = [];
@@ -299,6 +343,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       title: tab.title,
       pinned: tab.pinned,
       agentId: tab.agentId,
+      draft: tab.draft,
     }));
     this.post({ type: "tabs", tabs, active: this.active.id });
     this.saveTabs();
@@ -324,6 +369,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     for (const entry of saved?.tabs ?? []) {
       const tab = this.addTab();
       tab.pinned = entry.pinned ?? false;
+      tab.savedDraft = entry.draft;
       tab.agentId = entry.agentId === CUSTOM_AGENT ? undefined : entry.agentId;
       if (entry.sessionId) {
         tab.title = entry.title;
@@ -341,23 +387,111 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const value: SavedTabs = {
       active: this.tabs.indexOf(this.active),
       tabs: this.tabs.map((tab) => {
-        const { pinned } = tab;
+        const { pinned, savedDraft: draft } = tab;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId } = tab;
           const cwd = tab.cwd ?? this.cwd();
           const agentId = tab.running?.agentId;
-          return { title: tab.title, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned };
+          return { title: tab.title, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title: tab.title, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned };
+          return { title: tab.title, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
         }
-        return { pinned, agentId: tab.agentId };
+        return { pinned, agentId: tab.agentId, draft };
       }),
     };
     this.run(thenable(() => this.context.workspaceState.update(TABS_KEY, value)));
   }
+
+  /** Holds the raw bytes of draft attachments, which are too big for workspaceState. */
+  private draftsDir(): string {
+    return path.join((this.context.storageUri ?? this.context.globalStorageUri).fsPath, "drafts");
+  }
+
+  /** Keeps `draft` as the tab's unsent content and saves it, writing raw bytes to the drafts folder. */
+  private readonly setDraft = Effect.fn("ChatView.setDraft")(function* (this: ChatViewProvider, tab: Tab, draft: Draft) {
+    const empty = !draft.text.trim() && draft.inline.length === 0 && draft.attachments.length === 0;
+    yield* Semaphore.withPermits(this.draftLock, 1)(
+      Effect.gen({ self: this }, function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const dir = this.draftsDir();
+        const store = Effect.fnUntraced(function* (a: Attachment): Effect.fn.Return<SavedAttachment, PlatformError.PlatformError> {
+          if (a.kind !== "data") {
+            return a;
+          }
+          const file = createHash("sha256").update(a.data).digest("hex");
+          const target = path.join(dir, file);
+          if (!(yield* fs.exists(target))) {
+            yield* fs.makeDirectory(dir, { recursive: true });
+            yield* fs.writeFile(target, Buffer.from(a.data, "base64"));
+          }
+          return { kind: "stored", name: a.name, mimeType: a.mimeType, file };
+        });
+        const saved: SavedDraft | undefined = empty
+          ? undefined
+          : {
+              text: draft.text,
+              inline: yield* Effect.forEach(draft.inline, ({ token, attachment }) =>
+                Effect.map(store(attachment), (stored) => ({ token, attachment: stored })),
+              ),
+              attachments: yield* Effect.forEach(draft.attachments, store),
+            };
+        // The tab may have closed while the files were written.
+        if (!this.tabs.includes(tab)) {
+          return;
+        }
+        tab.draft = empty ? undefined : draft;
+        tab.savedDraft = saved;
+        this.saveTabs();
+      }),
+    );
+    yield* this.pruneDraftFiles;
+  });
+
+  /** Reads back the drafts saved before a reload; an attachment whose file is gone is dropped. */
+  private readonly loadDrafts = Effect.fn("ChatView.loadDrafts")(function* (this: ChatViewProvider) {
+    const fs = yield* FileSystem.FileSystem;
+    const dir = this.draftsDir();
+    const load = (a: SavedAttachment): Effect.Effect<Attachment[]> =>
+      a.kind !== "stored"
+        ? Effect.succeed([a])
+        : fs.readFile(path.join(dir, a.file)).pipe(
+            Effect.map((bytes) => [{ kind: "data" as const, name: a.name, mimeType: a.mimeType, data: Buffer.from(bytes).toString("base64") }]),
+            Effect.orElseSucceed(() => []),
+          );
+    for (const tab of this.tabs) {
+      const saved = tab.savedDraft;
+      if (!saved || tab.draft) {
+        continue;
+      }
+      const inline = yield* Effect.forEach(saved.inline, ({ token, attachment }) =>
+        Effect.map(load(attachment), (loaded) => loaded.map((a) => ({ token, attachment: a }))),
+      );
+      const attachments = yield* Effect.forEach(saved.attachments, load);
+      tab.draft = { text: saved.text, inline: inline.flat(), attachments: attachments.flat() };
+    }
+  });
+
+  /** Removes files of the drafts folder that no tab's draft refers to. */
+  private readonly pruneDraftFiles = Semaphore.withPermits(this.draftLock, 1)(
+    Effect.gen({ self: this }, function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const dir = this.draftsDir();
+      const used = new Set(
+        this.tabs.flatMap((tab) =>
+          [...(tab.savedDraft?.inline.map((x) => x.attachment) ?? []), ...(tab.savedDraft?.attachments ?? [])].flatMap((a) =>
+            a.kind === "stored" ? [a.file] : [],
+          ),
+        ),
+      );
+      const files = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed(() => []));
+      yield* Effect.forEach(files.filter((file) => !used.has(file)), (file) => fs.remove(path.join(dir, file), { force: true }), {
+        discard: true,
+      });
+    }),
+  );
 
   private usageOf(tab: Tab, sessionId: string): SavedUsage | undefined {
     return tab.usageSessionId === sessionId ? tab.usage : undefined;
@@ -420,6 +554,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const tab = this.tabOf(msg);
     switch (msg.type) {
       case "ready":
+        yield* this.loadDrafts();
         this.postTabs();
         yield* this.postAgent;
         for (const each of this.tabs) {
@@ -439,6 +574,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           yield* this.cancelTab(tab);
         }
         break;
+      case "draft":
+        if (tab) {
+          yield* this.setDraft(tab, msg.draft);
+        }
+        break;
       case "newTab":
         yield* this.newSession();
         break;
@@ -450,6 +590,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "closeTab":
         if (tab) {
           yield* this.closeTab(tab);
+          yield* this.pruneDraftFiles;
         }
         break;
       case "pinTab":
@@ -534,9 +675,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       return;
     }
     const position = line ? new vscode.Position(line - 1, 0) : undefined;
-    yield* thenable(() =>
-      vscode.window.showTextDocument(uri, position ? { selection: new vscode.Range(position, position) } : {}),
-    );
+    // `vscode.open` picks the editor by file type, so images and other binaries open in their viewer.
+    const options: vscode.TextDocumentShowOptions = position ? { selection: new vscode.Range(position, position) } : {};
+    yield* thenable(() => vscode.commands.executeCommand("vscode.open", uri, options));
   });
 
   /** Saves a data-URI image to a temp file and opens it in VS Code's image preview, in a new window. */
@@ -909,12 +1050,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /** Shows the agent's past sessions for this workspace in the chat view. */
   readonly showHistory = Effect.fn("ChatView.showHistory")(function* (this: ChatViewProvider) {
     yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
-    this.post({ type: "history", loading: true, sessions: [] });
+    const request = ++this.historyRequest;
+    const post = (message: object) => {
+      if (request === this.historyRequest) {
+        this.post({ type: "history", ...message });
+      }
+    };
+    post({ loading: true, sessions: [] });
     const running = yield* this.getAgent(this.active).pipe(Effect.catchTag("NoAgentError", () => Effect.undefined));
     const agent = running?.agent;
     const caps = agent?.initializeResponse.agentCapabilities;
     if (!agent || !caps?.sessionCapabilities?.list) {
-      this.post({ type: "history", unsupported: true, sessions: [] });
+      post({ unsupported: true, sessions: [] });
       return;
     }
     const sessions: Array<acp.SessionInfo> = [];
@@ -927,8 +1074,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       }
     }
-    this.post({
-      type: "history",
+    post({
       sessions,
       currentId: this.active.sessionId,
       openIds: this.tabs.flatMap((tab) => {

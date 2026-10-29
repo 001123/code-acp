@@ -44,7 +44,7 @@ function Card({ agent: a }: { agent: Agent }) {
   return (
     <div className={"card" + (a.active ? " active" : "")}>
       <div className="icon-tile">
-        <div className="icon" style={a.icon ? { maskImage: `url("${a.icon}")` } : undefined} />
+        <div className="agent-icon" style={a.icon ? { maskImage: `url("${a.icon}")` } : undefined} />
       </div>
       <div className="body">
         <div className="title">

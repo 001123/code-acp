@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { createContext, Fragment, useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { Attachment, FromWebview as ChatMessage, PromptPart, SentAttachment, TabInfo } from "../chatViewProvider";
+import type { Attachment, Draft, FromWebview as ChatMessage, PromptPart, SentAttachment, TabInfo } from "../chatViewProvider";
 import type { FileSuggestion, SkillSuggestion } from "../completions";
 import { Icon } from "./icon";
 import { Lightbox } from "./lightbox";
@@ -919,6 +919,12 @@ function App() {
   /** Unsent text per tab; the textarea holds the active tab's. */
   const drafts = useRef(new Map<number, string>());
   const shownDraft = useRef<number>(undefined);
+  /** A draft not yet sent to the extension, which keeps it across reloads. */
+  const pendingDraft = useRef<{ tab: number; draft: Draft; timer: ReturnType<typeof setTimeout> }>(undefined);
+  /** Tabs whose saved draft was taken; later "tabs" messages don't overwrite what was typed since. */
+  const seeded = useRef(new Set<number>());
+  const statesRef = useRef(states);
+  statesRef.current = states;
 
   const [preview, setPreview] = useState<Preview>();
   const closePreview = useCallback(() => setPreview(undefined), []);
@@ -1143,7 +1149,17 @@ function App() {
       case "tabs":
         setTabs(msg.tabs);
         setActive(msg.active);
-        return dispatchTabs({ type: "keep", ids: msg.tabs.map((x: TabInfo) => x.id) });
+        dispatchTabs({ type: "keep", ids: msg.tabs.map((x: TabInfo) => x.id) });
+        // After a reload the extension holds the drafts.
+        for (const { id, draft } of msg.tabs as TabInfo[]) {
+          if (seeded.current.has(id)) continue;
+          seeded.current.add(id);
+          if (!draft) continue;
+          drafts.current.set(id, draft.text);
+          inline.current.set(id, new Map(draft.inline.map((x) => [x.token, x.attachment])));
+          if (draft.attachments.length > 0) update(id, (s) => ({ ...s, attachments: draft.attachments }));
+        }
+        return;
       case "update":
         update(tab, (s) => (s.status.busy ? { ...s, lastActivity: Date.now() } : s));
         return handleUpdate(tab, msg.update);
@@ -1267,6 +1283,14 @@ function App() {
     el.focus();
   }, [active]);
 
+  // Reloads an open history list when the active tab switches agent; the list is per agent.
+  const activeAgentId = tabs.find((x) => x.id === active)?.agentId;
+  const historyAgent = useRef(activeAgentId);
+  useEffect(() => {
+    if (history && historyAgent.current !== activeAgentId) post({ type: "history" });
+    historyAgent.current = activeAgentId;
+  }, [activeAgentId]);
+
   useEffect(() => {
     if (!history) return;
     const onKey = (e: KeyboardEvent) => {
@@ -1355,7 +1379,35 @@ function App() {
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
     setInputText(el.value);
     syncScroll();
+    saveDraft(el.value);
   }
+
+  function flushDraft(): void {
+    const pending = pendingDraft.current;
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pendingDraft.current = undefined;
+    post({ type: "draft", tab: pending.tab, draft: pending.draft });
+  }
+
+  /** Sends the active tab's composer content to the extension, at most every 300 ms. */
+  function saveDraft(text: string): void {
+    const tab = activeRef.current;
+    if (tab === undefined) return;
+    const draft: Draft = {
+      text,
+      inline: [...inlineOf(tab)].filter(([token]) => text.includes(token)).map(([token, attachment]) => ({ token, attachment })),
+      attachments: statesRef.current[tab]?.attachments ?? [],
+    };
+    if (pendingDraft.current?.tab !== tab) flushDraft();
+    else clearTimeout(pendingDraft.current.timer);
+    pendingDraft.current = { tab, draft, timer: setTimeout(flushDraft, 300) };
+  }
+
+  // Attachments outside the text change without an edit.
+  useEffect(() => {
+    if (input.current) saveDraft(input.current.value);
+  }, [attachments]);
 
   /** The image token drawn under the pointer; the backdrop sits behind the textarea, so hit-test its rects. */
   function imageTokenAt(x: number, y: number): { src: string; name: string; rect: DOMRect } | undefined {
