@@ -231,6 +231,39 @@ export function contentText(block: acp.ContentBlock | undefined): string {
   return `[${block.type}]`;
 }
 
+/** How Claude Code's ACP adapter writes a file it was sent, which is what a replayed user message holds. */
+const FILE_LINK = /\[(@[^\]\n]+)\]\((file:\/\/[^)\s]+)\)/g;
+
+/** The adapter's copy of an embedded file, which it appends after the prompt. */
+const CONTEXT = /\n?<context ref="[^"]*">\n[\s\S]*?\n<\/context>/g;
+
+/** The editor selection "include open file" sends (see `activeFileBlocks`): the last prompt block, before any context. */
+const SELECTION = /Selection \([^\n]*:\d+-\d+\):\n[\s\S]*?(?=\n<context ref="|$)/;
+
+/**
+ * A replayed user message with its `[@name](file://…)` links turned into `@name` tokens, and without the context the
+ * live message does not show either: embedded file contents and the open file's selection. The adapter joins prompt
+ * blocks without a separator, so a token gets the spaces it needs to stand apart from the words around it.
+ */
+export function fileLinkTokens(replayed: string): { text: string; tokens: Token[] } {
+  const tokens: Token[] = [];
+  const text = replayed.replace(SELECTION, "").replace(CONTEXT, "").trimEnd();
+  const out = text.replace(FILE_LINK, (link, token: string, uri: string, at: number) => {
+    let path: string;
+    try {
+      path = decodeURIComponent(new URL(uri).pathname).replace(/^\/(?=[A-Za-z]:)/, "");
+    } catch {
+      return link;
+    }
+    tokens.push({ token, path });
+    const before = at > 0 && !/\s/.test(text[at - 1]!) ? " " : "";
+    const end = at + link.length;
+    const after = end < text.length && !/[\s.,;:!?)]/.test(text[end]!) ? " " : "";
+    return before + token + after;
+  });
+  return { text: out, tokens };
+}
+
 export type ActivityItem = { kind: "thought"; id: number; text: string } | ToolItem;
 
 /** Groups each run of consecutive thoughts and tool calls into one entry. */

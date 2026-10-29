@@ -11,7 +11,7 @@ import { CANCELLED, Permissions } from "../src/chat/permissions";
 import type { Attachment } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
-import { transcript, EMPTY, type Action } from "../src/ui/chat/transcript";
+import { transcript, EMPTY, fileLinkTokens, type Action } from "../src/ui/chat/transcript";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../src/workspace";
 import { __test, Uri, window, workspace } from "./stubs/vscode";
 
@@ -366,5 +366,28 @@ describe("rewind and fork state", () => {
     assert.isFalse(tab.steer);
     assert.strictEqual(tab.sent.size, 0);
     assert.isUndefined(tab.rewindNote);
+  });
+});
+
+describe("fileLinkTokens", () => {
+  it("turns the file links of a replayed user message into tokens", () => {
+    const { text, tokens } = fileLinkTokens("see[@READ ME.md](file:///a/READ%20ME.md)and [@x.ts](file:///C:/b/x.ts). [y](https://y)");
+    assert.strictEqual(text, "see @READ ME.md and @x.ts. [y](https://y)");
+    assert.deepStrictEqual(tokens, [
+      { token: "@READ ME.md", path: "/a/READ ME.md" },
+      { token: "@x.ts", path: "C:/b/x.ts" },
+    ]);
+  });
+
+  it("drops embedded file contents and the open file's selection", () => {
+    const uri = "file:///w/README.md";
+    const { text, tokens } = fileLinkTokens(
+      `[@README.md#L12](${uri}#L12) fix this[@README.md](${uri})Selection (README.md:12-12):\n- line\n<context ref="${uri}#L12">\n- line\n</context>`,
+    );
+    assert.strictEqual(text, "@README.md#L12 fix this @README.md");
+    assert.deepStrictEqual(tokens, [
+      { token: "@README.md#L12", path: "/w/README.md" },
+      { token: "@README.md", path: "/w/README.md" },
+    ]);
   });
 });

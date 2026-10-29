@@ -1,6 +1,7 @@
 import { Fragment, useContext } from "react";
 import { useL10n } from "../l10n";
 import { HoverPreview, OpenPreview } from "./context";
+import { openFile } from "./post";
 
 /**
  * Splits `text` at the first occurrence of each item's token; an item whose token is gone from the text is left out.
@@ -26,10 +27,11 @@ export function splitTokens<T extends { token: string }>(text: string, items: It
   return out;
 }
 
-/** An inline token; `src` is set for images, which open in the lightbox. */
+/** An inline token; `src` is set for images, which open in the lightbox, `path` for files, which open in an editor. */
 export interface Token {
   token: string;
   src?: string;
+  path?: string;
 }
 
 /** `text` with its attachment tokens highlighted. */
@@ -53,6 +55,10 @@ export function Tokens({ text, tokens }: { text: string; tokens: Token[] }) {
           open({ src: part.src!, name: part.token.slice(1) });
         }}
       >
+        {part.token}
+      </mark>
+    ) : part.path ? (
+      <mark key={i} className="token file" title={part.path} onClick={() => openFile({ path: part.path! })}>
         {part.token}
       </mark>
     ) : (

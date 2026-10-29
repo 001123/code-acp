@@ -13,7 +13,7 @@ import { readSettings } from "../settings";
 import { TerminalContext } from "../terminalContext";
 import { webviewHtml, webviewRoots } from "../webview";
 import { AgentPool, stopAll } from "./agents";
-import { activeFileBlocks, attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
+import { activeFileBlocks, activeFileName, attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
 import { ChangeReview, confirm } from "./changes";
 import { DraftStore } from "./drafts";
 import { Follower } from "./follow";
@@ -130,6 +130,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
+      vscode.window.onDidChangeActiveTextEditor(() => this.postActiveFile()),
       // Edits the user saves change the counts.
       vscode.workspace.onDidSaveTextDocument((doc) => {
         for (const tab of this.tabs.all) {
@@ -179,6 +180,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   private postFolders(): void {
     this.post({ type: "folders", folders: workspaceFolders() });
+  }
+
+  /** The file "include open file" would send, shown beside the checkbox. */
+  private postActiveFile(): void {
+    this.post({ type: "activeFile", name: activeFileName() });
   }
 
   /** The composer's agent picker: installed and custom agents, and the default for new tabs. */
@@ -249,6 +255,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.drafts.load();
         this.post({ type: "environment", remote: vscode.env.remoteName !== undefined });
         this.postFolders();
+        this.postActiveFile();
         this.postTabs();
         yield* this.postAgent;
         this.post({ type: "followAgent", enabled: this.followAgent });

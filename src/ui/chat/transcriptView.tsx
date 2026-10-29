@@ -18,7 +18,7 @@ import refreshIcon from "@tabler/icons/outline/refresh.svg";
 import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
-import { clip, contentText, type ActivityItem, type Item, type Text } from "./transcript";
+import { clip, contentText, fileLinkTokens, type ActivityItem, type Item, type Text } from "./transcript";
 import { Tokens } from "./tokens";
 
 const HOVER_WIDTH = 240;
@@ -335,12 +335,14 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
   switch (item.kind) {
     case "assistant":
       return <MarkdownView className="msg assistant md" text={item.text} onOpenFile={openFile} />;
-    case "user":
+    case "user": {
+      const replayed = fileLinkTokens(item.text);
       return (
         <div className="msg user">
-          <Tokens text={item.text} tokens={item.tokens ?? []} />
+          <Tokens text={replayed.text} tokens={[...(item.tokens ?? []), ...replayed.tokens]} />
         </div>
       );
+    }
     case "thought":
       return (
         <details className="thought">

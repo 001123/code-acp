@@ -89,6 +89,7 @@ const vi: Record<MessageKey, string> = {
   "chat.placeholder": "Hỏi bất cứ điều gì. @ file & terminal, $ skill, / lệnh",
   "chat.inputTitle": "Chuột phải file → Đính kèm vào chat",
   "chat.includeFile": "Kèm file đang mở",
+  "chat.includeFileNamed": "Kèm file đang mở: {0}",
   "chat.stop": "Dừng",
   "chat.sendTitle": "Gửi (Enter)",
   "chat.send": "Gửi",

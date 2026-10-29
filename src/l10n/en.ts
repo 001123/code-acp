@@ -88,6 +88,7 @@ const en = {
   "chat.placeholder": "Ask anything. @ files & terminal, $ skills, / commands",
   "chat.inputTitle": "Right-click a file → Attach to Chat to attach it",
   "chat.includeFile": "Include open file",
+  "chat.includeFileNamed": "Include open file: {0}",
   "chat.stop": "Stop",
   "chat.sendTitle": "Send (Enter)",
   "chat.send": "Send",

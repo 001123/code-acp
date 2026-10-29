@@ -757,10 +757,12 @@ mark.token {
 #input-backdrop mark.token {
   color: transparent;
 }
-mark.token.image {
+mark.token.image,
+mark.token.file {
   cursor: pointer;
 }
-mark.token.image:hover {
+mark.token.image:hover,
+mark.token.file:hover {
   text-decoration: underline;
 }
 /* "@" / "$" / "/" suggestions, above the composer. */
@@ -915,6 +917,12 @@ mark.token.image:hover {
   height: 14px;
   stroke-width: 1.75;
   opacity: 0.8;
+}
+#actions .label-text {
+  max-width: 16ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 #actions input[type="checkbox"]:not(:checked) ~ .svg-icon svg,
 #actions input[type="checkbox"]:not(:checked) ~ .label-text {

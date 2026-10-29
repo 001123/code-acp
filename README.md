@@ -9,7 +9,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 - Review the agent's changes, restore checkpoints, follow subagents and terminals.
 - Install, update and switch agents from the **ACP Agents** page, or add your own.
 - Generate commit messages from the Source Control view.
-- English and Vietnamese UI.
+- Multilingual UI.
 
 ## Getting started
 

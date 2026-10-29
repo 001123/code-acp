@@ -78,6 +78,8 @@ export interface ComposerOptions {
   agents: AgentChoices;
   /** The workspace folders a tab can run in. */
   folders: ReadonlyArray<WorkspaceFolderInfo>;
+  /** The file "include open file" sends: the active editor's, workspace-relative. */
+  activeFile: string | undefined;
   /** The extension runs on another machine (Remote SSH, WSL, containers), which can't read paths on this one. */
   remote: boolean;
   update: (tab: number | undefined, f: (s: TabState) => TabState) => void;
@@ -88,7 +90,7 @@ export interface ComposerOptions {
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover } =
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, activeFile, remote, update, error, setPreview, setHover } =
     options;
   const { t } = useL10n();
   const [includeFile, setIncludeFile] = useState(false);
@@ -741,10 +743,10 @@ export function useComposer(options: ComposerOptions) {
       <div id="actions">
         <AgentSelect tab={tabs.find((x) => x.id === active)} choices={agents} />
         <FolderSelect tab={tabs.find((x) => x.id === active)} folders={folders} />
-        <label title={t("chat.includeFile")}>
+        <label title={activeFile ? t("chat.includeFileNamed", activeFile) : t("chat.includeFile")}>
           <input type="checkbox" id="include-file" checked={includeFile} onChange={(e) => setIncludeFile(e.target.checked)} />
           <Icon svg={paperclipIcon} />
-          <span className="label-text">{t("chat.includeFile")}</span>
+          <span className="label-text">{activeFile ? activeFile.split("/").pop() : t("chat.includeFile")}</span>
         </label>
         <span className="spacer" />
         <button
