@@ -21,6 +21,7 @@ export type FromWebview =
 function isDefault(key: SettingKey, value: unknown): boolean {
   if (key === "language") return value === "auto";
   if (key === "nodePath") return value === "" || value === "node";
+  if (key === "checkAgentUpdates") return value === true;
   // Empty is a real choice here: no extra instructions.
   if (key === "commitMessage.instructions") return value === DEFAULT_COMMIT_INSTRUCTIONS;
   if (Array.isArray(value)) return value.length === 0;

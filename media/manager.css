@@ -1,60 +1,195 @@
+:root {
+  --radius: 8px;
+  --accent: var(--vscode-button-background);
+  --border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.25)));
+  --surface: color-mix(in srgb, var(--vscode-foreground) 3%, transparent);
+  --surface-hover: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+}
+
 body {
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
-  padding: 0 16px 16px;
+  padding: 0 20px 20px;
   max-width: 960px;
+  margin: 0 auto;
 }
 
+/* Tabler SVGs (src/ui/icon.tsx) inherit color via currentColor. */
+.svg-icon {
+  display: contents;
+}
+.svg-icon svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* Header */
 header {
   position: sticky;
   top: 0;
+  z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  padding: 12px 0;
+  padding: 16px 0 12px;
+  margin-bottom: 4px;
   background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--border);
+}
+.heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-right: auto;
 }
 h1 {
   font-size: 1.4em;
-  margin: 0 auto 0 0;
+  font-weight: 600;
+  margin: 0;
+}
+.count {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search svg {
+  position: absolute;
+  left: 9px;
+  width: 14px;
+  height: 14px;
+  color: var(--vscode-descriptionForeground);
+  pointer-events: none;
 }
 #search {
   width: 240px;
-  padding: 4px 6px;
+  padding: 6px 10px 6px 30px;
+  font: inherit;
   color: var(--vscode-input-foreground);
   background: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, transparent);
+  border: 1px solid var(--vscode-input-border, var(--border));
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+#search:focus {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+/* "Installed" filter: a pill with a custom checkbox. */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.toggle:hover {
+  background: var(--surface-hover);
+}
+.toggle:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.toggle input {
+  appearance: none;
+  position: relative;
+  flex: none;
+  margin: 0;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--vscode-checkbox-border, var(--vscode-descriptionForeground));
+  border-radius: 4px;
+  background: var(--vscode-checkbox-background, transparent);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.toggle input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+/* Checkmark: a rotated L drawn with borders. */
+.toggle input:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-button-foreground);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.toggle input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
 }
 
 #error {
+  padding: 8px 12px;
+  margin: 8px 0;
   color: var(--vscode-errorForeground);
-  margin-bottom: 8px;
+  background: var(--vscode-inputValidation-errorBackground, transparent);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  border-radius: var(--radius);
 }
 
+/* List */
 #list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-top: 8px;
 }
 
 .card {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: 6px;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: background 0.15s, border-color 0.15s;
+}
+.card:hover {
+  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--vscode-foreground) 25%, transparent);
 }
 .card.active {
-  border-color: var(--vscode-focusBorder);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
+.icon-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
 /* The registry SVGs are monochrome; masking lets them follow the theme color. */
 .icon {
-  flex: none;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   background-color: var(--vscode-foreground);
   mask-size: contain;
   mask-repeat: no-repeat;
@@ -67,65 +202,155 @@ h1 {
 }
 .title {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 .name {
-  font-weight: bold;
+  font-weight: 600;
 }
-.version,
-.meta,
-.muted {
+.version {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85em;
   color: var(--vscode-descriptionForeground);
-  font-size: 0.9em;
 }
 .badge {
-  font-size: 0.8em;
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  font-size: 0.75em;
+  line-height: 1.6;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--vscode-descriptionForeground);
 }
 .badge.active {
-  background: var(--vscode-button-background);
+  border-color: transparent;
+  background: var(--accent);
   color: var(--vscode-button-foreground);
 }
 .desc {
-  margin: 2px 0;
+  margin: 4px 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .meta {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.meta-item svg {
+  width: 13px;
+  height: 13px;
 }
 .meta a {
   color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+.meta a:hover .link-text {
+  text-decoration: underline;
+}
+.link-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex: none;
 }
-.busy {
+.busy,
+.muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--vscode-descriptionForeground);
-  font-style: italic;
+  font-size: 0.9em;
+}
+.busy svg,
+.loading svg {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 0;
+  color: var(--vscode-descriptionForeground);
+}
+.empty svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.6;
+}
+
+/* Buttons */
 button {
-  background: var(--vscode-button-background);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-weight: 500;
   color: var(--vscode-button-foreground);
-  border: none;
-  padding: 4px 10px;
+  background: var(--vscode-button-background);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 button:hover {
   background: var(--vscode-button-hoverBackground);
 }
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
 button.secondary {
-  background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+button.secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+button.icon-button {
+  padding: 6px;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border-color: var(--border);
+}
+button.icon-button:hover {
+  background: var(--surface-hover);
+}
+button.icon-button.danger:hover {
+  color: var(--vscode-errorForeground);
+  border-color: var(--vscode-errorForeground);
+  background: color-mix(in srgb, var(--vscode-errorForeground) 12%, transparent);
 }
 button[disabled] {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: default;
+}
+button.loading[disabled] {
+  opacity: 1;
 }

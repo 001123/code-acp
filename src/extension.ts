@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import * as vscode from "vscode";
 import { AgentManager } from "./agentManager";
+import { AgentUpdates } from "./agentUpdates";
 import { ChatViewProvider } from "./chatViewProvider";
 import { CommitMessage } from "./commitMessage";
 import { DropViewProvider } from "./dropView";
@@ -38,6 +39,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       yield* provider.setAgent(picked.id);
     }
   });
+
+  /** Offers to install the updates a background check found. */
+  const offerUpdates = Effect.fn("offerUpdates")(function* () {
+    const updates = yield* AgentUpdates.use((u) => u.due);
+    if (!updates.length) {
+      return;
+    }
+    const list = updates.map((u) => `${u.latest.name} ${u.installed.version} → ${u.latest.version}`).join(", ");
+    const [update, manage, disable] = [t("updates.update"), t("settings.manageAgents"), t("updates.disable")];
+    const picked = yield* thenable(() => vscode.window.showInformationMessage(t("updates.available", list), update, manage, disable));
+    if (picked === update) {
+      yield* AgentUpdates.use((u) => u.install(updates));
+    } else if (picked === manage) {
+      ManagerPanel.show(context, runtime, manager);
+    } else if (picked === disable) {
+      yield* thenable(() =>
+        vscode.workspace.getConfiguration("codeAcp").update("checkAgentUpdates", false, vscode.ConfigurationTarget.Global),
+      );
+    }
+  });
+  void run(offerUpdates)();
 
   context.subscriptions.push(
     log,
@@ -94,6 +116,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         provider.quote(context.selectedText);
       }
     }),
+    ...(
+      [
+        ["codeAcp.pinTab", "pin"],
+        ["codeAcp.unpinTab", "unpin"],
+        ["codeAcp.closeTab", "close"],
+        ["codeAcp.closeOtherTabs", "closeOthers"],
+        ["codeAcp.closeTabsToRight", "closeToRight"],
+      ] as const
+    ).map(([command, action]) =>
+      // The tab's `data-vscode-context` (see TabStrip in src/ui/chat.tsx).
+      vscode.commands.registerCommand(
+        command,
+        run((context?: { tab?: unknown }) => (typeof context?.tab === "number" ? provider.tabAction(context.tab, action) : Effect.void)),
+      ),
+    ),
     // Last, so services (e.g. the AgentManager event emitter) outlive everything above.
     { dispose: () => void runtime.dispose() },
   );

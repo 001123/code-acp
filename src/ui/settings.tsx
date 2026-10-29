@@ -178,6 +178,17 @@ function App() {
             </button>
           </div>
         </Field>
+        <Field id="checkAgentUpdates" label="settings.checkUpdates" overridden={overridden("checkAgentUpdates")}>
+          <label className="check">
+            <input
+              id="checkAgentUpdates"
+              type="checkbox"
+              checked={v.checkAgentUpdates !== false}
+              onChange={(e) => set("checkAgentUpdates", e.target.checked)}
+            />
+            {t("settings.checkUpdatesDesc")}
+          </label>
+        </Field>
         <Field id="nodePath" label="settings.nodePath" desc="settings.nodePathDesc" overridden={overridden("nodePath")}>
           <Text id="nodePath" placeholder="node" value={str("nodePath")} onCommit={(s) => set("nodePath", s.trim())} />
         </Field>

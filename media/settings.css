@@ -51,6 +51,18 @@ h2 {
   align-items: center;
 }
 
+.check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: normal;
+  opacity: 0.85;
+}
+.check input {
+  margin: 0;
+  accent-color: var(--vscode-checkbox-background, var(--vscode-focusBorder));
+}
+
 input[type="text"],
 textarea,
 select {

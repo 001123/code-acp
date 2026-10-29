@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import { spawnAgent, type AcpAgent, type AgentCommand, type AgentRequestError, type AgentStartError } from "./acpClient";
 import type { AgentManager } from "./agentManager";
 import { ClaudeSettings } from "./claudeSettings";
+import { Completions } from "./completions";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "./i18n";
 import { runIn, thenable, type AppRuntime, type AppServices, type Output, type VscodeError } from "./runtime";
 import { readSettings } from "./settings";
@@ -33,7 +34,11 @@ export type FromWebview =
   /** A file path from agent output; relative paths resolve against the workspace. `line` is 1-based. */
   | { type: "openFile"; path: string; line?: number }
   /** An image from the lightbox (a data URI), to open in a window of its own. */
-  | { type: "openImage"; src: string; name: string };
+  | { type: "openImage"; src: string; name: string }
+  /** Workspace files matching what follows "@"; answered with "files" carrying the same `id`. */
+  | { type: "searchFiles"; id: number; query: string }
+  /** Skills for "$"; answered with "skills". */
+  | { type: "listSkills" };
 
 /** A chat tab as the webview shows it in the tab strip. */
 export interface TabInfo {
@@ -494,6 +499,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "openImage":
         yield* this.openImage(msg.src, msg.name);
+        break;
+      case "searchFiles": {
+        const completions = yield* Completions;
+        // A failed search offers nothing rather than an error in the chat.
+        const files = yield* completions.files(msg.query).pipe(
+          Effect.tapError((err) => Effect.logWarning(`File search failed: ${err.message}`)),
+          Effect.orElseSucceed(() => []),
+        );
+        this.post({ type: "files", id: msg.id, files });
+        break;
+      }
+      case "listSkills":
+        this.post({ type: "skills", skills: yield* (yield* Completions).skills });
         break;
     }
   });
@@ -1086,6 +1104,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
     this.flushAttachments();
+  });
+
+  /** Runs a tab context menu action (webview context menu); pinned tabs are never closed. */
+  readonly tabAction = Effect.fn("ChatView.tabAction")(function* (
+    this: ChatViewProvider,
+    id: number,
+    action: "pin" | "unpin" | "close" | "closeOthers" | "closeToRight",
+  ) {
+    const tab = this.tabById(id);
+    if (!tab) {
+      return;
+    }
+    switch (action) {
+      case "pin":
+      case "unpin":
+        this.pinTab(tab, action === "pin");
+        return;
+      case "close":
+        if (!tab.pinned) {
+          yield* this.closeTab(tab);
+        }
+        return;
+      case "closeOthers":
+      case "closeToRight": {
+        const index = this.tabs.indexOf(tab);
+        const targets = this.tabs.filter((each, i) => !each.pinned && (action === "closeOthers" ? each !== tab : i > index));
+        if (targets.length && this.active !== tab && targets.includes(this.active)) {
+          yield* this.selectTab(tab);
+        }
+        for (const each of targets) {
+          yield* this.closeTab(each);
+        }
+        return;
+      }
+    }
   });
 
   /** Quotes text selected in the transcript into the composer (webview context menu). */

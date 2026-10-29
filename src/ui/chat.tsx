@@ -1,6 +1,7 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { createContext, Fragment, useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, type ClipboardEvent } from "react";
+import { createContext, Fragment, useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Attachment, FromWebview as ChatMessage, PromptPart, SentAttachment, TabInfo } from "../chatViewProvider";
+import type { FileSuggestion, SkillSuggestion } from "../completions";
 import { Icon } from "./icon";
 import { Lightbox } from "./lightbox";
 import { MarkdownView, type FileRef } from "./markdown";
@@ -697,6 +698,42 @@ function urisFrom(dt: DataTransfer): string[] {
     .filter((l) => l && !l.startsWith("#"));
 }
 
+/** The "@", "$" or "/" word being typed before the caret; `start` is the sigil, `end` the caret. */
+interface Trigger {
+  sigil: "@" | "$" | "/";
+  start: number;
+  end: number;
+  query: string;
+}
+
+/** The trigger before the caret, if any: "@" and "$" start a word, "/" only the whole message. */
+function triggerIn(el: HTMLTextAreaElement): Trigger | undefined {
+  if (el.selectionStart !== el.selectionEnd) return undefined;
+  const end = el.selectionStart;
+  const before = el.value.slice(0, end);
+  const m = /(^|\s)([@$])([^\s@$]*)$/.exec(before) ?? /^(\s*)(\/)(\S*)$/.exec(before);
+  if (!m) return undefined;
+  return { sigil: m[2] as Trigger["sigil"], start: m.index + m[1]!.length, end, query: m[3]! };
+}
+
+/** Names containing `query`, those starting with it first. */
+function byName<T>(items: T[], name: (item: T) => string, query: string): T[] {
+  const q = query.toLowerCase();
+  return items
+    .map((item) => ({ item, at: name(item).toLowerCase().indexOf(q) }))
+    .filter((x) => x.at >= 0)
+    .sort((a, b) => Number(a.at > 0) - Number(b.at > 0))
+    .map((x) => x.item);
+}
+
+/** One row of the "@" / "$" / "/" popup. */
+interface Suggestion {
+  key: string;
+  label: string;
+  detail?: string;
+  pick: () => void;
+}
+
 /** Everything the webview keeps per tab; the host only knows the session behind it. */
 interface TabState {
   transcript: Transcript;
@@ -706,13 +743,15 @@ interface TabState {
   compactAt?: number;
   status: Status;
   attachments: Attachment[];
+  /** Slash commands the agent offers in this session. */
+  commands: acp.AvailableCommand[];
   /** When the tab became busy; drives the elapsed time. */
   busySince?: number;
   /** Last session update while busy; a long silence shows the waiting row. */
   lastActivity?: number;
 }
 
-const NEW_TAB: TabState = { transcript: EMPTY, config: [], status: { text: "" }, attachments: [] };
+const NEW_TAB: TabState = { transcript: EMPTY, config: [], status: { text: "" }, attachments: [], commands: [] };
 
 type TabsAction =
   | { type: "update"; tab: number; f: (state: TabState) => TabState }
@@ -792,6 +831,13 @@ function TabStrip({
               data-dragging={tab.id === dragged || undefined}
               data-drop={dropAt?.id === tab.id ? (dropAt.after ? "after" : "before") : undefined}
               title={waiting ? `${title} · ${t("chat.tabWaiting")}` : title}
+              // Native context menu: the `webview/context` tab commands in package.json.
+              data-vscode-context={JSON.stringify({
+                webviewSection: "tab",
+                tab: tab.id,
+                tabPinned: tab.pinned,
+                preventDefaultContextMenuItems: true,
+              })}
               onClick={() => onSelect(tab.id)}
               onAuxClick={(e) => {
                 if (e.button === 1 && !tab.pinned) post({ type: "closeTab", tab: tab.id });
@@ -878,7 +924,7 @@ function App() {
   const closePreview = useCallback(() => setPreview(undefined), []);
   const [hover, setHover] = useState<Hover>();
   const current = (active !== undefined && states[active]) || NEW_TAB;
-  const { transcript: state, config, usage, compactAt, status, attachments, busySince, lastActivity } = current;
+  const { transcript: state, config, usage, compactAt, status, attachments, commands, busySince, lastActivity } = current;
   const now = useNow(busySince !== undefined);
   const elapsed = busySince !== undefined ? Math.max(0, now - busySince) : 0;
   const silent = busySince !== undefined ? Math.max(0, now - (lastActivity ?? busySince)) : 0;
@@ -904,27 +950,126 @@ function App() {
     return map;
   }
 
-  function addAttachment(a: Attachment): void {
+  /** Adds `a` as a token at the caret, or in place of the typed trigger `at` (which also gives the sigil). */
+  function addAttachment(a: Attachment, at?: Trigger): void {
     const tab = activeRef.current;
     const el = input.current;
     if (tab === undefined || !el) {
       update(tab, (s) => ({ ...s, attachments: [...s.attachments, a] }));
       return;
     }
-    // Attachments go inline as a token at the caret; a file already in the text is not added again.
+    const start = at?.start ?? el.selectionStart;
+    const end = at?.end ?? el.selectionEnd;
+    // Attachments go inline as a token; a file already in the text is not added again.
     const key = attachmentKey(a);
     const tokens = inlineOf(tab);
     for (const [token, x] of tokens) {
       if (!el.value.includes(token)) tokens.delete(token);
-      else if (key !== undefined && attachmentKey(x) === key) return;
+      else if (key !== undefined && attachmentKey(x) === key) {
+        if (at) editText(el, "", start, end);
+        autosize();
+        return;
+      }
     }
-    let token = `@${a.name}`;
-    for (let n = 2; tokens.has(token); n++) token = `@${a.name} (${n})`;
+    const sigil = at?.sigil ?? "@";
+    let token = `${sigil}${a.name}`;
+    for (let n = 2; tokens.has(token); n++) token = `${sigil}${a.name} (${n})`;
     tokens.set(token, a);
-    const start = el.selectionStart;
     const space = start > 0 && !/\s/.test(el.value[start - 1]!) ? " " : "";
-    editText(el, `${space}${token} `, start, el.selectionEnd);
+    editText(el, `${space}${token} `, start, end);
     autosize();
+  }
+
+  const [trigger, setTrigger] = useState<Trigger>();
+  const [selected, setSelected] = useState(0);
+  const [files, setFiles] = useState<FileSuggestion[]>([]);
+  const [skills, setSkills] = useState<SkillSuggestion[]>([]);
+  /** Id of the latest file search; older answers are dropped. */
+  const searchId = useRef(0);
+  /** Start of the trigger closed with Escape; it stays closed until the caret leaves it. */
+  const dismissed = useRef<number>(undefined);
+
+  /** Opens, updates or closes the popup for the text before the caret. */
+  function refreshTrigger(): void {
+    const el = input.current;
+    let next = el ? triggerIn(el) : undefined;
+    // The text of a token already placed is not a trigger.
+    if (next && active !== undefined && [...inlineOf(active).keys()].some((x) => el!.value.startsWith(x, next!.start))) next = undefined;
+    if (next?.start !== dismissed.current) dismissed.current = undefined;
+    if (dismissed.current !== undefined) next = undefined;
+    if (next?.sigil === trigger?.sigil && next?.query === trigger?.query && next?.start === trigger?.start) {
+      if (next && next.end !== trigger?.end) setTrigger(next);
+      return;
+    }
+    setTrigger(next);
+    setSelected(0);
+    if (next?.sigil === "@") {
+      // Results of an earlier "@" don't belong to this one.
+      if (trigger?.sigil !== "@" || trigger.start !== next.start) setFiles([]);
+      post({ type: "searchFiles", id: ++searchId.current, query: next.query });
+    }
+    if (next?.sigil === "$" && trigger?.sigil !== "$") post({ type: "listSkills" });
+  }
+
+  /** Replaces the typed trigger with `text`. */
+  function replaceTrigger(at: Trigger, text: string): void {
+    const el = input.current;
+    if (!el) return;
+    editText(el, text, at.start, at.end);
+    autosize();
+  }
+
+  const suggestions: Suggestion[] = !trigger
+    ? []
+    : trigger.sigil === "/"
+      ? byName(commands, (c) => c.name, trigger.query).map((c) => ({
+          key: c.name,
+          label: `/${c.name}`,
+          detail: c.description,
+          pick: () => replaceTrigger(trigger, `/${c.name} `),
+        }))
+      : trigger.sigil === "$"
+        ? byName(skills, (s) => s.name, trigger.query).map((s) => ({
+            key: s.uri,
+            label: `$${s.name}`,
+            detail: s.description,
+            pick: () => addAttachment({ kind: "uri", uri: s.uri, name: s.name }, trigger),
+          }))
+        : files.map((f) => ({
+            key: f.uri,
+            label: f.folder ? `${f.name}/` : f.name,
+            detail: f.path,
+            pick: () => addAttachment({ kind: "uri", uri: f.uri, name: f.name }, trigger),
+          }));
+  const shown = Math.min(selected, suggestions.length - 1);
+
+  function pick(s: Suggestion): void {
+    setTrigger(undefined);
+    s.pick();
+    input.current?.focus();
+  }
+
+  /** Popup keys; true when the key was used. */
+  function suggestKey(e: ReactKeyboardEvent<HTMLTextAreaElement>): boolean {
+    if (!trigger || suggestions.length === 0 || e.nativeEvent.isComposing) return false;
+    switch (e.key) {
+      case "ArrowDown":
+        setSelected((shown + 1) % suggestions.length);
+        return true;
+      case "ArrowUp":
+        setSelected((shown - 1 + suggestions.length) % suggestions.length);
+        return true;
+      case "Enter":
+      case "Tab":
+        if (e.shiftKey) return false;
+        pick(suggestions[shown]!);
+        return true;
+      case "Escape":
+        dismissed.current = trigger.start;
+        setTrigger(undefined);
+        return true;
+    }
+    return false;
   }
 
   /** Backspace right after a token deletes the whole token. */
@@ -1046,6 +1191,11 @@ function App() {
         return;
       case "quote":
         return quote(msg.text);
+      case "files":
+        if (msg.id === searchId.current) setFiles(msg.files);
+        return;
+      case "skills":
+        return setSkills(msg.skills);
       case "reset":
         dispatch(tab, { type: "reset" });
         update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined }));
@@ -1075,6 +1225,8 @@ function App() {
         return dispatch(tab, { type: "plan", entries: u.entries });
       case "config_option_update":
         return update(tab, (s) => ({ ...s, config: u.configOptions }));
+      case "available_commands_update":
+        return update(tab, (s) => ({ ...s, commands: u.availableCommands }));
       case "usage_update":
         return update(tab, (s) => ({ ...s, usage: { used: u.used, size: u.size, cost: u.cost } }));
       case "session_info_update":
@@ -1110,6 +1262,7 @@ function App() {
     }
     el.value = (active !== undefined && drafts.current.get(active)) || "";
     shownDraft.current = active;
+    setTrigger(undefined);
     autosize();
     el.focus();
   }, [active]);
@@ -1275,6 +1428,28 @@ function App() {
             submit();
           }}
         >
+          {suggestions.length > 0 && (
+            <div id="suggest" role="listbox">
+              {suggestions.map((s, i) => (
+                <div
+                  key={s.key}
+                  role="option"
+                  className="suggest-item"
+                  aria-selected={i === shown}
+                  ref={i === shown ? (n) => n?.scrollIntoView({ block: "nearest" }) : undefined}
+                  // Keeps the focus in the textarea.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pick(s);
+                  }}
+                  onMouseMove={() => i !== shown && setSelected(i)}
+                >
+                  <span className="suggest-label">{s.label}</span>
+                  {s.detail && <span className="suggest-detail">{s.detail}</span>}
+                </div>
+              ))}
+            </div>
+          )}
           <div id="attachments">
             {attachments.map((a, i) => (
               <span key={attachmentKey(a) ?? i} className="chip" title={attachmentTitle(t, a)}>
@@ -1313,7 +1488,12 @@ function App() {
               rows={2}
               placeholder={t("chat.placeholder")}
               title={t("chat.inputTitle")}
-              onInput={autosize}
+              onInput={() => {
+                autosize();
+                refreshTrigger();
+              }}
+              onSelect={refreshTrigger}
+              onBlur={() => setTrigger(undefined)}
               onScroll={() => {
                 syncScroll();
                 setHover(undefined);
@@ -1334,7 +1514,9 @@ function App() {
                 }
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                if (suggestKey(e)) {
+                  e.preventDefault();
+                } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   form.current?.requestSubmit();
                 } else if (e.key === "Backspace" && !e.nativeEvent.isComposing && deleteToken()) {

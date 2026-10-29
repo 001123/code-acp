@@ -110,6 +110,26 @@
       {
         "command": "codeAcp.quoteSelection",
         "title": "%command.quoteSelection%"
+      },
+      {
+        "command": "codeAcp.pinTab",
+        "title": "%command.pinTab%"
+      },
+      {
+        "command": "codeAcp.unpinTab",
+        "title": "%command.unpinTab%"
+      },
+      {
+        "command": "codeAcp.closeTab",
+        "title": "%command.closeTab%"
+      },
+      {
+        "command": "codeAcp.closeOtherTabs",
+        "title": "%command.closeOtherTabs%"
+      },
+      {
+        "command": "codeAcp.closeTabsToRight",
+        "title": "%command.closeTabsToRight%"
       }
     ],
     "menus": {
@@ -185,6 +205,26 @@
         {
           "command": "codeAcp.quoteSelection",
           "when": "false"
+        },
+        {
+          "command": "codeAcp.pinTab",
+          "when": "false"
+        },
+        {
+          "command": "codeAcp.unpinTab",
+          "when": "false"
+        },
+        {
+          "command": "codeAcp.closeTab",
+          "when": "false"
+        },
+        {
+          "command": "codeAcp.closeOtherTabs",
+          "when": "false"
+        },
+        {
+          "command": "codeAcp.closeTabsToRight",
+          "when": "false"
         }
       ],
       "webview/context": [
@@ -192,6 +232,31 @@
           "command": "codeAcp.quoteSelection",
           "when": "webviewId == 'codeAcp.chat' && webviewSection == 'messages' && selectedText",
           "group": "codeAcp@1"
+        },
+        {
+          "command": "codeAcp.pinTab",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && !tabPinned",
+          "group": "1_pin@1"
+        },
+        {
+          "command": "codeAcp.unpinTab",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && tabPinned",
+          "group": "1_pin@1"
+        },
+        {
+          "command": "codeAcp.closeTab",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && !tabPinned",
+          "group": "2_close@1"
+        },
+        {
+          "command": "codeAcp.closeOtherTabs",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "group": "2_close@2"
+        },
+        {
+          "command": "codeAcp.closeTabsToRight",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "group": "2_close@3"
         }
       ]
     },
@@ -238,6 +303,11 @@
           "type": "string",
           "default": "node",
           "description": "%config.nodePath%"
+        },
+        "codeAcp.checkAgentUpdates": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.checkAgentUpdates%"
         },
         "codeAcp.commitMessage.agent": {
           "type": "string",
