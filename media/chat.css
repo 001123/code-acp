@@ -567,10 +567,37 @@ mark.token.image:hover {
   color: var(--vscode-foreground);
 }
 #actions input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  flex: none;
   margin: 0;
-  width: 13px;
-  height: 13px;
-  accent-color: var(--vscode-button-background);
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, currentColor));
+  border-radius: 3px;
+  background: var(--vscode-checkbox-background, transparent);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+#actions input[type="checkbox"]:checked {
+  border-color: var(--vscode-button-background);
+  background: var(--vscode-button-background);
+}
+/* Checkmark: a rotated L drawn with borders. */
+#actions input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-button-foreground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+#actions input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
 }
 .spacer {
   flex: 1;

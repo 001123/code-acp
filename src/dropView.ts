@@ -25,20 +25,12 @@ export class DropViewProvider
   }
 
   getChildren(element?: string): string[] {
-    return element ? [] : ["hint", "info"];
+    return element ? [] : ["hint"];
   }
 
-  getTreeItem(element: string): vscode.TreeItem {
-    if (element === "info") {
-      const item = new vscode.TreeItem("");
-      item.iconPath = new vscode.ThemeIcon("info");
-      item.description = t("drop.infoLabel");
-      item.tooltip = new vscode.MarkdownString(t("drop.infoTooltip"));
-      return item;
-    }
+  getTreeItem(_element: string): vscode.TreeItem {
     const item = new vscode.TreeItem(t("drop.label"));
-    item.iconPath = new vscode.ThemeIcon("cloud-upload", new vscode.ThemeColor("textLink.foreground"));
-    item.tooltip = t("drop.tooltip");
+    item.tooltip = new vscode.MarkdownString(t("drop.tooltip"));
     return item;
   }
 

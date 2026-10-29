@@ -85,10 +85,8 @@ const en = {
   "chat.reopenFailed": "Couldn't reopen this conversation; starting a new one.",
   "chat.fileNotFound": "File not found: {0}",
 
-  "drop.label": "⇣  Drop files / folders here  ⇣",
-  "drop.tooltip": "Drop files or folders from the Explorer, editor tabs or Finder",
-  "drop.infoLabel": "Why is this here?",
-  "drop.infoTooltip": "**Known issue:** since VS Code 1.140, dragging from the Explorer no longer reaches the chat box ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nDrop files or folders here instead, or paste them into the chat.",
+  "drop.label": "Drop files / folders here",
+  "drop.tooltip": "**Known issue:** since VS Code 1.140, dragging from the Explorer no longer reaches the chat box ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nDrop files or folders here instead, or paste them into the chat.",
 
   "install.unsupported": "{0} does not support platform {1}",
   "install.checkUvx": "Checking uvx…",

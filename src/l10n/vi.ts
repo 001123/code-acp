@@ -86,10 +86,8 @@ const vi: Record<MessageKey, string> = {
   "chat.reopenFailed": "Không mở lại được cuộc trò chuyện này; bắt đầu cuộc mới.",
   "chat.fileNotFound": "Không tìm thấy file: {0}",
 
-  "drop.label": "⇣  Thả file / thư mục vào đây  ⇣",
-  "drop.tooltip": "Thả file hoặc thư mục từ Explorer, tab editor hay Finder",
-  "drop.infoLabel": "Vì sao cần ô này?",
-  "drop.infoTooltip": "**Lỗi đã biết:** từ VS Code 1.140, kéo thả từ Explorer không còn tới được ô chat ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nHãy thả file hoặc thư mục vào đây, hoặc dán vào ô chat.",
+  "drop.label": "Thả file / thư mục vào đây",
+  "drop.tooltip": "**Lỗi đã biết:** từ VS Code 1.140, kéo thả từ Explorer không còn tới được ô chat ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nHãy thả file hoặc thư mục vào đây, hoặc dán vào ô chat.",
 
   "install.unsupported": "{0} không hỗ trợ nền tảng {1}",
   "install.checkUvx": "Kiểm tra uvx…",
