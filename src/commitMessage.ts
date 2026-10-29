@@ -16,8 +16,21 @@ export interface CommitTarget {
 }
 
 /** The part of the `vscode.git` extension API used here (see extensions/git/src/api/git.d.ts). */
+interface GitRepository extends CommitTarget {
+  readonly state: {
+    readonly HEAD: { readonly name?: string; readonly upstream?: unknown } | undefined;
+    readonly remotes: ReadonlyArray<{ readonly name: string }>;
+    readonly indexChanges: ReadonlyArray<unknown>;
+    readonly workingTreeChanges: ReadonlyArray<unknown>;
+    readonly untrackedChanges?: ReadonlyArray<unknown>;
+  };
+  /** `all: true` stages every change, untracked files included, before committing. */
+  commit(message: string, opts?: { all?: boolean }): Thenable<void>;
+  push(remoteName?: string, branchName?: string, setUpstream?: boolean): Thenable<void>;
+}
 interface GitApi {
-  readonly repositories: ReadonlyArray<CommitTarget>;
+  readonly repositories: ReadonlyArray<GitRepository>;
+  getRepository(uri: vscode.Uri): GitRepository | null;
 }
 interface GitExtension {
   getAPI(version: 1): GitApi;
@@ -61,6 +74,8 @@ const isCommitTarget = (arg: unknown): arg is CommitTarget =>
 export class CommitMessage extends Context.Service<CommitMessage, {
   /** `arg` is what the `scm/title` menu passes (the SourceControl); without one, picks a git repository. */
   generate(arg: unknown): Effect.Effect<void, CommitMessageError>;
+  /** Commits with the message in the box (generating one when it is empty), then pushes. */
+  commitAndPush(arg: unknown): Effect.Effect<void, CommitMessageError>;
   readonly cancel: Effect.Effect<void>;
   /** Models of the agent `agentId` (empty: the default agent), read from a throwaway session. */
   models(agentId: string): Effect.Effect<ReadonlyArray<CommitModel>, CommitMessageError>;
@@ -72,6 +87,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
       const output = yield* Output;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       let stop: Deferred.Deferred<void> | undefined;
+      let pushing = false;
 
       const fail = (message: string) => new CommitMessageError({ message });
       const git = (cwd: string, ...args: Array<string>) =>
@@ -79,15 +95,19 @@ export class CommitMessage extends Context.Service<CommitMessage, {
       const setGenerating = (value: boolean) =>
         thenable(() => vscode.commands.executeCommand("setContext", GENERATING_KEY, value)).pipe(Effect.ignore);
 
-      const resolveTarget = Effect.fn("CommitMessage.resolveTarget")(function* (arg: unknown) {
-        if (isCommitTarget(arg)) {
-          return arg;
-        }
+      const gitApi = Effect.gen(function* () {
         const extension = vscode.extensions.getExtension<GitExtension>("vscode.git");
         const exports = extension
           ? yield* thenable(() => extension.activate()).pipe(Effect.orElseSucceed(() => undefined))
           : undefined;
-        const repositories = exports?.getAPI(1).repositories ?? [];
+        return exports?.getAPI(1);
+      });
+
+      const resolveTarget = Effect.fn("CommitMessage.resolveTarget")(function* (arg: unknown) {
+        if (isCommitTarget(arg)) {
+          return arg;
+        }
+        const repositories = (yield* gitApi)?.repositories ?? [];
         const active = vscode.window.activeTextEditor?.document.uri.fsPath;
         const target =
           repositories.find((repo) => active?.startsWith(repo.rootUri.fsPath)) ?? repositories[0];
@@ -199,6 +219,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
             return yield* fail(t("commit.empty"));
           }
           target.inputBox.value = message;
+          return message;
         },
         Effect.scoped,
         Effect.provideService(Output, output),
@@ -229,11 +250,8 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         }),
       );
 
-      const generate = Effect.fn("CommitMessage.generate")(function* (arg: unknown) {
-        if (stop) {
-          return;
-        }
-        const target = yield* resolveTarget(arg);
+      /** Generates into the target's box with the stop button shown; `undefined` when the user stops it. */
+      const generateInto = Effect.fn("CommitMessage.generateInto")(function* (target: CommitTarget) {
         const current = yield* Deferred.make<void>();
         stop = current;
         yield* setGenerating(true);
@@ -244,7 +262,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
           { location: vscode.ProgressLocation.SourceControl, title: t("commit.generating") },
           () => runPromise(Deferred.await(done)),
         );
-        yield* Effect.raceFirst(run(target), Deferred.await(current)).pipe(
+        return yield* Effect.raceFirst(run(target), Deferred.await(current).pipe(Effect.as(undefined))).pipe(
           Effect.tapError((err) => Effect.sync(() => output.appendLine(`[commit] ${messageOf(err)}`))),
           Effect.ensuring(
             Effect.suspend(() => {
@@ -255,8 +273,71 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         );
       });
 
+      const generate = Effect.fn("CommitMessage.generate")(function* (arg: unknown) {
+        if (stop || pushing) {
+          return;
+        }
+        yield* generateInto(yield* resolveTarget(arg));
+      });
+
+      /** Pushes to the upstream, or publishes the branch to `origin` (else the first remote). */
+      const pushFor = Effect.fn("CommitMessage.pushFor")(function* (repo: GitRepository) {
+        const head = repo.state.HEAD;
+        if (head?.upstream) {
+          return () => repo.push();
+        }
+        if (!head?.name) {
+          return yield* fail(t("commit.detachedHead"));
+        }
+        const remote = repo.state.remotes.find((r) => r.name === "origin") ?? repo.state.remotes[0];
+        if (!remote) {
+          return yield* fail(t("commit.noRemote"));
+        }
+        const branch = head.name;
+        return () => repo.push(remote.name, branch, true);
+      });
+
+      const withProgress = (title: string, task: () => Thenable<void>) =>
+        thenable(() => vscode.window.withProgress({ location: vscode.ProgressLocation.SourceControl, title }, task));
+
+      const commitAndPush = Effect.fn("CommitMessage.commitAndPush")(function* (arg: unknown) {
+        if (stop || pushing) {
+          return;
+        }
+        const target = yield* resolveTarget(arg);
+        const repo = (yield* gitApi)?.getRepository(target.rootUri);
+        if (!repo) {
+          return yield* fail(t("commit.noRepository"));
+        }
+        const { indexChanges, workingTreeChanges, untrackedChanges = [] } = repo.state;
+        const staged = indexChanges.length > 0;
+        if (!staged && !workingTreeChanges.length && !untrackedChanges.length) {
+          return yield* fail(t("commit.noChanges"));
+        }
+        // Checked before committing, so a branch that cannot be pushed is left untouched.
+        const push = yield* pushFor(repo);
+        const message = target.inputBox.value.trim() || (yield* generateInto(target));
+        if (!message) {
+          return;
+        }
+        pushing = true;
+        yield* Effect.gen(function* () {
+          // Nothing staged: commit every change, like the generated message describes.
+          yield* withProgress(t("commit.committing"), () => repo.commit(message, { all: !staged })).pipe(
+            Effect.mapError((err) => fail(t("commit.commitFailed", err.message))),
+          );
+          if (target.inputBox.value.trim() === message) {
+            target.inputBox.value = "";
+          }
+          yield* withProgress(t("commit.pushing"), push).pipe(
+            Effect.mapError((err) => fail(t("commit.pushFailed", err.message))),
+          );
+        }).pipe(Effect.ensuring(Effect.sync(() => (pushing = false))));
+      });
+
       return CommitMessage.of({
         generate,
+        commitAndPush,
         models,
         cancel: Effect.suspend(() => (stop ? Deferred.succeed(stop, undefined).pipe(Effect.asVoid) : Effect.void)),
       });

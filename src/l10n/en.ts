@@ -145,6 +145,12 @@ const en = {
   "commit.empty": "The agent returned an empty commit message.",
   "commit.needsLogin": "The agent requires login. Log in from the Code ACP chat first.",
   "commit.failed": "Could not generate a commit message: {0}",
+  "commit.committing": "Committing…",
+  "commit.pushing": "Pushing…",
+  "commit.noRemote": "The repository has no remote to push to.",
+  "commit.detachedHead": "HEAD is detached; check out a branch to push.",
+  "commit.commitFailed": "Could not commit: {0}",
+  "commit.pushFailed": "Committed, but could not push: {0}",
 };
 
 export type MessageKey = keyof typeof en;

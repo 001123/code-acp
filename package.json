@@ -98,6 +98,12 @@
         "icon": "$(debug-stop)"
       },
       {
+        "command": "codeAcp.commitAndPush",
+        "title": "%command.commitAndPush%",
+        "icon": "$(cloud-upload)",
+        "enablement": "!codeAcp.generatingCommitMessage"
+      },
+      {
         "command": "codeAcp.addSelection",
         "title": "%command.addSelection%"
       },
@@ -164,6 +170,11 @@
           "command": "codeAcp.cancelCommitMessage",
           "when": "scmProvider == git && codeAcp.generatingCommitMessage",
           "group": "navigation@1"
+        },
+        {
+          "command": "codeAcp.commitAndPush",
+          "when": "scmProvider == git",
+          "group": "navigation@2"
         }
       ],
       "commandPalette": [

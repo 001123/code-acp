@@ -19,6 +19,7 @@
   "config.nodePath": "Node dùng để chạy các agent cài qua npm.",
   "command.generateCommitMessage": "Code ACP: Tạo commit message",
   "command.cancelCommitMessage": "Code ACP: Dừng tạo commit message",
+  "command.commitAndPush": "Code ACP: Commit & Push",
   "command.addSelection": "Code ACP: Thêm vùng chọn vào chat",
   "command.quoteSelection": "Thêm vào chat",
   "config.commitMessage.agent": "Id của agent đã cài dùng để tạo commit message. Để trống: dùng agent mặc định.",

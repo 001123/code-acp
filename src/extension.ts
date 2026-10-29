@@ -65,6 +65,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       run((sourceControl?: unknown) => CommitMessage.use((commit) => commit.generate(sourceControl))),
     ),
     vscode.commands.registerCommand(
+      "codeAcp.commitAndPush",
+      run((sourceControl?: unknown) => CommitMessage.use((commit) => commit.commitAndPush(sourceControl))),
+    ),
+    vscode.commands.registerCommand(
       "codeAcp.cancelCommitMessage",
       run(() => CommitMessage.use((commit) => commit.cancel)),
     ),

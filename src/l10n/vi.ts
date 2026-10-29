@@ -146,6 +146,12 @@ const vi: Record<MessageKey, string> = {
   "commit.empty": "Agent trả về commit message rỗng.",
   "commit.needsLogin": "Agent cần đăng nhập. Hãy đăng nhập trong chat Code ACP trước.",
   "commit.failed": "Không tạo được commit message: {0}",
+  "commit.committing": "Đang commit…",
+  "commit.pushing": "Đang push…",
+  "commit.noRemote": "Repository chưa có remote để push.",
+  "commit.detachedHead": "HEAD đang ở trạng thái detached; hãy checkout một branch để push.",
+  "commit.commitFailed": "Không commit được: {0}",
+  "commit.pushFailed": "Đã commit nhưng không push được: {0}",
 };
 
 export default vi;

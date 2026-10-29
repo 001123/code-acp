@@ -19,6 +19,7 @@
   "config.nodePath": "Node used to run agents installed via npm.",
   "command.generateCommitMessage": "Code ACP: Generate Commit Message",
   "command.cancelCommitMessage": "Code ACP: Stop Generating Commit Message",
+  "command.commitAndPush": "Code ACP: Commit & Push",
   "command.addSelection": "Code ACP: Add Selection to Chat",
   "command.quoteSelection": "Add to Chat",
   "config.commitMessage.agent": "Id of the installed agent that generates commit messages. Empty: the default agent.",
