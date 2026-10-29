@@ -511,6 +511,7 @@ pre.terminal-output {
 /* Edit, retry and fork float on the message's top edge while it is hovered. */
 .msg.user {
   position: relative;
+  display: flow-root;
 }
 .msg-tools {
   position: absolute;
@@ -529,11 +530,13 @@ pre.terminal-output {
 .msg-tools:focus-within {
   visibility: visible;
 }
+/* Restore sits at the right edge, on the last line when it fits. */
 .msg.user .restore {
+  float: right;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 6px;
+  margin: 6px 0 0 8px;
   padding: 1px 8px;
   font-size: 0.85em;
 }
