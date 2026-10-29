@@ -16,6 +16,7 @@ import { AgentPool, stopAll } from "./agents";
 import { activeFileBlocks, attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
 import { ChangeReview, confirm } from "./changes";
 import { DraftStore } from "./drafts";
+import { Follower } from "./follow";
 import { canReopen, HistoryRequests, listHistory } from "./history";
 import { CANCELLED, Permissions } from "./permissions";
 import type { Attachment, Draft, FromWebview, LoadComposer, QueuedInfo, SentAttachment } from "./protocol";
@@ -90,8 +91,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private nextQueued = 1;
   /** codeAcp.followAgent: the active tab's agent's tool locations are opened in the editor. */
   private followAgent = readSettings().followAgent;
-  /** Last location followed, so repeated updates of a tool call don't reopen it. */
-  private lastFollowed?: string;
+  private readonly follower = new Follower(this.followAgent, {
+    activeTab: () => this.tabs.active,
+    run: (effect, tab) => this.run(effect, tab),
+  });
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -118,10 +121,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         ),
       ),
       this.changes,
+      this.follower,
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("codeAcp.followAgent")) {
           this.followAgent = readSettings().followAgent;
-          this.lastFollowed = undefined;
+          this.follower.setEnabled(this.followAgent);
           this.post({ type: "followAgent", enabled: this.followAgent });
         }
       }),
@@ -448,29 +452,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   });
 
-  /** Shows where the agent is working (codeAcp.followAgent), without taking the focus from the chat. */
-  private follow(tab: Tab, location: acp.ToolCallLocation): void {
-    const key = `${location.path}:${location.line ?? ""}`;
-    if (!this.followAgent || tab !== this.tabs.active || key === this.lastFollowed) {
-      return;
-    }
-    this.lastFollowed = key;
-    const line = location.line ? Math.max(0, location.line - 1) : 0;
-    const position = new vscode.Position(line, 0);
-    this.run(
-      thenable(() =>
-        vscode.window.showTextDocument(vscode.Uri.file(location.path), {
-          preview: true,
-          preserveFocus: true,
-          selection: new vscode.Range(position, position),
-        }),
-      ).pipe(
-        // A file the agent is about to create does not exist yet: nothing to show.
-        Effect.ignore,
-      ),
-    );
-  }
-
   /**
    * Opens a file in an editor (at `line` when given) or reveals a folder in the Explorer. Relative paths come
    * from the shown conversation, so they start at the active tab's folder.
@@ -553,7 +534,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         const tab = tabFor(sessionId);
         if (tab) {
           this.changes.post(tab);
-          this.follow(tab, { path: file });
+          this.follower.fileWritten(tab, file);
         }
       },
     }).pipe(
@@ -578,10 +559,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     this.postTab(tab, { type: "update", update });
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
-      const location = update.locations?.[0];
-      if (location && update.status !== "failed") {
-        this.follow(tab, location);
-      }
+      this.follower.toolCall(tab, update);
       // The tool may have changed files, however it did.
       if (update.status === "completed" || update.status === "failed") {
         this.changes.post(tab);
@@ -884,6 +862,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       yield* this.cancelTab(tab).pipe(Effect.ignore);
     }
     this.permissions.cancel(tab);
+    this.follower.forget(tab);
     const index = this.tabs.remove(tab);
     if (index < 0) {
       // Closed by another caller while its turn was being cancelled.

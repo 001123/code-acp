@@ -64,7 +64,7 @@ const en = {
   "changes.restoreConfirm": "Restore {0} file(s) to how they were before this message? Changes made to them since are lost. The conversation itself is not rewound.",
   "changes.restoreBusy": "Wait for the agent to finish, or stop it, before restoring files.",
   "settings.followAgent": "Follow the agent",
-  "settings.followAgentDesc": "Open the files the agent reads and edits in the editor, at the line it is working on.",
+  "settings.followAgentDesc": "Open the files the agent reads and edits in the editor, at the line it is working on, and briefly highlight the lines it changes.",
   "checkpoints.gitFailed": "git {0} failed: {1}",
   "checkpoints.timeout": "Taking a snapshot of the workspace took over {0} seconds.",
   "checkpoints.unavailable": "Checkpoints are off for this chat: {0}",

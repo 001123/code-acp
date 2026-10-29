@@ -65,7 +65,7 @@ const vi: Record<MessageKey, string> = {
   "changes.restoreConfirm": "Đưa {0} file về trạng thái trước tin nhắn này? Các thay đổi sau đó trên các file này sẽ mất. Cuộc hội thoại không bị quay lại.",
   "changes.restoreBusy": "Hãy đợi agent làm xong, hoặc dừng nó, trước khi khôi phục file.",
   "settings.followAgent": "Theo dõi agent",
-  "settings.followAgentDesc": "Mở trong editor các file agent đang đọc và sửa, tại dòng agent đang làm việc.",
+  "settings.followAgentDesc": "Mở trong editor các file agent đang đọc và sửa, tại dòng agent đang làm việc, và tô sáng trong giây lát những dòng agent vừa sửa.",
   "checkpoints.gitFailed": "git {0} lỗi: {1}",
   "checkpoints.timeout": "Chụp snapshot workspace mất quá {0} giây.",
   "checkpoints.unavailable": "Checkpoint đã tắt cho cuộc trò chuyện này: {0}",
