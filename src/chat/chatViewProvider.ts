@@ -447,11 +447,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           yield* this.changes.restore(tab, msg.turn);
         }
         break;
-      case "pickCheckpoint":
-        if (tab) {
-          yield* this.changes.pick(tab);
-        }
-        break;
       case "setFollowAgent":
         yield* thenable(() =>
           vscode.workspace.getConfiguration("codeAcp").update("followAgent", msg.enabled, vscode.ConfigurationTarget.Global),

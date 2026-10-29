@@ -259,26 +259,6 @@ export const undo = Effect.fn("ChangeSet.undo")(function* (changes: ChangeSet, f
   return files;
 });
 
-/** Checkpoints that would change something, newest first, with the files restoring each would put back. */
-export const restorable = Effect.fn("ChangeSet.restorable")(function* (changes: ChangeSet) {
-  const { root } = changes;
-  if (root === undefined) {
-    return [];
-  }
-  const current = yield* snapshotOf(root);
-  const out: Array<{ checkpoint: Checkpoint; files: number }> = [];
-  for (const checkpoint of [...changes.checkpoints].reverse()) {
-    if (checkpoint.tree === current) {
-      continue;
-    }
-    const diff = yield* ShadowGit.use((git) => git.diff(root, checkpoint.tree, current));
-    if (diff.length > 0) {
-      out.push({ checkpoint, files: diff.length });
-    }
-  }
-  return out;
-});
-
 /** Files restoring the checkpoint of `turn` would put back. */
 export const restorePlan = Effect.fn("ChangeSet.restorePlan")(function* (changes: ChangeSet, turn: number) {
   const { root } = changes;

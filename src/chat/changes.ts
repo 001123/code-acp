@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import * as vscode from "vscode";
-import { beforeOf, beginTurn, BeforeDocuments, keep, refresh, restorable, restore, restorePlan, undo } from "../fileChanges";
+import { beforeOf, beginTurn, BeforeDocuments, keep, refresh, restore, restorePlan, undo } from "../fileChanges";
 import { t } from "../i18n";
 import { thenable, type AppServices, type VscodeError } from "../runtime";
 import { folderOf } from "../workspace";
@@ -147,25 +147,6 @@ export class ChangeReview implements vscode.Disposable {
       this.post(tab);
     }
     return picked !== undefined;
-  });
-
-  /** The tab's checkpoints in a quick pick, newest first; also those of messages no longer shown (after a reload). */
-  readonly pick = Effect.fn("ChangeReview.pick")(function* (this: ChangeReview, tab: Tab) {
-    const format = new Intl.DateTimeFormat(vscode.env.language, { dateStyle: "short", timeStyle: "short" });
-    const items = (yield* restorable(tab.changes)).map(({ checkpoint, files }) => ({
-      label: checkpoint.label || t("chat.untitled"),
-      description: format.format(checkpoint.at),
-      detail: t("checkpoints.files", files),
-      turn: checkpoint.turn,
-    }));
-    if (items.length === 0) {
-      void vscode.window.showInformationMessage(t("checkpoints.none"));
-      return;
-    }
-    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("checkpoints.pickTitle") }));
-    if (picked) {
-      yield* this.restore(tab, picked.turn);
-    }
   });
 
   /** Turns snapshots off for the tab after one failed (no git, a work tree too big), saying why once. */
