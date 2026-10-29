@@ -8,7 +8,8 @@ export type Text = { key: Parameters<Translate>[0]; args?: unknown[] } | { raw: 
 
 export type Item =
   /** `tokens` stand for the images of replayed user messages, where they were in the text. */
-  | { kind: "assistant" | "user" | "thought"; id: number; text: string; tokens?: Token[] }
+  /** `turn` is set on replayed user messages the extension keeps to edit or send again. */
+  | { kind: "assistant" | "user" | "thought"; id: number; text: string; tokens?: Token[]; turn?: number }
   /** `turn` is set for messages sent from this chat, not for replayed ones. */
   | { kind: "userMessage"; id: number; text: string; attachments: SentAttachment[]; turn?: number }
   | ToolItem
@@ -41,7 +42,7 @@ export interface Transcript {
 }
 
 export type Action =
-  | { type: "chunk"; kind: "assistant" | "user" | "thought"; text: string; image?: string }
+  | { type: "chunk"; kind: "assistant" | "user" | "thought"; text: string; image?: string; turn?: number }
   | { type: "toolCall"; update: acp.ToolCall | acp.ToolCallUpdate }
   | { type: "plan"; entries: acp.PlanEntry[] }
   | { type: "add"; item: DistributiveOmit<Item, "id"> }
@@ -123,7 +124,7 @@ export function transcript(state: Transcript, action: Action): Transcript {
   switch (action.type) {
     case "chunk": {
       const current = state.items.find((i) => i.id === state.streaming);
-      const same = current && current.kind === action.kind ? current : undefined;
+      const same = current && current.kind === action.kind && current.turn === action.turn ? current : undefined;
       let text = action.text;
       let tokens = same?.tokens;
       if (action.image) {
@@ -138,7 +139,7 @@ export function transcript(state: Transcript, action: Action): Transcript {
       if (same) {
         return { ...state, items: replace(same.id, () => ({ ...same, text: same.text + text, tokens })) };
       }
-      return add({ kind: action.kind, text, tokens }, true);
+      return add({ kind: action.kind, text, tokens, turn: action.turn }, true);
     }
     case "toolCall": {
       const u = action.update;
@@ -215,7 +216,7 @@ export function transcript(state: Transcript, action: Action): Transcript {
     case "endStream":
       return { ...state, streaming: undefined };
     case "rewind": {
-      const index = state.items.findIndex((i) => i.kind === "userMessage" && i.turn === action.turn);
+      const index = state.items.findIndex((i) => (i.kind === "userMessage" || i.kind === "user") && i.turn === action.turn);
       return index < 0 ? state : { ...state, items: state.items.slice(0, index), streaming: undefined };
     }
     case "reset":

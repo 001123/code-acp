@@ -39,4 +39,4 @@ See [AGENTS.md](AGENTS.md) for the full conventions.
 
 ## Terminal context
 
-The agent gets the command, shell, cwd, exit code and the last 200 lines of plain-text output. Output needs [shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) and only covers commands run after VS Code started. Terminal selections go through the clipboard ([microsoft/vscode#188173](https://github.com/microsoft/vscode/issues/188173)); see [KNOW_ISSUES.md](KNOW_ISSUES.md).
+The agent gets the command, shell, cwd, exit code and the last 200 lines of plain-text output. Output needs [shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) and only covers commands run after VS Code started. Terminal selections go through the clipboard ([microsoft/vscode#188173](https://github.com/microsoft/vscode/issues/188173)); see [KNOWN_ISSUES.md](KNOWN_ISSUES.md).

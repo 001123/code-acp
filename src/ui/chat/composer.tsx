@@ -691,7 +691,6 @@ export function useComposer(options: ComposerOptions) {
           ref={input}
           rows={2}
           placeholder={t("chat.placeholder")}
-          title={t("chat.inputTitle")}
           onInput={() => {
             autosize();
             refreshTrigger();

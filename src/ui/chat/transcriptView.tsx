@@ -16,6 +16,8 @@ import restoreIcon from "@tabler/icons/outline/restore.svg";
 import pencilIcon from "@tabler/icons/outline/pencil.svg";
 import refreshIcon from "@tabler/icons/outline/refresh.svg";
 import branchIcon from "@tabler/icons/outline/git-branch.svg";
+import copyIcon from "@tabler/icons/outline/copy.svg";
+import checkIcon from "@tabler/icons/outline/check.svg";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { clip, contentText, fileLinkTokens, type ActivityItem, type Item, type Text } from "./transcript";
@@ -223,28 +225,36 @@ function Locations({ locations }: { locations?: acp.ToolCallLocation[] }) {
   );
 }
 
-/** On a user message whose turn changed files: puts them back as they were before it. */
-/** Under a message sent from this chat: restore its checkpoint, edit it, send it again, fork before it. */
-function MessageActions({ turn }: { turn?: number }) {
+/** On a user message: copy it; when sent from this chat, also restore its checkpoint, edit it, send it again, fork before it. */
+function MessageActions({ turn, text }: { turn?: number; text: string }) {
   const { t } = useL10n();
   const tab = useContext(ShownTab);
-  if (turn === undefined || tab.id === undefined) return null;
+  const [copied, setCopied] = useState(false);
   const id = tab.id;
+  const sent = turn !== undefined && id !== undefined;
   const action = (label: string, svg: string, onClick: () => void) => (
     <button className="icon-btn small" title={label} aria-label={label} onClick={onClick}>
       <Icon svg={svg} />
     </button>
   );
+  const copy = () =>
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
   return (
     <>
-      {!tab.busy && (
-        <div className="msg-tools">
-          {action(t("chat.editMessage"), pencilIcon, () => post({ type: "editMessage", tab: id, turn }))}
-          {action(t("chat.retry"), refreshIcon, () => post({ type: "retry", tab: id, turn }))}
-          {tab.canFork && action(t("chat.forkHere"), branchIcon, () => post({ type: "fork", tab: id, turn }))}
-        </div>
-      )}
-      {tab.checkpoints.has(turn) && (
+      <div className="msg-tools">
+        {action(copied ? t("chat.copied") : t("chat.copyMessage"), copied ? checkIcon : copyIcon, copy)}
+        {sent && !tab.busy && (
+          <>
+            {action(t("chat.editMessage"), pencilIcon, () => post({ type: "editMessage", tab: id, turn }))}
+            {action(t("chat.retry"), refreshIcon, () => post({ type: "retry", tab: id, turn }))}
+            {tab.canFork && action(t("chat.forkHere"), branchIcon, () => post({ type: "fork", tab: id, turn }))}
+          </>
+        )}
+      </div>
+      {sent && tab.checkpoints.has(turn) && (
         <button
           className="restore secondary"
           title={t("changes.restoreTitle")}
@@ -340,6 +350,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
       return (
         <div className="msg user">
           <Tokens text={replayed.text} tokens={[...(item.tokens ?? []), ...replayed.tokens]} />
+          <MessageActions turn={item.turn} text={replayed.text} />
         </div>
       );
     }
@@ -355,7 +366,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
         <div className="msg user">
           <Tokens text={item.text} tokens={item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []))} />
           <SentAttachments attachments={item.attachments.filter((a) => !a.token)} />
-          <MessageActions turn={item.turn} />
+          <MessageActions turn={item.turn} text={item.text} />
         </div>
       );
     case "tool": {

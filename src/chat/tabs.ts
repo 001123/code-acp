@@ -1,3 +1,4 @@
+import type * as acp from "@agentclientprotocol/sdk";
 import { Option, Schema, Scope, Semaphore } from "effect";
 import { canFork, type AcpAgent } from "../acpClient";
 import { ChangeSet, SavedChanges } from "../fileChanges";
@@ -107,6 +108,8 @@ export interface Tab extends DraftHolder {
   sent: Map<number, OutgoingMessage>;
   /** Tells the agent, with the next prompt, which messages the user took back. */
   rewindNote?: string;
+  /** While session/load replays the history: the user message being replayed, kept in `sent` by its turn. */
+  replaying?: { turn?: number; blocks: acp.ContentBlock[] };
   /** Pending `postChanges`. */
   changesTimer?: ReturnType<typeof setTimeout>;
 }

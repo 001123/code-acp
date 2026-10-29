@@ -9,6 +9,7 @@ import { DraftStore, type DraftHolder } from "../src/chat/drafts";
 import { canReopen, HistoryRequests, listHistory } from "../src/chat/history";
 import { CANCELLED, Permissions } from "../src/chat/permissions";
 import type { Attachment } from "../src/chat/protocol";
+import { replayedParts } from "../src/chat/replay";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
 import { transcript, EMPTY, fileLinkTokens, type Action } from "../src/ui/chat/transcript";
@@ -389,5 +390,24 @@ describe("fileLinkTokens", () => {
       { token: "@README.md#L12", path: "/w/README.md" },
       { token: "@README.md", path: "/w/README.md" },
     ]);
+  });
+});
+
+describe("replayedParts", () => {
+  it("turns a replayed user message back into composer parts", () => {
+    const uri = "file:///w/README.md";
+    const parts = replayedParts([
+      { type: "text", text: `fix[@README.md](${uri})and ` },
+      { type: "image", mimeType: "image/jpeg", data: "AAA" },
+      { type: "text", text: ` here\n<context ref="${uri}">\n- line\n</context>` },
+    ]);
+    assert.deepStrictEqual(parts, [
+      "fix ",
+      { kind: "uri", uri, name: "README.md", token: "@README.md" },
+      " and ",
+      { kind: "data", name: "image.jpg", mimeType: "image/jpeg", data: "AAA", token: "@image.jpg" },
+      " here",
+    ]);
+    assert.strictEqual(messageText(parts), "fix @README.md and @image.jpg here");
   });
 });

@@ -16,6 +16,15 @@ export function ChangesBar({ tab, changes }: { tab: number; changes: ChangesMess
       <summary>
         <span className="changes-count">{files.length === 1 ? t("changes.countOne") : t("changes.count", files.length)}</span>
         <span className="spacer" />
+        {(changes?.turns.length ?? 0) > 0 && (
+          <button
+            className="secondary"
+            title={t("checkpoints.pick")}
+            onClick={(e) => (e.preventDefault(), post({ type: "pickCheckpoint", tab }))}
+          >
+            {t("changes.restorePick")}
+          </button>
+        )}
         <button
           className="secondary"
           onClick={(e) => (e.preventDefault(), post({ type: "undoChanges", tab }))}

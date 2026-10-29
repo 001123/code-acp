@@ -9,6 +9,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 - Review the agent's changes, restore checkpoints, follow subagents and terminals.
 - Install, update and switch agents from the **ACP Agents** page, or add your own.
 - Generate commit messages from the Source Control view.
+- Follow the agent's edits in the editor.
 - Multilingual UI.
 
 ## Getting started
@@ -17,7 +18,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 2. Sign in with the **Login** button.
 3. Start chatting.
 
-`npx` agents need Node.js, `uvx` agents need [uv](https://docs.astral.sh/uv/). Settings are under `Code ACP: Open Settings`. Known limitations: [KNOW_ISSUES.md](KNOW_ISSUES.md).
+`npx` agents need Node.js, `uvx` agents need [uv](https://docs.astral.sh/uv/). Settings are under `Code ACP: Open Settings`. Known limitations: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Contributing
 

@@ -8,7 +8,6 @@ import { mount } from "./mount";
 import { useMessages } from "./vscode";
 import eyeIcon from "@tabler/icons/outline/eye.svg";
 import eyeOffIcon from "@tabler/icons/outline/eye-off.svg";
-import restoreIcon from "@tabler/icons/outline/restore.svg";
 import { ChangesBar } from "./chat/changes";
 import { HoverPreview, OpenPreview, ShownTab, Terminals, type Hover, type Preview } from "./chat/context";
 import { useComposer } from "./chat/composer";
@@ -108,7 +107,7 @@ function App() {
         return;
       case "update":
         update(tab, (s) => (s.status.busy ? { ...s, lastActivity: Date.now() } : s));
-        return handleUpdate(tab, msg.update);
+        return handleUpdate(tab, msg.update, msg.turn);
       case "userMessage":
         return dispatch(tab, { type: "add", item: { kind: "userMessage", text: msg.text, attachments: msg.attachments ?? [], turn: msg.turn } });
       case "terminal": {
@@ -200,7 +199,7 @@ function App() {
   useEffect(() => post({ type: "ready" }), []);
 
 
-  function handleUpdate(tab: number | undefined, u: acp.SessionUpdate): void {
+  function handleUpdate(tab: number | undefined, u: acp.SessionUpdate, turn?: number): void {
     switch (u.sessionUpdate) {
       case "agent_message_chunk":
         return dispatch(tab, { type: "chunk", kind: "assistant", text: contentText(u.content) });
@@ -210,8 +209,8 @@ function App() {
         return dispatch(
           tab,
           u.content.type === "image"
-            ? { type: "chunk", kind: "user", text: "", image: `data:${u.content.mimeType};base64,${u.content.data}` }
-            : { type: "chunk", kind: "user", text: contentText(u.content) },
+            ? { type: "chunk", kind: "user", text: "", image: `data:${u.content.mimeType};base64,${u.content.data}`, turn }
+            : { type: "chunk", kind: "user", text: contentText(u.content), turn },
         );
       case "tool_call":
       case "tool_call_update":
@@ -344,17 +343,6 @@ function App() {
             {t("chat.installAgent")}
           </button>
           <span className="spacer" />
-          {active !== undefined && (changes?.turns.length ?? 0) > 0 && (
-            <button
-              id="checkpoints"
-              className="icon-btn small"
-              title={t("checkpoints.pick")}
-              aria-label={t("checkpoints.pick")}
-              onClick={() => post({ type: "pickCheckpoint", tab: active })}
-            >
-              <Icon svg={restoreIcon} />
-            </button>
-          )}
           <UsageMeter usage={usage} compactAt={compactAt} />
         </div>
         {composer.element}

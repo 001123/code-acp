@@ -30,6 +30,7 @@ import {
   type RunningAgent,
   type Tab,
 } from "./tabs";
+import { replayedParts } from "./replay";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
 
 /** `_meta` key on Claude agents' `usage_update` naming the model the usage belongs to. */
@@ -558,13 +559,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return started;
   });
 
+  /** The turn a replayed user message chunk belongs to; each replayed message is kept to edit or send again. */
+  private replayTurn(tab: Tab, update: acp.SessionUpdate): number | undefined {
+    const replay = tab.replaying;
+    if (!replay) return undefined;
+    if (update.sessionUpdate !== "user_message_chunk") {
+      replay.turn = undefined;
+      replay.blocks = [];
+      return undefined;
+    }
+    replay.turn ??= this.nextTurn++;
+    replay.blocks.push(update.content);
+    tab.sent.set(replay.turn, { parts: replayedParts(replay.blocks), includeActiveFile: false });
+    return replay.turn;
+  }
+
   private onSessionUpdate(tab: Tab, n: acp.SessionNotification): void {
     const { update } = n;
     if (update.sessionUpdate === "session_info_update" && update.title !== undefined) {
       tab.title = update.title ?? undefined;
       this.postTabs();
     }
-    this.postTab(tab, { type: "update", update });
+    this.postTab(tab, { type: "update", update, turn: this.replayTurn(tab, update) });
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
       this.follower.toolCall(tab, update);
       // The tool may have changed files, however it did.
@@ -711,6 +727,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const caps = agent.initializeResponse.agentCapabilities;
     this.postTab(tab, { type: "reset" });
     this.changes.clear(tab);
+    tab.sent.clear();
     const previousCwd = tab.cwd;
     // Set first: the replayed updates are only forwarded for a tab's session.
     tab.sessionId = sessionId;
@@ -722,7 +739,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.postTabs();
     const res = yield* (
       caps?.loadSession
-        ? agent.loadSession(sessionId, cwd)
+        ? Effect.suspend(() => {
+            tab.replaying = { blocks: [] };
+            return agent.loadSession(sessionId, cwd);
+          }).pipe(Effect.ensuring(Effect.sync(() => void (tab.replaying = undefined))))
         : agent.resumeSession(sessionId, cwd).pipe(
             Effect.tap(() => Effect.sync(() => this.postTab(tab, { type: "notice", key: "chat.resumedNoHistory" }))),
           )
