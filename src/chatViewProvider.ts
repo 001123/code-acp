@@ -31,7 +31,9 @@ export type FromWebview =
   | { type: "permission"; id: number; optionId: string | null }
   | { type: "setConfig"; tab: number; configId: string; value: string }
   /** A file path from agent output; relative paths resolve against the workspace. `line` is 1-based. */
-  | { type: "openFile"; path: string; line?: number };
+  | { type: "openFile"; path: string; line?: number }
+  /** An image from the lightbox (a data URI), to open in a window of its own. */
+  | { type: "openImage"; src: string; name: string };
 
 /** A chat tab as the webview shows it in the tab strip. */
 export interface TabInfo {
@@ -69,6 +71,15 @@ const IMAGE_MIME: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
+};
+
+const IMAGE_EXT: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/svg+xml": ".svg",
+  "image/bmp": ".bmp",
 };
 
 /** Pages of `session/list` fetched for the history list. */
@@ -481,6 +492,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "openFile":
         yield* this.openFile(msg.path, msg.line);
         break;
+      case "openImage":
+        yield* this.openImage(msg.src, msg.name);
+        break;
     }
   });
 
@@ -505,6 +519,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     yield* thenable(() =>
       vscode.window.showTextDocument(uri, position ? { selection: new vscode.Range(position, position) } : {}),
     );
+  });
+
+  /** Saves a data-URI image to a temp file and opens it in VS Code's image preview, in a new window. */
+  private readonly openImage = Effect.fn("ChatView.openImage")(function* (
+    this: ChatViewProvider,
+    src: string,
+    name: string,
+  ) {
+    const match = /^data:(image\/[\w.+-]+);base64,(.*)$/s.exec(src);
+    if (!match) {
+      return;
+    }
+    const [, mimeType, data] = match;
+    // The image preview picks files by extension.
+    const ext = IMAGE_EXT[mimeType!] ?? "";
+    const base = path.basename(name) || "image";
+    const fs = yield* FileSystem.FileSystem;
+    const dir = path.join(os.tmpdir(), "code-acp");
+    yield* fs.makeDirectory(dir, { recursive: true });
+    const file = path.join(dir, `${yield* Clock.currentTimeMillis}-${base}${path.extname(base) ? "" : ext}`);
+    yield* fs.writeFile(file, Buffer.from(data!, "base64"));
+    yield* thenable(() => vscode.commands.executeCommand("vscode.open", vscode.Uri.file(file)));
+    yield* thenable(() => vscode.commands.executeCommand("workbench.action.moveEditorToNewWindow"));
   });
 
   /** The process of the agent `tab` runs on, started on first use; the tab is set to that agent. */

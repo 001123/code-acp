@@ -890,6 +890,23 @@ button.chip-remove {
   cursor: zoom-in;
 }
 
+.hover-thumb {
+  position: fixed;
+  z-index: 15;
+  padding: 3px;
+  border-radius: 6px;
+  background: var(--vscode-editorHoverWidget-background);
+  border: 1px solid var(--vscode-editorHoverWidget-border, transparent);
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+  pointer-events: none;
+}
+.hover-thumb img {
+  display: block;
+  max-width: 240px;
+  max-height: 180px;
+  border-radius: 4px;
+}
+
 .lightbox {
   position: fixed;
   inset: 0;
@@ -924,7 +941,10 @@ button.chip-remove {
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
-  border-top: 1px solid var(--vscode-panel-border, transparent);
+  /* Above the stage; solid so the chat behind doesn't show through. */
+  order: -1;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
 }
 .lightbox-toolbar .icon-btn,
 .lightbox-scale {

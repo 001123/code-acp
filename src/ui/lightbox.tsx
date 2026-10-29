@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
+import appWindowIcon from "@tabler/icons/outline/app-window.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import zoomInIcon from "@tabler/icons/outline/zoom-in.svg";
 import zoomOutIcon from "@tabler/icons/outline/zoom-out.svg";
@@ -17,8 +18,21 @@ interface View {
 }
 const FIT: View = { scale: 1, x: 0, y: 0 };
 
-/** Full-screen image preview: wheel / buttons / keys to zoom, drag to pan, Esc or backdrop click to close. */
-export function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+/**
+ * Full-screen image preview: wheel / buttons / keys to zoom, drag to pan, Esc or backdrop click to close.
+ * `onPopOut` opens the image in a window of its own.
+ */
+export function Lightbox({
+  src,
+  alt,
+  onClose,
+  onPopOut,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+  onPopOut?: () => void;
+}) {
   const { t } = useL10n();
   const [view, setView] = useState(FIT);
   const [dragging, setDragging] = useState(false);
@@ -127,6 +141,11 @@ export function Lightbox({ src, alt, onClose }: { src: string; alt: string; onCl
         <button type="button" className="icon-btn" title={t("lightbox.reset")} aria-label={t("lightbox.reset")} onClick={() => setView(FIT)}>
           <Icon svg={zoomResetIcon} />
         </button>
+        {onPopOut && (
+          <button type="button" className="icon-btn" title={t("lightbox.popOut")} aria-label={t("lightbox.popOut")} onClick={onPopOut}>
+            <Icon svg={appWindowIcon} />
+          </button>
+        )}
         <button type="button" className="icon-btn" title={t("lightbox.close")} aria-label={t("lightbox.close")} onClick={onClose}>
           <Icon svg={xIcon} />
         </button>

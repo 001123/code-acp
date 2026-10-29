@@ -37,12 +37,37 @@ interface Preview {
 /** Opens an image in the lightbox; provided by the app. */
 const OpenPreview = createContext<(preview: Preview) => void>(() => {});
 
+/** An image token under the pointer: `rect` is the box to place the thumbnail next to. */
+interface Hover {
+  src: string;
+  rect: DOMRect;
+}
+/** Shows (or, with undefined, hides) the hover thumbnail; provided by the app. */
+const HoverPreview = createContext<(hover: Hover | undefined) => void>(() => {});
+
+const HOVER_WIDTH = 240;
+const HOVER_HEIGHT = 180;
+const HOVER_GAP = 6;
+
+/** Thumbnail floating above the hovered token, or below it when there is no room above. */
+function HoverThumb({ hover }: { hover: Hover }) {
+  const { rect } = hover;
+  const left = Math.max(HOVER_GAP, Math.min(rect.left, window.innerWidth - HOVER_WIDTH - HOVER_GAP));
+  const above = rect.top >= HOVER_HEIGHT + 2 * HOVER_GAP;
+  const style = above ? { left, bottom: window.innerHeight - rect.top + HOVER_GAP } : { left, top: rect.bottom + HOVER_GAP };
+  return (
+    <div className="hover-thumb" style={style}>
+      <img src={hover.src} alt="" />
+    </div>
+  );
+}
+
 /** A localized line: a message key with its arguments, translated when rendered. */
 type Text = { key: Parameters<Translate>[0]; args?: unknown[] } | { raw: string };
 
 type Item =
-  /** `images` (data URIs) come from replayed user messages. */
-  | { kind: "assistant" | "user" | "thought"; id: number; text: string; images?: string[] }
+  /** `tokens` stand for the images of replayed user messages, where they were in the text. */
+  | { kind: "assistant" | "user" | "thought"; id: number; text: string; tokens?: Token[] }
   | { kind: "userMessage"; id: number; text: string; attachments: SentAttachment[] }
   | { kind: "tool"; id: number; toolCallId: string; title?: string; status?: acp.ToolCallStatus; content?: acp.ToolCallContent[] }
   | { kind: "plan"; id: number; entries: acp.PlanEntry[] }
@@ -83,12 +108,22 @@ function transcript(state: Transcript, action: Action): Transcript {
   switch (action.type) {
     case "chunk": {
       const current = state.items.find((i) => i.id === state.streaming);
-      const image = action.image;
-      if (current && current.kind === action.kind) {
-        const images = image ? [...(current.images ?? []), image] : current.images;
-        return { ...state, items: replace(current.id, () => ({ ...current, text: current.text + action.text, images })) };
+      const same = current && current.kind === action.kind ? current : undefined;
+      let text = action.text;
+      let tokens = same?.tokens;
+      if (action.image) {
+        // An image goes inline as a token at its place in the text, named like a pasted one.
+        const ext = /^data:image\/(\w+)/.exec(action.image)?.[1]?.replace("jpeg", "jpg") ?? "png";
+        const n = (tokens?.length ?? 0) + 1;
+        const token = n === 1 ? `@image.${ext}` : `@image.${ext} (${n})`;
+        // The text runs around it keep the spaces the composer put there.
+        text += token;
+        tokens = [...(tokens ?? []), { token, src: action.image }];
       }
-      return add({ kind: action.kind, text: action.text, images: image ? [image] : undefined }, true);
+      if (same) {
+        return { ...state, items: replace(same.id, () => ({ ...same, text: same.text + text, tokens })) };
+      }
+      return add({ kind: action.kind, text, tokens }, true);
     }
     case "toolCall": {
       const u = action.update;
@@ -262,8 +297,7 @@ function ItemView({ item }: { item: Item }) {
     case "user":
       return (
         <div className="msg user">
-          {item.text}
-          <SentAttachments attachments={(item.images ?? []).map((src) => ({ name: "", src }))} />
+          <Tokens text={item.text} tokens={item.tokens ?? []} />
         </div>
       );
     case "thought":
@@ -587,6 +621,7 @@ interface Token {
 function Tokens({ text, tokens }: { text: string; tokens: Token[] }) {
   const { t } = useL10n();
   const open = useContext(OpenPreview);
+  const hover = useContext(HoverPreview);
   return splitTokens(text, tokens).map((part, i) =>
     typeof part === "string" ? (
       <Fragment key={i}>{part}</Fragment>
@@ -595,8 +630,13 @@ function Tokens({ text, tokens }: { text: string; tokens: Token[] }) {
         key={i}
         className="token image"
         data-token={part.token}
-        title={t("chat.previewImage")}
-        onClick={() => open({ src: part.src!, name: part.token.slice(1) })}
+        aria-label={t("chat.previewImage")}
+        onMouseEnter={(e) => hover({ src: part.src!, rect: e.currentTarget.getBoundingClientRect() })}
+        onMouseLeave={() => hover(undefined)}
+        onClick={() => {
+          hover(undefined);
+          open({ src: part.src!, name: part.token.slice(1) });
+        }}
       >
         {part.token}
       </mark>
@@ -836,6 +876,7 @@ function App() {
 
   const [preview, setPreview] = useState<Preview>();
   const closePreview = useCallback(() => setPreview(undefined), []);
+  const [hover, setHover] = useState<Hover>();
   const current = (active !== undefined && states[active]) || NEW_TAB;
   const { transcript: state, config, usage, compactAt, status, attachments, busySince, lastActivity } = current;
   const now = useNow(busySince !== undefined);
@@ -1164,11 +1205,14 @@ function App() {
   }
 
   /** The image token drawn under the pointer; the backdrop sits behind the textarea, so hit-test its rects. */
-  function imageTokenAt(x: number, y: number): Attachment | undefined {
+  function imageTokenAt(x: number, y: number): { src: string; name: string; rect: DOMRect } | undefined {
     if (active === undefined) return undefined;
     for (const mark of backdrop.current?.querySelectorAll<HTMLElement>("mark.image") ?? []) {
-      for (const r of mark.getClientRects()) {
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return inlineOf(active).get(mark.dataset.token!);
+      for (const rect of mark.getClientRects()) {
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+        const a = inlineOf(active).get(mark.dataset.token!);
+        const src = a && imageSrc(a);
+        return a && src ? { src, name: a.name, rect } : undefined;
       }
     }
     return undefined;
@@ -1194,160 +1238,182 @@ function App() {
 
   return (
     <OpenPreview.Provider value={setPreview}>
-      <TabStrip tabs={tabs} states={states} active={active} onSelect={selectTab} />
-      {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
-      <div id="messages" ref={messages} hidden={!!history}>
-        {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
-        {groupActivity(state.items).map((entry) =>
-          Array.isArray(entry) ? <ActivityView key={entry[0]!.id} items={entry} /> : <ItemView key={entry.id} item={entry} />,
-        )}
-        {busySince !== undefined && silent >= WAITING_AFTER_MS && (
-          <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
-        )}
-      </div>
-      <div id="drop-overlay" className={dragging ? "visible" : undefined}>
-        {t("chat.dropHint")}
-      </div>
-      <div id="status">
-        <span id="status-text">
-          {status.text}
-          {busySince !== undefined && elapsed >= 1000 && <span className="elapsed"> · {formatDuration(elapsed)}</span>}
-        </span>
-        <button id="login" hidden={!status.needsLogin} onClick={() => post({ type: "login" })}>
-          {t("chat.login")}
-        </button>
-        <button id="manage" hidden={!status.needsAgent} onClick={() => post({ type: "selectAgent" })}>
-          {t("chat.installAgent")}
-        </button>
-        <span className="spacer" />
-        <UsageMeter usage={usage} compactAt={compactAt} />
-      </div>
-      <form
-        id="composer"
-        ref={form}
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <div id="attachments">
-          {attachments.map((a, i) => (
-            <span key={attachmentKey(a) ?? i} className="chip" title={attachmentTitle(t, a)}>
-              {imageSrc(a) && (
-                <img
-                  className="chip-preview"
-                  src={imageSrc(a)}
-                  title={t("chat.previewImage")}
-                  onClick={() => setPreview({ src: imageSrc(a)!, name: a.name })}
-                />
-              )}
-              <span>{a.name}</span>
-              <button
-                type="button"
-                className="chip-remove"
-                title={t("chat.removeAttachment")}
-                onClick={() => update(active, (s) => ({ ...s, attachments: s.attachments.filter((x) => x !== a) }))}
-              >
-                ×
-              </button>
-            </span>
-          ))}
+      <HoverPreview.Provider value={setHover}>
+        <TabStrip tabs={tabs} states={states} active={active} onSelect={selectTab} />
+        {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
+        <div id="messages" ref={messages} hidden={!!history}>
+          {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
+          {groupActivity(state.items).map((entry) =>
+            Array.isArray(entry) ? <ActivityView key={entry[0]!.id} items={entry} /> : <ItemView key={entry.id} item={entry} />,
+          )}
+          {busySince !== undefined && silent >= WAITING_AFTER_MS && (
+            <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
+          )}
         </div>
-        <div id="input-box">
-          {/* Same text as the textarea, transparent, so tokens get a highlight behind them. */}
-          <div id="input-backdrop" ref={backdrop} aria-hidden="true">
-            <Tokens
-              text={inputText}
-              tokens={active !== undefined ? [...inlineOf(active)].map(([token, a]) => ({ token, src: imageSrc(a) })) : []}
-            />
-            {"\n"}
-          </div>
-          <textarea
-            id="input"
-            ref={input}
-            rows={2}
-            placeholder={t("chat.placeholder")}
-            title={t("chat.inputTitle")}
-            onInput={autosize}
-            onScroll={syncScroll}
-            onPaste={onPaste}
-            onMouseMove={(e) => {
-              e.currentTarget.style.cursor = imageTokenAt(e.clientX, e.clientY) ? "pointer" : "";
-            }}
-            onClick={(e) => {
-              const a = imageTokenAt(e.clientX, e.clientY);
-              const src = a && imageSrc(a);
-              if (a && src && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) setPreview({ src, name: a.name });
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                form.current?.requestSubmit();
-              } else if (e.key === "Backspace" && !e.nativeEvent.isComposing && deleteToken()) {
-                e.preventDefault();
-              }
-            }}
-          />
+        <div id="drop-overlay" className={dragging ? "visible" : undefined}>
+          {t("chat.dropHint")}
         </div>
-        <div id="actions">
-          <AgentSelect tab={tabs.find((x) => x.id === active)} choices={agents} />
-          <label title={t("chat.includeFile")}>
-            <input type="checkbox" id="include-file" checked={includeFile} onChange={(e) => setIncludeFile(e.target.checked)} />
-            <Icon svg={paperclipIcon} />
-            <span className="label-text">{t("chat.includeFile")}</span>
-          </label>
+        <div id="status">
+          <span id="status-text">
+            {status.text}
+            {busySince !== undefined && elapsed >= 1000 && <span className="elapsed"> · {formatDuration(elapsed)}</span>}
+          </span>
+          <button id="login" hidden={!status.needsLogin} onClick={() => post({ type: "login" })}>
+            {t("chat.login")}
+          </button>
+          <button id="manage" hidden={!status.needsAgent} onClick={() => post({ type: "selectAgent" })}>
+            {t("chat.installAgent")}
+          </button>
           <span className="spacer" />
-          <button
-            type="button"
-            id="cancel"
-            className="icon-btn"
-            title={t("chat.stop")}
-            aria-label={t("chat.stop")}
-            hidden={!status.busy}
-            onClick={() => active !== undefined && post({ type: "cancel", tab: active })}
-          >
-            <Icon svg={stopIcon} />
-          </button>
-          <button
-            type="submit"
-            id="send"
-            className="icon-btn"
-            title={t("chat.sendTitle")}
-            aria-label={t("chat.send")}
-            disabled={!!status.busy}
-          >
-            <Icon svg={arrowUpIcon} />
-          </button>
+          <UsageMeter usage={usage} compactAt={compactAt} />
         </div>
-      </form>
-      <div id="toolbar">
-        <div
-          id="config"
-          // A vertical wheel scrolls the single row sideways.
-          onWheel={(e) => {
-            if (e.deltaX === 0) e.currentTarget.scrollLeft += e.deltaY;
+        <form
+          id="composer"
+          ref={form}
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
           }}
         >
-          {active !== undefined &&
-            config.map((opt) =>
-              opt.type === "select" ? (
-                <ConfigSelect
-                  key={opt.id}
-                  tab={active}
-                  option={opt}
-                  // Shown right away; the agent's answer replaces the whole list.
-                  onChange={(value) =>
-                    update(active, (s) => ({
-                      ...s,
-                      config: s.config.map((o) => (o.id === opt.id ? ({ ...o, currentValue: value } as typeof o) : o)),
-                    }))
-                  }
-                />
-              ) : null,
-            )}
+          <div id="attachments">
+            {attachments.map((a, i) => (
+              <span key={attachmentKey(a) ?? i} className="chip" title={attachmentTitle(t, a)}>
+                {imageSrc(a) && (
+                  <img
+                    className="chip-preview"
+                    src={imageSrc(a)}
+                    title={t("chat.previewImage")}
+                    onClick={() => setPreview({ src: imageSrc(a)!, name: a.name })}
+                  />
+                )}
+                <span>{a.name}</span>
+                <button
+                  type="button"
+                  className="chip-remove"
+                  title={t("chat.removeAttachment")}
+                  onClick={() => update(active, (s) => ({ ...s, attachments: s.attachments.filter((x) => x !== a) }))}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div id="input-box">
+            {/* Same text as the textarea, transparent, so tokens get a highlight behind them. */}
+            <div id="input-backdrop" ref={backdrop} aria-hidden="true">
+              <Tokens
+                text={inputText}
+                tokens={active !== undefined ? [...inlineOf(active)].map(([token, a]) => ({ token, src: imageSrc(a) })) : []}
+              />
+              {"\n"}
+            </div>
+            <textarea
+              id="input"
+              ref={input}
+              rows={2}
+              placeholder={t("chat.placeholder")}
+              title={t("chat.inputTitle")}
+              onInput={autosize}
+              onScroll={() => {
+                syncScroll();
+                setHover(undefined);
+              }}
+              onPaste={onPaste}
+              onMouseMove={(e) => {
+                const hit = imageTokenAt(e.clientX, e.clientY);
+                e.currentTarget.style.cursor = hit ? "pointer" : "";
+                // Keep the same object while on the same token, so moving within it doesn't re-render.
+                setHover((h) => (hit ? (h?.src === hit.src && h.rect.top === hit.rect.top ? h : hit) : undefined));
+              }}
+              onMouseLeave={() => setHover(undefined)}
+              onClick={(e) => {
+                const hit = imageTokenAt(e.clientX, e.clientY);
+                if (hit && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
+                  setHover(undefined);
+                  setPreview({ src: hit.src, name: hit.name });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  form.current?.requestSubmit();
+                } else if (e.key === "Backspace" && !e.nativeEvent.isComposing && deleteToken()) {
+                  e.preventDefault();
+                }
+              }}
+            />
+          </div>
+          <div id="actions">
+            <AgentSelect tab={tabs.find((x) => x.id === active)} choices={agents} />
+            <label title={t("chat.includeFile")}>
+              <input type="checkbox" id="include-file" checked={includeFile} onChange={(e) => setIncludeFile(e.target.checked)} />
+              <Icon svg={paperclipIcon} />
+              <span className="label-text">{t("chat.includeFile")}</span>
+            </label>
+            <span className="spacer" />
+            <button
+              type="button"
+              id="cancel"
+              className="icon-btn"
+              title={t("chat.stop")}
+              aria-label={t("chat.stop")}
+              hidden={!status.busy}
+              onClick={() => active !== undefined && post({ type: "cancel", tab: active })}
+            >
+              <Icon svg={stopIcon} />
+            </button>
+            <button
+              type="submit"
+              id="send"
+              className="icon-btn"
+              title={t("chat.sendTitle")}
+              aria-label={t("chat.send")}
+              disabled={!!status.busy}
+            >
+              <Icon svg={arrowUpIcon} />
+            </button>
+          </div>
+        </form>
+        <div id="toolbar">
+          <div
+            id="config"
+            // A vertical wheel scrolls the single row sideways.
+            onWheel={(e) => {
+              if (e.deltaX === 0) e.currentTarget.scrollLeft += e.deltaY;
+            }}
+          >
+            {active !== undefined &&
+              config.map((opt) =>
+                opt.type === "select" ? (
+                  <ConfigSelect
+                    key={opt.id}
+                    tab={active}
+                    option={opt}
+                    // Shown right away; the agent's answer replaces the whole list.
+                    onChange={(value) =>
+                      update(active, (s) => ({
+                        ...s,
+                        config: s.config.map((o) => (o.id === opt.id ? ({ ...o, currentValue: value } as typeof o) : o)),
+                      }))
+                    }
+                  />
+                ) : null,
+              )}
+          </div>
         </div>
-      </div>
-      {preview && <Lightbox src={preview.src} alt={preview.name} onClose={closePreview} />}
+        {preview && (
+          <Lightbox
+            src={preview.src}
+            alt={preview.name}
+            onClose={closePreview}
+            onPopOut={() => {
+              post({ type: "openImage", src: preview.src, name: preview.name });
+              closePreview();
+            }}
+          />
+        )}
+        {hover && !preview && <HoverThumb hover={hover} />}
+      </HoverPreview.Provider>
     </OpenPreview.Provider>
   );
 }

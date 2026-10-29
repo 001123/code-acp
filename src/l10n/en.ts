@@ -60,6 +60,7 @@ const en = {
   "lightbox.zoomOut": "Zoom out (−)",
   "lightbox.reset": "Fit (0)",
   "lightbox.close": "Close (Esc)",
+  "lightbox.popOut": "Open in a new window",
   "chat.previewImage": "Click to preview",
   "chat.tooLarge": "{0} is too large (limit 20 MB).",
   "chat.readFailed": "Could not read {0}.",

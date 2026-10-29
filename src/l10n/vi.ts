@@ -61,6 +61,7 @@ const vi: Record<MessageKey, string> = {
   "lightbox.zoomOut": "Thu nhỏ (−)",
   "lightbox.reset": "Vừa khung (0)",
   "lightbox.close": "Đóng (Esc)",
+  "lightbox.popOut": "Mở trong cửa sổ mới",
   "chat.previewImage": "Bấm để xem ảnh",
   "chat.tooLarge": "{0} quá lớn (giới hạn 20 MB).",
   "chat.readFailed": "Không đọc được {0}.",
