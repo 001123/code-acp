@@ -1,9 +1,9 @@
 import { Option, Schema, Scope, Semaphore } from "effect";
-import type { AcpAgent } from "../acpClient";
+import { canFork, type AcpAgent } from "../acpClient";
 import { ChangeSet, SavedChanges } from "../fileChanges";
 import type { MessageKey } from "../i18n";
 import { SavedDraft, type DraftHolder } from "./drafts";
-import type { TabInfo } from "./protocol";
+import type { PromptPart, TabInfo } from "./protocol";
 
 export interface RunningAgent {
   readonly agent: AcpAgent;
@@ -19,6 +19,21 @@ export interface Reopen {
   readonly cwd: string;
   /** The agent the session belongs to; another agent can't open it. */
   readonly agentId: string | undefined;
+}
+
+/** A message as the composer sent it, kept to queue it, or to edit and send it again. */
+export interface OutgoingMessage {
+  readonly parts: ReadonlyArray<PromptPart>;
+  readonly includeActiveFile: boolean;
+}
+
+export interface QueuedMessage extends OutgoingMessage {
+  readonly id: number;
+}
+
+/** The composer text of a message, with its inline attachments as their tokens. */
+export function messageText(parts: ReadonlyArray<PromptPart>): string {
+  return parts.map((part) => (typeof part === "string" ? part : (part.token ?? ""))).join("");
 }
 
 /** Last context usage reported for a session; agents report none when a session is loaded. */
@@ -42,6 +57,7 @@ export const SavedTabs = Schema.Struct({
       agentId: Schema.optional(Schema.String),
       usage: Schema.optional(SavedUsage),
       pinned: Schema.optional(Schema.Boolean),
+      name: Schema.optional(Schema.String),
       draft: Schema.optional(SavedDraft),
       changes: Schema.optional(SavedChanges),
     }),
@@ -53,6 +69,8 @@ export type SavedTabs = typeof SavedTabs.Type;
 export interface Tab extends DraftHolder {
   readonly id: number;
   title?: string;
+  /** The name the user gave the tab; shown instead of `title`, which the agent keeps updating. */
+  name?: string;
   /** Epoch ms of the first message sent in the session; reset with `title`. */
   createdAt?: number;
   sessionId?: string;
@@ -81,6 +99,14 @@ export interface Tab extends DraftHolder {
   changes: ChangeSet;
   /** The turn being run; its user message carries the id. */
   turn?: number;
+  /** Messages sent while a turn ran, sent in order as each turn ends. */
+  queue: QueuedMessage[];
+  /** The running turn was stopped to send the first queued message right away. */
+  steer: boolean;
+  /** The messages sent from this chat, by turn, so they can be edited or sent again. */
+  sent: Map<number, OutgoingMessage>;
+  /** Tells the agent, with the next prompt, which messages the user took back. */
+  rewindNote?: string;
   /** Pending `postChanges`. */
   changesTimer?: ReturnType<typeof setTimeout>;
 }
@@ -94,6 +120,10 @@ export function resetConversation(tab: Tab): void {
   tab.title = undefined;
   tab.createdAt = undefined;
   tab.reopen = undefined;
+  tab.queue = [];
+  tab.steer = false;
+  tab.sent.clear();
+  tab.rewindNote = undefined;
 }
 
 /** The usage saved for `sessionId`, if the tab's last report was about it. */
@@ -113,6 +143,7 @@ export class TabList {
     for (const entry of decoded?.tabs ?? []) {
       const tab = this.add(entry.cwd ?? defaultCwd());
       tab.pinned = entry.pinned ?? false;
+      tab.name = entry.name;
       tab.savedDraft = entry.draft;
       tab.agentId = entry.agentId;
       tab.changes = ChangeSet.fromSaved(entry.changes);
@@ -146,6 +177,9 @@ export class TabList {
       used: false,
       sessionLock: Semaphore.makeUnsafe(1),
       changes: new ChangeSet(),
+      queue: [],
+      steer: false,
+      sent: new Map(),
     };
     this.tabs.push(tab);
     return tab;
@@ -208,6 +242,16 @@ export class TabList {
     return this.move(tab, this.tabs.filter((each) => each.pinned && each !== tab).length);
   }
 
+  /** Names `tab` as the user typed it; an empty name shows its title again. False if nothing changed. */
+  rename(tab: Tab, name: string): boolean {
+    const trimmed = name.trim() || undefined;
+    if (tab.name === trimmed) {
+      return false;
+    }
+    tab.name = trimmed;
+    return true;
+  }
+
   /** The highest turn id in the saved checkpoints, so new turns don't reuse one. */
   get lastTurn(): number {
     return Math.max(0, ...this.tabs.flatMap((tab) => tab.changes.checkpoints.map((c) => c.turn)));
@@ -217,11 +261,12 @@ export class TabList {
   get info(): TabInfo[] {
     return this.tabs.map((tab) => ({
       id: tab.id,
-      title: tab.title,
+      title: tab.name ?? tab.title,
       createdAt: tab.createdAt,
       pinned: tab.pinned,
       agentId: tab.agentId,
       cwd: tab.cwd,
+      canFork: !!tab.sessionId && !!tab.running && canFork(tab.running.agent),
       draft: tab.draft,
     }));
   }
@@ -231,19 +276,19 @@ export class TabList {
     return {
       active: this.tabs.indexOf(this.active),
       tabs: this.tabs.map((tab) => {
-        const { pinned, savedDraft: draft, title, createdAt } = tab;
+        const { pinned, name, savedDraft: draft, title, createdAt } = tab;
         const changes = tab.changes.saved;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, draft, changes };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, draft, changes };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes };
         }
-        return { cwd: tab.cwd, pinned, agentId: tab.agentId, draft, changes };
+        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes };
       }),
     };
   }

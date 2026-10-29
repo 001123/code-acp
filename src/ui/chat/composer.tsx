@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent, type MutableRefObject, type ReactNode } from "react";
-import type { Attachment, Draft, PromptPart, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
+import type { Attachment, Draft, PromptPart, QueuedInfo, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import type { FileSuggestion, SkillSuggestion } from "../../completions";
 import type { TerminalSuggestion } from "../../terminalContext";
 import { Icon } from "../icon";
@@ -7,6 +7,10 @@ import { useL10n, type Translate } from "../l10n";
 import arrowUpIcon from "@tabler/icons/outline/arrow-up.svg";
 import paperclipIcon from "@tabler/icons/outline/paperclip.svg";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
+import clockIcon from "@tabler/icons/outline/clock.svg";
+import pencilIcon from "@tabler/icons/outline/pencil.svg";
+import sendNowIcon from "@tabler/icons/outline/player-track-next.svg";
+import xIcon from "@tabler/icons/outline/x.svg";
 import { attachmentKey, attachmentTitle, editText, imageSrc, nameFromUri, urisFrom } from "./attachments";
 import type { Hover, Preview } from "./context";
 import { post } from "./post";
@@ -17,6 +21,46 @@ import { AgentSelect, FolderSelect, type AgentChoices } from "./toolbar";
 
 const MAX_DATA_BYTES = 20 * 1024 * 1024;
 
+/** What the composer of one tab holds. */
+interface Content {
+  text: string;
+  inline: Map<string, Attachment>;
+  attachments: Attachment[];
+}
+
+/** The composer content a sent or queued message is made of. */
+function contentOf(parts: ReadonlyArray<PromptPart>): Content {
+  const content: Content = { text: "", inline: new Map(), attachments: [] };
+  for (const part of parts) {
+    if (typeof part === "string") {
+      content.text += part;
+      continue;
+    }
+    const { token, ...attachment } = part;
+    if (token) {
+      content.text += token;
+      content.inline.set(token, attachment);
+    } else {
+      content.attachments.push(attachment);
+    }
+  }
+  return content;
+}
+
+/** `added` after `content`, its tokens renamed where `content` already uses them. */
+function appendContent(content: Content, added: Content): Content {
+  let text = added.text;
+  const inline = new Map(content.inline);
+  for (const [token, attachment] of added.inline) {
+    let name = token;
+    for (let n = 2; inline.has(name); n++) name = `${token} (${n})`;
+    if (name !== token) text = text.split(token).join(name);
+    inline.set(name, attachment);
+  }
+  const lead = content.text.trim() ? `${content.text.trimEnd()}\n\n` : "";
+  return { text: lead + text, inline, attachments: [...content.attachments, ...added.attachments] };
+}
+
 export interface ComposerOptions {
   /** The active tab; also as a ref for callbacks registered once (drop, FileReader). */
   active: number | undefined;
@@ -25,6 +69,10 @@ export interface ComposerOptions {
   states: Record<number, TabState>;
   /** The active tab's attachments that are not inline in the text. */
   attachments: Attachment[];
+  /** The active tab's queued messages. */
+  queue: QueuedInfo[];
+  /** The turn whose message the active tab's composer is editing. */
+  editing: number | undefined;
   commands: TabState["commands"];
   busy: boolean;
   agents: AgentChoices;
@@ -40,7 +88,8 @@ export interface ComposerOptions {
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, commands, busy, agents, folders, remote, update, error, setPreview, setHover } = options;
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover } =
+    options;
   const { t } = useL10n();
   const [includeFile, setIncludeFile] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -55,6 +104,8 @@ export function useComposer(options: ComposerOptions) {
   const sentAttachments = useRef(new Map<number, unknown[]>());
   /** Tabs whose saved draft was taken; later "tabs" messages don't overwrite what was typed since. */
   const seeded = useRef(new Set<number>());
+  /** Per tab editing a sent message, what its composer held before; it comes back once the edit is sent or cancelled. */
+  const beforeEdit = useRef(new Map<number, Content>());
 
   const statesRef = useRef(states);
   statesRef.current = states;
@@ -291,6 +342,52 @@ export function useComposer(options: ComposerOptions) {
     }
   }
 
+  /** What the composer of `tab` holds, shown or not. */
+  function contentIn(tab: number): Content {
+    const el = input.current;
+    const text = tab === shownDraft.current && el ? el.value : (drafts.current.get(tab) ?? "");
+    return { text, inline: new Map(inlineOf(tab)), attachments: statesRef.current[tab]?.attachments ?? [] };
+  }
+
+  function setContent(tab: number, content: Content): void {
+    inline.current.set(tab, new Map(content.inline));
+    update(tab, (s) => ({ ...s, attachments: content.attachments }));
+    const el = input.current;
+    if (tab !== shownDraft.current || !el) {
+      // Shown, and saved, when the tab is next selected.
+      drafts.current.set(tab, content.text);
+      return;
+    }
+    el.value = content.text;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+    autosize();
+  }
+
+  /**
+   * Puts a message back in the composer of `tab`: a queued one after what is there, or a sent one (with `rewind`, its
+   * turn) in place of it until the edit is sent or cancelled.
+   */
+  function load(tab: number, parts: ReadonlyArray<PromptPart>, rewind?: number): void {
+    const loaded = contentOf(parts);
+    if (rewind === undefined) {
+      setContent(tab, appendContent(contentIn(tab), loaded));
+      return;
+    }
+    if (!beforeEdit.current.has(tab)) beforeEdit.current.set(tab, contentIn(tab));
+    update(tab, (s) => ({ ...s, editing: rewind }));
+    setContent(tab, loaded);
+  }
+
+  /** Ends editing a sent message: the composer gets back what it held before. */
+  function endEdit(tab: number): void {
+    const before = beforeEdit.current.get(tab);
+    if (!before) return;
+    beforeEdit.current.delete(tab);
+    update(tab, (s) => ({ ...s, editing: undefined }));
+    setContent(tab, before);
+  }
+
   /** The "files" answer to the latest search; older ones are dropped. */
   function setSearchResults(id: number, files: FileSuggestion[], terminals: TerminalSuggestion[] | undefined): void {
     if (id !== searchId.current) return;
@@ -313,6 +410,9 @@ export function useComposer(options: ComposerOptions) {
     }
     for (const id of sentAttachments.current.keys()) {
       if (!tabs.some((x) => x.id === id)) sentAttachments.current.delete(id);
+    }
+    for (const id of beforeEdit.current.keys()) {
+      if (!tabs.some((x) => x.id === id)) beforeEdit.current.delete(id);
     }
     el.value = (active !== undefined && drafts.current.get(active)) || "";
     shownDraft.current = active;
@@ -439,16 +539,21 @@ export function useComposer(options: ComposerOptions) {
     if (backdrop.current && input.current) backdrop.current.scrollTop = input.current.scrollTop;
   }
 
-  function submit(): void {
+  /** Sends the composer content; while the agent works it is queued, unless `now`. An edit replaces its message. */
+  function submit(now: boolean): void {
     const el = input.current;
     if (!el || active === undefined) return;
     const text = el.value;
     const tokens = [...inlineOf(active)].map(([token, a]) => ({ ...a, token }));
     const parts: PromptPart[] = [...splitTokens(text, tokens), ...attachments];
     if (parts.every((p) => typeof p === "string" && !p.trim())) return;
+    post({ type: "send", tab: active, parts, includeActiveFile: includeFile, now: now || undefined, rewind: editing });
+    if (editing !== undefined) {
+      endEdit(active);
+      return;
+    }
     el.value = "";
     autosize();
-    post({ type: "send", tab: active, parts, includeActiveFile: includeFile });
     update(active, (s) => ({ ...s, attachments: [] }));
     inline.current.delete(active);
   }
@@ -459,7 +564,7 @@ export function useComposer(options: ComposerOptions) {
       ref={form}
       onSubmit={(e) => {
         e.preventDefault();
-        submit();
+        submit(false);
       }}
     >
       {suggestions.length > 0 && (
@@ -482,6 +587,63 @@ export function useComposer(options: ComposerOptions) {
               {s.detail && <span className="suggest-detail">{s.detail}</span>}
             </div>
           ))}
+        </div>
+      )}
+      {active !== undefined && queue.length > 0 && (
+        <div id="queue" aria-label={t("chat.queued")}>
+          {queue.map((q) => (
+            <div key={q.id} className="queued">
+              <Icon svg={clockIcon} />
+              <span className="queued-text" title={q.text}>
+                {q.text.trim() || q.attachments.join(", ")}
+              </span>
+              {q.text.trim() && q.attachments.length > 0 && (
+                <span className="queued-more">{t("chat.queuedAttachments", q.attachments.length)}</span>
+              )}
+              <button
+                type="button"
+                className="icon-btn small"
+                title={t("chat.sendNow")}
+                aria-label={t("chat.sendNow")}
+                onClick={() => post({ type: "sendQueuedNow", tab: active, id: q.id })}
+              >
+                <Icon svg={sendNowIcon} />
+              </button>
+              <button
+                type="button"
+                className="icon-btn small"
+                title={t("chat.editQueued")}
+                aria-label={t("chat.editQueued")}
+                onClick={() => post({ type: "unqueue", tab: active, id: q.id, edit: true })}
+              >
+                <Icon svg={pencilIcon} />
+              </button>
+              <button
+                type="button"
+                className="icon-btn small"
+                title={t("chat.removeQueued")}
+                aria-label={t("chat.removeQueued")}
+                onClick={() => post({ type: "unqueue", tab: active, id: q.id, edit: false })}
+              >
+                <Icon svg={xIcon} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {active !== undefined && editing !== undefined && (
+        <div id="editing">
+          <Icon svg={pencilIcon} />
+          <span className="editing-text">{t("chat.editing")}</span>
+          <button
+            type="button"
+            className="icon-btn small"
+            title={t("chat.cancelEdit")}
+            aria-label={t("chat.cancelEdit")}
+            onClick={() => endEdit(active)}
+          >
+            <Icon svg={xIcon} />
+          </button>
         </div>
       )}
       <div id="attachments">
@@ -566,7 +728,10 @@ export function useComposer(options: ComposerOptions) {
               e.preventDefault();
             } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              form.current?.requestSubmit();
+              submit(e.ctrlKey || e.metaKey);
+            } else if (e.key === "Escape" && editing !== undefined && active !== undefined) {
+              e.preventDefault();
+              endEdit(active);
             } else if (e.key === "Backspace" && !e.nativeEvent.isComposing && deleteToken()) {
               e.preventDefault();
             }
@@ -597,9 +762,8 @@ export function useComposer(options: ComposerOptions) {
           type="submit"
           id="send"
           className="icon-btn"
-          title={t("chat.sendTitle")}
+          title={t(busy ? "chat.queueTitle" : "chat.sendTitle")}
           aria-label={t("chat.send")}
-          disabled={busy}
         >
           <Icon svg={arrowUpIcon} />
         </button>
@@ -607,5 +771,5 @@ export function useComposer(options: ComposerOptions) {
     </form>
   );
 
-  return { element, dragging, addAttachment, quote, seed, setSearchResults, setSkills, focus };
+  return { element, dragging, addAttachment, quote, seed, setSearchResults, setSkills, focus, load, endEdit };
 }

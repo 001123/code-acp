@@ -150,6 +150,10 @@
         "title": "%command.unpinTab%"
       },
       {
+        "command": "codeAcp.renameTab",
+        "title": "%command.renameTab%"
+      },
+      {
         "command": "codeAcp.closeTab",
         "title": "%command.closeTab%"
       },
@@ -160,17 +164,16 @@
       {
         "command": "codeAcp.closeTabsToRight",
         "title": "%command.closeTabsToRight%"
+      },
+      {
+        "command": "codeAcp.forkTab",
+        "title": "%command.forkTab%"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "codeAcp.history",
-          "when": "view == codeAcp.chat",
-          "group": "navigation"
-        },
-        {
-          "command": "codeAcp.newSession",
           "when": "view == codeAcp.chat",
           "group": "navigation"
         },
@@ -260,6 +263,10 @@
           "when": "false"
         },
         {
+          "command": "codeAcp.renameTab",
+          "when": "false"
+        },
+        {
           "command": "codeAcp.closeTab",
           "when": "false"
         },
@@ -269,6 +276,10 @@
         },
         {
           "command": "codeAcp.closeTabsToRight",
+          "when": "false"
+        },
+        {
+          "command": "codeAcp.forkTab",
           "when": "false"
         }
       ],
@@ -289,6 +300,11 @@
           "group": "1_pin@1"
         },
         {
+          "command": "codeAcp.renameTab",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "group": "1_pin@3"
+        },
+        {
           "command": "codeAcp.closeTab",
           "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && !tabPinned",
           "group": "2_close@1"
@@ -302,6 +318,11 @@
           "command": "codeAcp.closeTabsToRight",
           "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
           "group": "2_close@3"
+        },
+        {
+          "command": "codeAcp.forkTab",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && tabCanFork",
+          "group": "1_pin@2"
         }
       ]
     },
@@ -442,6 +463,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "test": "vitest run",
     "package": "node esbuild.mjs --production && vsce package --out release/",
+    "reinstall": "npm run package && code --install-extension release/code-acp-$npm_package_version.vsix --force",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
   "devDependencies": {

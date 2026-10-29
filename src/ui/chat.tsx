@@ -29,6 +29,8 @@ function App() {
   const [folders, setFolders] = useState<WorkspaceFolderInfo[]>([]);
   const [remote, setRemote] = useState(false);
   const [history, setHistory] = useState<History>();
+  /** The tab whose name is being edited in the strip. */
+  const [renaming, setRenaming] = useState<number>();
   const messages = useRef<HTMLDivElement>(null);
   /** The active tab for callbacks registered once (drop, FileReader). */
   const activeRef = useRef(active);
@@ -38,12 +40,27 @@ function App() {
   const closePreview = useCallback(() => setPreview(undefined), []);
   const [hover, setHover] = useState<Hover>();
   const current = (active !== undefined && states[active]) || NEW_TAB;
-  const { transcript: state, config, usage, compactAt, status, attachments, commands, busySince, lastActivity, terminals: agentTerminals, changes } = current;
+  const {
+    transcript: state,
+    config,
+    usage,
+    compactAt,
+    status,
+    attachments,
+    commands,
+    busySince,
+    lastActivity,
+    terminals: agentTerminals,
+    changes,
+    queue,
+    editing,
+  } = current;
   const [followAgent, setFollowAgent] = useState(false);
   const checkpointTurns = changes?.turns;
+  const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;
   const shownTab = useMemo<ShownTab>(
-    () => ({ id: active, busy: !!status.busy, checkpoints: new Set(checkpointTurns) }),
-    [active, status.busy, checkpointTurns],
+    () => ({ id: active, busy: !!status.busy, canFork, checkpoints: new Set(checkpointTurns) }),
+    [active, status.busy, canFork, checkpointTurns],
   );
   const now = useNow(busySince !== undefined);
   const elapsed = busySince !== undefined ? Math.max(0, now - busySince) : 0;
@@ -64,6 +81,8 @@ function App() {
     tabs,
     states,
     attachments,
+    queue,
+    editing,
     commands,
     busy: !!status.busy,
     agents,
@@ -96,6 +115,16 @@ function App() {
       }
       case "changes":
         return update(tab, (s) => ({ ...s, changes: { files: msg.files, turns: msg.turns } }));
+      case "queue":
+        return update(tab, (s) => ({ ...s, queue: msg.items }));
+      case "loadComposer":
+        if (tab !== undefined) composer.load(tab, msg.parts, msg.rewind);
+        return;
+      case "rewind":
+        return dispatch(tab, { type: "rewind", turn: msg.turn });
+      case "forked":
+        if (tab !== undefined) dispatchTabs({ type: "fork", from: msg.from, tab });
+        return;
       case "followAgent":
         return setFollowAgent(msg.enabled);
       case "turnEnd":
@@ -150,13 +179,16 @@ function App() {
         return;
       case "quote":
         return composer.quote(msg.text);
+      case "renameTab":
+        return setRenaming(msg.tab);
       case "files":
         return composer.setSearchResults(msg.id, msg.files, msg.terminals);
       case "skills":
         return composer.setSkills(msg.skills);
       case "reset":
+        if (tab !== undefined) composer.endEdit(tab);
         dispatch(tab, { type: "reset" });
-        update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined, terminals: {} }));
+        update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined, terminals: {}, queue: [] }));
         return;
     }
   });
@@ -226,10 +258,42 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [!history]);
 
+  const pinned = useRef(true);
   useLayoutEffect(() => {
     const el = messages.current;
     if (el) el.scrollTop = el.scrollHeight;
+    pinned.current = true;
   }, [state.items, active]);
+
+  // Entries off screen skip rendering (content-visibility), so their real height shows up only later:
+  // keep following the end while the view is there. Scrolling up stops it, reaching the end again resumes it.
+  useEffect(() => {
+    const el = messages.current;
+    if (!el) return;
+    let lastTop = el.scrollTop;
+    const onScroll = () => {
+      const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+      pinned.current = atEnd || (pinned.current && el.scrollTop >= lastTop);
+      lastTop = el.scrollTop;
+    };
+    const resized = new ResizeObserver(() => {
+      if (pinned.current) el.scrollTop = el.scrollHeight;
+    });
+    for (const child of el.children) resized.observe(child);
+    const changed = new MutationObserver((records) => {
+      for (const r of records) {
+        for (const node of r.addedNodes) if (node instanceof Element) resized.observe(node);
+        for (const node of r.removedNodes) if (node instanceof Element) resized.unobserve(node);
+      }
+    });
+    changed.observe(el, { childList: true });
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      changed.disconnect();
+      resized.disconnect();
+    };
+  }, []);
 
   // VS Code builds the native context menu from `data-vscode-context`; the selection is read here,
   // in the capture phase, so it is current when VS Code's own listener runs.
@@ -249,7 +313,7 @@ function App() {
       <HoverPreview.Provider value={setHover}>
       <ShownTab.Provider value={shownTab}>
       <Terminals.Provider value={agentTerminals}>
-        <TabStrip tabs={tabs} states={states} active={active} onSelect={selectTab} />
+        <TabStrip tabs={tabs} states={states} active={active} onSelect={selectTab} renaming={renaming} onRename={setRenaming} />
         {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
         <div id="messages" ref={messages} hidden={!!history}>
           {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
@@ -287,16 +351,6 @@ function App() {
               <Icon svg={restoreIcon} />
             </button>
           )}
-          <button
-            id="follow"
-            className="icon-btn small"
-            title={t("chat.followAgent")}
-            aria-label={t("chat.followAgent")}
-            aria-pressed={followAgent}
-            onClick={() => post({ type: "setFollowAgent", enabled: !followAgent })}
-          >
-            <Icon svg={followAgent ? eyeIcon : eyeOffIcon} />
-          </button>
           <UsageMeter usage={usage} compactAt={compactAt} />
         </div>
         {composer.element}
@@ -326,6 +380,16 @@ function App() {
                 ) : null,
               )}
           </div>
+          <button
+            id="follow"
+            className="config-item"
+            title={t("chat.followAgent")}
+            aria-pressed={followAgent}
+            onClick={() => post({ type: "setFollowAgent", enabled: !followAgent })}
+          >
+            <Icon svg={followAgent ? eyeIcon : eyeOffIcon} />
+            {t("chat.follow")}
+          </button>
         </div>
         {preview && (
           <Lightbox

@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useEffect, useRef, useState } from "react";
-import type { Attachment, ChangesMessage, TabInfo, TerminalSnapshot } from "../../chat/protocol";
+import type { Attachment, ChangesMessage, QueuedInfo, TabInfo, TerminalSnapshot } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import pinIcon from "@tabler/icons/outline/pin.svg";
@@ -36,14 +36,28 @@ export interface TabState {
   /** The agent's terminals, by id. */
   terminals: Record<string, TerminalSnapshot>;
   changes?: ChangesMessage;
+  /** Messages waiting for the running turn to end. */
+  queue: QueuedInfo[];
+  /** The turn whose user message the composer is editing. */
+  editing?: number;
 }
 
-export const NEW_TAB: TabState = { transcript: EMPTY, config: [], status: { text: "" }, attachments: [], commands: [], terminals: {} };
+export const NEW_TAB: TabState = {
+  transcript: EMPTY,
+  config: [],
+  status: { text: "" },
+  attachments: [],
+  commands: [],
+  terminals: {},
+  queue: [],
+};
 
 export type TabsAction =
   | { type: "update"; tab: number; f: (state: TabState) => TabState }
   /** Drops the state of tabs that were closed. */
-  | { type: "keep"; ids: number[] };
+  | { type: "keep"; ids: number[] }
+  /** A forked tab starts with the conversation of the tab it was forked from. */
+  | { type: "fork"; from: number; tab: number };
 
 export function tabStates(state: Record<number, TabState>, action: TabsAction): Record<number, TabState> {
   switch (action.type) {
@@ -51,6 +65,11 @@ export function tabStates(state: Record<number, TabState>, action: TabsAction): 
       return { ...state, [action.tab]: action.f(state[action.tab] ?? NEW_TAB) };
     case "keep":
       return Object.fromEntries(action.ids.flatMap((id) => (state[id] ? [[id, state[id]]] : [])));
+    case "fork": {
+      const from = state[action.from] ?? NEW_TAB;
+      const tab = state[action.tab] ?? NEW_TAB;
+      return { ...state, [action.tab]: { ...tab, transcript: from.transcript, commands: from.commands, config: from.config } };
+    }
   }
 }
 
@@ -64,11 +83,16 @@ export function TabStrip({
   states,
   active,
   onSelect,
+  renaming,
+  onRename,
 }: {
   tabs: TabInfo[];
   states: Record<number, TabState>;
   active: number | undefined;
   onSelect: (id: number) => void;
+  /** The tab whose name is being edited; `onRename` starts or ends the edit. */
+  renaming: number | undefined;
+  onRename: (id: number | undefined) => void;
 }) {
   const { t, lang } = useL10n();
   const dateFormat = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" });
@@ -114,7 +138,7 @@ export function TabStrip({
               key={tab.id}
               className="tab"
               role="tab"
-              draggable
+              draggable={tab.id !== renaming}
               aria-selected={tab.id === active}
               data-active={tab.id === active || undefined}
               data-busy={state?.status.busy || undefined}
@@ -128,9 +152,11 @@ export function TabStrip({
                 webviewSection: "tab",
                 tab: tab.id,
                 tabPinned: tab.pinned,
+                tabCanFork: tab.canFork,
                 preventDefaultContextMenuItems: true,
               })}
               onClick={() => onSelect(tab.id)}
+              onDoubleClick={() => onRename(tab.id)}
               onAuxClick={(e) => {
                 if (e.button === 1 && !tab.pinned) post({ type: "closeTab", tab: tab.id });
               }}
@@ -156,7 +182,18 @@ export function TabStrip({
               }}
             >
               <span className="tab-dot" />
-              <span className="tab-title">{title}</span>
+              {tab.id === renaming ? (
+                <TabNameInput
+                  // What the strip shows: the user's name, else the title. Clearing it drops the name.
+                  initial={tab.title ?? ""}
+                  onDone={(name) => {
+                    onRename(undefined);
+                    if (name !== undefined && name !== (tab.title ?? "")) post({ type: "renameTab", tab: tab.id, title: name });
+                  }}
+                />
+              ) : (
+                <span className="tab-title">{title}</span>
+              )}
               <button
                 className="tab-pin"
                 title={pinLabel}
@@ -190,5 +227,38 @@ export function TabStrip({
         <Icon svg={plusIcon} />
       </button>
     </div>
+  );
+}
+
+/** Edits a tab's name in place: Enter or leaving the field keeps it, Escape drops it (`undefined`). */
+function TabNameInput({ initial, onDone }: { initial: string; onDone: (name: string | undefined) => void }) {
+  const { t } = useL10n();
+  const input = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  const finish = (name: string | undefined) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(name);
+  };
+  useEffect(() => {
+    input.current?.focus();
+    input.current?.select();
+  }, []);
+  return (
+    <input
+      ref={input}
+      className="tab-name"
+      defaultValue={initial}
+      aria-label={t("chat.renameTab")}
+      placeholder={t("chat.renameTab")}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") finish(e.currentTarget.value);
+        else if (e.key === "Escape") finish(undefined);
+      }}
+      onBlur={(e) => finish(e.currentTarget.value)}
+    />
   );
 }

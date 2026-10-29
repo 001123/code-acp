@@ -22,10 +22,12 @@ export const HoverPreview = createContext<(hover: Hover | undefined) => void>(()
 export interface ShownTab {
   id?: number;
   busy: boolean;
+  /** The tab's agent can fork the conversation. */
+  canFork: boolean;
   /** Turns whose user message can restore the files the agent changed from then on. */
   checkpoints: ReadonlySet<number>;
 }
-export const ShownTab = createContext<ShownTab>({ busy: false, checkpoints: new Set() });
+export const ShownTab = createContext<ShownTab>({ busy: false, canFork: false, checkpoints: new Set() });
 
 /** The shown tab's agent terminals by id; their own context, so output only re-renders the terminal views. */
 export const Terminals = createContext<Readonly<Record<string, TerminalSnapshot>>>({});

@@ -1,5 +1,5 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { Fragment, memo, useContext } from "react";
+import { Fragment, memo, useContext, useLayoutEffect, useRef, useState } from "react";
 import type { SentAttachment } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { diffLines, hunks } from "../lineDiff";
@@ -13,6 +13,9 @@ import loaderIcon from "@tabler/icons/outline/loader-2.svg";
 import usersIcon from "@tabler/icons/outline/users.svg";
 import diffIcon from "@tabler/icons/outline/file-diff.svg";
 import restoreIcon from "@tabler/icons/outline/restore.svg";
+import pencilIcon from "@tabler/icons/outline/pencil.svg";
+import refreshIcon from "@tabler/icons/outline/refresh.svg";
+import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { clip, contentText, type ActivityItem, type Item, type Text } from "./transcript";
@@ -43,11 +46,69 @@ function plainOutput(text: string): string {
   return text.replace(ANSI, "").replace(/[^\n]*\r(?!\n)/g, "");
 }
 
+/** Characters of a long output shown at first; each "show more" doubles it. */
+const OUTPUT_CHUNK = 20_000;
+
+/** A long output cut at a line break: its start, or its end for a terminal, with a button that shows more. */
+function LongOutput({ text, fromEnd }: { text: string; fromEnd?: boolean }) {
+  const { t } = useL10n();
+  const [shown, setShown] = useState(OUTPUT_CHUNK);
+  // Earlier output goes in above what is on screen: keep that where it is, measured from the bottom.
+  const anchor = useRef<{ box: Element; fromBottom: number }>(undefined);
+  useLayoutEffect(() => {
+    if (!anchor.current) return;
+    const { box, fromBottom } = anchor.current;
+    box.scrollTop = box.scrollHeight - fromBottom;
+    anchor.current = undefined;
+  }, [shown]);
+  if (text.length <= shown) return <>{text}</>;
+  let cut: number;
+  if (fromEnd) {
+    const at = text.indexOf("\n", text.length - shown);
+    cut = at < 0 ? text.length - shown : at + 1;
+  } else {
+    const at = text.lastIndexOf("\n", shown);
+    cut = at <= 0 ? shown : at + 1;
+  }
+  const hidden = fromEnd ? text.slice(0, cut) : text.slice(cut);
+  const lines = hidden.split("\n").length - (hidden.endsWith("\n") ? 1 : 0);
+  const more = (
+    <button
+      className="link output-more"
+      onClick={(e) => {
+        const box = e.currentTarget.closest("pre");
+        if (fromEnd && box) anchor.current = { box, fromBottom: box.scrollHeight - box.scrollTop };
+        setShown(shown * 2);
+      }}
+    >
+      {t(fromEnd ? "chat.showEarlier" : "chat.showMore", lines)}
+    </button>
+  );
+  return fromEnd ? (
+    <>
+      {more}
+      {text.slice(cut)}
+    </>
+  ) : (
+    <>
+      {text.slice(0, cut)}
+      {more}
+    </>
+  );
+}
+
 /** A command the agent runs in a client terminal, with its output so far. */
 function TerminalView({ terminalId }: { terminalId: string }) {
   const { t } = useL10n();
   const tab = useContext(ShownTab);
   const terminal = useContext(Terminals)[terminalId];
+  // Follows the end of the output, like a terminal, until the user scrolls away from it.
+  const output = useRef<HTMLPreElement>(null);
+  const follow = useRef(true);
+  useLayoutEffect(() => {
+    const el = output.current;
+    if (el && follow.current) el.scrollTop = el.scrollHeight;
+  });
   if (!terminal) return <div className="muted">{t("terminal.running")}</div>;
   const exit = terminal.exitStatus;
   const state = !exit
@@ -72,12 +133,16 @@ function TerminalView({ terminalId }: { terminalId: string }) {
         )}
       </div>
       {terminal.output && (
-        <pre className="tool-output terminal-output" ref={(el) => {
-            // Follows the end of the output, like a terminal.
-            if (el) el.scrollTop = el.scrollHeight;
-          }}>
+        <pre
+          className="tool-output terminal-output"
+          ref={output}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+          }}
+        >
           {terminal.truncated && <span className="muted">{t("terminal.truncated")}…{"\n"}</span>}
-          {plainOutput(terminal.output)}
+          <LongOutput text={plainOutput(terminal.output)} fromEnd />
         </pre>
       )}
     </div>
@@ -131,7 +196,7 @@ function ToolContent({ content }: { content?: acp.ToolCallContent[] | null }) {
           <DiffView key={i} diff={item} />
         ) : item.type === "content" ? (
           <pre key={i} className="tool-output">
-            {contentText(item.content)}
+            <LongOutput text={contentText(item.content)} />
           </pre>
         ) : item.type === "terminal" ? (
           <TerminalView key={i} terminalId={item.terminalId} />
@@ -159,20 +224,38 @@ function Locations({ locations }: { locations?: acp.ToolCallLocation[] }) {
 }
 
 /** On a user message whose turn changed files: puts them back as they were before it. */
-function RestoreButton({ turn }: { turn?: number }) {
+/** Under a message sent from this chat: restore its checkpoint, edit it, send it again, fork before it. */
+function MessageActions({ turn }: { turn?: number }) {
   const { t } = useL10n();
   const tab = useContext(ShownTab);
-  if (turn === undefined || tab.id === undefined || !tab.checkpoints.has(turn)) return null;
-  return (
-    <button
-      className="restore secondary"
-      title={t("changes.restoreTitle")}
-      disabled={tab.busy}
-      onClick={() => post({ type: "restoreCheckpoint", tab: tab.id!, turn })}
-    >
-      <Icon svg={restoreIcon} />
-      {t("changes.restore")}
+  if (turn === undefined || tab.id === undefined) return null;
+  const id = tab.id;
+  const action = (label: string, svg: string, onClick: () => void) => (
+    <button className="icon-btn small" title={label} aria-label={label} onClick={onClick}>
+      <Icon svg={svg} />
     </button>
+  );
+  return (
+    <>
+      {!tab.busy && (
+        <div className="msg-tools">
+          {action(t("chat.editMessage"), pencilIcon, () => post({ type: "editMessage", tab: id, turn }))}
+          {action(t("chat.retry"), refreshIcon, () => post({ type: "retry", tab: id, turn }))}
+          {tab.canFork && action(t("chat.forkHere"), branchIcon, () => post({ type: "fork", tab: id, turn }))}
+        </div>
+      )}
+      {tab.checkpoints.has(turn) && (
+        <button
+          className="restore secondary"
+          title={t("changes.restoreTitle")}
+          disabled={tab.busy}
+          onClick={() => post({ type: "restoreCheckpoint", tab: id, turn })}
+        >
+          <Icon svg={restoreIcon} />
+          {t("changes.restore")}
+        </button>
+      )}
+    </>
   );
 }
 
@@ -270,7 +353,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
         <div className="msg user">
           <Tokens text={item.text} tokens={item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []))} />
           <SentAttachments attachments={item.attachments.filter((a) => !a.token)} />
-          <RestoreButton turn={item.turn} />
+          <MessageActions turn={item.turn} />
         </div>
       );
     case "tool": {
@@ -324,7 +407,9 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
               <ToolContent content={item.toolCall.content} />
             </div>
           ) : item.toolCall.rawInput ? (
-            <pre className="tool-output">{clip(JSON.stringify(item.toolCall.rawInput, null, 2))}</pre>
+            <pre className="tool-output">
+              <LongOutput text={clip(JSON.stringify(item.toolCall.rawInput, null, 2))} />
+            </pre>
           ) : null}
           <div className="permission-buttons">
             {item.options.map((opt) => (

@@ -59,6 +59,17 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tab-name {
+  min-width: 0;
+  width: 100%;
+  padding: 0 2px;
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 3px;
+  outline: none;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
 .tab-dot {
   display: none;
   flex-shrink: 0;
@@ -132,13 +143,37 @@ body {
   margin-top: -4px;
   padding: 0 10px 6px;
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 4px;
 }
-/* Only session config lives here; nothing to show before the agent sends any. */
-#toolbar:has(#config:empty) {
+#config:empty {
   display: none;
+}
+/* Session config scrolls; the follow toggle stays pinned at the end. */
+#config {
+  flex: 1;
+  min-width: 0;
+}
+#follow {
+  gap: 5px;
+  margin-left: auto;
+  padding: 0 9px 0 7px;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-size: 0.92em;
+  cursor: pointer;
+}
+#follow svg {
+  width: 14px;
+  height: 14px;
+}
+#follow:hover {
+  color: var(--vscode-foreground);
+}
+#follow[aria-pressed="true"] {
+  color: var(--vscode-textLink-foreground);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground) 14%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-textLink-foreground) 35%, transparent);
 }
 button.link {
   background: none;
@@ -147,6 +182,12 @@ button.link {
   margin-left: -6px;
   border-radius: 6px;
   font-weight: 600;
+}
+button.output-more {
+  display: block;
+  margin: 2px 0 2px -6px;
+  font-family: var(--vscode-font-family);
+  font-weight: normal;
 }
 button.link:hover {
   background: var(--vscode-toolbar-hoverBackground);
@@ -221,6 +262,12 @@ button.link:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+/* Entries off screen skip layout and paint, which keeps long chats fast. User messages are left out:
+   their actions float above the box, and paint containment would clip them. */
+#messages > :not(.msg.user, .empty) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
 }
 #messages[hidden] {
   display: none;
@@ -461,6 +508,27 @@ pre.terminal-output {
   word-break: break-all;
 }
 
+/* Edit, retry and fork float on the message's top edge while it is hovered. */
+.msg.user {
+  position: relative;
+}
+.msg-tools {
+  position: absolute;
+  top: -11px;
+  right: 8px;
+  display: flex;
+  gap: 2px;
+  padding: 1px;
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-widget-border, color-mix(in srgb, var(--vscode-foreground) 15%, transparent));
+  white-space: normal;
+  visibility: hidden;
+}
+.msg.user:hover .msg-tools,
+.msg-tools:focus-within {
+  visibility: visible;
+}
 .msg.user .restore {
   display: inline-flex;
   align-items: center;
@@ -875,6 +943,53 @@ button[disabled] {
   cursor: default;
 }
 
+/* Messages waiting for the turn to end, and the banner of an edit, above the input. */
+#queue {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.queued,
+#editing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px 2px 6px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+}
+.queued > .svg-icon svg,
+#editing > .svg-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.queued > .svg-icon,
+#editing > .svg-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--vscode-descriptionForeground);
+}
+.queued-text,
+.editing-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queued-more {
+  flex: none;
+  color: var(--vscode-descriptionForeground);
+}
+#editing {
+  margin-bottom: 6px;
+  color: var(--vscode-textLink-foreground);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground) 10%, transparent);
+}
+
 #attachments,
 .msg-attachments {
   display: flex;
@@ -937,41 +1052,91 @@ button.chip-remove {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px 4px 12px;
+  padding: 10px 8px 8px 16px;
 }
 #history-header .icon-btn {
   background: none;
-  color: var(--vscode-foreground);
+  color: var(--vscode-descriptionForeground);
 }
 #history-header .icon-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
 }
 #history-title {
   font-weight: 600;
+  font-size: 1.05em;
+}
+/* Lines up with the list items below it. */
+#history-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin: 0 8px 8px;
+  padding: 0 4px 0 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+  background: var(--vscode-input-background);
+  color: var(--vscode-descriptionForeground);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+#history-search:focus-within {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 20%, transparent);
+}
+#history-search > svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+#history-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
+#history-search input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+#history-search input::-webkit-search-cancel-button {
+  display: none;
 }
 .history-message {
-  padding: 8px 12px;
+  padding: 8px 18px;
   color: var(--vscode-descriptionForeground);
 }
 #history-list {
   list-style: none;
   margin: 0;
-  padding: 0 6px 8px;
+  padding: 0 8px 8px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 .history-item {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
-  border-radius: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 8px;
   background: none;
   color: var(--vscode-foreground);
   text-align: left;
 }
 .history-item:hover:not(:disabled) {
   background: var(--vscode-list-hoverBackground);
+}
+.history-item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
 .history-item[data-current] {
   background: var(--vscode-list-inactiveSelectionBackground);
@@ -987,9 +1152,24 @@ button.chip-remove {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.history-item-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  color: var(--vscode-descriptionForeground);
+  background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
+.history-item-badge[data-current] {
+  color: var(--vscode-textLink-foreground);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground) 15%, transparent);
+}
 .history-item-meta {
   flex-shrink: 0;
-  font-size: 0.9em;
+  min-width: 4.5em;
+  text-align: right;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
   color: var(--vscode-descriptionForeground);
 }
 

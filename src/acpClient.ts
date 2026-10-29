@@ -1,4 +1,5 @@
 import * as acp from "@agentclientprotocol/sdk";
+import type * as unstable from "@agentclientprotocol/sdk/unstable";
 import { Deferred, Effect, Option, Schema, Scope } from "effect";
 import { execa } from "execa";
 import { Readable, Writable } from "node:stream";
@@ -68,6 +69,8 @@ export interface AcpAgent {
   loadSession(sessionId: string, cwd: string): Effect.Effect<acp.LoadSessionResponse, RequestError>;
   /** Needs `sessionCapabilities.resume`; continues a session without replaying its history. */
   resumeSession(sessionId: string, cwd: string): Effect.Effect<acp.ResumeSessionResponse, RequestError>;
+  /** Needs `sessionCapabilities.fork`; a new session that starts with a copy of this one's history. */
+  forkSession(sessionId: string, cwd: string): Effect.Effect<unstable.ForkSessionResponse, RequestError>;
   /** Needs `sessionCapabilities.close`; frees the session's resources on the agent. */
   closeSession(sessionId: string): Effect.Effect<void, RequestError>;
   prompt(sessionId: string, prompt: Array<acp.ContentBlock>): Effect.Effect<acp.PromptResponse, RequestError>;
@@ -80,6 +83,12 @@ export interface AcpAgent {
   authenticate(methodId: string): Effect.Effect<acp.AuthenticateResponse, RequestError>;
   /** Stops the command of one of the agent's terminals; the agent still gets its output and exit status. */
   killTerminal(sessionId: string, terminalId: string): Effect.Effect<void, TerminalNotFoundError>;
+}
+
+/** Whether the agent can fork sessions; session/fork is unstable, so the stable types leave it out. */
+export function canFork(agent: AcpAgent): boolean {
+  const caps: unstable.SessionCapabilities | null | undefined = agent.initializeResponse.agentCapabilities?.sessionCapabilities;
+  return !!caps?.fork;
 }
 
 /** The part of the extension's package.json sent as `clientInfo`. */
@@ -260,6 +269,15 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
           ),
         ),
         Effect.tap(() => remember(sessionId, cwd)),
+      ),
+    forkSession: (sessionId, cwd) =>
+      mcpServers.pipe(
+        Effect.flatMap((mcpServers) =>
+          request("session/fork", (agent) =>
+            agent.request<unstable.ForkSessionResponse, unstable.ForkSessionRequest>("session/fork", { sessionId, cwd, mcpServers }),
+          ),
+        ),
+        Effect.tap((res) => remember(res.sessionId, cwd)),
       ),
     closeSession: (sessionId) =>
       request("session/close", (agent) => agent.request(acp.methods.agent.session.close, { sessionId })).pipe(

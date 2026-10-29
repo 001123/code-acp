@@ -117,6 +117,28 @@ export class ChangeReview implements vscode.Disposable {
     this.post(tab);
   });
 
+  /**
+   * Before the conversation goes back to the user message of `turn`: when the files differ from its checkpoint,
+   * asks whether to put them back too. False when the user cancelled.
+   */
+  readonly rewind = Effect.fn("ChangeReview.rewind")(function* (this: ChangeReview, tab: Tab, turn: number) {
+    const files = yield* restorePlan(tab.changes, turn);
+    if (files.length === 0) {
+      return true;
+    }
+    const restoreFiles = t("chat.rewindRestore");
+    const keepFiles = t("chat.rewindKeep");
+    const picked = yield* thenable(() =>
+      vscode.window.showWarningMessage(t("chat.rewindFiles", files.length), { modal: true }, restoreFiles, keepFiles),
+    );
+    if (picked === restoreFiles) {
+      yield* restore(tab.changes, turn);
+      this.host.saveTabs();
+      this.post(tab);
+    }
+    return picked !== undefined;
+  });
+
   /** The tab's checkpoints in a quick pick, newest first; also those of messages no longer shown (after a reload). */
   readonly pick = Effect.fn("ChangeReview.pick")(function* (this: ChangeReview, tab: Tab) {
     const format = new Intl.DateTimeFormat(vscode.env.language, { dateStyle: "short", timeStyle: "short" });

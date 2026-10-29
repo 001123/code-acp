@@ -1,8 +1,11 @@
 import type * as acp from "@agentclientprotocol/sdk";
+import { useState } from "react";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
+import searchIcon from "@tabler/icons/outline/search.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { post } from "./post";
+import { matchesSession } from "./search";
 
 export interface History {
   sessions: acp.SessionInfo[];
@@ -36,16 +39,21 @@ function relativeTime(lang: string, iso: string | null | undefined): string {
 
 export function HistoryView({ history, onClose }: { history: History; onClose: () => void }) {
   const { t, lang } = useL10n();
-  const sessions = [...history.sessions].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  const [query, setQuery] = useState("");
+  const sessions = history.sessions
+    .filter((s) => matchesSession(s, query))
+    .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
   const message = history.loading
     ? t("chat.historyLoading")
     : history.unsupported
       ? t("chat.historyUnsupported")
-      : sessions.length === 0
+      : history.sessions.length === 0
         ? t("chat.historyEmpty")
-        : history.canOpen
-          ? undefined
-          : t("chat.historyCannotOpen");
+        : sessions.length === 0
+          ? t("chat.historyNoMatch")
+          : history.canOpen
+            ? undefined
+            : t("chat.historyCannotOpen");
   return (
     <div id="history">
       <div id="history-header">
@@ -54,8 +62,57 @@ export function HistoryView({ history, onClose }: { history: History; onClose: (
           <Icon svg={xIcon} />
         </button>
       </div>
+      {history.sessions.length > 0 && (
+        <div id="history-search">
+          <Icon svg={searchIcon} />
+          <input
+            type="search"
+            autoFocus
+            value={query}
+            placeholder={t("chat.historySearch")}
+            aria-label={t("chat.historySearch")}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                if (query) setQuery("");
+                else onClose();
+              } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                document.querySelector<HTMLButtonElement>(".history-item:not(:disabled)")?.focus();
+              }
+            }}
+          />
+          {query && (
+            <button
+              className="icon-btn small"
+              title={t("chat.historyClearSearch")}
+              aria-label={t("chat.historyClearSearch")}
+              onClick={(e) => {
+                setQuery("");
+                e.currentTarget.parentElement?.querySelector("input")?.focus();
+              }}
+            >
+              <Icon svg={xIcon} />
+            </button>
+          )}
+        </div>
+      )}
       {message && <div className="history-message">{message}</div>}
-      <ul id="history-list">
+      <ul
+        id="history-list"
+        // Arrow keys walk the list; Up from the first item returns to the search box.
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+          const items = [...e.currentTarget.querySelectorAll<HTMLButtonElement>(".history-item:not(:disabled)")];
+          const i = items.indexOf(document.activeElement as HTMLButtonElement);
+          if (i < 0) return;
+          e.preventDefault();
+          const next = items[i + (e.key === "ArrowDown" ? 1 : -1)];
+          if (next) next.focus();
+          else if (e.key === "ArrowUp") document.querySelector<HTMLInputElement>("#history-search input")?.focus();
+        }}
+      >
         {sessions.map((s) => (
           <li key={s.sessionId}>
             <button
@@ -70,13 +127,14 @@ export function HistoryView({ history, onClose }: { history: History; onClose: (
               }}
             >
               <span className="history-item-title">{s.title?.trim() || t("chat.untitled")}</span>
-              <span className="history-item-meta">
-                {s.sessionId === history.currentId
-                  ? t("chat.currentSession")
-                  : history.openIds?.includes(s.sessionId)
-                    ? t("chat.openInTab")
-                    : relativeTime(lang, s.updatedAt)}
-              </span>
+              {s.sessionId === history.currentId ? (
+                <span className="history-item-badge" data-current>
+                  {t("chat.currentSession")}
+                </span>
+              ) : (
+                history.openIds?.includes(s.sessionId) && <span className="history-item-badge">{t("chat.openInTab")}</span>
+              )}
+              <span className="history-item-meta">{relativeTime(lang, s.updatedAt)}</span>
             </button>
           </li>
         ))}

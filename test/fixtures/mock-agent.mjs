@@ -1,5 +1,6 @@
 // A mock ACP agent speaking ndjson on stdio. Scenarios are picked by env vars and by the prompt text.
-import * as acp from "@agentclientprotocol/sdk";
+// The unstable entry: the stable API and session/fork.
+import * as acp from "@agentclientprotocol/sdk/unstable";
 import { Readable, Writable } from "node:stream";
 
 if (process.env.MOCK_EXIT_EARLY === "1") {
@@ -16,6 +17,7 @@ acp
     agentInfo: { name: "mock-agent", version: "9.9.9" },
     agentCapabilities: {
       mcpCapabilities: { http: process.env.MOCK_HTTP === "1", sse: false },
+      ...(process.env.MOCK_FORK === "1" ? { sessionCapabilities: { fork: {} } } : {}),
     },
     authMethods: [{ id: "login", name: "Log in" }],
     _meta: { clientInfo: params.clientInfo, clientCapabilities: params.clientCapabilities, pid: process.pid },
@@ -26,6 +28,10 @@ acp
     }
     return { sessionId: "s1", _meta: { cwd: params.cwd, mcpServers: params.mcpServers } };
   })
+  .onRequest(acp.methods.agent.session.fork, ({ params }) => ({
+    sessionId: `${params.sessionId}-fork`,
+    _meta: { cwd: params.cwd, mcpServers: params.mcpServers },
+  }))
   .onRequest(acp.methods.agent.session.prompt, async ({ params, client }) => {
     const text = params.prompt.map((b) => (b.type === "text" ? b.text : "")).join("");
     const [scenario, arg] = text.split(" ");

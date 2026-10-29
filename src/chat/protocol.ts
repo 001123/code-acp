@@ -6,13 +6,29 @@ export type { ChangedFile, TerminalSnapshot };
 
 export type FromWebview =
   | { type: "ready" }
-  /** The composer in order: text runs and the attachments between them. */
-  | { type: "send"; tab: number; parts: PromptPart[]; includeActiveFile: boolean }
+  /**
+   * The composer in order: text runs and the attachments between them. While the tab is busy it is queued, or with
+   * `now` sent right away, stopping the turn. With `rewind`, it replaces the user message of that turn and the rest
+   * of the conversation after it.
+   */
+  | { type: "send"; tab: number; parts: PromptPart[]; includeActiveFile: boolean; now?: boolean; rewind?: number }
+  /** Sends a queued message now, stopping the running turn. */
+  | { type: "sendQueuedNow"; tab: number; id: number }
+  /** Takes a message out of the queue; with `edit`, it goes back to the composer ("loadComposer"). */
+  | { type: "unqueue"; tab: number; id: number; edit: boolean }
+  /** Puts the user message of `turn` back in the composer to change it and send it again ("loadComposer"). */
+  | { type: "editMessage"; tab: number; turn: number }
+  /** Sends the user message of `turn` again, dropping the conversation after it. */
+  | { type: "retry"; tab: number; turn: number }
+  /** Copies the conversation into a new tab; with `turn`, only what came before that user message. */
+  | { type: "fork"; tab: number; turn?: number }
   | { type: "cancel"; tab: number }
   | { type: "newTab" }
   | { type: "selectTab"; tab: number }
   | { type: "closeTab"; tab: number }
   | { type: "pinTab"; tab: number; pinned: boolean }
+  /** A name the user gave the tab, shown over its title; an empty one shows the title again. */
+  | { type: "renameTab"; tab: number; title: string }
   /** `index` is the tab's position after the move; it stays inside its pinned or unpinned group. */
   | { type: "moveTab"; tab: number; index: number }
   /** The composer's unsent content, kept so it survives a reload. */
@@ -62,6 +78,21 @@ export interface ChangesMessage {
   turns: number[];
 }
 
+/** A message waiting for the running turn to end ("queue" message). */
+export interface QueuedInfo {
+  id: number;
+  text: string;
+  /** Names of the attachments not inline in the text. */
+  attachments: string[];
+}
+
+/** The composer content to put back ("loadComposer"): a queued message, or a sent one to edit (with `rewind`). */
+export interface LoadComposer {
+  parts: PromptPart[];
+  /** The turn whose user message is being edited. */
+  rewind?: number;
+}
+
 /** The workspace folders a tab can run in ("folders" message); the picker shows when there are several. */
 export interface WorkspaceFolderInfo {
   name: string;
@@ -71,7 +102,7 @@ export interface WorkspaceFolderInfo {
 /** A chat tab as the webview shows it in the tab strip. */
 export interface TabInfo {
   id: number;
-  /** Undefined until the first message or the agent names the session. */
+  /** The user's name for the tab, else its title; undefined until the first message or the agent names the session. */
   title?: string;
   pinned: boolean;
   /** When the conversation started (epoch ms); undefined until the first message, or for sessions opened from history. */
@@ -80,6 +111,8 @@ export interface TabInfo {
   agentId?: string;
   /** The folder the tab's session runs in. */
   cwd: string;
+  /** The tab's agent can fork its session (session/fork). */
+  canFork: boolean;
   /** Unsent composer content; the webview only uses it for tabs it has no draft for yet. */
   draft?: Draft;
 }

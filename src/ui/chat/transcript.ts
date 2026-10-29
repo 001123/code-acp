@@ -48,6 +48,8 @@ export type Action =
   | { type: "permissionDone"; requestId: number }
   /** The turn ended: the next chunk starts a new block. */
   | { type: "endStream" }
+  /** Drops the user message of `turn` and everything after it. */
+  | { type: "rewind"; turn: number }
   | { type: "reset" };
 
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -55,20 +57,26 @@ export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omi
 export const EMPTY: Transcript = { items: [], nextId: 1 };
 
 /**
- * Characters kept of one tool output or diff side. Agents send whole files here, and every tab keeps its
- * transcript for as long as the view lives.
+ * Characters kept of one tool output. Agents send whole files here, and every tab keeps its transcript for as
+ * long as the view lives; the view shows the start and reveals the rest on demand.
  */
-const MAX_TOOL_TEXT = 20_000;
+const MAX_TOOL_TEXT = 500_000;
+/** Characters kept of one diff side; the full diff opens in an editor. */
+const MAX_DIFF_TEXT = 20_000;
 
-export function clip(text: string): string {
-  return text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n…` : text;
+export function clip(text: string, max = MAX_TOOL_TEXT): string {
+  return text.length > max ? `${text.slice(0, max)}\n…` : text;
 }
 
 /** Tool call content as the transcript keeps it: long text clipped, binary data dropped (only its kind is shown). */
 export function clipContent(content: acp.ToolCallContent[] | null | undefined): acp.ToolCallContent[] | undefined {
   return content?.map((item): acp.ToolCallContent => {
     if (item.type === "diff") {
-      return { ...item, oldText: item.oldText == null ? item.oldText : clip(item.oldText), newText: clip(item.newText) };
+      return {
+        ...item,
+        oldText: item.oldText == null ? item.oldText : clip(item.oldText, MAX_DIFF_TEXT),
+        newText: clip(item.newText, MAX_DIFF_TEXT),
+      };
     }
     if (item.type !== "content") return item;
     const block = item.content;
@@ -206,6 +214,10 @@ export function transcript(state: Transcript, action: Action): Transcript {
       };
     case "endStream":
       return { ...state, streaming: undefined };
+    case "rewind": {
+      const index = state.items.findIndex((i) => i.kind === "userMessage" && i.turn === action.turn);
+      return index < 0 ? state : { ...state, items: state.items.slice(0, index), streaming: undefined };
+    }
     case "reset":
       return EMPTY;
   }

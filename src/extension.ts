@@ -123,9 +123,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       [
         ["codeAcp.pinTab", "pin"],
         ["codeAcp.unpinTab", "unpin"],
+        ["codeAcp.renameTab", "rename"],
         ["codeAcp.closeTab", "close"],
         ["codeAcp.closeOtherTabs", "closeOthers"],
         ["codeAcp.closeTabsToRight", "closeToRight"],
+        ["codeAcp.forkTab", "fork"],
       ] as const
     ).map(([command, action]) =>
       // The tab's `data-vscode-context` (see TabStrip in src/ui/chat.tsx).

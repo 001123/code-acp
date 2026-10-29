@@ -9,7 +9,9 @@ import { DraftStore, type DraftHolder } from "../src/chat/drafts";
 import { canReopen, HistoryRequests, listHistory } from "../src/chat/history";
 import { CANCELLED, Permissions } from "../src/chat/permissions";
 import type { Attachment } from "../src/chat/protocol";
-import { SavedTabs, TabList } from "../src/chat/tabs";
+import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
+import { matchesSession } from "../src/ui/chat/search";
+import { transcript, EMPTY, type Action } from "../src/ui/chat/transcript";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../src/workspace";
 import { __test, Uri, window, workspace } from "./stubs/vscode";
 
@@ -133,6 +135,34 @@ describe("TabList", () => {
     assert.strictEqual(list.remove(b), 1);
     assert.strictEqual(list.remove(b), -1);
     assert.isFalse(list.has(b));
+  });
+
+  it("shows the user's name over the title, and keeps it across a reload", () => {
+    const list = new TabList(undefined, () => "/d");
+    const tab = list.active;
+    tab.title = "From the agent";
+    assert.isTrue(list.rename(tab, "  Mine "));
+    assert.isFalse(list.rename(tab, "Mine"));
+    tab.title = "Newer from the agent";
+    assert.strictEqual(list.info[0]!.title, "Mine");
+    const restored = new TabList(list.saved, () => "/d");
+    assert.strictEqual(restored.info[0]!.title, "Mine");
+    // An empty name shows the title again.
+    assert.isTrue(list.rename(tab, " "));
+    assert.strictEqual(list.info[0]!.title, "Newer from the agent");
+    assert.isFalse(list.rename(tab, ""));
+  });
+});
+
+describe("history search", () => {
+  const session = { sessionId: "s", cwd: "/work/code-acp", title: "Tìm kiếm trong lịch sử" };
+
+  it("matches every word, ignoring case and diacritics", () => {
+    assert.isTrue(matchesSession(session, ""));
+    assert.isTrue(matchesSession(session, "tim LICH"));
+    assert.isTrue(matchesSession(session, "lịch code-acp"));
+    assert.isFalse(matchesSession(session, "tim tab"));
+    assert.isTrue(matchesSession({ sessionId: "d", cwd: "/w", title: "Đổi tên" }, "doi"));
   });
 });
 
@@ -297,5 +327,44 @@ describe("history", () => {
     const second = requests.next();
     assert.isFalse(first());
     assert.isTrue(second());
+  });
+});
+
+describe("rewind and fork state", () => {
+  it("drops a user message and everything after it from the transcript", () => {
+    const actions: Action[] = [
+      { type: "add", item: { kind: "userMessage", text: "one", attachments: [], turn: 1 } },
+      { type: "chunk", kind: "assistant", text: "reply one" },
+      { type: "add", item: { kind: "userMessage", text: "two", attachments: [], turn: 2 } },
+      { type: "chunk", kind: "assistant", text: "reply two" },
+    ];
+    const state = actions.reduce(transcript, EMPTY);
+    const rewound = transcript(state, { type: "rewind", turn: 2 });
+    assert.deepStrictEqual(
+      rewound.items.map((i) => ("text" in i ? i.text : i.kind)),
+      ["one", "reply one"],
+    );
+    assert.isUndefined(rewound.streaming);
+    // A turn no longer shown changes nothing.
+    assert.strictEqual(transcript(rewound, { type: "rewind", turn: 2 }), rewound);
+  });
+
+  it("names inline attachments by their token in a message's text", () => {
+    const file: Attachment = { kind: "uri", uri: "file:///w/a.ts", name: "a.ts" };
+    assert.strictEqual(messageText(["look at ", { ...file, token: "@a.ts" }, " please", file]), "look at @a.ts please");
+  });
+
+  it("forgets the queue, the sent messages and the rewind note when a tab starts over", () => {
+    const tabs = new TabList(undefined, () => "/w");
+    const tab = tabs.active;
+    tab.queue.push({ id: 1, parts: ["later"], includeActiveFile: false });
+    tab.steer = true;
+    tab.sent.set(3, { parts: ["sent"], includeActiveFile: false });
+    tab.rewindNote = "note";
+    resetConversation(tab);
+    assert.deepStrictEqual(tab.queue, []);
+    assert.isFalse(tab.steer);
+    assert.strictEqual(tab.sent.size, 0);
+    assert.isUndefined(tab.rewindNote);
   });
 });

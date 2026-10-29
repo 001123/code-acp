@@ -4,7 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Scope } from "effect";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type AcpAgent, type AgentHandlers, spawnAgent } from "../src/acpClient";
+import { type AcpAgent, type AgentHandlers, canFork, spawnAgent } from "../src/acpClient";
 import { ExtensionCtx, Output } from "../src/runtime";
 import { __test } from "./stubs/vscode";
 import { makeExtensionCtx, makeOutput, type OutputStub, stubLayer } from "./helpers";
@@ -123,6 +123,24 @@ describe("spawnAgent", () => {
         ]);
       }),
     );
+  });
+
+  it.live("forks a session when the agent advertises session/fork", () => {
+    __test.reset();
+    __test.setSetting("codeAcp.mcpServers", { local: { command: "node", args: ["srv.js"] } });
+    return Effect.gen(function* () {
+      yield* withAgent({}, allow, (agent) => Effect.sync(() => assert.isFalse(canFork(agent))));
+      yield* withAgent({ MOCK_FORK: "1" }, allow, (agent) =>
+        Effect.gen(function* () {
+          assert.isTrue(canFork(agent));
+          const res = yield* agent.forkSession("s1", "/some/cwd");
+          assert.strictEqual(res.sessionId, "s1-fork");
+          const meta = res._meta as { cwd: string; mcpServers: Array<unknown> };
+          assert.strictEqual(meta.cwd, "/some/cwd");
+          assert.deepStrictEqual(meta.mcpServers, [{ name: "local", command: "node", args: ["srv.js"], env: [] }]);
+        }),
+      );
+    });
   });
 
   it.live("newSession passes http servers when the agent supports them", () => {

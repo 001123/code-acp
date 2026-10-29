@@ -14,6 +14,7 @@ VS Code extension "Code ACP": chat with coding agents over ACP, install agents f
 - Chat view: host in `src/chat/` (`chatViewProvider.ts` is the adapter; tabs, drafts, attachments, permissions, history, changes beside it), webview in `src/ui/chat.tsx` + `src/ui/chat/`. Messages shared by both live in `src/chat/protocol.ts`.
 - Tests: `test/*.test.ts` with `@effect/vitest`; `vscode` is aliased to `test/stubs/vscode.ts` (extend it as needed), `test/fixtures/mock-agent.mjs` is an ACP agent over stdio.
 - Run `npm run typecheck` and `npm test` before finishing.
+- Local dev (the `code` CLI is on `PATH`): after the checks pass, run `npm run reinstall` to package and reinstall the extension, then tell the user to run "Developer: Reload Window". Skip this in CI or remote sessions.
 
 ## Effect
 

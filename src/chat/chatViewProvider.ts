@@ -2,10 +2,11 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { Effect, Exit, Option, Predicate, Schema, Scope, Semaphore } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { spawnAgent, type AgentRequestError, type AgentStartError } from "../acpClient";
+import { canFork, spawnAgent, type AgentRequestError, type AgentStartError } from "../acpClient";
 import type { AgentManager } from "../agentManager";
 import { ClaudeSettings } from "../claudeSettings";
 import { Completions } from "../completions";
+import { ChangeSet } from "../fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
 import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output } from "../runtime";
 import { readSettings } from "../settings";
@@ -17,8 +18,17 @@ import { ChangeReview, confirm } from "./changes";
 import { DraftStore } from "./drafts";
 import { canReopen, HistoryRequests, listHistory } from "./history";
 import { CANCELLED, Permissions } from "./permissions";
-import type { Attachment, Draft, FromWebview, PromptPart, SentAttachment } from "./protocol";
-import { resetConversation, TabList, usageOf, type Reopen, type RunningAgent, type Tab } from "./tabs";
+import type { Attachment, Draft, FromWebview, LoadComposer, QueuedInfo, SentAttachment } from "./protocol";
+import {
+  messageText,
+  resetConversation,
+  TabList,
+  usageOf,
+  type OutgoingMessage,
+  type Reopen,
+  type RunningAgent,
+  type Tab,
+} from "./tabs";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
 
 /** `_meta` key on Claude agents' `usage_update` naming the model the usage belongs to. */
@@ -27,6 +37,9 @@ const CLAUDE_MODEL_META = "_claude/model";
 const TABS_KEY = "codeAcp.tabs";
 
 const MAX_TITLE_LENGTH = 40;
+
+/** Characters of a taken-back message quoted to the agent. */
+const MAX_EXCERPT_LENGTH = 80;
 
 /** Tabs are written to workspaceState at most this often; usage updates arrive many times per turn. */
 const SAVE_TABS_DELAY_MS = 500;
@@ -73,6 +86,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private saveTimer?: ReturnType<typeof setTimeout>;
   /** Turn ids, unique across tabs. */
   private nextTurn: number;
+  /** Ids of queued messages. */
+  private nextQueued = 1;
   /** codeAcp.followAgent: the active tab's agent's tool locations are opened in the editor. */
   private followAgent = readSettings().followAgent;
   /** Last location followed, so repeated updates of a tool call don't reopen it. */
@@ -237,13 +252,52 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           this.refreshStatus(each);
           this.postSavedUsage(each);
           this.changes.postIfTracked(each);
+          if (each.queue.length > 0) {
+            this.postQueue(each);
+          }
         }
         this.attachments.flush();
         yield* this.ensureSession(this.tabs.active);
         break;
       case "send":
         if (tab) {
-          yield* this.send(tab, msg.parts, msg.includeActiveFile);
+          const message: OutgoingMessage = { parts: msg.parts, includeActiveFile: msg.includeActiveFile };
+          if (msg.rewind !== undefined) {
+            yield* this.resend(tab, msg.rewind, message, true);
+          } else if (msg.now) {
+            yield* this.sendNow(tab, message);
+          } else {
+            yield* this.send(tab, message);
+          }
+        }
+        break;
+      case "sendQueuedNow":
+        if (tab) {
+          yield* this.sendQueuedNow(tab, msg.id);
+        }
+        break;
+      case "unqueue":
+        if (tab) {
+          this.unqueue(tab, msg.id, msg.edit);
+        }
+        break;
+      case "editMessage":
+        if (tab) {
+          this.editMessage(tab, msg.turn);
+        }
+        break;
+      case "retry": {
+        const sent = tab?.sent.get(msg.turn);
+        if (tab && sent) {
+          yield* this.resend(tab, msg.turn, sent, false);
+        } else if (tab) {
+          this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
+        }
+        break;
+      }
+      case "fork":
+        if (tab) {
+          yield* this.fork(tab, msg.turn);
         }
         break;
       case "cancel":
@@ -277,6 +331,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "pinTab":
         if (tab && this.tabs.pin(tab, msg.pinned)) {
+          this.postTabs();
+        }
+        break;
+      case "renameTab":
+        if (tab && this.tabs.rename(tab, msg.title)) {
           this.postTabs();
         }
         break;
@@ -576,8 +635,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       tab.sessionId = undefined;
       tab.running = undefined;
       tab.busy = false;
+      // The queue waits for the user rather than starting the agent again.
+      tab.steer = false;
       this.status(tab, "chat.stopped", { stopped: true });
     }
+    this.postTabs();
     // A separate fiber: this one runs inside the scope being closed.
     this.runtime.runFork(Scope.close(running.scope, Exit.void));
   }
@@ -612,6 +674,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         tab.sessionId = res.sessionId;
         tab.running = running;
+        this.postTabs();
         this.postTab(tab, { type: "session", sessionId: res.sessionId, configOptions: res.configOptions });
         this.status(tab, "chat.ready");
         return res.sessionId;
@@ -697,6 +760,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.postTab(tab, { type: "session", sessionId, configOptions: res.configOptions });
     this.postSavedUsage(tab);
     this.status(tab, "chat.ready");
+    // Messages sent while the session loaded.
+    this.sendQueued(tab);
   });
 
   /** The tab's session, created when missing; undefined when the user has to act first. */
@@ -906,30 +971,225 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.saveTabs();
   });
 
-  /** Sends the composer content, unless the tab is already sending or busy with a turn. */
-  private readonly send = Effect.fn("ChatView.send")(function* (
-    this: ChatViewProvider,
-    tab: Tab,
-    parts: ReadonlyArray<PromptPart>,
-    includeActiveFile: boolean,
-  ) {
+  /** Sends a message, or queues it while the tab is busy with a turn; queued ones follow when a turn ends. */
+  private readonly send = Effect.fn("ChatView.send")(function* (this: ChatViewProvider, tab: Tab, message: OutgoingMessage) {
+    if (message.parts.every((part) => typeof part === "string" && !part.trim())) {
+      return;
+    }
     if (tab.busy || tab.sending) {
+      tab.queue.push({ ...message, id: this.nextQueued++ });
+      this.postQueue(tab);
       return;
     }
     tab.sending = true;
-    yield* this.sendTurn(tab, parts, includeActiveFile).pipe(Effect.ensuring(Effect.sync(() => (tab.sending = false))));
+    yield* this.sendTurn(tab, message).pipe(
+      Effect.ensuring(Effect.sync(() => (tab.sending = false))),
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          // The queue waits while the user looks at a turn they stopped, or that failed.
+          if (tab.steer || (Exit.isSuccess(exit) && exit.value === "end_turn")) {
+            this.sendQueued(tab);
+          }
+        }),
+      ),
+    );
   });
 
+  /** Sends the first queued message, when the tab is idle. */
+  private sendQueued(tab: Tab): void {
+    tab.steer = false;
+    if (!this.tabs.has(tab) || tab.busy || tab.sending) {
+      return;
+    }
+    const next = tab.queue.shift();
+    if (next) {
+      this.postQueue(tab);
+      this.run(this.send(tab, next), tab);
+    }
+  }
+
+  private postQueue(tab: Tab): void {
+    const items: QueuedInfo[] = tab.queue.map(({ id, parts }) => ({
+      id,
+      text: messageText(parts),
+      attachments: parts.flatMap((part) => (typeof part !== "string" && !part.token ? [part.name] : [])),
+    }));
+    this.postTab(tab, { type: "queue", items });
+  }
+
+  /** Sends a message right away: a running turn is stopped, and the message goes first once it has. */
+  private readonly sendNow = Effect.fn("ChatView.sendNow")(function* (this: ChatViewProvider, tab: Tab, message: OutgoingMessage) {
+    if (!tab.busy && !tab.sending) {
+      return yield* this.send(tab, message);
+    }
+    tab.queue.unshift({ ...message, id: this.nextQueued++ });
+    this.postQueue(tab);
+    yield* this.steer(tab);
+  });
+
+  /** Moves a queued message first and sends it, stopping the running turn. */
+  private readonly sendQueuedNow = Effect.fn("ChatView.sendQueuedNow")(function* (this: ChatViewProvider, tab: Tab, id: number) {
+    const index = tab.queue.findIndex((each) => each.id === id);
+    if (index < 0) {
+      return;
+    }
+    tab.queue.unshift(...tab.queue.splice(index, 1));
+    this.postQueue(tab);
+    if (tab.busy) {
+      yield* this.steer(tab);
+    } else {
+      this.sendQueued(tab);
+    }
+  });
+
+  /** Stops the running turn so the first queued message goes next. */
+  private readonly steer = Effect.fn("ChatView.steer")(function* (this: ChatViewProvider, tab: Tab) {
+    // Still preparing its prompt: the queue follows once that turn ends.
+    if (tab.busy) {
+      tab.steer = true;
+      yield* this.cancelTab(tab);
+    }
+  });
+
+  /** Takes a message out of the queue, back to the composer when it is to be edited. */
+  private unqueue(tab: Tab, id: number, edit: boolean): void {
+    const index = tab.queue.findIndex((each) => each.id === id);
+    if (index < 0) {
+      return;
+    }
+    const [message] = tab.queue.splice(index, 1);
+    this.postQueue(tab);
+    if (edit && message) {
+      this.loadComposer(tab, { parts: [...message.parts] });
+    }
+  }
+
+  private loadComposer(tab: Tab, load: LoadComposer): void {
+    this.postTab(tab, { type: "loadComposer", ...load });
+  }
+
+  /** Puts a sent message back in the composer, to change it and send it in place of the original. */
+  private editMessage(tab: Tab, turn: number): void {
+    const sent = tab.sent.get(turn);
+    if (!sent) {
+      this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
+      return;
+    }
+    this.loadComposer(tab, { parts: [...sent.parts], rewind: turn });
+  }
+
+  /**
+   * Takes back the user message of `turn` and the rest of the conversation, then sends `message` in its place.
+   * The agent can't forget, so the prompt tells it what was taken back. An edit the user cancels goes back to
+   * the composer.
+   */
+  private readonly resend = Effect.fn("ChatView.resend")(function* (
+    this: ChatViewProvider,
+    tab: Tab,
+    turn: number,
+    message: OutgoingMessage,
+    edited: boolean,
+  ) {
+    const giveBack = () => {
+      if (edited) {
+        this.loadComposer(tab, { parts: [...message.parts], rewind: turn });
+      }
+    };
+    if (!tab.sent.has(turn)) {
+      this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
+      return;
+    }
+    if (tab.busy || tab.sending) {
+      void vscode.window.showInformationMessage(t("chat.rewindBusy"));
+      return giveBack();
+    }
+    // The dialog leaves time to start another turn.
+    if (!(yield* this.changes.rewind(tab, turn)) || tab.busy || tab.sending || !tab.sent.has(turn)) {
+      return giveBack();
+    }
+    this.rewindTo(tab, turn);
+    yield* this.send(tab, message);
+  });
+
+  /** Drops the user message of `turn` and what followed from the chat, and tells the agent with the next prompt. */
+  private rewindTo(tab: Tab, turn: number): void {
+    const original = tab.sent.get(turn);
+    const line = original ? messageText(original.parts).trim().split("\n")[0]! : "";
+    const excerpt = line.length > MAX_EXCERPT_LENGTH ? `${line.slice(0, MAX_EXCERPT_LENGTH - 1)}…` : line;
+    for (const each of [...tab.sent.keys()]) {
+      if (each >= turn) {
+        tab.sent.delete(each);
+      }
+    }
+    // Their messages are gone; the next turn takes a checkpoint of its own.
+    tab.changes.checkpoints = tab.changes.checkpoints.filter((c) => c.turn < turn);
+    this.saveTabs();
+    this.changes.post(tab);
+    tab.rewindNote = `[Note from the editor: the user went back in the conversation and took back their message "${excerpt}" and everything after it. Disregard that message, your replies to it and any later messages, as if they had never been sent, and continue from the message below.]`;
+    this.postTab(tab, { type: "rewind", turn });
+  }
+
+  /**
+   * Copies the conversation into a new tab next to `tab`, on a fork of its session (session/fork). With `turn`, the
+   * fork goes back to before that user message, which waits in its composer.
+   */
+  private readonly fork = Effect.fn("ChatView.fork")(function* (this: ChatViewProvider, tab: Tab, turn: number | undefined) {
+    const { running, sessionId } = tab;
+    if (!running || !sessionId || !canFork(running.agent)) {
+      void vscode.window.showInformationMessage(t("chat.forkUnsupported"));
+      return;
+    }
+    if (tab.busy || tab.sending) {
+      void vscode.window.showInformationMessage(t("chat.forkBusy"));
+      return;
+    }
+    const original = turn === undefined ? undefined : tab.sent.get(turn);
+    if (turn !== undefined && !original) {
+      this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
+      return;
+    }
+    const res = yield* running.agent.forkSession(sessionId, tab.cwd);
+    if (!this.tabs.has(tab) || !this.agents.isCurrent(running)) {
+      // Closed, or its agent stopped, while forking.
+      yield* this.closeSessionOnAgent(running, res.sessionId);
+      return;
+    }
+    const fork = this.tabs.add(tab.cwd);
+    this.tabs.move(fork, this.tabs.indexOf(tab) + 1);
+    fork.agentId = running.agentId;
+    fork.running = running;
+    fork.sessionId = res.sessionId;
+    fork.used = true;
+    fork.title = t("chat.forkTitle", tab.name || tab.title || t("chat.untitled"));
+    fork.createdAt = Date.now();
+    fork.changes = ChangeSet.fromSaved(tab.changes.saved);
+    fork.sent = new Map(tab.sent);
+    fork.rewindNote = tab.rewindNote;
+    if (tab.usage) {
+      fork.usage = tab.usage;
+      fork.usageSessionId = res.sessionId;
+    }
+    this.tabs.active = fork;
+    this.postTabs();
+    this.postTab(fork, { type: "forked", from: tab.id });
+    this.postTab(fork, { type: "session", sessionId: res.sessionId, configOptions: res.configOptions });
+    this.postSavedUsage(fork);
+    this.changes.postIfTracked(fork);
+    this.status(fork, "chat.ready");
+    if (turn !== undefined && original) {
+      this.rewindTo(fork, turn);
+      this.loadComposer(fork, { parts: [...original.parts] });
+    }
+  });
+
+  /** Runs a turn; its stop reason, or undefined when it could not start. */
   private readonly sendTurn = Effect.fn("ChatView.sendTurn")(function* (
     this: ChatViewProvider,
     tab: Tab,
-    parts: ReadonlyArray<PromptPart>,
-    includeActiveFile: boolean,
+    message: OutgoingMessage,
   ) {
-    const text = parts.map((part) => (typeof part === "string" ? part : (part.token ?? ""))).join("");
-    if (parts.every((part) => typeof part === "string" && !part.trim())) {
-      return;
-    }
+    const { parts, includeActiveFile } = message;
+    const text = messageText(parts);
     const sessionId = yield* this.ensureSession(tab);
     const agent = tab.running?.agent;
     if (!sessionId || !agent) {
@@ -978,20 +1238,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.postTabs();
     const turn = this.nextTurn++;
     tab.turn = turn;
+    tab.sent.set(turn, message);
     yield* this.changes.beginTurn(tab, turn, text || sent[0]?.name || "");
-    const note = tab.changes.takeNote();
-    if (note) {
-      prompt.unshift({ type: "text", text: note });
+    const notes = [tab.rewindNote, tab.changes.takeNote()].filter(Predicate.isString);
+    tab.rewindNote = undefined;
+    if (notes.length > 0) {
+      prompt.unshift({ type: "text", text: notes.join("\n\n") });
     }
     this.postTab(tab, { type: "userMessage", text, attachments: sent, turn });
     tab.busy = true;
     this.status(tab, "chat.working");
-    yield* agent.prompt(sessionId, prompt).pipe(
-      Effect.tap((res) => Effect.sync(() => this.postTab(tab, { type: "turnEnd", stopReason: res.stopReason }))),
+    return yield* agent.prompt(sessionId, prompt).pipe(
+      Effect.map((res) => {
+        this.postTab(tab, { type: "turnEnd", stopReason: res.stopReason });
+        return res.stopReason;
+      }),
       Effect.catchTag("AuthRequiredError", () =>
         Effect.sync(() => {
           tab.sessionId = undefined;
           this.status(tab, "chat.needsLogin", { needsLogin: true });
+          return undefined;
         }),
       ),
       Effect.ensuring(
@@ -1066,7 +1332,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   readonly tabAction = Effect.fn("ChatView.tabAction")(function* (
     this: ChatViewProvider,
     id: number,
-    action: "pin" | "unpin" | "close" | "closeOthers" | "closeToRight",
+    action: "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeToRight" | "fork",
   ) {
     const tab = this.tabs.byId(id);
     if (!tab) {
@@ -1078,6 +1344,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         if (this.tabs.pin(tab, action === "pin")) {
           this.postTabs();
         }
+        return;
+      case "fork":
+        yield* this.fork(tab, undefined);
+        return;
+      case "rename":
+        // Edited in place in the tab strip, which answers with "renameTab".
+        this.post({ type: "renameTab", tab: tab.id });
         return;
       case "close":
         if (!tab.pinned) {

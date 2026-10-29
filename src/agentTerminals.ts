@@ -35,8 +35,8 @@ export class TerminalNotFoundError extends Schema.TaggedError<TerminalNotFoundEr
 /** Output kept when the agent sets no `outputByteLimit`. */
 const DEFAULT_OUTPUT_BYTES = 1024 * 1024;
 
-/** Characters of output sent to the chat per snapshot; it shows the end of the output. */
-const SNAPSHOT_CHARS = 20_000;
+/** Characters of output sent to the chat per snapshot; it shows the end and reveals earlier output on demand. */
+const SNAPSHOT_CHARS = 200_000;
 
 /** Snapshots of a running command are sent at most this often. */
 const SNAPSHOT_DELAY_MS = 150;
