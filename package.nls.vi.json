@@ -17,6 +17,7 @@
   "config.env": "Biến môi trường thêm cho agent (vd. ANTHROPIC_API_KEY).",
   "config.nodePath": "Node dùng để chạy các agent cài qua npm.",
   "config.followAgent": "Mở trong editor các file agent đang đọc và sửa, tại dòng agent đang làm việc, và tô sáng trong giây lát những dòng agent vừa sửa.",
+  "config.autoScroll": "Tự động cuộn chat xuống nội dung mới nhất khi agent trả lời. Tắt đi để giữ nguyên vị trí bạn đang xem.",
   "config.checkAgentUpdates": "Mỗi ngày kiểm tra ACP Registry một lần để tìm bản cập nhật agent và đề nghị cài đặt.",
   "command.generateCommitMessage": "Code ACP: Tạo commit message",
   "command.cancelCommitMessage": "Code ACP: Dừng tạo commit message",

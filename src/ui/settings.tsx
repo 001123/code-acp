@@ -426,7 +426,7 @@ function EntryList(props: { agents?: boolean; value: unknown; overridden: boolea
 type Tab = "general" | "agent" | "commit" | "mcp" | "custom";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll"] },
   {
     id: "agent",
     label: "settings.agent",
@@ -580,6 +580,15 @@ function App() {
               inline
             >
               <Toggle id="followAgent" checked={v.followAgent === true} onChange={(checked) => set("followAgent", checked)} />
+            </Field>
+            <Field
+              id="autoScroll"
+              label="settings.autoScroll"
+              desc="settings.autoScrollDesc"
+              overridden={overridden("autoScroll")}
+              inline
+            >
+              <Toggle id="autoScroll" checked={v.autoScroll !== false} onChange={(checked) => set("autoScroll", checked)} />
             </Field>
           </section>
         )}

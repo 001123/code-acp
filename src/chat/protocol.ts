@@ -68,7 +68,8 @@ export type FromWebview =
   | { type: "undoChanges"; tab: number; path?: string }
   /** Puts the work tree back as it was before the user message of `turn`. */
   | { type: "restoreCheckpoint"; tab: number; turn: number }
-  | { type: "setFollowAgent"; enabled: boolean };
+  | { type: "setFollowAgent"; enabled: boolean }
+  | { type: "setAutoScroll"; enabled: boolean };
 
 /** The changed files of a tab, and the turns whose checkpoint differs from the work tree. */
 export interface ChangesMessage {

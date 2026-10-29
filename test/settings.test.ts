@@ -13,17 +13,20 @@ describe("readSettings", () => {
     assert.strictEqual(s.nodePath, "node");
     assert.isTrue(s.checkAgentUpdates);
     assert.isFalse(s.followAgent);
+    assert.isTrue(s.autoScroll);
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
   });
 
   it("reads valid values", () => {
     __test.setSetting("codeAcp.language", "vi");
     __test.setSetting("codeAcp.followAgent", true);
+    __test.setSetting("codeAcp.autoScroll", false);
     __test.setSetting("codeAcp.env", { A: "1" });
     __test.setSetting("codeAcp.customAgents", { mine: { command: "x", args: ["a"] } });
     const s = readSettings();
     assert.strictEqual(s.language, "vi");
     assert.isTrue(s.followAgent);
+    assert.isFalse(s.autoScroll);
     assert.deepStrictEqual(s.env, { A: "1" });
     assert.deepStrictEqual(s.customAgents, { mine: { command: "x", args: ["a"] } });
   });

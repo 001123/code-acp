@@ -8,6 +8,8 @@ import { mount } from "./mount";
 import { useMessages } from "./vscode";
 import eyeIcon from "@tabler/icons/outline/eye.svg";
 import eyeOffIcon from "@tabler/icons/outline/eye-off.svg";
+import scrollIcon from "@tabler/icons/outline/arrow-bar-to-down.svg";
+import scrollOffIcon from "@tabler/icons/outline/arrow-bar-to-down-dashed.svg";
 import { ChangesBar } from "./chat/changes";
 import { HoverPreview, OpenPreview, ShownTab, Terminals, type Hover, type Preview } from "./chat/context";
 import { useComposer } from "./chat/composer";
@@ -56,6 +58,10 @@ function App() {
     editing,
   } = current;
   const [followAgent, setFollowAgent] = useState(false);
+  /** codeAcp.autoScroll: new content scrolls the messages to the end. */
+  const [autoScroll, setAutoScroll] = useState(true);
+  const autoScrollRef = useRef(autoScroll);
+  autoScrollRef.current = autoScroll;
   const checkpointTurns = changes?.turns;
   const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;
   const shownTab = useMemo<ShownTab>(
@@ -128,6 +134,8 @@ function App() {
         return;
       case "followAgent":
         return setFollowAgent(msg.enabled);
+      case "autoScroll":
+        return setAutoScroll(msg.enabled);
       case "turnEnd":
         return dispatch(
           tab,
@@ -261,12 +269,29 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [!history]);
 
+  // Switching tabs or sending a message always shows the end. Other new content does only while the view
+  // follows the end, and never with auto-scroll off.
   const pinned = useRef(true);
+  const shownTabId = useRef(active);
+  const lastItem = useRef<unknown>(undefined);
   useLayoutEffect(() => {
     const el = messages.current;
-    if (el) el.scrollTop = el.scrollHeight;
-    pinned.current = true;
+    const last = state.items.at(-1);
+    const sent = last !== lastItem.current && last?.kind === "userMessage";
+    lastItem.current = last;
+    if (shownTabId.current !== active || sent) pinned.current = true;
+    else if (!autoScrollRef.current) pinned.current = false;
+    shownTabId.current = active;
+    if (el && pinned.current) el.scrollTop = el.scrollHeight;
   }, [state.items, active]);
+
+  // Turning auto-scroll on jumps to the end.
+  useLayoutEffect(() => {
+    const el = messages.current;
+    if (!autoScroll || !el) return;
+    pinned.current = true;
+    el.scrollTop = el.scrollHeight;
+  }, [autoScroll]);
 
   // Entries off screen skip rendering (content-visibility), so their real height shows up only later:
   // keep following the end while the view is there. Scrolling up stops it, reaching the end again resumes it.
@@ -376,11 +401,21 @@ function App() {
             id="follow"
             className="config-item"
             title={t("chat.followAgent")}
+            aria-label={t("chat.followAgent")}
             aria-pressed={followAgent}
             onClick={() => post({ type: "setFollowAgent", enabled: !followAgent })}
           >
             <Icon svg={followAgent ? eyeIcon : eyeOffIcon} />
-            {t("chat.follow")}
+          </button>
+          <button
+            id="auto-scroll"
+            className="config-item"
+            title={t("chat.autoScroll")}
+            aria-label={t("chat.autoScroll")}
+            aria-pressed={autoScroll}
+            onClick={() => post({ type: "setAutoScroll", enabled: !autoScroll })}
+          >
+            <Icon svg={autoScroll ? scrollIcon : scrollOffIcon} />
           </button>
         </div>
         {preview && (

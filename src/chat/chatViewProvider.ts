@@ -129,6 +129,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           this.follower.setEnabled(this.followAgent);
           this.post({ type: "followAgent", enabled: this.followAgent });
         }
+        if (e.affectsConfiguration("codeAcp.autoScroll")) {
+          this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
+        }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
       vscode.window.onDidChangeActiveTextEditor(() => this.postActiveFile()),
@@ -260,6 +263,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.postTabs();
         yield* this.postAgent;
         this.post({ type: "followAgent", enabled: this.followAgent });
+        this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
         for (const each of this.tabs.all) {
           this.refreshStatus(each);
           this.postSavedUsage(each);
@@ -450,6 +454,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "setFollowAgent":
         yield* thenable(() =>
           vscode.workspace.getConfiguration("codeAcp").update("followAgent", msg.enabled, vscode.ConfigurationTarget.Global),
+        );
+        break;
+      case "setAutoScroll":
+        yield* thenable(() =>
+          vscode.workspace.getConfiguration("codeAcp").update("autoScroll", msg.enabled, vscode.ConfigurationTarget.Global),
         );
         break;
     }

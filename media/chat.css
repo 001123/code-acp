@@ -149,28 +149,33 @@ body {
 #config:empty {
   display: none;
 }
-/* Session config scrolls; the follow toggle stays pinned at the end. */
+/* Session config scrolls; the follow and auto-scroll toggles stay pinned at the end. */
 #config {
   flex: 1;
   min-width: 0;
 }
-#follow {
-  gap: 5px;
-  margin-left: auto;
-  padding: 0 9px 0 7px;
+#follow,
+#auto-scroll {
+  padding: 0 6px;
   color: var(--vscode-descriptionForeground);
   font: inherit;
   font-size: 0.92em;
   cursor: pointer;
 }
-#follow svg {
+#follow {
+  margin-left: auto;
+}
+#follow svg,
+#auto-scroll svg {
   width: 14px;
   height: 14px;
 }
-#follow:hover {
+#follow:hover,
+#auto-scroll:hover {
   color: var(--vscode-foreground);
 }
-#follow[aria-pressed="true"] {
+#follow[aria-pressed="true"],
+#auto-scroll[aria-pressed="true"] {
   color: var(--vscode-textLink-foreground);
   background: color-mix(in srgb, var(--vscode-textLink-foreground) 14%, transparent);
   border-color: color-mix(in srgb, var(--vscode-textLink-foreground) 35%, transparent);

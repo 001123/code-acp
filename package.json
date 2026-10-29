@@ -395,6 +395,11 @@
           "default": false,
           "description": "%config.followAgent%"
         },
+        "codeAcp.autoScroll": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.autoScroll%"
+        },
         "codeAcp.commitMessage.agent": {
           "type": "string",
           "default": "",

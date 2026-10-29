@@ -17,6 +17,7 @@
   "config.env": "Extra environment variables for the agent (e.g. ANTHROPIC_API_KEY).",
   "config.nodePath": "Node used to run agents installed via npm.",
   "config.followAgent": "Open the files the agent reads and edits in the editor, at the line it is working on, and briefly highlight the lines it changes.",
+  "config.autoScroll": "Keep the chat scrolled to the newest content while the agent replies. Turn off to stay where you scrolled.",
   "config.checkAgentUpdates": "Check the ACP Registry for agent updates once a day and offer to install them.",
   "command.generateCommitMessage": "Code ACP: Generate Commit Message",
   "command.cancelCommitMessage": "Code ACP: Stop Generating Commit Message",
