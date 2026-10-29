@@ -1,5 +1,5 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { createContext, Fragment, useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Attachment, Draft, FromWebview as ChatMessage, PromptPart, SentAttachment, TabInfo } from "../chatViewProvider";
 import type { FileSuggestion, SkillSuggestion } from "../completions";
 import type { TerminalSuggestion } from "../terminalContext";
@@ -35,6 +35,8 @@ const MAX_DATA_BYTES = 20 * 1024 * 1024;
 interface Preview {
   src: string;
   name: string;
+  /** Takes the drawn-on copy of a composer image; without it, the copy is attached as a new image. */
+  replace?: (a: Attachment) => void;
 }
 /** Opens an image in the lightbox; provided by the app. */
 const OpenPreview = createContext<(preview: Preview) => void>(() => {});
@@ -98,6 +100,40 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 
 const EMPTY: Transcript = { items: [], nextId: 1 };
 
+/**
+ * Characters kept of one tool output or diff side. Agents send whole files here, and every tab keeps its
+ * transcript for as long as the view lives.
+ */
+const MAX_TOOL_TEXT = 20_000;
+
+function clip(text: string): string {
+  return text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n…` : text;
+}
+
+/** Tool call content as the transcript keeps it: long text clipped, binary data dropped (only its kind is shown). */
+function clipContent(content: acp.ToolCallContent[] | null | undefined): acp.ToolCallContent[] | undefined {
+  return content?.map((item): acp.ToolCallContent => {
+    if (item.type === "diff") {
+      return { ...item, oldText: item.oldText == null ? item.oldText : clip(item.oldText), newText: clip(item.newText) };
+    }
+    if (item.type !== "content") return item;
+    const block = item.content;
+    switch (block.type) {
+      case "text":
+        return { ...item, content: { ...block, text: clip(block.text) } };
+      case "image":
+      case "audio":
+        return { ...item, content: { ...block, data: "" } };
+      case "resource":
+        return "text" in block.resource
+          ? { ...item, content: { ...block, resource: { ...block.resource, text: clip(block.resource.text) } } }
+          : { ...item, content: { ...block, resource: { ...block.resource, blob: "" } } };
+      default:
+        return item;
+    }
+  });
+}
+
 function transcript(state: Transcript, action: Action): Transcript {
   const add = (item: DistributiveOmit<Item, "id">, streaming?: boolean): Transcript => ({
     ...state,
@@ -131,7 +167,7 @@ function transcript(state: Transcript, action: Action): Transcript {
       const u = action.update;
       const existing = state.items.find((i) => i.kind === "tool" && i.toolCallId === u.toolCallId);
       if (!existing) {
-        return add({ kind: "tool", toolCallId: u.toolCallId, title: u.title ?? undefined, status: u.status ?? undefined, content: u.content ?? undefined });
+        return add({ kind: "tool", toolCallId: u.toolCallId, title: u.title ?? undefined, status: u.status ?? undefined, content: clipContent(u.content) });
       }
       return {
         ...state,
@@ -139,7 +175,7 @@ function transcript(state: Transcript, action: Action): Transcript {
           ...i,
           ...(u.title ? { title: u.title } : {}),
           ...(u.status ? { status: u.status } : {}),
-          ...(u.content ? { content: u.content } : {}),
+          ...(u.content ? { content: clipContent(u.content) } : {}),
         })),
       };
     }
@@ -248,31 +284,35 @@ function useNow(ticking: boolean): number {
 }
 
 /** A run of thoughts and tool calls, collapsed under one "Thinking" summary. */
-function ActivityView({ items }: { items: ActivityItem[] }) {
-  const { t } = useL10n();
-  const tools = items.filter((i) => i.kind === "tool");
-  if (tools.length === 0 && items.length === 1) return <ItemView item={items[0]!} />;
-  const running = tools.some((i) => i.status === "pending" || i.status === "in_progress");
-  const failed = tools.filter((i) => i.status === "failed").length;
-  return (
-    <details className="activity" data-running={running || undefined}>
-      <summary>
-        {t("chat.thought")}
-        {tools.length > 0 && <span className="activity-count"> · {t("chat.toolCount", tools.length)}</span>}
-        {failed > 0 && <span className="activity-failed"> · {t("chat.toolFailed", failed)}</span>}
-      </summary>
-      <div className="activity-body">
-        {items.map((item) =>
-          item.kind === "thought" ? (
-            <MarkdownView key={item.id} className="thought text md" text={item.text} onOpenFile={openFile} />
-          ) : (
-            <ItemView key={item.id} item={item} />
-          ),
-        )}
-      </div>
-    </details>
-  );
-}
+const ActivityView = memo(
+  function ActivityView({ items }: { items: ActivityItem[] }) {
+    const { t } = useL10n();
+    const tools = items.filter((i) => i.kind === "tool");
+    if (tools.length === 0 && items.length === 1) return <ItemView item={items[0]!} />;
+    const running = tools.some((i) => i.status === "pending" || i.status === "in_progress");
+    const failed = tools.filter((i) => i.status === "failed").length;
+    return (
+      <details className="activity" data-running={running || undefined}>
+        <summary>
+          {t("chat.thought")}
+          {tools.length > 0 && <span className="activity-count"> · {t("chat.toolCount", tools.length)}</span>}
+          {failed > 0 && <span className="activity-failed"> · {t("chat.toolFailed", failed)}</span>}
+        </summary>
+        <div className="activity-body">
+          {items.map((item) =>
+            item.kind === "thought" ? (
+              <MarkdownView key={item.id} className="thought text md" text={item.text} onOpenFile={openFile} />
+            ) : (
+              <ItemView key={item.id} item={item} />
+            ),
+          )}
+        </div>
+      </details>
+    );
+  },
+  // groupActivity builds a new array per render; the items in it keep their identity until they change.
+  (prev, next) => prev.items.length === next.items.length && prev.items.every((item, i) => item === next.items[i]),
+);
 
 /** Image chips for a sent or replayed user message; images open in the lightbox. */
 function SentAttachments({ attachments }: { attachments: SentAttachment[] }) {
@@ -291,7 +331,8 @@ function SentAttachments({ attachments }: { attachments: SentAttachment[] }) {
   );
 }
 
-function ItemView({ item }: { item: Item }) {
+/** One transcript entry; memoized so a streamed chunk only re-renders the entry it extends. */
+const ItemView = memo(function ItemView({ item }: { item: Item }) {
   const { t } = useL10n();
   switch (item.kind) {
     case "assistant":
@@ -348,7 +389,7 @@ function ItemView({ item }: { item: Item }) {
               <ToolContent content={item.toolCall.content} />
             </div>
           ) : item.toolCall.rawInput ? (
-            <pre className="tool-output">{JSON.stringify(item.toolCall.rawInput, null, 2)}</pre>
+            <pre className="tool-output">{clip(JSON.stringify(item.toolCall.rawInput, null, 2))}</pre>
           ) : null}
           <div className="permission-buttons">
             {item.options.map((opt) => (
@@ -367,7 +408,7 @@ function ItemView({ item }: { item: Item }) {
     case "error":
       return <div className={item.kind}>{render(t, item.text)}</div>;
   }
-}
+});
 
 /** Icon for a config option: by its ACP category, else by keywords in its id or name. */
 function configIcon(option: acp.SessionConfigOption): string {
@@ -423,24 +464,21 @@ function ConfigSelect({
 interface AgentChoices {
   agents: ReadonlyArray<{ id: string; name: string }>;
   activeId?: string;
-  /** Set when codeAcp.agentCommand overrides the installed agents. */
-  custom?: string;
 }
 
 const MANAGE_AGENTS = "\0manage";
 
-/** Picks the tab's agent from the installed ones; the last entry opens the agent manager. */
+/** Picks the tab's agent from the installed and custom ones; the last entry opens the agent manager. */
 function AgentSelect({ tab, choices }: { tab: TabInfo | undefined; choices: AgentChoices }) {
   const { t } = useL10n();
-  const { agents, activeId, custom } = choices;
+  const { agents, activeId } = choices;
   // A tab without a pick yet gets the default.
   const picked = tab?.agentId ?? activeId;
-  const value = custom !== undefined ? "" : (agents.find((a) => a.id === picked)?.id ?? "");
+  const value = agents.find((a) => a.id === picked)?.id ?? "";
   return (
-    <span id="agent" className="config-item" title={custom ?? t("chat.switchAgent")}>
+    <span id="agent" className="config-item" title={t("chat.switchAgent")}>
       <select
         value={value}
-        disabled={custom !== undefined}
         onChange={(e) => {
           const id = e.target.value;
           if (id === MANAGE_AGENTS) post({ type: "manageAgents" });
@@ -449,7 +487,7 @@ function AgentSelect({ tab, choices }: { tab: TabInfo | undefined; choices: Agen
       >
         {value === "" && (
           <option value="" disabled>
-            {custom ?? t("chat.noAgentSelected")}
+            {t("chat.noAgentSelected")}
           </option>
         )}
         {agents.map((a) => (
@@ -786,7 +824,8 @@ function TabStrip({
   active: number | undefined;
   onSelect: (id: number) => void;
 }) {
-  const { t } = useL10n();
+  const { t, lang } = useL10n();
+  const dateFormat = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" });
   const strip = useRef<HTMLDivElement>(null);
   const [dragged, setDragged] = useState<number>();
   const [dropAt, setDropAt] = useState<{ id: number; after: boolean }>();
@@ -819,6 +858,10 @@ function TabStrip({
           const state = states[tab.id];
           const waiting = state?.transcript.items.some((i) => i.kind === "permission" && !i.done);
           const title = tab.title || t("chat.newTab");
+          const tooltip = [
+            waiting ? `${title} · ${t("chat.tabWaiting")}` : title,
+            ...(tab.createdAt === undefined ? [] : [t("chat.tabCreated", dateFormat.format(tab.createdAt))]),
+          ].join("\n");
           const pinLabel = t(tab.pinned ? "chat.unpinTab" : "chat.pinTab");
           return (
             <div
@@ -833,7 +876,7 @@ function TabStrip({
               data-pinned={tab.pinned || undefined}
               data-dragging={tab.id === dragged || undefined}
               data-drop={dropAt?.id === tab.id ? (dropAt.after ? "after" : "before") : undefined}
-              title={waiting ? `${title} · ${t("chat.tabWaiting")}` : title}
+              title={tooltip}
               // Native context menu: the `webview/context` tab commands in package.json.
               data-vscode-context={JSON.stringify({
                 webviewSection: "tab",
@@ -924,6 +967,8 @@ function App() {
   const shownDraft = useRef<number>(undefined);
   /** A draft not yet sent to the extension, which keeps it across reloads. */
   const pendingDraft = useRef<{ tab: number; draft: Draft; timer: ReturnType<typeof setTimeout> }>(undefined);
+  /** Per tab, the tokens and attachments last sent with a draft; while they stay the same, only the text goes out. */
+  const sentAttachments = useRef(new Map<number, unknown[]>());
   /** Tabs whose saved draft was taken; later "tabs" messages don't overwrite what was typed since. */
   const seeded = useRef(new Set<number>());
   const statesRef = useRef(states);
@@ -1207,7 +1252,13 @@ function App() {
       case "permissionRequest":
         return dispatch(tab, {
           type: "add",
-          item: { kind: "permission", requestId: msg.id, toolCall: msg.toolCall, options: msg.options, done: false },
+          item: {
+            kind: "permission",
+            requestId: msg.id,
+            toolCall: { ...msg.toolCall, content: clipContent(msg.toolCall.content) },
+            options: msg.options,
+            done: false,
+          },
         });
       case "permissionDone":
         return dispatch(tab, { type: "permissionDone", requestId: msg.id });
@@ -1219,7 +1270,7 @@ function App() {
       case "error":
         return dispatch(tab, { type: "add", item: { kind: "error", text: { raw: msg.text } } });
       case "agent":
-        return setAgents({ agents: msg.agents, activeId: msg.activeId, custom: msg.custom });
+        return setAgents({ agents: msg.agents, activeId: msg.activeId });
       case "addAttachments":
         for (const a of msg.attachments) addAttachment(a);
         input.current?.focus();
@@ -1297,6 +1348,9 @@ function App() {
     }
     for (const id of inline.current.keys()) {
       if (!tabs.some((x) => x.id === id)) inline.current.delete(id);
+    }
+    for (const id of sentAttachments.current.keys()) {
+      if (!tabs.some((x) => x.id === id)) sentAttachments.current.delete(id);
     }
     el.value = (active !== undefined && drafts.current.get(active)) || "";
     shownDraft.current = active;
@@ -1409,7 +1463,16 @@ function App() {
     if (!pending) return;
     clearTimeout(pending.timer);
     pendingDraft.current = undefined;
-    post({ type: "draft", tab: pending.tab, draft: pending.draft });
+    const { tab, draft } = pending;
+    // Attachments can be megabytes of base64; resending them on every keystroke pause is wasted work.
+    const refs = [...draft.inline.flatMap((x) => [x.token, x.attachment]), ...draft.attachments];
+    const last = sentAttachments.current.get(tab);
+    if (last && last.length === refs.length && last.every((x, i) => x === refs[i])) {
+      post({ type: "draftText", tab, text: draft.text });
+      return;
+    }
+    sentAttachments.current.set(tab, refs);
+    post({ type: "draft", tab, draft });
   }
 
   /** Sends the active tab's composer content to the extension, at most every 300 ms. */
@@ -1432,14 +1495,15 @@ function App() {
   }, [attachments]);
 
   /** The image token drawn under the pointer; the backdrop sits behind the textarea, so hit-test its rects. */
-  function imageTokenAt(x: number, y: number): { src: string; name: string; rect: DOMRect } | undefined {
+  function imageTokenAt(x: number, y: number): { src: string; name: string; token: string; rect: DOMRect } | undefined {
     if (active === undefined) return undefined;
     for (const mark of backdrop.current?.querySelectorAll<HTMLElement>("mark.image") ?? []) {
       for (const rect of mark.getClientRects()) {
         if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
-        const a = inlineOf(active).get(mark.dataset.token!);
+        const token = mark.dataset.token!;
+        const a = inlineOf(active).get(token);
         const src = a && imageSrc(a);
-        return a && src ? { src, name: a.name, rect } : undefined;
+        return a && src ? { src, name: a.name, token, rect } : undefined;
       }
     }
     return undefined;
@@ -1532,7 +1596,13 @@ function App() {
                     className="chip-preview"
                     src={imageSrc(a)}
                     title={t("chat.previewImage")}
-                    onClick={() => setPreview({ src: imageSrc(a)!, name: a.name })}
+                    onClick={() =>
+                      setPreview({
+                        src: imageSrc(a)!,
+                        name: a.name,
+                        replace: (b) => update(active, (s) => ({ ...s, attachments: s.attachments.map((x) => (x === a ? b : x)) })),
+                      })
+                    }
                   />
                 )}
                 <span>{a.name}</span>
@@ -1584,7 +1654,15 @@ function App() {
                 const hit = imageTokenAt(e.clientX, e.clientY);
                 if (hit && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
                   setHover(undefined);
-                  setPreview({ src: hit.src, name: hit.name });
+                  const tab = active!;
+                  setPreview({
+                    src: hit.src,
+                    name: hit.name,
+                    replace: (b) => {
+                      inlineOf(tab).set(hit.token, b);
+                      if (input.current) saveDraft(input.current.value);
+                    },
+                  });
                 }
               }}
               onKeyDown={(e) => {
@@ -1659,9 +1737,18 @@ function App() {
         </div>
         {preview && (
           <Lightbox
+            key={preview.src}
             src={preview.src}
             alt={preview.name}
             onClose={closePreview}
+            saveLabel={t(preview.replace ? "lightbox.save" : "lightbox.attach")}
+            onSave={(src) => {
+              const data = src.slice(src.indexOf(",") + 1);
+              if (preview.replace) preview.replace({ kind: "data", name: preview.name, mimeType: "image/png", data });
+              else addAttachment({ kind: "data", name: `${preview.name.replace(/\.[^.]*$/, "") || "image"}-annotated.png`, mimeType: "image/png", data });
+              closePreview();
+              input.current?.focus();
+            }}
             onPopOut={() => {
               post({ type: "openImage", src: preview.src, name: preview.name });
               closePreview();

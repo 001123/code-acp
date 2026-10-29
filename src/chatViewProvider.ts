@@ -4,13 +4,12 @@ import { createHash } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { spawnAgent, type AcpAgent, type AgentCommand, type AgentRequestError, type AgentStartError } from "./acpClient";
+import { spawnAgent, type AcpAgent, type AgentRequestError, type AgentStartError } from "./acpClient";
 import type { AgentManager } from "./agentManager";
 import { ClaudeSettings } from "./claudeSettings";
 import { Completions } from "./completions";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "./i18n";
-import { runIn, thenable, type AppRuntime, type AppServices, type Output, type VscodeError } from "./runtime";
-import { readSettings } from "./settings";
+import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output, type VscodeError } from "./runtime";
 import { TerminalContext } from "./terminalContext";
 import { webviewHtml, webviewRoots } from "./webview";
 
@@ -27,6 +26,8 @@ export type FromWebview =
   | { type: "moveTab"; tab: number; index: number }
   /** The composer's unsent content, kept so it survives a reload. */
   | { type: "draft"; tab: number; draft: Draft }
+  /** The draft's text alone, when its attachments are the ones last sent with "draft". */
+  | { type: "draftText"; tab: number; text: string }
   | { type: "history" }
   | { type: "openSession"; sessionId: string; cwd: string; title?: string }
   | { type: "login" }
@@ -52,6 +53,8 @@ export interface TabInfo {
   /** Undefined until the first message or the agent names the session. */
   title?: string;
   pinned: boolean;
+  /** When the conversation started (epoch ms); undefined until the first message, or for sessions opened from history. */
+  createdAt?: number;
   /** The installed agent picked for the tab; undefined until it has one. */
   agentId?: string;
   /** Unsent composer content; the webview only uses it for tabs it has no draft for yet. */
@@ -104,6 +107,12 @@ const IMAGE_EXT: Record<string, string> = {
   "image/bmp": ".bmp",
 };
 
+/** Pasted attachments and opened images go here, so agents and editors can read them by path. */
+const TEMP_DIR = path.join(os.tmpdir(), "code-acp");
+
+/** Temp files older than this are removed on startup; a session rarely goes back to an attachment after a day. */
+const TEMP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 /** Pages of `session/list` fetched for the history list. */
 const MAX_HISTORY_PAGES = 5;
 
@@ -132,7 +141,7 @@ interface RunningAgent {
   readonly agent: AcpAgent;
   /** Owns the agent process; closing it kills the process. */
   readonly scope: Scope.Closeable;
-  /** Id of the installed agent the process was started from (`CUSTOM_AGENT` for the setting). */
+  /** Id of the agent the process was started from, installed or custom. */
   readonly agentId: string;
 }
 
@@ -192,6 +201,7 @@ const SavedTabs = Schema.Struct({
   tabs: Schema.Array(
     Schema.Struct({
       title: Schema.optional(Schema.String),
+      createdAt: Schema.optional(Schema.Finite),
       sessionId: Schema.optional(Schema.String),
       cwd: Schema.optional(Schema.String),
       agentId: Schema.optional(Schema.String),
@@ -205,19 +215,18 @@ type SavedTabs = typeof SavedTabs.Type;
 
 const TABS_KEY = "codeAcp.tabs";
 
-/** Id of the codeAcp.agentCommand override among agent ids. */
-const CUSTOM_AGENT = "custom";
-
 /** One conversation: an ACP session on its agent's process; tabs on the same agent share the process. */
 interface Tab {
   readonly id: number;
   title?: string;
+  /** Epoch ms of the first message sent in the session; reset with `title`. */
+  createdAt?: number;
   sessionId?: string;
   /** The process that owns `sessionId`. */
   running?: RunningAgent;
   /** Where the session runs; the workspace for new sessions. */
   cwd?: string;
-  /** The installed agent picked for the tab; the codeAcp.agentCommand override wins over it. */
+  /** The agent picked for the tab, installed or custom. */
   agentId?: string;
   /** Unsent composer content; undefined when empty, or until `savedDraft` is loaded. */
   draft?: Draft;
@@ -228,6 +237,8 @@ interface Tab {
   usage?: SavedUsage;
   usageSessionId?: string;
   busy: boolean;
+  /** Set while a send prepares its prompt, before `busy`; a second click in that time is dropped. */
+  sending: boolean;
   /** Pinned tabs come first and have no close button. */
   pinned: boolean;
   /** Whether anything was sent or loaded; an unused tab is reused to open a past session. */
@@ -245,14 +256,17 @@ interface PendingPermission {
 
 const MAX_TITLE_LENGTH = 40;
 
+/** Tabs are written to workspaceState at most this often; usage updates arrive many times per turn. */
+const SAVE_TABS_DELAY_MS = 500;
+
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewId = "codeAcp.chat";
 
   private view?: vscode.WebviewView;
   /** Agent processes by agent id. */
   private readonly running = new Map<string, RunningAgent>();
-  /** Makes concurrent callers share one agent start. */
-  private readonly startLock = Semaphore.makeUnsafe(1);
+  /** Per agent id: makes concurrent callers share one start, without one slow agent holding up the others. */
+  private readonly startLocks = new Map<string, Semaphore.Semaphore>();
   private nextTabId = 1;
   private readonly tabs: Tab[] = [];
   private active: Tab;
@@ -265,6 +279,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /** Attachments added before the webview was ready; flushed on "ready". */
   private queuedAttachments: Attachment[] = [];
   private readonly disposables: vscode.Disposable[] = [];
+  /** Pending `writeTabs`; flushed on dispose. */
+  private saveTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -272,14 +288,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private readonly manager: AgentManager["Service"],
   ) {
     this.active = this.restoreTabs();
+    this.run(this.pruneTempFiles);
     this.disposables.push(
       manager.onDidChange(() =>
         this.run(
           Effect.gen({ self: this }, function* () {
             yield* this.postAgent;
-            // An uninstalled agent's tabs move to the default agent.
+            // A removed agent's tabs move to the default agent.
             for (const id of this.running.keys()) {
-              if (id !== CUSTOM_AGENT && !(yield* this.manager.get(id))) {
+              if (!(yield* this.manager.has(id))) {
                 yield* this.restart(id);
               }
             }
@@ -301,39 +318,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     void runIn(this.runtime, effect, (text) => this.postTab(tab ?? this.active, { type: "error", text }));
   }
 
-  /** The agent `tab` runs on: the override, else its pick while installed, else the default (last picked). */
+  /** The agent `tab` runs on: its pick while it exists, else the default (last picked). */
   private readonly agentIdOf = Effect.fn("ChatView.agentIdOf")(function* (this: ChatViewProvider, tab: Tab) {
-    if (this.customCommand()) {
-      return CUSTOM_AGENT;
-    }
-    if (tab.agentId && (yield* this.manager.get(tab.agentId))) {
+    if (tab.agentId && (yield* this.manager.has(tab.agentId))) {
       return tab.agentId;
     }
     return yield* this.manager.activeId;
   });
 
-  private customCommand(): AgentCommand | undefined {
-    const { agentCommand, agentArgs, env } = readSettings();
-    const command = agentCommand.trim();
-    return command ? { command, args: agentArgs, env } : undefined;
-  }
-
-  /** Command to start the agent `agentId`, or undefined when it is not installed. */
-  private readonly commandFor = Effect.fn("ChatView.commandFor")(function* (this: ChatViewProvider, agentId: string) {
-    if (agentId === CUSTOM_AGENT) {
-      return this.customCommand();
-    }
-    const agent = yield* this.manager.get(agentId);
-    return agent ? this.manager.commandFor(agent) : undefined;
-  });
-
-  /** The composer's agent picker: installed agents, the default for new tabs, or the codeAcp.agentCommand override. */
+  /** The composer's agent picker: installed and custom agents, and the default for new tabs. */
   private get postAgent(): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       const activeId = yield* this.manager.activeId;
-      const agents = (yield* this.manager.list).map((a) => ({ id: a.id, name: `${a.name} ${a.version}` }));
-      const custom = this.customCommand() ? t("chat.customAgent") : undefined;
-      this.post({ type: "agent", agents, activeId, custom });
+      const agents = (yield* this.manager.agents).map((a) => ({
+        id: a.id,
+        name: a.version ? `${a.name} ${a.version}` : a.name,
+      }));
+      this.post({ type: "agent", agents, activeId });
     });
   }
 
@@ -362,6 +363,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const tabs: TabInfo[] = this.tabs.map((tab) => ({
       id: tab.id,
       title: tab.title,
+      createdAt: tab.createdAt,
       pinned: tab.pinned,
       agentId: tab.agentId,
       draft: tab.draft,
@@ -391,9 +393,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       const tab = this.addTab();
       tab.pinned = entry.pinned ?? false;
       tab.savedDraft = entry.draft;
-      tab.agentId = entry.agentId === CUSTOM_AGENT ? undefined : entry.agentId;
+      tab.agentId = entry.agentId;
       if (entry.sessionId) {
         tab.title = entry.title;
+        tab.createdAt = entry.createdAt;
         tab.used = true;
         tab.reopen = { sessionId: entry.sessionId, cwd: entry.cwd ?? this.cwd(), agentId: entry.agentId };
         tab.usage = entry.usage;
@@ -403,8 +406,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return this.tabs[saved?.active ?? 0] ?? this.tabs[0] ?? this.addTab();
   }
 
-  /** Saves the tabs so they come back after a reload. */
+  /** Saves the tabs so they come back after a reload, batching changes that come in quick succession. */
   private saveTabs(): void {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.writeTabs(), SAVE_TABS_DELAY_MS);
+  }
+
+  private writeTabs(): void {
+    this.saveTimer = undefined;
     const value: SavedTabs = {
       active: this.tabs.indexOf(this.active),
       tabs: this.tabs.map((tab) => {
@@ -414,11 +423,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           const { sessionId } = tab;
           const cwd = tab.cwd ?? this.cwd();
           const agentId = tab.running?.agentId;
-          return { title: tab.title, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
+          return { title: tab.title, createdAt: tab.createdAt, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title: tab.title, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
+          return { title: tab.title, createdAt: tab.createdAt, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
         }
         return { pinned, agentId: tab.agentId, draft };
       }),
@@ -431,11 +440,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return path.join((this.context.storageUri ?? this.context.globalStorageUri).fsPath, "drafts");
   }
 
-  /** Keeps `draft` as the tab's unsent content and saves it, writing raw bytes to the drafts folder. */
-  private readonly setDraft = Effect.fn("ChatView.setDraft")(function* (this: ChatViewProvider, tab: Tab, draft: Draft) {
-    const empty = !draft.text.trim() && draft.inline.length === 0 && draft.attachments.length === 0;
+  /**
+   * Keeps `update` as the tab's unsent content and saves it, writing raw bytes to the drafts folder. A string
+   * replaces only the text: the attachments stay, and their files are not written again.
+   */
+  private readonly setDraft = Effect.fn("ChatView.setDraft")(function* (this: ChatViewProvider, tab: Tab, update: Draft | string) {
     yield* Semaphore.withPermits(this.draftLock, 1)(
       Effect.gen({ self: this }, function* () {
+        // Inside the lock: a "draft" sent just before has set the attachments by now.
+        const textOnly = Predicate.isString(update);
+        const draft = textOnly ? { inline: [], attachments: [], ...tab.draft, text: update } : update;
+        const empty = !draft.text.trim() && draft.inline.length === 0 && draft.attachments.length === 0;
         const fs = yield* FileSystem.FileSystem;
         const dir = this.draftsDir();
         const store = Effect.fnUntraced(function* (a: Attachment): Effect.fn.Return<SavedAttachment, PlatformError.PlatformError> {
@@ -452,13 +467,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         });
         const saved: SavedDraft | undefined = empty
           ? undefined
-          : {
-              text: draft.text,
-              inline: yield* Effect.forEach(draft.inline, ({ token, attachment }) =>
-                Effect.map(store(attachment), (stored) => ({ token, attachment: stored })),
-              ),
-              attachments: yield* Effect.forEach(draft.attachments, store),
-            };
+          : textOnly && tab.savedDraft
+            ? { ...tab.savedDraft, text: draft.text }
+            : {
+                text: draft.text,
+                inline: yield* Effect.forEach(draft.inline, ({ token, attachment }) =>
+                  Effect.map(store(attachment), (stored) => ({ token, attachment: stored })),
+                ),
+                attachments: yield* Effect.forEach(draft.attachments, store),
+              };
         // The tab may have closed while the files were written.
         if (!this.tabs.includes(tab)) {
           return;
@@ -468,7 +485,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.saveTabs();
       }),
     );
-    yield* this.pruneDraftFiles;
+    // Only attachments add or drop draft files.
+    if (!Predicate.isString(update)) {
+      yield* this.pruneDraftFiles;
+    }
   });
 
   /** Reads back the drafts saved before a reload; an attachment whose file is gone is dropped. */
@@ -514,6 +534,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }),
   );
 
+  /** Removes old temp files; the OS may keep them for days. */
+  private readonly pruneTempFiles = Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const now = yield* Clock.currentTimeMillis;
+    const files = yield* fs.readDirectory(TEMP_DIR).pipe(Effect.orElseSucceed(() => []));
+    yield* Effect.forEach(
+      files,
+      (name) => {
+        const file = path.join(TEMP_DIR, name);
+        return fs.stat(file).pipe(
+          Effect.flatMap((info) => {
+            const mtime = Option.getOrUndefined(info.mtime)?.getTime();
+            return mtime !== undefined && now - mtime > TEMP_MAX_AGE_MS ? fs.remove(file, { force: true }) : Effect.void;
+          }),
+          Effect.ignore,
+        );
+      },
+      { discard: true },
+    );
+  });
+
   private usageOf(tab: Tab, sessionId: string): SavedUsage | undefined {
     return tab.usageSessionId === sessionId ? tab.usage : undefined;
   }
@@ -531,7 +572,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   private addTab(): Tab {
-    const tab: Tab = { id: this.nextTabId++, busy: false, pinned: false, used: false, sessionLock: Semaphore.makeUnsafe(1) };
+    const tab: Tab = { id: this.nextTabId++, busy: false, sending: false, pinned: false, used: false, sessionLock: Semaphore.makeUnsafe(1) };
     this.tabs.push(tab);
     return tab;
   }
@@ -598,6 +639,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "draft":
         if (tab) {
           yield* this.setDraft(tab, msg.draft);
+        }
+        break;
+      case "draftText":
+        if (tab) {
+          yield* this.setDraft(tab, msg.text);
         }
         break;
       case "newTab":
@@ -725,9 +771,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const ext = IMAGE_EXT[mimeType!] ?? "";
     const base = path.basename(name) || "image";
     const fs = yield* FileSystem.FileSystem;
-    const dir = path.join(os.tmpdir(), "code-acp");
-    yield* fs.makeDirectory(dir, { recursive: true });
-    const file = path.join(dir, `${yield* Clock.currentTimeMillis}-${base}${path.extname(base) ? "" : ext}`);
+    yield* fs.makeDirectory(TEMP_DIR, { recursive: true });
+    const file = path.join(TEMP_DIR, `${yield* Clock.currentTimeMillis}-${base}${path.extname(base) ? "" : ext}`);
     yield* fs.writeFile(file, Buffer.from(data!, "base64"));
     yield* thenable(() => vscode.commands.executeCommand("vscode.open", vscode.Uri.file(file)));
     yield* thenable(() => vscode.commands.executeCommand("workbench.action.moveEditorToNewWindow"));
@@ -739,11 +784,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (!agentId) {
       return yield* new NoAgentError();
     }
-    if (agentId !== CUSTOM_AGENT && tab.agentId !== agentId) {
+    if (tab.agentId !== agentId) {
       tab.agentId = agentId;
       this.postTabs();
     }
-    return yield* Semaphore.withPermits(this.startLock, 1)(
+    let lock = this.startLocks.get(agentId);
+    if (!lock) {
+      this.startLocks.set(agentId, (lock = Semaphore.makeUnsafe(1)));
+    }
+    return yield* Semaphore.withPermits(lock, 1)(
       Effect.suspend(() => {
         const running = this.running.get(agentId);
         return running ? Effect.succeed(running) : this.startAgent(agentId, tab);
@@ -756,7 +805,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     agentId: string,
     tab: Tab,
   ) {
-    const command = yield* this.commandFor(agentId);
+    const command = yield* this.manager.command(agentId);
     if (!command) {
       return yield* new NoAgentError();
     }
@@ -909,6 +958,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     tab.reopen = undefined;
     tab.title = undefined;
+    tab.createdAt = undefined;
     tab.used = false;
     this.postTabs();
     return undefined;
@@ -959,7 +1009,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   });
 
   /** The tab's session, created when missing; undefined when the user has to act first. */
-  private ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output> {
+  private ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx> {
     return this.createSession(tab).pipe(
       Effect.catchTags({
         NoAgentError: () => Effect.sync(() => void this.status(tab, "chat.noAgent", { needsAgent: true })),
@@ -979,11 +1029,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /** Stops agent processes that no tab uses any more, nor is about to start a session on. */
   private readonly stopIdleAgents = Effect.fn("ChatView.stopIdleAgents")(function* (this: ChatViewProvider) {
-    const custom = !!this.customCommand();
     const inUse = (running: RunningAgent) =>
-      this.tabs.some(
-        (tab) => tab.running === running || (!tab.running && (custom ? CUSTOM_AGENT : tab.agentId) === running.agentId),
-      );
+      this.tabs.some((tab) => tab.running === running || (!tab.running && tab.agentId === running.agentId));
     for (const running of [...this.running.values()]) {
       if (!inUse(running)) {
         this.running.delete(running.agentId);
@@ -1015,6 +1062,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     tab.busy = false;
     tab.used = false;
     tab.title = undefined;
+    tab.createdAt = undefined;
     tab.reopen = undefined;
     tab.usage = undefined;
     tab.usageSessionId = undefined;
@@ -1141,6 +1189,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.active = tab;
     tab.agentId = from.agentId;
     tab.title = title?.trim() || undefined;
+    tab.createdAt = undefined;
     tab.reopen = undefined;
     this.postTabs();
     if (replaced) {
@@ -1153,14 +1202,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.saveTabs();
   });
 
+  /** Sends the composer content, unless the tab is already sending or busy with a turn. */
   private readonly send = Effect.fn("ChatView.send")(function* (
     this: ChatViewProvider,
     tab: Tab,
     parts: ReadonlyArray<PromptPart>,
     includeActiveFile: boolean,
   ) {
+    if (tab.busy || tab.sending) {
+      return;
+    }
+    tab.sending = true;
+    yield* this.sendTurn(tab, parts, includeActiveFile).pipe(Effect.ensuring(Effect.sync(() => (tab.sending = false))));
+  });
+
+  private readonly sendTurn = Effect.fn("ChatView.sendTurn")(function* (
+    this: ChatViewProvider,
+    tab: Tab,
+    parts: ReadonlyArray<PromptPart>,
+    includeActiveFile: boolean,
+  ) {
     const text = parts.map((part) => (typeof part === "string" ? part : (part.token ?? ""))).join("");
-    if (tab.busy || parts.every((part) => typeof part === "string" && !part.trim())) {
+    if (parts.every((part) => typeof part === "string" && !part.trim())) {
       return;
     }
     const sessionId = yield* this.ensureSession(tab);
@@ -1215,6 +1278,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
 
     tab.used = true;
+    tab.createdAt ??= Date.now();
     if (!tab.title) {
       const firstLine = text.trim().split("\n")[0] || sent[0]?.name || "";
       tab.title = firstLine.length > MAX_TITLE_LENGTH ? `${firstLine.slice(0, MAX_TITLE_LENGTH - 1)}…` : firstLine;
@@ -1378,9 +1442,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }
       // No path to point at: save to a temp file so any agent can read it via resource_link.
       const fs = yield* FileSystem.FileSystem;
-      const dir = path.join(os.tmpdir(), "code-acp");
-      yield* fs.makeDirectory(dir, { recursive: true });
-      const file = path.join(dir, `${yield* Clock.currentTimeMillis}-${path.basename(attachment.name) || "attachment"}`);
+      yield* fs.makeDirectory(TEMP_DIR, { recursive: true });
+      const file = path.join(TEMP_DIR, `${yield* Clock.currentTimeMillis}-${path.basename(attachment.name) || "attachment"}`);
       yield* fs.writeFile(file, Buffer.from(attachment.data, "base64"));
       return {
         type: "resource_link",
@@ -1503,7 +1566,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
     if (isTerminalAuth(picked)) {
       // Terminal auth: run the agent binary itself with the method's args in a terminal.
-      const cmd = yield* this.commandFor(running.agentId);
+      const cmd = yield* this.manager.command(running.agentId);
       if (!cmd) {
         return;
       }
@@ -1553,6 +1616,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       tab.busy = false;
       tab.used = false;
       tab.title = undefined;
+      tab.createdAt = undefined;
       tab.reopen = undefined;
       this.postTab(tab, { type: "reset" });
     }
@@ -1564,6 +1628,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   });
 
   dispose(): void {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.writeTabs();
+    }
     this.cancelPendingPermissions();
     const running = [...this.running.values()];
     this.running.clear();

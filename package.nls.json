@@ -13,8 +13,7 @@
   "command.openSettings": "Code ACP: Open Settings",
   "config.language": "Language of the Code ACP interface.",
   "config.language.auto": "Same as the VS Code display language",
-  "config.agentCommand": "Command that runs a custom ACP agent. When set, it overrides the agent selected from the registry.",
-  "config.agentArgs": "Arguments for agentCommand.",
+  "config.customAgents": "ACP agents run from local commands, by name. They appear in the chat's agent picker next to the installed agents; their env is added on top of codeAcp.env.",
   "config.env": "Extra environment variables for the agent (e.g. ANTHROPIC_API_KEY).",
   "config.nodePath": "Node used to run agents installed via npm.",
   "config.checkAgentUpdates": "Check the ACP Registry for agent updates once a day and offer to install them.",
@@ -31,6 +30,7 @@
   "command.closeTab": "Close",
   "command.closeOtherTabs": "Close Others",
   "command.closeTabsToRight": "Close to the Right",
+  "config.mcpServers": "Extra MCP servers passed to every agent session, on top of the agent's own MCP config. Keyed by server name, in the `.mcp.json` shape: `{ \"command\": \"npx\", \"args\": [...], \"env\": {...} }` for stdio, or `{ \"type\": \"http\" | \"sse\", \"url\": \"...\", \"headers\": {...} }`. Changes apply to new or reopened sessions.",
   "config.commitMessage.agent": "Id of the installed agent that generates commit messages. Empty: the default agent.",
   "config.commitMessage.model": "Model for generating commit messages (its id or name, as the agent lists it). Empty: the agent's default model.",
   "config.commitMessage.instructions": "Extra instructions for generating commit messages, e.g. a convention such as Conventional Commits."

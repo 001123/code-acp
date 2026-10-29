@@ -1,11 +1,35 @@
 import { Option, Schema } from "effect";
 import * as vscode from "vscode";
 
+/** One entry of codeAcp.mcpServers, in the `.mcp.json` shape: stdio when `url` is absent. */
+export const McpServerEntry = Schema.Union([
+  Schema.Struct({
+    type: Schema.optional(Schema.Literal("stdio")),
+    command: Schema.String,
+    args: Schema.optional(Schema.Array(Schema.String)),
+    env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  }),
+  Schema.Struct({
+    type: Schema.Literals(["http", "sse"]),
+    url: Schema.String,
+    headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  }),
+]);
+export type McpServerEntry = typeof McpServerEntry.Type;
+
+/** One entry of codeAcp.customAgents: an ACP agent run from a local command. */
+export const CustomAgentEntry = Schema.Struct({
+  command: Schema.String,
+  args: Schema.optional(Schema.Array(Schema.String)),
+  env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+});
+export type CustomAgentEntry = typeof CustomAgentEntry.Type;
+
 /** Schemas of the codeAcp.* settings; keep in sync with `contributes.configuration` in package.json. */
 export const Settings = Schema.Struct({
   language: Schema.Literals(["auto", "en", "vi"]),
-  agentCommand: Schema.String,
-  agentArgs: Schema.Array(Schema.String),
+  /** Agents run from local commands, by name; listed next to the installed ones. */
+  customAgents: Schema.Record(Schema.String, CustomAgentEntry),
   env: Schema.Record(Schema.String, Schema.String),
   nodePath: Schema.String,
   /** Look for agent updates in the ACP Registry once a day and offer to install them. */
@@ -15,20 +39,22 @@ export const Settings = Schema.Struct({
   /** Model value (or name) to pick in the commit session; empty keeps the agent's default. */
   "commitMessage.model": Schema.String,
   "commitMessage.instructions": Schema.String,
+  /** Extra MCP servers for every session, by name. */
+  mcpServers: Schema.Record(Schema.String, McpServerEntry),
 });
 export type Settings = typeof Settings.Type;
 export type SettingKey = keyof Settings;
 
 export const SETTING_KEYS = [
   "language",
-  "agentCommand",
-  "agentArgs",
+  "customAgents",
   "env",
   "nodePath",
   "checkAgentUpdates",
   "commitMessage.agent",
   "commitMessage.model",
   "commitMessage.instructions",
+  "mcpServers",
 ] as const satisfies ReadonlyArray<SettingKey>;
 
 /** Default of codeAcp.commitMessage.instructions; keep in sync with package.json. */
@@ -37,14 +63,14 @@ export const DEFAULT_COMMIT_INSTRUCTIONS =
 
 const DEFAULTS: Settings = {
   language: "auto",
-  agentCommand: "",
-  agentArgs: [],
+  customAgents: {},
   env: {},
   nodePath: "node",
   checkAgentUpdates: true,
   "commitMessage.agent": "",
   "commitMessage.model": "",
   "commitMessage.instructions": DEFAULT_COMMIT_INSTRUCTIONS,
+  mcpServers: {},
 };
 
 const decodeSettings = Schema.decodeUnknownOption(Settings);
@@ -61,14 +87,14 @@ export function readSettings(): Settings {
   };
   return {
     language: read("language"),
-    agentCommand: read("agentCommand"),
-    agentArgs: read("agentArgs"),
+    customAgents: read("customAgents"),
     env: read("env"),
     nodePath: read("nodePath"),
     checkAgentUpdates: read("checkAgentUpdates"),
     "commitMessage.agent": read("commitMessage.agent"),
     "commitMessage.model": read("commitMessage.model"),
     "commitMessage.instructions": read("commitMessage.instructions"),
+    mcpServers: read("mcpServers"),
   };
 }
 

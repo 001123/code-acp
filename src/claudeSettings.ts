@@ -49,12 +49,28 @@ export class ClaudeSettings extends Context.Service<ClaudeSettings, {
       const path = yield* Path.Path;
       const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
 
+      /** Files read so far by path, with the mtime they had; asked on every usage update, read again only when changed. */
+      const cache = new Map<string, { mtime: number; settings: Option.Option<ClaudeSettingsFile> }>();
+
       // A missing or unreadable file sets nothing.
-      const readFile = (file: string) =>
-        fs.readFileString(file).pipe(
+      const readFile = Effect.fnUntraced(function* (file: string) {
+        const info = yield* fs.stat(file).pipe(Effect.option);
+        if (Option.isNone(info)) {
+          cache.delete(file);
+          return Option.none<ClaudeSettingsFile>();
+        }
+        const mtime = Option.match(info.value.mtime, { onNone: () => -1, onSome: (date) => date.getTime() });
+        const cached = cache.get(file);
+        if (cached && mtime >= 0 && cached.mtime === mtime) {
+          return cached.settings;
+        }
+        const settings = yield* fs.readFileString(file).pipe(
           Effect.map(decodeSettingsFile),
           Effect.orElseSucceed(() => Option.none<ClaudeSettingsFile>()),
         );
+        cache.set(file, { mtime, settings });
+        return settings;
+      });
 
       const autoCompactWindow = Effect.fn("ClaudeSettings.autoCompactWindow")(function* (model: string, cwd: string) {
         // Highest precedence first: local project, shared project, user.

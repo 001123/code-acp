@@ -1,8 +1,9 @@
+import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 import { locale, webviewL10n } from "./i18n";
 
 export function nonce(): string {
-  return Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
+  return randomBytes(16).toString("hex");
 }
 
 /** Folders a webview may load from: media/ (CSS, icons) and dist/webview/ (React bundles). */

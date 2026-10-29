@@ -1,5 +1,5 @@
 import { mount, render, type Mounted } from "pele";
-import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { memo, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -105,11 +105,13 @@ const components: Components = {
   },
 };
 
+const remarkPlugins = [remarkGfm];
+
 /**
  * Agent text rendered as GitHub-flavored Markdown; ```mermaid blocks become diagrams. Local links and
  * inline code that names a file call `onOpenFile`.
  */
-export function MarkdownView({
+export const MarkdownView = memo(function MarkdownView({
   text,
   className,
   onOpenFile,
@@ -127,9 +129,9 @@ export function MarkdownView({
   };
   return (
     <div className={className} onClick={onClick}>
-      <Markdown remarkPlugins={[remarkGfm]} components={components}>
+      <Markdown remarkPlugins={remarkPlugins} components={components}>
         {text}
       </Markdown>
     </div>
   );
-}
+});

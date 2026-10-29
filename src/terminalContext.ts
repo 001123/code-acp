@@ -22,14 +22,16 @@ interface Command {
   /** Undefined while running, or when the shell did not report it. */
   exitCode: number | undefined;
   running: boolean;
-  /** Output as written, escape sequences included; only the tail is kept. */
-  raw: string;
+  /** Output as written, escape sequences included, in chunks; only about the last `MAX_RAW` characters are kept. */
+  chunks: string[];
+  /** Characters in `chunks`. */
+  size: number;
 }
 
 /** Commands kept per terminal. */
 const MAX_COMMANDS = 20;
-/** Raw output kept per command, in characters. */
-const MAX_RAW = 512 * 1024;
+/** Raw output kept per command, in characters; up to twice as much is held between trims. */
+const MAX_RAW = 256 * 1024;
 /** Output lines an attachment keeps; earlier ones are cut. */
 const MAX_LINES = 200;
 /** Terminal commands offered after "@". */
@@ -51,6 +53,10 @@ export function plainOutput(raw: string): string {
   while (lines.length && !lines[lines.length - 1]!.trim()) lines.pop();
   while (lines.length && !lines[0]!.trim()) lines.shift();
   return lines.length > MAX_LINES ? ["…", ...lines.slice(-MAX_LINES)].join("\n") : lines.join("\n");
+}
+
+function rawOf(command: Command): string {
+  return command.chunks.join("").slice(-MAX_RAW);
 }
 
 function short(text: string): string {
@@ -91,7 +97,8 @@ export class TerminalContext extends Context.Service<TerminalContext, {
           cwd: e.execution.cwd?.fsPath,
           exitCode: undefined,
           running: true,
-          raw: "",
+          chunks: [],
+          size: 0,
         };
         const list = history.get(e.terminal) ?? [];
         list.push(command);
@@ -103,7 +110,14 @@ export class TerminalContext extends Context.Service<TerminalContext, {
           Stream.fromAsyncIterable(output, (cause) => cause).pipe(
             Stream.runForEach((chunk) =>
               Effect.sync(() => {
-                command.raw = (command.raw + chunk).slice(-MAX_RAW);
+                // Appending is cheap; the tail is cut only once twice the limit has piled up.
+                command.chunks.push(chunk);
+                command.size += chunk.length;
+                if (command.size > 2 * MAX_RAW) {
+                  const tail = rawOf(command);
+                  command.chunks = [tail];
+                  command.size = tail.length;
+                }
               }),
             ),
             Effect.ignore,
@@ -141,7 +155,7 @@ export class TerminalContext extends Context.Service<TerminalContext, {
         commandLine: c.commandLine,
         cwd: c.cwd,
         exitCode: c.running ? undefined : c.exitCode,
-        text: plainOutput(c.raw),
+        text: plainOutput(rawOf(c)),
       });
 
       const newestFirst = () => [...history.values()].flat().sort((a, b) => b.id - a.id);

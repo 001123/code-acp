@@ -37,7 +37,7 @@ Open with `Code ACP: Open Settings` (gear button on the chat panel).
 | Setting | Description |
 | --- | --- |
 | `codeAcp.language` | `auto`, `en`, `vi` |
-| `codeAcp.agentCommand` / `codeAcp.agentArgs` | Custom agent, overrides the registry agent |
+| `codeAcp.customAgents` | Your own ACP agents (command, args, env by name), listed next to the installed ones |
 | `codeAcp.env` | Extra environment variables for the agent |
 | `codeAcp.nodePath` | Node for npm agents (default `node`) |
 | `codeAcp.checkAgentUpdates` | Check for agent updates daily |

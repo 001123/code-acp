@@ -314,18 +314,33 @@
           "default": "auto",
           "description": "%config.language%"
         },
-        "codeAcp.agentCommand": {
-          "type": "string",
-          "default": "",
-          "description": "%config.agentCommand%"
-        },
-        "codeAcp.agentArgs": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        "codeAcp.customAgents": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "command"
+            ]
           },
-          "default": [],
-          "description": "%config.agentArgs%"
+          "default": {},
+          "description": "%config.customAgents%"
         },
         "codeAcp.env": {
           "type": "object",
@@ -360,6 +375,49 @@
           "default": "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Write a single subject line only, no body.",
           "editPresentation": "multilineText",
           "description": "%config.commitMessage.instructions%"
+        },
+        "codeAcp.mcpServers": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "%config.mcpServers%",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stdio",
+                  "http",
+                  "sse"
+                ],
+                "default": "stdio"
+              },
+              "command": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "url": {
+                "type": "string"
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -383,6 +441,7 @@
     "@vscode/vsce": "^4.1.0",
     "effect": "4.1.0",
     "esbuild": "^0.28.2",
+    "execa": "^10.2.1",
     "pele": "1.12.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

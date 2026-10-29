@@ -7,7 +7,7 @@ import type { AgentCommand } from "./acpClient";
 import { t } from "./i18n";
 import { binaryTarget, currentPlatform, type BinaryTarget, type PackageDistribution, type RegistryAgent } from "./registry";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
-import { readSettings } from "./settings";
+import { CustomAgentEntry, readSettings } from "./settings";
 
 export const InstallKind = Schema.Literals(["npx", "uvx", "binary"]);
 export type InstallKind = typeof InstallKind.Type;
@@ -34,6 +34,32 @@ const PackageJson = Schema.fromJsonString(
   }),
 );
 
+/** An agent the chat can run: installed from the registry, or one of codeAcp.customAgents (no version). */
+export interface AgentChoice {
+  readonly id: string;
+  readonly name: string;
+  readonly version?: string;
+}
+
+/** Prefix of the ids of codeAcp.customAgents entries; keeps them apart from registry ids. */
+const CUSTOM_PREFIX = "custom:";
+
+const decodeCustomEntries = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown));
+const decodeCustomAgent = Schema.decodeUnknownOption(CustomAgentEntry);
+
+/** The usable codeAcp.customAgents entries by id, decoded one by one so a bad entry does not drop the others. */
+const customAgents = Effect.sync(() => {
+  const raw = vscode.workspace.getConfiguration("codeAcp").get("customAgents");
+  const agents = new Map<string, CustomAgentEntry & { readonly name: string }>();
+  for (const [name, value] of Object.entries(Option.getOrElse(decodeCustomEntries(raw ?? {}), () => ({})))) {
+    const entry = decodeCustomAgent(value);
+    if (Option.isSome(entry) && entry.value.command.trim()) {
+      agents.set(`${CUSTOM_PREFIX}${name}`, { ...entry.value, name });
+    }
+  }
+  return agents;
+});
+
 const INSTALLED_KEY = "codeAcp.installedAgents";
 const ACTIVE_KEY = "codeAcp.activeAgent";
 
@@ -58,17 +84,24 @@ export function installKind(agent: RegistryAgent): InstallKind | undefined {
   return undefined;
 }
 
-/** Agents installed from the registry, and which one the chat uses. */
+/** Agents installed from the registry and custom agents from the settings, and which one the chat uses. */
 export class AgentManager extends Context.Service<AgentManager, {
+  /** Fires when agents are installed or removed, the default changes, or codeAcp.customAgents changes. */
   readonly onDidChange: vscode.Event<void>;
   readonly list: Effect.Effect<ReadonlyArray<InstalledAgent>>;
   get(id: string): Effect.Effect<InstalledAgent | undefined>;
+  /** Every agent the chat can run: the installed ones, then the custom ones. */
+  readonly agents: Effect.Effect<ReadonlyArray<AgentChoice>>;
+  has(id: string): Effect.Effect<boolean>;
+  /** Command to launch the agent `id`, installed or custom; undefined when there is no such agent. */
+  command(id: string): Effect.Effect<AgentCommand | undefined>;
+  /** The default agent for new tabs, while it still exists. */
   readonly activeId: Effect.Effect<string | undefined>;
   readonly active: Effect.Effect<InstalledAgent | undefined>;
   setActive(id: string | undefined): Effect.Effect<void, InstallError>;
   /** Command to launch an installed agent, with the user's extra env applied. */
   commandFor(agent: InstalledAgent): AgentCommand;
-  /** Command for the chat's agent: the codeAcp.agentCommand override, else the active agent; undefined when neither. */
+  /** Command for the default agent; undefined when there is none. */
   readonly selectedCommand: Effect.Effect<AgentCommand | undefined>;
   install(agent: RegistryAgent, report: (message: string) => Effect.Effect<void>): Effect.Effect<InstalledAgent, InstallError>;
   uninstall(id: string): Effect.Effect<void, InstallError>;
@@ -86,6 +119,16 @@ export class AgentManager extends Context.Service<AgentManager, {
         Effect.sync(() => new vscode.EventEmitter<void>()),
         (emitter) => Effect.sync(() => emitter.dispose()),
       );
+      yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration("codeAcp.customAgents")) {
+              changed.fire();
+            }
+          }),
+        ),
+        (listener) => Effect.sync(() => listener.dispose()),
+      );
       // Serializes read-modify-write of the installed agents in globalState.
       const stateLock = yield* Semaphore.make(1);
       const root = path.join(context.globalStorageUri.fsPath, "agents");
@@ -98,9 +141,13 @@ export class AgentManager extends Context.Service<AgentManager, {
       const state = Effect.sync((): InstalledAgents =>
         Option.getOrElse(Schema.decodeUnknownOption(InstalledAgents)(context.globalState.get(INSTALLED_KEY)), () => ({})),
       );
+      const has = (id: string) =>
+        Effect.gen(function* () {
+          return !!(yield* state)[id] || (yield* customAgents).has(id);
+        });
       const activeId = Effect.gen(function* () {
         const id = context.globalState.get(ACTIVE_KEY);
-        return Predicate.isString(id) && (yield* state)[id] ? id : undefined;
+        return Predicate.isString(id) && (yield* has(id)) ? id : undefined;
       });
       const notify = Effect.sync(() => changed.fire());
 
@@ -273,10 +320,32 @@ export class AgentManager extends Context.Service<AgentManager, {
         env: { ...agent.env, ...readSettings().env },
       });
 
+      const command = Effect.fn("AgentManager.command")(function* (id: string) {
+        const installed = (yield* state)[id];
+        if (installed) {
+          return commandFor(installed);
+        }
+        const custom = (yield* customAgents).get(id);
+        return custom
+          ? ({
+              command: custom.command.trim(),
+              args: custom.args ?? [],
+              env: { ...readSettings().env, ...custom.env },
+            } satisfies AgentCommand)
+          : undefined;
+      });
+
       return AgentManager.of({
         onDidChange: changed.event,
         list: Effect.map(state, Object.values),
         get: (id) => Effect.map(state, (agents) => agents[id]),
+        agents: Effect.gen(function* () {
+          const installed = Object.values(yield* state).map(({ id, name, version }): AgentChoice => ({ id, name, version }));
+          const custom = [...(yield* customAgents)].map(([id, { name }]): AgentChoice => ({ id, name }));
+          return [...installed, ...custom];
+        }),
+        has,
+        command,
         activeId,
         active: Effect.gen(function* () {
           const id = yield* activeId;
@@ -285,14 +354,8 @@ export class AgentManager extends Context.Service<AgentManager, {
         setActive: (id) => update(ACTIVE_KEY, id).pipe(Effect.andThen(notify)),
         commandFor,
         selectedCommand: Effect.gen(function* () {
-          const { agentCommand, agentArgs, env } = readSettings();
-          const command = agentCommand.trim();
-          if (command) {
-            return { command, args: agentArgs, env } satisfies AgentCommand;
-          }
           const id = yield* activeId;
-          const active = id ? (yield* state)[id] : undefined;
-          return active ? commandFor(active) : undefined;
+          return id ? yield* command(id) : undefined;
         }),
         install,
         uninstall,

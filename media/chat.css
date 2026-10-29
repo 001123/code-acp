@@ -994,13 +994,30 @@ button.chip-remove {
 .lightbox-stage[data-dragging] {
   cursor: grabbing;
 }
-.lightbox-stage img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+.lightbox-stage[data-editing] {
+  cursor: crosshair;
+}
+.lightbox-canvas {
+  position: relative;
+  flex: none;
   transform-origin: center;
+}
+.lightbox-canvas img {
+  display: block;
+  width: 100%;
+  height: 100%;
   user-select: none;
   image-rendering: auto;
+}
+.lightbox-canvas svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .lightbox-toolbar {
   display: flex;
@@ -1026,6 +1043,65 @@ button.chip-remove {
   padding: 2px 6px;
   border-radius: 4px;
   font-variant-numeric: tabular-nums;
+}
+.lightbox-text {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  min-width: 4em;
+  border: 1px dashed var(--vscode-focusBorder);
+  border-radius: 0;
+  outline: none;
+  background: rgba(0, 0, 0, 0.25);
+  line-height: 1.2;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  field-sizing: content;
+  -webkit-text-stroke: 0.15em rgba(0, 0, 0, 0.7);
+  paint-order: stroke fill;
+}
+.lightbox-toolbar .icon-btn[aria-pressed="true"] {
+  background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+  color: var(--vscode-focusBorder);
+}
+.lightbox-toolbar .icon-btn:disabled {
+  opacity: 0.4;
+  background: none;
+}
+.lightbox-tools {
+  border-bottom-style: dashed;
+}
+.lightbox-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--vscode-panel-border, currentColor);
+  opacity: 0.6;
+}
+.lightbox-spacer {
+  flex: 1;
+}
+.lightbox-swatch {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 40%, transparent);
+}
+.lightbox-swatch[aria-pressed="true"] {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+.lightbox-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 4px;
+}
+.lightbox-save:disabled {
+  opacity: 0.5;
 }
 .lightbox-name {
   flex: 1;

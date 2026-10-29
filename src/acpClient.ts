@@ -1,11 +1,12 @@
 import * as acp from "@agentclientprotocol/sdk";
-import { Deferred, Effect, Schema, Scope } from "effect";
-import { spawn } from "node:child_process";
+import { Deferred, Effect, Option, Schema, Scope } from "effect";
+import { execa } from "execa";
 import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
 import * as vscode from "vscode";
 import { t } from "./i18n";
-import { messageOf, Output, thenable } from "./runtime";
+import { mcpServersFor } from "./mcpServers";
+import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
 
 export interface AgentHandlers {
   onUpdate(notification: acp.SessionNotification): void;
@@ -70,6 +71,48 @@ export interface AcpAgent {
   authenticate(methodId: string): Effect.Effect<acp.AuthenticateResponse, RequestError>;
 }
 
+/** How long a stopped agent gets to exit on SIGTERM before it is killed. */
+const KILL_GRACE_MS = 3000;
+
+/** The part of the extension's package.json sent as `clientInfo`. */
+const PackageVersion = Schema.Struct({ version: Schema.String });
+
+/**
+ * Stops the agent and whatever it started. On POSIX it leads its own process group (`detached`), so wrappers
+ * such as `uvx` or `npx` don't leave their child running, and SIGKILL follows if it ignores SIGTERM. Windows
+ * has no signals to wait on: `taskkill /T` ends the whole tree, cmd.exe shims included.
+ */
+function stopProcess(child: { readonly pid?: number | undefined; kill(): boolean }, ended: () => boolean): void {
+  if (ended() || child.pid === undefined) {
+    return;
+  }
+  const pid = child.pid;
+  if (process.platform === "win32") {
+    void execa("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", reject: false }).then((result) => {
+      if (result.failed) {
+        child.kill();
+      }
+    });
+    return;
+  }
+  const signal = (name: NodeJS.Signals) => {
+    try {
+      process.kill(-pid, name);
+    } catch {
+      // Already gone.
+    }
+  };
+  signal("SIGTERM");
+  setTimeout(() => {
+    if (!ended()) {
+      signal("SIGKILL");
+    }
+  }, KILL_GRACE_MS).unref();
+}
+
+/** How long the agent may take to answer `initialize`; a first `uvx` run downloads its packages first. */
+const INIT_TIMEOUT_SECONDS = 120;
+
 function isAuthRequired(error: unknown): boolean {
   return error instanceof acp.RequestError && error.code === acp.RequestError.authRequired().code;
 }
@@ -78,8 +121,11 @@ function isAuthRequired(error: unknown): boolean {
 export const spawnAgent = Effect.fn("spawnAgent")(function* (
   agentCommand: AgentCommand,
   handlers: AgentHandlers,
-): Effect.fn.Return<AcpAgent, AgentStartError | RequestError, Scope.Scope | Output> {
+): Effect.fn.Return<AcpAgent, AgentStartError | RequestError, Scope.Scope | Output | ExtensionCtx> {
   const output = yield* Output;
+  const { version } = Schema.decodeUnknownOption(PackageVersion)((yield* ExtensionCtx).extension.packageJSON).pipe(
+    Option.getOrElse(() => ({ version: "0.0.0" })),
+  );
   const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
   const exited = yield* Deferred.make<AgentExit>();
   const { command, args, env } = agentCommand;
@@ -87,9 +133,14 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
 
   const connection = yield* Effect.acquireRelease(
     Effect.sync(() => {
-      const child = spawn(command, [...args], {
-        env: { ...process.env, ...env },
+      // execa: on Windows, `npx`-style commands are .cmd shims that need cmd.exe and escaped arguments.
+      const child = execa(command, [...args], {
+        env,
         stdio: ["pipe", "pipe", "pipe"],
+        detached: process.platform !== "win32",
+        // A long-lived process: its output is streamed, never collected, and ending is not a failure.
+        buffer: false,
+        reject: false,
       });
       const stream = acp.ndJsonStream(
         Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
@@ -111,21 +162,27 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         Deferred.doneUnsafe(exited, Effect.succeed(info));
       };
       child.stderr.on("data", (chunk: Buffer) => output.append(chunk.toString()));
-      // A failed spawn (e.g. command not found) emits "error" and no "exit".
-      child.on("error", (err) => {
-        output.appendLine(`[agent] error: ${err.message}`);
-        exit({ code: null, signal: null, spawnError: err.message });
+      let ended = false;
+      // With `reject: false` this settles once, on exit or on a failed spawn (e.g. command not found).
+      void child.then((result) => {
+        ended = true;
+        const code = result.exitCode ?? null;
+        const signal = result.signal ?? null;
+        if (result.failed && code === null && signal === null) {
+          const message = result.originalMessage || result.shortMessage;
+          output.appendLine(`[agent] error: ${message}`);
+          exit({ code, signal, spawnError: message });
+        } else {
+          output.appendLine(`[agent] exited code=${code} signal=${signal}`);
+          exit({ code, signal });
+        }
       });
-      child.on("exit", (code, signal) => {
-        output.appendLine(`[agent] exited code=${code} signal=${signal}`);
-        exit({ code, signal });
-      });
-      return { child, connection };
+      return { child, connection, ended: () => ended };
     }),
-    ({ child, connection }) =>
+    ({ child, connection, ended }) =>
       Effect.sync(() => {
         connection.close();
-        child.kill();
+        stopProcess(child, ended);
       }),
   ).pipe(Effect.map(({ connection }) => connection));
 
@@ -152,31 +209,52 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
   const initializeResponse = yield* request("initialize", (agent) =>
     agent.request(acp.methods.agent.initialize, {
       protocolVersion: acp.PROTOCOL_VERSION,
-      clientInfo: { name: "code-acp", version: "0.0.1" },
+      clientInfo: { name: "code-acp", version },
       clientCapabilities: {
         fs: { readTextFile: true, writeTextFile: true },
         terminal: false,
         auth: { terminal: true },
       },
     }),
-  ).pipe(Effect.raceFirst(exitedEarly));
+  ).pipe(
+    Effect.raceFirst(exitedEarly),
+    // A hung agent would otherwise keep its tabs on "starting" forever.
+    Effect.timeoutOrElse({
+      duration: `${INIT_TIMEOUT_SECONDS} seconds`,
+      orElse: () => Effect.fail(new AgentStartError({ message: t("agent.initTimeout", INIT_TIMEOUT_SECONDS) })),
+    }),
+  );
   yield* Effect.logInfo(`[agent] initialized: ${JSON.stringify(initializeResponse.agentInfo ?? {})}`);
+  // Read per session, so settings changes apply without restarting the agent.
+  const mcpServers = mcpServersFor(initializeResponse.agentCapabilities?.mcpCapabilities);
 
   return {
     initializeResponse,
     authMethods: initializeResponse.authMethods ?? [],
     exited: Deferred.await(exited),
     newSession: (cwd) =>
-      request("session/new", (agent) => agent.request(acp.methods.agent.session.new, { cwd, mcpServers: [] })),
+      mcpServers.pipe(
+        Effect.flatMap((mcpServers) =>
+          request("session/new", (agent) => agent.request(acp.methods.agent.session.new, { cwd, mcpServers })),
+        ),
+      ),
     listSessions: (cwd, cursor) =>
       request("session/list", (agent) => agent.request(acp.methods.agent.session.list, { cwd, cursor })),
     loadSession: (sessionId, cwd) =>
-      request("session/load", (agent) =>
-        agent.request(acp.methods.agent.session.load, { sessionId, cwd, mcpServers: [] }),
+      mcpServers.pipe(
+        Effect.flatMap((mcpServers) =>
+          request("session/load", (agent) =>
+            agent.request(acp.methods.agent.session.load, { sessionId, cwd, mcpServers }),
+          ),
+        ),
       ),
     resumeSession: (sessionId, cwd) =>
-      request("session/resume", (agent) =>
-        agent.request(acp.methods.agent.session.resume, { sessionId, cwd, mcpServers: [] }),
+      mcpServers.pipe(
+        Effect.flatMap((mcpServers) =>
+          request("session/resume", (agent) =>
+            agent.request(acp.methods.agent.session.resume, { sessionId, cwd, mcpServers }),
+          ),
+        ),
       ),
     closeSession: (sessionId) =>
       request("session/close", (agent) => agent.request(acp.methods.agent.session.close, { sessionId })).pipe(

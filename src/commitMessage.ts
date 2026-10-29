@@ -1,12 +1,12 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { Context, Deferred, Effect, Layer, Predicate, Schema } from "effect";
+import { Context, Deferred, Effect, Layer, Predicate, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as vscode from "vscode";
 import * as os from "node:os";
 import { spawnAgent, type AcpAgent } from "./acpClient";
 import { AgentManager } from "./agentManager";
 import { t } from "./i18n";
-import { messageOf, Output, thenable } from "./runtime";
+import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
 import { readSettings } from "./settings";
 
 /** A repository whose commit message box we fill: a `vscode.SourceControl` or a git extension repository. */
@@ -44,6 +44,25 @@ export class CommitMessageError extends Schema.TaggedError<CommitMessageError>()
 const GENERATING_KEY = "codeAcp.generatingCommitMessage";
 /** Keeps the prompt within what agents accept comfortably. */
 const MAX_DIFF_CHARS = 80_000;
+/**
+ * Generated lockfiles, left out of the diff: they can be megabytes and say nothing a message needs. They
+ * still show in `git status`.
+ */
+const DIFF_EXCLUDES = [
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+  "bun.lock",
+  "bun.lockb",
+  "Cargo.lock",
+  "poetry.lock",
+  "uv.lock",
+  "Pipfile.lock",
+  "composer.lock",
+  "Gemfile.lock",
+  "go.sum",
+].map((name) => `:(exclude,glob)**/${name}`);
 const CANCELLED: acp.RequestPermissionResponse = { outcome: { outcome: "cancelled" } };
 
 /** A model the commit agent offers. */
@@ -85,6 +104,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
     Effect.gen(function* () {
       const manager = yield* AgentManager;
       const output = yield* Output;
+      const context = yield* ExtensionCtx;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       let stop: Deferred.Deferred<void> | undefined;
       let pushing = false;
@@ -92,6 +112,20 @@ export class CommitMessage extends Context.Service<CommitMessage, {
       const fail = (message: string) => new CommitMessageError({ message });
       const git = (cwd: string, ...args: Array<string>) =>
         spawner.string(ChildProcess.make("git", args, { cwd })).pipe(Effect.orElseSucceed(() => ""));
+      /** At most about `max` characters of git's output; git is stopped once that much has come in. */
+      const gitHead = (cwd: string, max: number, ...args: Array<string>) =>
+        Effect.gen(function* () {
+          const handle = yield* spawner.spawn(ChildProcess.make("git", args, { cwd }));
+          let text = "";
+          yield* handle.stdout.pipe(
+            Stream.decodeText(),
+            Stream.takeUntil((chunk) => (text += chunk).length >= max),
+            Stream.runDrain,
+          );
+          return text;
+        }).pipe(Effect.scoped, Effect.orElseSucceed(() => ""));
+      const diff = (cwd: string, ...args: Array<string>) =>
+        gitHead(cwd, MAX_DIFF_CHARS + 1, "diff", "--no-color", ...args, "--", ".", ...DIFF_EXCLUDES);
       const setGenerating = (value: boolean) =>
         thenable(() => vscode.commands.executeCommand("setContext", GENERATING_KEY, value)).pipe(Effect.ignore);
 
@@ -119,21 +153,21 @@ export class CommitMessage extends Context.Service<CommitMessage, {
 
       /** Staged changes when there are any, otherwise the working tree (tracked diff + untracked file names). */
       const collectChanges = Effect.fn("CommitMessage.collectChanges")(function* (cwd: string) {
-        const staged = yield* git(cwd, "diff", "--cached", "--no-color");
-        const status = yield* git(cwd, "status", "--short", ...(staged.trim() ? [] : ["--untracked-files=all"]));
-        const diff = staged.trim() ? staged : yield* git(cwd, "diff", "--no-color");
-        if (!status.trim() && !diff.trim()) {
+        // By name: a staged lockfile alone leaves the diff empty, but it is still what gets committed.
+        const staged = !!(yield* gitHead(cwd, 1, "diff", "--cached", "--name-only")).trim();
+        const status = yield* git(cwd, "status", "--short", ...(staged ? [] : ["--untracked-files=all"]));
+        const changes = yield* diff(cwd, ...(staged ? ["--cached"] : []));
+        if (!status.trim() && !changes.trim()) {
           return yield* fail(t("commit.noChanges"));
         }
         const log = yield* git(cwd, "log", "-n", "10", "--format=%s");
-        const truncated = diff.length > MAX_DIFF_CHARS ? `${diff.slice(0, MAX_DIFF_CHARS)}\n[diff truncated]` : diff;
-        return { staged: !!staged.trim(), status, diff: truncated, log };
+        const truncated = changes.length > MAX_DIFF_CHARS ? `${changes.slice(0, MAX_DIFF_CHARS)}\n[diff truncated]` : changes;
+        return { staged, status, diff: truncated, log };
       });
 
-      /** The codeAcp.commitMessage.agent agent while installed, else the chat's default. */
+      /** The codeAcp.commitMessage.agent agent while it exists, else the chat's default. */
       const commandFor = Effect.fn("CommitMessage.commandFor")(function* (agentId: string) {
-        const agent = agentId ? yield* manager.get(agentId) : undefined;
-        const command = agent ? manager.commandFor(agent) : yield* manager.selectedCommand;
+        const command = (agentId ? yield* manager.command(agentId) : undefined) ?? (yield* manager.selectedCommand);
         if (!command) {
           return yield* fail(t("chat.noAgent"));
         }
@@ -223,6 +257,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         },
         Effect.scoped,
         Effect.provideService(Output, output),
+        Effect.provideService(ExtensionCtx, context),
         Effect.catchTags({
           AuthRequiredError: () => Effect.fail(fail(t("commit.needsLogin"))),
           AgentStartError: (err) => Effect.fail(fail(err.message)),
@@ -243,6 +278,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         },
         Effect.scoped,
         Effect.provideService(Output, output),
+        Effect.provideService(ExtensionCtx, context),
         Effect.catchTags({
           AuthRequiredError: () => Effect.fail(fail(t("commit.needsLogin"))),
           AgentStartError: (err) => Effect.fail(fail(err.message)),

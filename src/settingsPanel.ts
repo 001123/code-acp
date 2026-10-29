@@ -87,7 +87,7 @@ export class SettingsPanel {
         }
         break;
       case "use":
-        if (yield* this.manager.get(msg.id)) {
+        if (yield* this.manager.has(msg.id)) {
           yield* this.manager.setActive(msg.id);
         }
         break;
@@ -122,12 +122,11 @@ export class SettingsPanel {
           overridden.push(key);
         }
       }
-      const agents = yield* this.manager.list;
       void this.panel.webview.postMessage({
         type: "state",
         values,
         overridden,
-        agents: agents.map((a) => ({ id: a.id, name: a.name, version: a.version })),
+        agents: yield* this.manager.agents,
         activeId: yield* this.manager.activeId,
       });
     });

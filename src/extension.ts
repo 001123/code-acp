@@ -26,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const selectAgent = Effect.fn("selectAgent")(function* () {
     const manage = { label: t("agent.manage"), id: undefined as string | undefined };
     const activeId = yield* provider.activeAgentId;
-    const items = (yield* manager.list).map((a) => ({
+    const items = (yield* manager.agents).map((a) => ({
       label: a.name,
       description: a.version,
       detail: a.id === activeId ? t("agent.inUse") : undefined,
