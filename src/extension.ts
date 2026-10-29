@@ -110,6 +110,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return editor ? provider.attachSelection(editor) : Effect.void;
       }),
     ),
+    vscode.commands.registerCommand("codeAcp.addTerminalSelection", run(() => provider.attachTerminalSelection())),
+    vscode.commands.registerCommand("codeAcp.addTerminalOutput", run(() => provider.attachTerminalOutput(false))),
+    vscode.commands.registerCommand("codeAcp.addTerminalFailure", run(() => provider.attachTerminalOutput(true))),
     // webview/context passes the merged `data-vscode-context` of the clicked element (see src/ui/chat.tsx).
     vscode.commands.registerCommand("codeAcp.quoteSelection", (context?: { selectedText?: unknown }) => {
       if (typeof context?.selectedText === "string") {

@@ -10,6 +10,7 @@ import { ClaudeSettings } from "./claudeSettings";
 import { CommitMessage } from "./commitMessage";
 import { Completions } from "./completions";
 import { AcpRegistry } from "./registry";
+import { TerminalContext } from "./terminalContext";
 
 export class ExtensionCtx extends Context.Service<ExtensionCtx, vscode.ExtensionContext>()("code-acp/ExtensionCtx") {}
 
@@ -57,7 +58,7 @@ const appLayer = (context: vscode.ExtensionContext, channel: vscode.OutputChanne
     FetchHttpClient.layer,
     Logger.layer([outputLogger(channel)]),
   );
-  const services = Layer.mergeAll(AgentManager.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer).pipe(Layer.provideMerge(base));
+  const services = Layer.mergeAll(AgentManager.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer, TerminalContext.layer).pipe(Layer.provideMerge(base));
   return Layer.mergeAll(CommitMessage.layer, AgentUpdates.layer).pipe(Layer.provideMerge(services));
 };
 

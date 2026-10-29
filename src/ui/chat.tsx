@@ -2,6 +2,7 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { createContext, Fragment, useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Attachment, Draft, FromWebview as ChatMessage, PromptPart, SentAttachment, TabInfo } from "../chatViewProvider";
 import type { FileSuggestion, SkillSuggestion } from "../completions";
+import type { TerminalSuggestion } from "../terminalContext";
 import { Icon } from "./icon";
 import { Lightbox } from "./lightbox";
 import { MarkdownView, type FileRef } from "./markdown";
@@ -662,6 +663,7 @@ function attachmentKey(a: Attachment): string | undefined {
     case "snippet":
       return `${a.uri}#L${a.startLine}-${a.endLine}`;
     case "data":
+    case "terminal":
       return undefined;
   }
 }
@@ -673,6 +675,7 @@ function attachmentTitle(t: Translate, a: Attachment): string {
     case "uri":
       return a.uri;
     case "snippet":
+    case "terminal":
       return a.text.length > MAX_TITLE_CHARS ? `${a.text.slice(0, MAX_TITLE_CHARS)}…` : a.text;
     case "data":
       return `${a.name} (${a.mimeType || t("chat.unknownType")})`;
@@ -989,6 +992,7 @@ function App() {
   const [trigger, setTrigger] = useState<Trigger>();
   const [selected, setSelected] = useState(0);
   const [files, setFiles] = useState<FileSuggestion[]>([]);
+  const [terminals, setTerminals] = useState<TerminalSuggestion[]>([]);
   const [skills, setSkills] = useState<SkillSuggestion[]>([]);
   /** Id of the latest file search; older answers are dropped. */
   const searchId = useRef(0);
@@ -1011,7 +1015,10 @@ function App() {
     setSelected(0);
     if (next?.sigil === "@") {
       // Results of an earlier "@" don't belong to this one.
-      if (trigger?.sigil !== "@" || trigger.start !== next.start) setFiles([]);
+      if (trigger?.sigil !== "@" || trigger.start !== next.start) {
+        setFiles([]);
+        setTerminals([]);
+      }
       post({ type: "searchFiles", id: ++searchId.current, query: next.query });
     }
     if (next?.sigil === "$" && trigger?.sigil !== "$") post({ type: "listSkills" });
@@ -1041,12 +1048,24 @@ function App() {
             detail: s.description,
             pick: () => addAttachment({ kind: "uri", uri: s.uri, name: s.name }, trigger),
           }))
-        : files.map((f) => ({
-            key: f.uri,
-            label: f.folder ? `${f.name}/` : f.name,
-            detail: f.path,
-            pick: () => addAttachment({ kind: "uri", uri: f.uri, name: f.name }, trigger),
-          }));
+        : [
+            ...terminals.map((c) => ({
+              key: `terminal:${c.id}`,
+              label: c.label,
+              detail: c.detail,
+              // The output stays in the extension until picked; it comes back as "addAttachments".
+              pick: () => {
+                replaceTrigger(trigger, "");
+                post({ type: "attachTerminal", id: c.id });
+              },
+            })),
+            ...files.map((f) => ({
+              key: f.uri,
+              label: f.folder ? `${f.name}/` : f.name,
+              detail: f.path,
+              pick: () => addAttachment({ kind: "uri", uri: f.uri, name: f.name }, trigger),
+            })),
+          ];
   const shown = Math.min(selected, suggestions.length - 1);
 
   function pick(s: Suggestion): void {
@@ -1208,7 +1227,10 @@ function App() {
       case "quote":
         return quote(msg.text);
       case "files":
-        if (msg.id === searchId.current) setFiles(msg.files);
+        if (msg.id === searchId.current) {
+          setFiles(msg.files);
+          setTerminals(msg.terminals ?? []);
+        }
         return;
       case "skills":
         return setSkills(msg.skills);

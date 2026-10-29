@@ -11,6 +11,7 @@ import { Completions } from "./completions";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "./i18n";
 import { runIn, thenable, type AppRuntime, type AppServices, type Output, type VscodeError } from "./runtime";
 import { readSettings } from "./settings";
+import { TerminalContext } from "./terminalContext";
 import { webviewHtml, webviewRoots } from "./webview";
 
 export type FromWebview =
@@ -41,7 +42,9 @@ export type FromWebview =
   /** Workspace files matching what follows "@"; answered with "files" carrying the same `id`. */
   | { type: "searchFiles"; id: number; query: string }
   /** Skills for "$"; answered with "skills". */
-  | { type: "listSkills" };
+  | { type: "listSkills" }
+  /** A terminal command offered with the files; answered with "addAttachments". */
+  | { type: "attachTerminal"; id: number };
 
 /** A chat tab as the webview shows it in the tab strip. */
 export interface TabInfo {
@@ -69,7 +72,9 @@ export type Attachment =
   /** Raw bytes (OS drop or clipboard), base64-encoded. */
   | { kind: "data"; name: string; mimeType: string; data: string }
   /** Lines selected in an editor; `startLine`/`endLine` are 1-based and inclusive. */
-  | { kind: "snippet"; uri: string; name: string; languageId: string; startLine: number; endLine: number; text: string };
+  | { kind: "snippet"; uri: string; name: string; languageId: string; startLine: number; endLine: number; text: string }
+  /** Terminal text: a command's output, or a selection (no `commandLine`). */
+  | { kind: "terminal"; name: string; terminal: string; shell?: string; commandLine?: string; cwd?: string; exitCode?: number; text: string };
 
 /** A text run of the composer, or an attachment; inline ones carry the `token` that stands for them in the text. */
 export type PromptPart = string | (Attachment & { token?: string });
@@ -109,6 +114,12 @@ const MAX_EMBED_BYTES = 256 * 1024;
 const CLAUDE_MODEL_META = "_claude/model";
 
 const CANCELLED: acp.RequestPermissionResponse = { outcome: { outcome: "cancelled" } };
+
+/** `text` in a code block whose fence is longer than any backtick run in it. */
+function fenced(text: string, language: string): string {
+  const fence = "`".repeat(Math.max(3, ...Array.from(text.matchAll(/`+/g), (m) => m[0].length + 1)));
+  return `${fence}${language}\n${text}\n${fence}`;
+}
 
 function isTerminalAuth(m: acp.AuthMethod): m is acp.AuthMethodTerminal & { type: "terminal" } {
   return "type" in m && m.type === "terminal";
@@ -153,6 +164,16 @@ const SavedAttachment = Schema.Union([
     languageId: Schema.String,
     startLine: Schema.Int,
     endLine: Schema.Int,
+    text: Schema.String,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("terminal"),
+    name: Schema.String,
+    terminal: Schema.String,
+    shell: Schema.optional(Schema.String),
+    commandLine: Schema.optional(Schema.String),
+    cwd: Schema.optional(Schema.String),
+    exitCode: Schema.optional(Schema.Int),
     text: Schema.String,
   }),
   Schema.Struct({ kind: Schema.Literal("stored"), name: Schema.String, mimeType: Schema.String, file: Schema.String }),
@@ -648,7 +669,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           Effect.tapError((err) => Effect.logWarning(`File search failed: ${err.message}`)),
           Effect.orElseSucceed(() => []),
         );
-        this.post({ type: "files", id: msg.id, files });
+        const terminals = yield* (yield* TerminalContext).suggestions(msg.query);
+        this.post({ type: "files", id: msg.id, files, terminals });
+        break;
+      }
+      case "attachTerminal": {
+        const attachment = yield* (yield* TerminalContext).command(msg.id);
+        if (Option.isSome(attachment)) {
+          this.queuedAttachments.push(attachment.value);
+          this.flushAttachments();
+        }
         break;
       }
       case "listSkills":
@@ -1252,6 +1282,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.flushAttachments();
   });
 
+  /** Adds the active terminal's selection to the composer (terminal context menu). */
+  readonly attachTerminalSelection = Effect.fn("ChatView.attachTerminalSelection")(function* (this: ChatViewProvider) {
+    const selection = yield* (yield* TerminalContext).selection;
+    if (Option.isNone(selection)) {
+      void vscode.window.showInformationMessage(t("terminal.noSelection"));
+      return;
+    }
+    yield* this.queueAndFocus([selection.value]);
+  });
+
+  /**
+   * Adds the output of the active terminal's last command, or last failed one, to the composer
+   * (terminal context menu).
+   */
+  readonly attachTerminalOutput = Effect.fn("ChatView.attachTerminalOutput")(function* (this: ChatViewProvider, failed: boolean) {
+    const terminal = vscode.window.activeTerminal;
+    if (!terminal) {
+      return;
+    }
+    const terminals = yield* TerminalContext;
+    const command = yield* (failed ? terminals.lastFailed(terminal) : terminals.lastCommand(terminal));
+    if (Option.isNone(command)) {
+      const reason = !terminal.shellIntegration ? "terminal.noShellIntegration" : failed ? "terminal.noFailed" : "terminal.noCommands";
+      void vscode.window.showInformationMessage(t(reason));
+      return;
+    }
+    yield* this.queueAndFocus([command.value]);
+  });
+
+  private readonly queueAndFocus = Effect.fn("ChatView.queueAndFocus")(function* (this: ChatViewProvider, attachments: Attachment[]) {
+    this.queuedAttachments.push(...attachments);
+    yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+    this.flushAttachments();
+  });
+
   /** Runs a tab context menu action (webview context menu); pinned tabs are never closed. */
   readonly tabAction = Effect.fn("ChatView.tabAction")(function* (
     this: ChatViewProvider,
@@ -1325,6 +1390,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       };
     }
 
+    if (attachment.kind === "terminal") {
+      const { terminal, shell, commandLine, cwd, exitCode, text } = attachment;
+      const facts = [shell && `shell ${shell}`, cwd && `cwd ${cwd}`, exitCode !== undefined && `exit code ${exitCode}`].filter(Boolean).join(", ");
+      const where = `terminal "${terminal}"${facts ? ` (${facts})` : ""}`;
+      const title = commandLine === undefined ? `Selection in ${where}` : `Command in ${where}`;
+      const body = commandLine === undefined ? text : `$ ${commandLine}\n${text}`;
+      return { type: "text", text: `${title}:\n${fenced(body, "console")}` };
+    }
     const uri = vscode.Uri.parse(attachment.uri);
     const name = uri.scheme === "file" ? vscode.workspace.asRelativePath(uri) : attachment.name;
     if (attachment.kind === "snippet") {
@@ -1333,9 +1406,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       if (caps.embeddedContext) {
         return { type: "resource", resource: { uri: uri.with({ fragment: lines }).toString(), text } };
       }
-      // Fence longer than any backtick run in the snippet.
-      const fence = "`".repeat(Math.max(3, ...Array.from(text.matchAll(/`+/g), (m) => m[0].length + 1)));
-      return { type: "text", text: `${name}#${lines}\n${fence}${attachment.languageId}\n${text}\n${fence}` };
+      return { type: "text", text: `${name}#${lines}\n${fenced(text, attachment.languageId)}` };
     }
     const stat = yield* thenable(() => vscode.workspace.fs.stat(uri));
     if (stat.type & vscode.FileType.Directory) {

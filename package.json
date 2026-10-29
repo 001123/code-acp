@@ -18,7 +18,9 @@
     "Chat"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "viewsContainers": {
       "secondarySidebar": [
@@ -115,6 +117,18 @@
         "title": "%command.addSelection%"
       },
       {
+        "command": "codeAcp.addTerminalSelection",
+        "title": "%command.addTerminalSelection%"
+      },
+      {
+        "command": "codeAcp.addTerminalOutput",
+        "title": "%command.addTerminalOutput%"
+      },
+      {
+        "command": "codeAcp.addTerminalFailure",
+        "title": "%command.addTerminalFailure%"
+      },
+      {
         "command": "codeAcp.quoteSelection",
         "title": "%command.quoteSelection%"
       },
@@ -185,6 +199,21 @@
           "command": "codeAcp.attach",
           "when": "resourceScheme == file",
           "group": "codeAcp@1"
+        }
+      ],
+      "terminal/context": [
+        {
+          "command": "codeAcp.addTerminalSelection",
+          "when": "terminalTextSelected",
+          "group": "codeAcp@0"
+        },
+        {
+          "command": "codeAcp.addTerminalOutput",
+          "group": "codeAcp@1"
+        },
+        {
+          "command": "codeAcp.addTerminalFailure",
+          "group": "codeAcp@2"
         }
       ],
       "scm/title": [
