@@ -33,7 +33,7 @@ export const SETTING_KEYS = [
 
 /** Default of codeAcp.commitMessage.instructions; keep in sync with package.json. */
 export const DEFAULT_COMMIT_INSTRUCTIONS =
-  "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Keep it short: a subject line, plus a brief body only when the change needs explaining.";
+  "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Write a single subject line only, no body.";
 
 const DEFAULTS: Settings = {
   language: "auto",

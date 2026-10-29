@@ -162,7 +162,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         [
           "Write a git commit message for the changes below.",
           "Reply with the commit message only: no preamble, no code fences, no explanation. Do not use any tools.",
-          "Use a concise subject line (imperative mood, at most 72 characters), then a blank line and a short body only if it adds useful context.",
+          "Write a single subject line only (imperative mood, at most 72 characters), with no body.",
           changes.log.trim()
             ? `Follow the style and language of the recent commit subjects:\n${changes.log.trim()}`
             : "Write it in English.",
