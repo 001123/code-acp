@@ -14,6 +14,7 @@ const vi: Record<MessageKey, string> = {
   "manager.installedOnly": "Đã cài",
   "manager.refresh": "Làm mới",
   "manager.loading": "Đang tải…",
+  "manager.settings": "Cài đặt",
   "manager.active": "đang dùng",
   "manager.unsupported": "Không hỗ trợ nền tảng này",
   "manager.use": "Dùng",

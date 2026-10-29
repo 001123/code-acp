@@ -7,6 +7,7 @@ import loaderIcon from "@tabler/icons/outline/loader-2.svg";
 import packageIcon from "@tabler/icons/outline/package.svg";
 import playIcon from "@tabler/icons/outline/player-play.svg";
 import refreshIcon from "@tabler/icons/outline/refresh.svg";
+import settingsIcon from "@tabler/icons/outline/settings.svg";
 import searchIcon from "@tabler/icons/outline/search.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import updateIcon from "@tabler/icons/outline/arrow-up-circle.svg";
@@ -166,6 +167,14 @@ function App() {
           onClick={() => post({ type: "refresh" })}
         >
           <Icon svg={refreshIcon} />
+        </button>
+        <button
+          className="icon-button"
+          title={t("manager.settings")}
+          aria-label={t("manager.settings")}
+          onClick={() => post({ type: "settings" })}
+        >
+          <Icon svg={settingsIcon} />
         </button>
       </header>
       <div id="error" hidden={!state.error}>

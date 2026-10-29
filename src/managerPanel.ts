@@ -9,6 +9,7 @@ import { webviewHtml, webviewRoots } from "./webview";
 export type FromWebview =
   | { type: "ready" }
   | { type: "refresh" }
+  | { type: "settings" }
   | { type: "install"; id: string }
   | { type: "uninstall"; id: string }
   | { type: "use"; id: string }
@@ -66,6 +67,9 @@ export class ManagerPanel {
         break;
       case "refresh":
         yield* this.refresh;
+        break;
+      case "settings":
+        yield* thenable(() => vscode.commands.executeCommand("codeAcp.openSettings"));
         break;
       case "install":
         yield* this.install(msg.id);

@@ -13,6 +13,7 @@ const en = {
   "manager.installedOnly": "Installed",
   "manager.refresh": "Refresh",
   "manager.loading": "Loading…",
+  "manager.settings": "Settings",
   "manager.active": "in use",
   "manager.unsupported": "Not supported on this platform",
   "manager.use": "Use",
