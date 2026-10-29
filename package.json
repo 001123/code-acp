@@ -1,0 +1,279 @@
+{
+  "name": "code-acp",
+  "displayName": "Code ACP",
+  "description": "%description%",
+  "version": "0.0.1",
+  "publisher": "duybk",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.144.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "codeAcp",
+          "title": "Code ACP",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codeAcp": [
+        {
+          "type": "webview",
+          "id": "codeAcp.chat",
+          "name": "Chat",
+          "initialSize": 10
+        },
+        {
+          "id": "codeAcp.drop",
+          "name": "%view.drop%",
+          "initialSize": 1
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codeAcp.manageAgents",
+        "title": "%command.manageAgents%",
+        "icon": "$(extensions)"
+      },
+      {
+        "command": "codeAcp.selectAgent",
+        "title": "%command.selectAgent%"
+      },
+      {
+        "command": "codeAcp.newSession",
+        "title": "%command.newSession%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "codeAcp.history",
+        "title": "%command.history%",
+        "icon": "$(history)"
+      },
+      {
+        "command": "codeAcp.cancel",
+        "title": "%command.cancel%",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "codeAcp.login",
+        "title": "%command.login%"
+      },
+      {
+        "command": "codeAcp.restart",
+        "title": "%command.restart%"
+      },
+      {
+        "command": "codeAcp.showLog",
+        "title": "%command.showLog%"
+      },
+      {
+        "command": "codeAcp.attach",
+        "title": "%command.attach%",
+        "icon": "$(attach)"
+      },
+      {
+        "command": "codeAcp.openSettings",
+        "title": "%command.openSettings%",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "codeAcp.generateCommitMessage",
+        "title": "%command.generateCommitMessage%",
+        "icon": "$(sparkle)",
+        "enablement": "!codeAcp.generatingCommitMessage"
+      },
+      {
+        "command": "codeAcp.cancelCommitMessage",
+        "title": "%command.cancelCommitMessage%",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "codeAcp.addSelection",
+        "title": "%command.addSelection%"
+      },
+      {
+        "command": "codeAcp.quoteSelection",
+        "title": "%command.quoteSelection%"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codeAcp.history",
+          "when": "view == codeAcp.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "codeAcp.newSession",
+          "when": "view == codeAcp.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "codeAcp.manageAgents",
+          "when": "view == codeAcp.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "codeAcp.openSettings",
+          "when": "view == codeAcp.chat",
+          "group": "navigation@9"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "codeAcp.attach",
+          "group": "codeAcp@1"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "codeAcp.attach",
+          "when": "resourceScheme == file",
+          "group": "codeAcp@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "codeAcp.addSelection",
+          "when": "editorHasSelection",
+          "group": "codeAcp@0"
+        },
+        {
+          "command": "codeAcp.attach",
+          "when": "resourceScheme == file",
+          "group": "codeAcp@1"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "codeAcp.generateCommitMessage",
+          "when": "scmProvider == git && !codeAcp.generatingCommitMessage",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeAcp.cancelCommitMessage",
+          "when": "scmProvider == git && codeAcp.generatingCommitMessage",
+          "group": "navigation@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codeAcp.cancelCommitMessage",
+          "when": "codeAcp.generatingCommitMessage"
+        },
+        {
+          "command": "codeAcp.quoteSelection",
+          "when": "false"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "codeAcp.quoteSelection",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'messages' && selectedText",
+          "group": "codeAcp@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Code ACP",
+      "properties": {
+        "codeAcp.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "vi"
+          ],
+          "enumDescriptions": [
+            "%config.language.auto%",
+            "English",
+            "Tiếng Việt"
+          ],
+          "default": "auto",
+          "description": "%config.language%"
+        },
+        "codeAcp.agentCommand": {
+          "type": "string",
+          "default": "",
+          "description": "%config.agentCommand%"
+        },
+        "codeAcp.agentArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "%config.agentArgs%"
+        },
+        "codeAcp.env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "%config.env%"
+        },
+        "codeAcp.nodePath": {
+          "type": "string",
+          "default": "node",
+          "description": "%config.nodePath%"
+        },
+        "codeAcp.commitMessage.agent": {
+          "type": "string",
+          "default": "",
+          "description": "%config.commitMessage.agent%"
+        },
+        "codeAcp.commitMessage.model": {
+          "type": "string",
+          "default": "",
+          "description": "%config.commitMessage.model%"
+        },
+        "codeAcp.commitMessage.instructions": {
+          "type": "string",
+          "default": "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Keep it short: a subject line, plus a brief body only when the change needs explaining.",
+          "editPresentation": "multilineText",
+          "description": "%config.commitMessage.instructions%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "node esbuild.mjs --production && vsce package --out release/",
+    "prepare": "effect-tsgo patch --typescript --no-oxlint"
+  },
+  "devDependencies": {
+    "@agentclientprotocol/sdk": "2.1.0",
+    "@effect/platform-node-shared": "4.1.0",
+    "@effect/tsgo": "0.63.0",
+    "@tabler/icons": "^3.50.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/vscode": "~1.144.0",
+    "@vscode/vsce": "^4.1.0",
+    "effect": "4.1.0",
+    "esbuild": "^0.28.2",
+    "pele": "1.12.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

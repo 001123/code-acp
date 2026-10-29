@@ -1,0 +1,14 @@
+src/**
+.vscode/**
+esbuild.mjs
+tsconfig.json
+**/*.map
+scripts/**
+.gitignore
+.claude/**
+.agents/**
+skills/**
+skills-lock.json
+AGENTS.md
+**/.DS_Store
+release/**

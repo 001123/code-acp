@@ -1,0 +1,131 @@
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  padding: 0 16px 16px;
+  max-width: 960px;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  background: var(--vscode-editor-background);
+}
+h1 {
+  font-size: 1.4em;
+  margin: 0 auto 0 0;
+}
+#search {
+  width: 240px;
+  padding: 4px 6px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+}
+
+#error {
+  color: var(--vscode-errorForeground);
+  margin-bottom: 8px;
+}
+
+#list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+}
+.card.active {
+  border-color: var(--vscode-focusBorder);
+}
+
+/* The registry SVGs are monochrome; masking lets them follow the theme color. */
+.icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  background-color: var(--vscode-foreground);
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.name {
+  font-weight: bold;
+}
+.version,
+.meta,
+.muted {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+.badge {
+  font-size: 0.8em;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+.badge.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+.desc {
+  margin: 2px 0;
+}
+.meta {
+  display: flex;
+  gap: 12px;
+}
+.meta a {
+  color: var(--vscode-textLink-foreground);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+.busy {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+button {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+button.secondary {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+button[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
