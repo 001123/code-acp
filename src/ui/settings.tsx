@@ -426,7 +426,7 @@ function EntryList(props: { agents?: boolean; value: unknown; overridden: boolea
 type Tab = "general" | "agent" | "commit" | "mcp" | "custom";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent"] },
   {
     id: "agent",
     label: "settings.agent",
@@ -571,6 +571,15 @@ function App() {
                 <option value="en">English</option>
                 <option value="vi">Tiếng Việt</option>
               </select>
+            </Field>
+            <Field
+              id="followAgent"
+              label="settings.followAgent"
+              desc="settings.followAgentDesc"
+              overridden={overridden("followAgent")}
+              inline
+            >
+              <Toggle id="followAgent" checked={v.followAgent === true} onChange={(checked) => set("followAgent", checked)} />
             </Field>
           </section>
         )}

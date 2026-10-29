@@ -1,11 +1,13 @@
 import * as acp from "@agentclientprotocol/sdk";
 import { Deferred, Effect, Option, Schema, Scope } from "effect";
 import { execa } from "execa";
-import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
 import * as vscode from "vscode";
 import { t } from "./i18n";
+import { makeAgentTerminals, type TerminalNotFoundError, type TerminalSnapshot } from "./agentTerminals";
+import { writeFile } from "./fileChanges";
 import { mcpServersFor } from "./mcpServers";
+import { stopProcess } from "./processTree";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
 
 export interface AgentHandlers {
@@ -14,6 +16,13 @@ export interface AgentHandlers {
     request: acp.RequestPermissionRequest,
     signal: AbortSignal,
   ): Effect.Effect<acp.RequestPermissionResponse>;
+  /**
+   * A terminal the agent runs a command in has new output, or its command exited. Without it the client
+   * offers no terminals.
+   */
+  onTerminal?(snapshot: TerminalSnapshot): void;
+  /** The agent wrote `path` through the client. */
+  onFileWritten?(sessionId: string, path: string): void;
 }
 
 export interface AgentCommand {
@@ -69,46 +78,12 @@ export interface AcpAgent {
     value: string,
   ): Effect.Effect<acp.SetSessionConfigOptionResponse, RequestError>;
   authenticate(methodId: string): Effect.Effect<acp.AuthenticateResponse, RequestError>;
+  /** Stops the command of one of the agent's terminals; the agent still gets its output and exit status. */
+  killTerminal(sessionId: string, terminalId: string): Effect.Effect<void, TerminalNotFoundError>;
 }
-
-/** How long a stopped agent gets to exit on SIGTERM before it is killed. */
-const KILL_GRACE_MS = 3000;
 
 /** The part of the extension's package.json sent as `clientInfo`. */
 const PackageVersion = Schema.Struct({ version: Schema.String });
-
-/**
- * Stops the agent and whatever it started. On POSIX it leads its own process group (`detached`), so wrappers
- * such as `uvx` or `npx` don't leave their child running, and SIGKILL follows if it ignores SIGTERM. Windows
- * has no signals to wait on: `taskkill /T` ends the whole tree, cmd.exe shims included.
- */
-function stopProcess(child: { readonly pid?: number | undefined; kill(): boolean }, ended: () => boolean): void {
-  if (ended() || child.pid === undefined) {
-    return;
-  }
-  const pid = child.pid;
-  if (process.platform === "win32") {
-    void execa("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", reject: false }).then((result) => {
-      if (result.failed) {
-        child.kill();
-      }
-    });
-    return;
-  }
-  const signal = (name: NodeJS.Signals) => {
-    try {
-      process.kill(-pid, name);
-    } catch {
-      // Already gone.
-    }
-  };
-  signal("SIGTERM");
-  setTimeout(() => {
-    if (!ended()) {
-      signal("SIGKILL");
-    }
-  }, KILL_GRACE_MS).unref();
-}
 
 /** How long the agent may take to answer `initialize`; a first `uvx` run downloads its packages first. */
 const INIT_TIMEOUT_SECONDS = 120;
@@ -128,6 +103,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
   );
   const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
   const exited = yield* Deferred.make<AgentExit>();
+  const terminals = yield* makeAgentTerminals((snapshot) => handlers.onTerminal?.(snapshot));
   const { command, args, env } = agentCommand;
   yield* Effect.logInfo(`[agent] spawn ${command} ${args.join(" ")}`);
 
@@ -154,8 +130,20 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         )
         .onRequest(acp.methods.client.fs.readTextFile, ({ params }) => runPromise(readTextFile(params)))
         .onRequest(acp.methods.client.fs.writeTextFile, ({ params }) =>
-          runPromise(writeTextFile(params).pipe(Effect.as({}))),
+          runPromise(
+            writeFile(params.path, params.content).pipe(
+              Effect.map(() => {
+                handlers.onFileWritten?.(params.sessionId, params.path);
+                return {};
+              }),
+            ),
+          ),
         )
+        .onRequest(acp.methods.client.terminal.create, ({ params }) => runPromise(terminals.create(params)))
+        .onRequest(acp.methods.client.terminal.output, ({ params }) => runPromise(terminals.output(params)))
+        .onRequest(acp.methods.client.terminal.waitForExit, ({ params }) => runPromise(terminals.waitForExit(params)))
+        .onRequest(acp.methods.client.terminal.kill, ({ params }) => runPromise(terminals.kill(params)))
+        .onRequest(acp.methods.client.terminal.release, ({ params }) => runPromise(terminals.release(params)))
         .connect(stream);
       const exit = (info: AgentExit) => {
         connection.close();
@@ -212,7 +200,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
       clientInfo: { name: "code-acp", version },
       clientCapabilities: {
         fs: { readTextFile: true, writeTextFile: true },
-        terminal: false,
+        terminal: handlers.onTerminal !== undefined,
         auth: { terminal: true },
       },
     }),
@@ -270,6 +258,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
       ),
     authenticate: (methodId) =>
       request("authenticate", (agent) => agent.request(acp.methods.agent.authenticate, { methodId })),
+    killTerminal: (sessionId, terminalId) => terminals.kill({ sessionId, terminalId }).pipe(Effect.asVoid),
   };
 });
 
@@ -284,18 +273,4 @@ const readTextFile = Effect.fn("readTextFile")(function* (params: acp.ReadTextFi
     content = lines.slice(start, end).join("\n");
   }
   return { content } satisfies acp.ReadTextFileResponse;
-});
-
-const writeTextFile = Effect.fn("writeTextFile")(function* (params: acp.WriteTextFileRequest) {
-  const uri = vscode.Uri.file(params.path);
-  const open = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === uri.fsPath);
-  if (open) {
-    const edit = new vscode.WorkspaceEdit();
-    edit.replace(uri, new vscode.Range(0, 0, open.lineCount, 0), params.content);
-    yield* thenable(() => vscode.workspace.applyEdit(edit));
-    yield* thenable(() => open.save());
-    return;
-  }
-  yield* thenable(() => vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(params.path))));
-  yield* thenable(() => vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(params.content)));
 });

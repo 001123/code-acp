@@ -6,10 +6,26 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { spawnAgent, type AcpAgent, type AgentRequestError, type AgentStartError } from "./acpClient";
 import type { AgentManager } from "./agentManager";
+import type { TerminalSnapshot } from "./agentTerminals";
 import { ClaudeSettings } from "./claudeSettings";
 import { Completions } from "./completions";
+import {
+  BeforeDocuments,
+  beforeOf,
+  beginTurn,
+  ChangeSet,
+  keep,
+  refresh,
+  restorable,
+  restore,
+  restorePlan,
+  SavedChanges,
+  undo,
+  type ChangedFile,
+} from "./fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "./i18n";
 import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output, type VscodeError } from "./runtime";
+import { readSettings } from "./settings";
 import { TerminalContext } from "./terminalContext";
 import { webviewHtml, webviewRoots } from "./webview";
 
@@ -45,7 +61,31 @@ export type FromWebview =
   /** Skills for "$"; answered with "skills". */
   | { type: "listSkills" }
   /** A terminal command offered with the files; answered with "addAttachments". */
-  | { type: "attachTerminal"; id: number };
+  | { type: "attachTerminal"; id: number }
+  /** Stops the command running in one of the agent's terminals. */
+  | { type: "killTerminal"; tab: number; terminalId: string }
+  /**
+   * Opens a diff of what the agent changed in `path`; the tool call's texts are used when the change was not
+   * written through the client.
+   */
+  | { type: "openDiff"; tab: number; path: string; oldText?: string | null; newText?: string }
+  /** Accepts the agent's changes to `path`, or to every changed file. */
+  | { type: "keepChanges"; tab: number; path?: string }
+  /** Puts back what `path` held before the agent changed it, or every changed file. */
+  | { type: "undoChanges"; tab: number; path?: string }
+  /** Puts the work tree back as it was before the user message of `turn`. */
+  | { type: "restoreCheckpoint"; tab: number; turn: number }
+  /** Picks a checkpoint of the tab to restore, from a quick pick. */
+  | { type: "pickCheckpoint"; tab: number }
+  | { type: "setFollowAgent"; enabled: boolean };
+
+/** The changed files of a tab, and the turns whose checkpoint differs from the work tree. */
+export interface ChangesMessage {
+  files: ChangedFile[];
+  turns: number[];
+}
+
+export type { ChangedFile, TerminalSnapshot };
 
 /** A chat tab as the webview shows it in the tab strip. */
 export interface TabInfo {
@@ -208,6 +248,7 @@ const SavedTabs = Schema.Struct({
       usage: Schema.optional(SavedUsage),
       pinned: Schema.optional(Schema.Boolean),
       draft: Schema.optional(SavedDraft),
+      changes: Schema.optional(SavedChanges),
     }),
   ),
 });
@@ -247,6 +288,12 @@ interface Tab {
   readonly sessionLock: Semaphore.Semaphore;
   /** Last status shown, re-posted in the new language when the locale changes. */
   lastStatus?: { key: MessageKey; extra: Record<string, unknown> };
+  /** Checkpoints of the work tree and the changes since the last review. */
+  changes: ChangeSet;
+  /** The turn being run; its user message carries the id. */
+  turn?: number;
+  /** Pending `postChanges`. */
+  changesTimer?: ReturnType<typeof setTimeout>;
 }
 
 interface PendingPermission {
@@ -255,6 +302,9 @@ interface PendingPermission {
 }
 
 const MAX_TITLE_LENGTH = 40;
+
+/** The changed files are recounted at most this often while the agent writes. */
+const CHANGES_DELAY_MS = 200;
 
 /** Tabs are written to workspaceState at most this often; usage updates arrive many times per turn. */
 const SAVE_TABS_DELAY_MS = 500;
@@ -281,6 +331,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly disposables: vscode.Disposable[] = [];
   /** Pending `writeTabs`; flushed on dispose. */
   private saveTimer?: ReturnType<typeof setTimeout>;
+  /** Turn ids, unique across tabs. */
+  private nextTurn = 1;
+  /** codeAcp.followAgent: the active tab's agent's tool locations are opened in the editor. */
+  private followAgent = readSettings().followAgent;
+  /** Last location followed, so repeated updates of a tool call don't reopen it. */
+  private lastFollowed?: string;
+  private readonly beforeDocuments = new BeforeDocuments();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -303,6 +360,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           }),
         ),
       ),
+      this.beforeDocuments,
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("codeAcp.followAgent")) {
+          this.followAgent = readSettings().followAgent;
+          this.lastFollowed = undefined;
+          this.post({ type: "followAgent", enabled: this.followAgent });
+        }
+      }),
+      // Edits the user saves change the counts.
+      vscode.workspace.onDidSaveTextDocument((doc) => {
+        for (const tab of this.tabs) {
+          if (tab.changes.relative(doc.uri.fsPath) !== undefined && tab.changes.base !== undefined) {
+            this.postChanges(tab);
+          }
+        }
+      }),
       onDidChangeLocale(() => {
         this.post(webviewL10n());
         this.run(this.postAgent);
@@ -394,6 +467,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       tab.pinned = entry.pinned ?? false;
       tab.savedDraft = entry.draft;
       tab.agentId = entry.agentId;
+      tab.changes = ChangeSet.fromSaved(entry.changes);
+      for (const checkpoint of tab.changes.checkpoints) {
+        this.nextTurn = Math.max(this.nextTurn, checkpoint.turn + 1);
+      }
       if (entry.sessionId) {
         tab.title = entry.title;
         tab.createdAt = entry.createdAt;
@@ -418,18 +495,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       active: this.tabs.indexOf(this.active),
       tabs: this.tabs.map((tab) => {
         const { pinned, savedDraft: draft } = tab;
+        const changes = tab.changes.saved;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId } = tab;
           const cwd = tab.cwd ?? this.cwd();
           const agentId = tab.running?.agentId;
-          return { title: tab.title, createdAt: tab.createdAt, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
+          return { title: tab.title, createdAt: tab.createdAt, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft, changes };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title: tab.title, createdAt: tab.createdAt, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft };
+          return { title: tab.title, createdAt: tab.createdAt, sessionId, cwd, agentId, usage: this.usageOf(tab, sessionId), pinned, draft, changes };
         }
-        return { pinned, agentId: tab.agentId, draft };
+        return { pinned, agentId: tab.agentId, draft, changes };
       }),
     };
     this.run(thenable(() => this.context.workspaceState.update(TABS_KEY, value)));
@@ -572,7 +650,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   private addTab(): Tab {
-    const tab: Tab = { id: this.nextTabId++, busy: false, sending: false, pinned: false, used: false, sessionLock: Semaphore.makeUnsafe(1) };
+    const tab: Tab = {
+      id: this.nextTabId++,
+      busy: false,
+      sending: false,
+      pinned: false,
+      used: false,
+      sessionLock: Semaphore.makeUnsafe(1),
+      changes: new ChangeSet(),
+    };
     this.tabs.push(tab);
     return tab;
   }
@@ -619,9 +705,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.loadDrafts();
         this.postTabs();
         yield* this.postAgent;
+        this.post({ type: "followAgent", enabled: this.followAgent });
         for (const each of this.tabs) {
           this.refreshStatus(each);
           this.postSavedUsage(each);
+          if (each.changes.base !== undefined) {
+            this.postChanges(each);
+          }
         }
         this.flushAttachments();
         yield* this.ensureSession(this.active);
@@ -730,8 +820,180 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "listSkills":
         this.post({ type: "skills", skills: yield* (yield* Completions).skills });
         break;
+      case "killTerminal":
+        if (tab?.running && tab.sessionId) {
+          yield* tab.running.agent.killTerminal(tab.sessionId, msg.terminalId);
+        }
+        break;
+      case "openDiff":
+        if (tab) {
+          yield* this.openDiff(tab, msg.path, msg.oldText, msg.newText);
+        }
+        break;
+      case "keepChanges":
+        if (tab) {
+          yield* keep(tab.changes, msg.path);
+          this.saveTabs();
+          this.postChanges(tab);
+        }
+        break;
+      case "undoChanges":
+        if (tab) {
+          yield* this.undoChanges(tab, msg.path);
+        }
+        break;
+      case "restoreCheckpoint":
+        if (tab) {
+          yield* this.restoreCheckpoint(tab, msg.turn);
+        }
+        break;
+      case "pickCheckpoint":
+        if (tab) {
+          yield* this.pickCheckpoint(tab);
+        }
+        break;
+      case "setFollowAgent":
+        yield* thenable(() =>
+          vscode.workspace.getConfiguration("codeAcp").update("followAgent", msg.enabled, vscode.ConfigurationTarget.Global),
+        );
+        break;
     }
   });
+
+  /** Lists the tab's changed files again and sends them to the chat, batching requests in quick succession. */
+  private postChanges(tab: Tab): void {
+    clearTimeout(tab.changesTimer);
+    tab.changesTimer = setTimeout(() => {
+      tab.changesTimer = undefined;
+      this.run(
+        Effect.gen({ self: this }, function* () {
+          yield* refresh(tab.changes).pipe(Effect.catch((err) => this.disableCheckpoints(tab, err.message)));
+          const message: ChangesMessage = { files: tab.changes.files, turns: tab.changes.turns };
+          this.postTab(tab, { type: "changes", ...message });
+        }),
+        tab,
+      );
+    }, CHANGES_DELAY_MS);
+  }
+
+  /** Turns snapshots off for the tab after one failed (no git, a work tree too big), saying why once. */
+  private disableCheckpoints(tab: Tab, reason: string): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      yield* Effect.logWarning(`[checkpoints] ${reason}`);
+      if (!tab.changes.disabled) {
+        tab.changes.disabled = reason;
+        this.postTab(tab, { type: "error", text: t("checkpoints.unavailable", reason) });
+      }
+    });
+  }
+
+  /** Forgets the tab's checkpoints, when it starts over; the files stay as they are. */
+  private clearChanges(tab: Tab): void {
+    tab.changes.clear();
+    this.saveTabs();
+    this.postChanges(tab);
+  }
+
+  /** Diff of the changes to `file` since the last review, else of the tool call's own texts. */
+  private readonly openDiff = Effect.fn("ChatView.openDiff")(function* (
+    this: ChatViewProvider,
+    tab: Tab,
+    file: string,
+    oldText: string | null | undefined,
+    newText: string | undefined,
+  ) {
+    const before = yield* beforeOf(tab.changes, file);
+    if (before !== undefined) {
+      yield* this.beforeDocuments.open(file, before);
+    } else if (newText !== undefined) {
+      yield* this.beforeDocuments.open(file, oldText ?? null, newText);
+    } else {
+      yield* this.openFile(file, undefined);
+    }
+  });
+
+  /** Asks before a change to the files that can't be taken back; true to go ahead. */
+  private readonly confirm = Effect.fn("ChatView.confirm")(function* (
+    this: ChatViewProvider,
+    message: string,
+    action: string,
+  ) {
+    const picked = yield* thenable(() => vscode.window.showWarningMessage(message, { modal: true }, action));
+    return picked === action;
+  });
+
+  private readonly undoChanges = Effect.fn("ChatView.undoChanges")(function* (
+    this: ChatViewProvider,
+    tab: Tab,
+    file: string | undefined,
+  ) {
+    if (file === undefined && !(yield* this.confirm(t("changes.undoAllConfirm", tab.changes.files.length), t("changes.undoAll")))) {
+      return;
+    }
+    yield* undo(tab.changes, file);
+    this.saveTabs();
+    this.postChanges(tab);
+  });
+
+  private readonly restoreCheckpoint = Effect.fn("ChatView.restoreCheckpoint")(function* (
+    this: ChatViewProvider,
+    tab: Tab,
+    turn: number,
+  ) {
+    if (tab.busy) {
+      void vscode.window.showInformationMessage(t("changes.restoreBusy"));
+      return;
+    }
+    const files = yield* restorePlan(tab.changes, turn);
+    if (files.length === 0 || !(yield* this.confirm(t("changes.restoreConfirm", files.length), t("changes.restore")))) {
+      return;
+    }
+    yield* restore(tab.changes, turn);
+    this.saveTabs();
+    this.postChanges(tab);
+  });
+
+  /** The tab's checkpoints in a quick pick, newest first; also those of messages no longer shown (after a reload). */
+  private readonly pickCheckpoint = Effect.fn("ChatView.pickCheckpoint")(function* (this: ChatViewProvider, tab: Tab) {
+    const format = new Intl.DateTimeFormat(vscode.env.language, { dateStyle: "short", timeStyle: "short" });
+    const items = (yield* restorable(tab.changes)).map(({ checkpoint, files }) => ({
+      label: checkpoint.label || t("chat.untitled"),
+      description: format.format(checkpoint.at),
+      detail: t("checkpoints.files", files),
+      turn: checkpoint.turn,
+    }));
+    if (items.length === 0) {
+      void vscode.window.showInformationMessage(t("checkpoints.none"));
+      return;
+    }
+    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("checkpoints.pickTitle") }));
+    if (picked) {
+      yield* this.restoreCheckpoint(tab, picked.turn);
+    }
+  });
+
+  /** Shows where the agent is working (codeAcp.followAgent), without taking the focus from the chat. */
+  private follow(tab: Tab, location: acp.ToolCallLocation): void {
+    const key = `${location.path}:${location.line ?? ""}`;
+    if (!this.followAgent || tab !== this.active || key === this.lastFollowed) {
+      return;
+    }
+    this.lastFollowed = key;
+    const line = location.line ? Math.max(0, location.line - 1) : 0;
+    const position = new vscode.Position(line, 0);
+    this.run(
+      thenable(() =>
+        vscode.window.showTextDocument(vscode.Uri.file(location.path), {
+          preview: true,
+          preserveFocus: true,
+          selection: new vscode.Range(position, position),
+        }),
+      ).pipe(
+        // A file the agent is about to create does not exist yet: nothing to show.
+        Effect.ignore,
+      ),
+    );
+  }
 
   /** Opens a file in an editor (at `line` when given) or reveals a folder in the Explorer. */
   private readonly openFile = Effect.fn("ChatView.openFile")(function* (
@@ -824,6 +1086,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           this.postTabs();
         }
         this.postTab(tab, { type: "update", update: n.update });
+        if (n.update.sessionUpdate === "tool_call" || n.update.sessionUpdate === "tool_call_update") {
+          const location = n.update.locations?.[0];
+          if (location && n.update.status !== "failed") {
+            this.follow(tab, location);
+          }
+          // The tool may have changed files, however it did.
+          if (n.update.status === "completed" || n.update.status === "failed") {
+            this.postChanges(tab);
+          }
+        }
         if (n.update.sessionUpdate === "usage_update") {
           const { used, size, cost } = n.update;
           const compactAt = tab.usageSessionId === n.sessionId ? tab.usage?.compactAt : undefined;
@@ -835,6 +1107,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       },
       requestPermission: (req, signal) =>
         running ? this.requestPermission(running, req, signal) : Effect.succeed(CANCELLED),
+      onTerminal: (snapshot) => {
+        const tab = running && this.tabForSession(running, snapshot.sessionId);
+        if (tab) {
+          this.postTab(tab, { type: "terminal", snapshot });
+        }
+      },
+      onFileWritten: (sessionId, file) => {
+        const tab = running && this.tabForSession(running, sessionId);
+        if (tab) {
+          this.postChanges(tab);
+          this.follow(tab, { path: file });
+        }
+      },
     }).pipe(
       Scope.provide(scope),
       Effect.onError(() => Scope.close(scope, Exit.void)),
@@ -975,6 +1260,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const { agent } = running;
     const caps = agent.initializeResponse.agentCapabilities;
     this.postTab(tab, { type: "reset" });
+    this.clearChanges(tab);
     // Set first: the replayed updates are only forwarded for a tab's session.
     tab.sessionId = sessionId;
     tab.running = running;
@@ -1067,6 +1353,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     tab.usage = undefined;
     tab.usageSessionId = undefined;
     this.postTab(tab, { type: "reset" });
+    this.clearChanges(tab);
     this.postTabs();
     yield* this.stopIdleAgents();
     yield* this.ensureSession(tab);
@@ -1284,7 +1571,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       tab.title = firstLine.length > MAX_TITLE_LENGTH ? `${firstLine.slice(0, MAX_TITLE_LENGTH - 1)}…` : firstLine;
     }
     this.postTabs();
-    this.postTab(tab, { type: "userMessage", text, attachments: sent });
+    const turn = this.nextTurn++;
+    tab.turn = turn;
+    // Without a workspace the work tree would be the home folder: no snapshots.
+    if (vscode.workspace.workspaceFolders?.length) {
+      yield* beginTurn(tab.changes, tab.cwd ?? this.cwd(), turn, text || sent[0]?.name || "").pipe(
+        Effect.catch((err) => this.disableCheckpoints(tab, err.message)),
+      );
+      this.saveTabs();
+    }
+    const note = tab.changes.takeNote();
+    if (note) {
+      prompt.unshift({ type: "text", text: note });
+    }
+    this.postTab(tab, { type: "userMessage", text, attachments: sent, turn });
     tab.busy = true;
     this.status(tab, "chat.working");
     yield* agent.prompt(sessionId, prompt).pipe(
@@ -1298,6 +1598,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       Effect.ensuring(
         Effect.sync(() => {
           tab.busy = false;
+          tab.turn = undefined;
+          this.postChanges(tab);
           if (tab.sessionId) {
             this.status(tab, "chat.ready");
           } else {
@@ -1619,6 +1921,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       tab.createdAt = undefined;
       tab.reopen = undefined;
       this.postTab(tab, { type: "reset" });
+      this.clearChanges(tab);
     }
     this.postTabs();
     for (const running of stopped) {
@@ -1633,6 +1936,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.writeTabs();
     }
     this.cancelPendingPermissions();
+    for (const tab of this.tabs) {
+      clearTimeout(tab.changesTimer);
+    }
     const running = [...this.running.values()];
     this.running.clear();
     for (const each of running) {

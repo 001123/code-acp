@@ -34,6 +34,8 @@ export const Settings = Schema.Struct({
   nodePath: Schema.String,
   /** Look for agent updates in the ACP Registry once a day and offer to install them. */
   checkAgentUpdates: Schema.Boolean,
+  /** Open the files the agent reads and edits in the editor, at the line it is on. */
+  followAgent: Schema.Boolean,
   /** Installed agent id for commit messages; empty means the default agent. */
   "commitMessage.agent": Schema.String,
   /** Model value (or name) to pick in the commit session; empty keeps the agent's default. */
@@ -51,6 +53,7 @@ export const SETTING_KEYS = [
   "env",
   "nodePath",
   "checkAgentUpdates",
+  "followAgent",
   "commitMessage.agent",
   "commitMessage.model",
   "commitMessage.instructions",
@@ -67,6 +70,7 @@ const DEFAULTS: Settings = {
   env: {},
   nodePath: "node",
   checkAgentUpdates: true,
+  followAgent: false,
   "commitMessage.agent": "",
   "commitMessage.model": "",
   "commitMessage.instructions": DEFAULT_COMMIT_INSTRUCTIONS,
@@ -91,6 +95,7 @@ export function readSettings(): Settings {
     env: read("env"),
     nodePath: read("nodePath"),
     checkAgentUpdates: read("checkAgentUpdates"),
+    followAgent: read("followAgent"),
     "commitMessage.agent": read("commitMessage.agent"),
     "commitMessage.model": read("commitMessage.model"),
     "commitMessage.instructions": read("commitMessage.instructions"),

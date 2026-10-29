@@ -356,14 +356,152 @@ pre {
   font-size: var(--vscode-editor-font-size);
   background: var(--vscode-textCodeBlock-background);
 }
+.diff-header,
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
 .diff-path {
   font-family: var(--vscode-editor-font-family);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-pre.add {
-  background: var(--vscode-diffEditor-insertedTextBackground);
+pre.diff-lines {
+  white-space: pre;
 }
-pre.del {
-  background: var(--vscode-diffEditor-removedTextBackground);
+.diff-lines > span,
+.diff-lines .diff-add,
+.diff-lines .diff-del,
+.diff-lines .diff-ctx {
+  display: block;
+}
+.diff-add {
+  background: var(--vscode-diffEditor-insertedLineBackground, var(--vscode-diffEditor-insertedTextBackground));
+}
+.diff-del {
+  background: var(--vscode-diffEditor-removedLineBackground, var(--vscode-diffEditor-removedTextBackground));
+}
+.diff-gap {
+  color: var(--vscode-descriptionForeground);
+}
+.icon-btn.small {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+}
+.icon-btn.small:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+.icon-btn.small svg {
+  width: 14px;
+  height: 14px;
+}
+.icon-btn.small[aria-pressed="true"] {
+  color: var(--vscode-textLink-foreground);
+}
+
+.tool-locations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+}
+
+.terminal-command {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+}
+.terminal-state {
+  flex: none;
+  font-size: 0.9em;
+}
+.terminal[data-running] .terminal-state {
+  animation: activity-pulse 1.5s ease-in-out infinite;
+}
+.terminal[data-failed] .terminal-state {
+  color: var(--vscode-testing-iconFailed);
+}
+pre.terminal-output {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.msg.user .restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 1px 8px;
+  font-size: 0.85em;
+}
+.msg.user .restore svg {
+  width: 12px;
+  height: 12px;
+}
+
+#changes {
+  margin: 0 10px 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-widget-border, color-mix(in srgb, var(--vscode-foreground) 15%, transparent));
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+#changes > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+#changes > summary button {
+  padding: 1px 8px;
+  font-size: 0.95em;
+}
+#changes .spacer {
+  flex: 1;
+}
+.changes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  max-height: 160px;
+  overflow: auto;
+}
+.changes-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.changes-file > a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family);
+}
+.changes-new {
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+.changes-stats {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.changes-stats .added {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+.changes-stats .removed {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-testing-iconFailed));
 }
 
 .plan {

@@ -16,6 +16,7 @@
   "config.customAgents": "ACP agents run from local commands, by name. They appear in the chat's agent picker next to the installed agents; their env is added on top of codeAcp.env.",
   "config.env": "Extra environment variables for the agent (e.g. ANTHROPIC_API_KEY).",
   "config.nodePath": "Node used to run agents installed via npm.",
+  "config.followAgent": "Open the files the agent reads and edits in the editor, at the line it is working on.",
   "config.checkAgentUpdates": "Check the ACP Registry for agent updates once a day and offer to install them.",
   "command.generateCommitMessage": "Code ACP: Generate Commit Message",
   "command.cancelCommitMessage": "Code ACP: Stop Generating Commit Message",

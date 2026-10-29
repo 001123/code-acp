@@ -1,10 +1,11 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { Attachment, Draft, FromWebview as ChatMessage, PromptPart, SentAttachment, TabInfo } from "../chatViewProvider";
+import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { Attachment, ChangesMessage, Draft, FromWebview as ChatMessage, PromptPart, SentAttachment, TabInfo, TerminalSnapshot } from "../chatViewProvider";
 import type { FileSuggestion, SkillSuggestion } from "../completions";
 import type { TerminalSuggestion } from "../terminalContext";
 import { Icon } from "./icon";
 import { Lightbox } from "./lightbox";
+import { diffLines, hunks } from "./lineDiff";
 import { MarkdownView, type FileRef } from "./markdown";
 import { useL10n, type Translate } from "./l10n";
 import { mount } from "./mount";
@@ -26,6 +27,12 @@ import circleCheckIcon from "@tabler/icons/outline/circle-check.svg";
 import circleDashedIcon from "@tabler/icons/outline/circle-dashed.svg";
 import circleXIcon from "@tabler/icons/outline/circle-x.svg";
 import loaderIcon from "@tabler/icons/outline/loader-2.svg";
+import eyeIcon from "@tabler/icons/outline/eye.svg";
+import eyeOffIcon from "@tabler/icons/outline/eye-off.svg";
+import undoIcon from "@tabler/icons/outline/arrow-back-up.svg";
+import checkIcon from "@tabler/icons/outline/check.svg";
+import diffIcon from "@tabler/icons/outline/file-diff.svg";
+import restoreIcon from "@tabler/icons/outline/restore.svg";
 
 const post = poster<ChatMessage>();
 const openFile = (ref: FileRef) => post({ type: "openFile", ...ref });
@@ -48,6 +55,18 @@ interface Hover {
 }
 /** Shows (or, with undefined, hides) the hover thumbnail; provided by the app. */
 const HoverPreview = createContext<(hover: Hover | undefined) => void>(() => {});
+
+/** The shown tab, for transcript entries that act on it. */
+interface ShownTab {
+  id?: number;
+  busy: boolean;
+  /** Turns whose user message can restore the files the agent changed from then on. */
+  checkpoints: ReadonlySet<number>;
+}
+const ShownTab = createContext<ShownTab>({ busy: false, checkpoints: new Set() });
+
+/** The shown tab's agent terminals by id; their own context, so output only re-renders the terminal views. */
+const Terminals = createContext<Readonly<Record<string, TerminalSnapshot>>>({});
 
 const HOVER_WIDTH = 240;
 const HOVER_HEIGHT = 180;
@@ -72,8 +91,17 @@ type Text = { key: Parameters<Translate>[0]; args?: unknown[] } | { raw: string 
 type Item =
   /** `tokens` stand for the images of replayed user messages, where they were in the text. */
   | { kind: "assistant" | "user" | "thought"; id: number; text: string; tokens?: Token[] }
-  | { kind: "userMessage"; id: number; text: string; attachments: SentAttachment[] }
-  | { kind: "tool"; id: number; toolCallId: string; title?: string; status?: acp.ToolCallStatus; content?: acp.ToolCallContent[] }
+  /** `turn` is set for messages sent from this chat, not for replayed ones. */
+  | { kind: "userMessage"; id: number; text: string; attachments: SentAttachment[]; turn?: number }
+  | {
+      kind: "tool";
+      id: number;
+      toolCallId: string;
+      title?: string;
+      status?: acp.ToolCallStatus;
+      content?: acp.ToolCallContent[];
+      locations?: acp.ToolCallLocation[];
+    }
   | { kind: "plan"; id: number; entries: acp.PlanEntry[] }
   | { kind: "permission"; id: number; requestId: number; toolCall: acp.ToolCallUpdate; options: acp.PermissionOption[]; done: boolean }
   | { kind: "notice" | "error"; id: number; text: Text };
@@ -167,7 +195,14 @@ function transcript(state: Transcript, action: Action): Transcript {
       const u = action.update;
       const existing = state.items.find((i) => i.kind === "tool" && i.toolCallId === u.toolCallId);
       if (!existing) {
-        return add({ kind: "tool", toolCallId: u.toolCallId, title: u.title ?? undefined, status: u.status ?? undefined, content: clipContent(u.content) });
+        return add({
+          kind: "tool",
+          toolCallId: u.toolCallId,
+          title: u.title ?? undefined,
+          status: u.status ?? undefined,
+          content: clipContent(u.content),
+          locations: u.locations ?? undefined,
+        });
       }
       return {
         ...state,
@@ -176,6 +211,7 @@ function transcript(state: Transcript, action: Action): Transcript {
           ...(u.title ? { title: u.title } : {}),
           ...(u.status ? { status: u.status } : {}),
           ...(u.content ? { content: clipContent(u.content) } : {}),
+          ...(u.locations ? { locations: u.locations } : {}),
         })),
       };
     }
@@ -206,27 +242,197 @@ function contentText(block: acp.ContentBlock | undefined): string {
   return `[${block.type}]`;
 }
 
+/** Escape sequences (colors, cursor moves, titles) the commands print; the chat shows plain text. */
+const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
+
+function plainOutput(text: string): string {
+  // A bare carriage return redraws the line (progress bars): keep what was drawn last.
+  return text.replace(ANSI, "").replace(/[^\n]*\r(?!\n)/g, "");
+}
+
+/** A command the agent runs in a client terminal, with its output so far. */
+function TerminalView({ terminalId }: { terminalId: string }) {
+  const { t } = useL10n();
+  const tab = useContext(ShownTab);
+  const terminal = useContext(Terminals)[terminalId];
+  if (!terminal) return <div className="muted">{t("terminal.running")}</div>;
+  const exit = terminal.exitStatus;
+  const state = !exit
+    ? t("terminal.running")
+    : exit.signal
+      ? t("terminal.signal", exit.signal)
+      : t("terminal.exitCode", exit.exitCode ?? "?");
+  return (
+    <div className="terminal" data-running={!exit || undefined} data-failed={(exit && exit.exitCode !== 0) || undefined}>
+      <div className="terminal-header">
+        <code className="terminal-command">$ {terminal.command}</code>
+        <span className="terminal-state">{state}</span>
+        {!exit && tab.id !== undefined && (
+          <button
+            className="icon-btn small"
+            title={t("terminal.kill")}
+            aria-label={t("terminal.kill")}
+            onClick={() => post({ type: "killTerminal", tab: tab.id!, terminalId })}
+          >
+            <Icon svg={stopIcon} />
+          </button>
+        )}
+      </div>
+      {terminal.output && (
+        <pre className="tool-output terminal-output" ref={(el) => {
+            // Follows the end of the output, like a terminal.
+            if (el) el.scrollTop = el.scrollHeight;
+          }}>
+          {terminal.truncated && <span className="muted">{t("terminal.truncated")}…{"\n"}</span>}
+          {plainOutput(terminal.output)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+/** A file change from a tool call: the changed lines with some context, and a button for the full diff. */
+function DiffView({ diff }: { diff: Extract<acp.ToolCallContent, { type: "diff" }> }) {
+  const { t } = useL10n();
+  const tab = useContext(ShownTab);
+  const parts = hunks(diffLines(diff.oldText, diff.newText));
+  return (
+    <div className="diff">
+      <div className="diff-header">
+        <a className="diff-path" href="#" title={diff.path} onClick={(e) => (e.preventDefault(), openFile({ path: diff.path }))}>
+          {diff.path.split(/[\\/]/).pop()}
+        </a>
+        {tab.id !== undefined && (
+          <button
+            className="icon-btn small"
+            title={t("chat.openDiff")}
+            aria-label={t("chat.openDiff")}
+            onClick={() => post({ type: "openDiff", tab: tab.id!, path: diff.path, oldText: diff.oldText, newText: diff.newText })}
+          >
+            <Icon svg={diffIcon} />
+          </button>
+        )}
+      </div>
+      <pre className="diff-lines">
+        {parts.map((hunk, i) => (
+          <Fragment key={i}>
+            {i > 0 && <span className="diff-gap">⋯{"\n"}</span>}
+            {hunk.lines.map((l, j) => (
+              <span key={j} className={`diff-${l.type}`}>
+                {l.type === "add" ? "+" : l.type === "del" ? "-" : " "} {l.text}
+                {"\n"}
+              </span>
+            ))}
+          </Fragment>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
 function ToolContent({ content }: { content?: acp.ToolCallContent[] | null }) {
   return (
     <>
       {(content ?? []).map((item, i) =>
         item.type === "diff" ? (
-          <div key={i} className="diff">
-            <div className="diff-path">{item.path}</div>
-            {item.oldText && <pre className="del">{item.oldText}</pre>}
-            <pre className="add">{item.newText}</pre>
-          </div>
+          <DiffView key={i} diff={item} />
         ) : item.type === "content" ? (
           <pre key={i} className="tool-output">
             {contentText(item.content)}
           </pre>
         ) : item.type === "terminal" ? (
-          <div key={i} className="muted">
-            terminal {item.terminalId}
-          </div>
+          <TerminalView key={i} terminalId={item.terminalId} />
         ) : null,
       )}
     </>
+  );
+}
+
+/** The files a tool call works on; each opens at its line. */
+function Locations({ locations }: { locations?: acp.ToolCallLocation[] }) {
+  if (!locations?.length) return null;
+  return (
+    <div className="tool-locations">
+      {locations.map((l, i) => {
+        const name = `${l.path.split(/[\\/]/).pop()}${l.line ? `:${l.line}` : ""}`;
+        return (
+          <a key={i} href="#" title={l.path} onClick={(e) => (e.preventDefault(), openFile({ path: l.path, line: l.line ?? undefined }))}>
+            {name}
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+/** On a user message whose turn changed files: puts them back as they were before it. */
+function RestoreButton({ turn }: { turn?: number }) {
+  const { t } = useL10n();
+  const tab = useContext(ShownTab);
+  if (turn === undefined || tab.id === undefined || !tab.checkpoints.has(turn)) return null;
+  return (
+    <button
+      className="restore secondary"
+      title={t("changes.restoreTitle")}
+      disabled={tab.busy}
+      onClick={() => post({ type: "restoreCheckpoint", tab: tab.id!, turn })}
+    >
+      <Icon svg={restoreIcon} />
+      {t("changes.restore")}
+    </button>
+  );
+}
+
+/** The files the agent changed that are not reviewed yet: open the diff, keep or undo each, or all. */
+function ChangesBar({ tab, changes }: { tab: number; changes: ChangesMessage | undefined }) {
+  const { t } = useL10n();
+  const files = changes?.files ?? [];
+  if (files.length === 0) return null;
+  return (
+    <details id="changes">
+      <summary>
+        <span className="changes-count">{files.length === 1 ? t("changes.countOne") : t("changes.count", files.length)}</span>
+        <span className="spacer" />
+        <button
+          className="secondary"
+          onClick={(e) => (e.preventDefault(), post({ type: "undoChanges", tab }))}
+        >
+          {t("changes.undoAll")}
+        </button>
+        <button onClick={(e) => (e.preventDefault(), post({ type: "keepChanges", tab }))}>{t("changes.keepAll")}</button>
+      </summary>
+      <div className="changes-list">
+        {files.map((f) => (
+          <div key={f.path} className="changes-file">
+            <a href="#" title={f.path} onClick={(e) => (e.preventDefault(), post({ type: "openDiff", tab, path: f.path }))}>
+              {f.name}
+            </a>
+            {(f.created || f.deleted || f.binary) && (
+              <span className="changes-new">
+                {[f.created && t("changes.created"), f.deleted && t("changes.deleted"), f.binary && t("changes.binary")]
+                  .filter(Boolean)
+                  .join(", ")}
+              </span>
+            )}
+            {!f.binary && (
+              <span className="changes-stats">
+                <span className="added">+{f.added}</span> <span className="removed">−{f.removed}</span>
+              </span>
+            )}
+            <span className="spacer" />
+            <button className="icon-btn small" title={t("chat.openDiff")} aria-label={t("chat.openDiff")} onClick={() => post({ type: "openDiff", tab, path: f.path })}>
+              <Icon svg={diffIcon} />
+            </button>
+            <button className="icon-btn small" title={t("changes.undo")} aria-label={t("changes.undo")} onClick={() => post({ type: "undoChanges", tab, path: f.path })}>
+              <Icon svg={undoIcon} />
+            </button>
+            <button className="icon-btn small" title={t("changes.keep")} aria-label={t("changes.keep")} onClick={() => post({ type: "keepChanges", tab, path: f.path })}>
+              <Icon svg={checkIcon} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -355,6 +561,7 @@ const ItemView = memo(function ItemView({ item }: { item: Item }) {
         <div className="msg user">
           <Tokens text={item.text} tokens={item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []))} />
           <SentAttachments attachments={item.attachments.filter((a) => !a.token)} />
+          <RestoreButton turn={item.turn} />
         </div>
       );
     case "tool":
@@ -365,6 +572,7 @@ const ItemView = memo(function ItemView({ item }: { item: Item }) {
             <span className="tool-title">{item.title}</span>
           </summary>
           <div className="tool-body">
+            <Locations locations={item.locations} />
             <ToolContent content={item.content} />
           </div>
         </details>
@@ -790,9 +998,12 @@ interface TabState {
   busySince?: number;
   /** Last session update while busy; a long silence shows the waiting row. */
   lastActivity?: number;
+  /** The agent's terminals, by id. */
+  terminals: Record<string, TerminalSnapshot>;
+  changes?: ChangesMessage;
 }
 
-const NEW_TAB: TabState = { transcript: EMPTY, config: [], status: { text: "" }, attachments: [], commands: [] };
+const NEW_TAB: TabState = { transcript: EMPTY, config: [], status: { text: "" }, attachments: [], commands: [], terminals: {} };
 
 type TabsAction =
   | { type: "update"; tab: number; f: (state: TabState) => TabState }
@@ -978,7 +1189,13 @@ function App() {
   const closePreview = useCallback(() => setPreview(undefined), []);
   const [hover, setHover] = useState<Hover>();
   const current = (active !== undefined && states[active]) || NEW_TAB;
-  const { transcript: state, config, usage, compactAt, status, attachments, commands, busySince, lastActivity } = current;
+  const { transcript: state, config, usage, compactAt, status, attachments, commands, busySince, lastActivity, terminals: agentTerminals, changes } = current;
+  const [followAgent, setFollowAgent] = useState(false);
+  const checkpointTurns = changes?.turns;
+  const shownTab = useMemo<ShownTab>(
+    () => ({ id: active, busy: !!status.busy, checkpoints: new Set(checkpointTurns) }),
+    [active, status.busy, checkpointTurns],
+  );
   const now = useNow(busySince !== undefined);
   const elapsed = busySince !== undefined ? Math.max(0, now - busySince) : 0;
   const silent = busySince !== undefined ? Math.max(0, now - (lastActivity ?? busySince)) : 0;
@@ -1228,7 +1445,15 @@ function App() {
         update(tab, (s) => (s.status.busy ? { ...s, lastActivity: Date.now() } : s));
         return handleUpdate(tab, msg.update);
       case "userMessage":
-        return dispatch(tab, { type: "add", item: { kind: "userMessage", text: msg.text, attachments: msg.attachments ?? [] } });
+        return dispatch(tab, { type: "add", item: { kind: "userMessage", text: msg.text, attachments: msg.attachments ?? [], turn: msg.turn } });
+      case "terminal": {
+        const snapshot: TerminalSnapshot = msg.snapshot;
+        return update(tab, (s) => ({ ...s, terminals: { ...s.terminals, [snapshot.terminalId]: snapshot } }));
+      }
+      case "changes":
+        return update(tab, (s) => ({ ...s, changes: { files: msg.files, turns: msg.turns } }));
+      case "followAgent":
+        return setFollowAgent(msg.enabled);
       case "turnEnd":
         return dispatch(
           tab,
@@ -1287,7 +1512,7 @@ function App() {
         return setSkills(msg.skills);
       case "reset":
         dispatch(tab, { type: "reset" });
-        update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined }));
+        update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined, terminals: {} }));
         return;
     }
   });
@@ -1530,6 +1755,8 @@ function App() {
   return (
     <OpenPreview.Provider value={setPreview}>
       <HoverPreview.Provider value={setHover}>
+      <ShownTab.Provider value={shownTab}>
+      <Terminals.Provider value={agentTerminals}>
         <TabStrip tabs={tabs} states={states} active={active} onSelect={selectTab} />
         {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
         <div id="messages" ref={messages} hidden={!!history}>
@@ -1544,6 +1771,7 @@ function App() {
         <div id="drop-overlay" className={dragging ? "visible" : undefined}>
           {t("chat.dropHint")}
         </div>
+        {active !== undefined && <ChangesBar tab={active} changes={changes} />}
         <div id="status">
           <span id="status-text">
             {status.text}
@@ -1556,6 +1784,27 @@ function App() {
             {t("chat.installAgent")}
           </button>
           <span className="spacer" />
+          {active !== undefined && (changes?.turns.length ?? 0) > 0 && (
+            <button
+              id="checkpoints"
+              className="icon-btn small"
+              title={t("checkpoints.pick")}
+              aria-label={t("checkpoints.pick")}
+              onClick={() => post({ type: "pickCheckpoint", tab: active })}
+            >
+              <Icon svg={restoreIcon} />
+            </button>
+          )}
+          <button
+            id="follow"
+            className="icon-btn small"
+            title={t("chat.followAgent")}
+            aria-label={t("chat.followAgent")}
+            aria-pressed={followAgent}
+            onClick={() => post({ type: "setFollowAgent", enabled: !followAgent })}
+          >
+            <Icon svg={followAgent ? eyeIcon : eyeOffIcon} />
+          </button>
           <UsageMeter usage={usage} compactAt={compactAt} />
         </div>
         <form
@@ -1756,6 +2005,8 @@ function App() {
           />
         )}
         {hover && !preview && <HoverThumb hover={hover} />}
+      </Terminals.Provider>
+      </ShownTab.Provider>
       </HoverPreview.Provider>
     </OpenPreview.Provider>
   );
