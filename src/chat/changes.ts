@@ -57,16 +57,26 @@ export class ChangeReview implements vscode.Disposable {
   /** Forgets the tab's checkpoints, when it starts over; the files stay as they are. */
   clear(tab: Tab): void {
     tab.changes.clear();
+    tab.changes.messages = 0;
+    this.host.saveTabs();
+    this.post(tab);
+  }
+
+  /** Puts the checkpoints back on their messages after the session's history replayed with `turns`. */
+  matchReplay(tab: Tab, turns: ReadonlyArray<number>): void {
+    tab.changes.matchReplay(turns);
     this.host.saveTabs();
     this.post(tab);
   }
 
   /** Takes the checkpoint before a turn. Outside the workspace (e.g. in the home folder) there are none. */
   readonly beginTurn = Effect.fn("ChangeReview.beginTurn")(function* (this: ChangeReview, tab: Tab, turn: number, label: string) {
+    const position = tab.changes.countMessage();
     if (folderOf(tab.cwd) === undefined) {
+      this.host.saveTabs();
       return;
     }
-    yield* beginTurn(tab.changes, tab.cwd, turn, label).pipe(Effect.catch((err) => this.disable(tab, err.message)));
+    yield* beginTurn(tab.changes, tab.cwd, turn, label, position).pipe(Effect.catch((err) => this.disable(tab, err.message)));
     this.host.saveTabs();
   });
 

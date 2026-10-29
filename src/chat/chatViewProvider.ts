@@ -568,7 +568,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       replay.blocks = [];
       return undefined;
     }
-    replay.turn ??= this.nextTurn++;
+    if (replay.turn === undefined) {
+      replay.turn = this.nextTurn++;
+      replay.turns.push(replay.turn);
+    }
     replay.blocks.push(update.content);
     tab.sent.set(replay.turn, { parts: replayedParts(replay.blocks), includeActiveFile: false });
     return replay.turn;
@@ -715,7 +718,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return undefined;
   });
 
-  /** Shows a past session in `tab`, replaying its history when the agent supports session/load. */
+  /**
+   * Shows a past session in `tab`, replaying its history when the agent supports session/load. The tab's checkpoints
+   * stay: callers showing another session clear them first.
+   */
   private readonly loadInto = Effect.fn("ChatView.loadInto")(function* (
     this: ChatViewProvider,
     tab: Tab,
@@ -726,7 +732,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const { agent } = running;
     const caps = agent.initializeResponse.agentCapabilities;
     this.postTab(tab, { type: "reset" });
-    this.changes.clear(tab);
     tab.sent.clear();
     const previousCwd = tab.cwd;
     // Set first: the replayed updates are only forwarded for a tab's session.
@@ -740,8 +745,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const res = yield* (
       caps?.loadSession
         ? Effect.suspend(() => {
-            tab.replaying = { blocks: [] };
-            return agent.loadSession(sessionId, cwd);
+            const replaying = (tab.replaying = { blocks: [], turns: [] });
+            return agent.loadSession(sessionId, cwd).pipe(Effect.tap(() => Effect.sync(() => this.changes.matchReplay(tab, replaying.turns))));
           }).pipe(Effect.ensuring(Effect.sync(() => void (tab.replaying = undefined))))
         : agent.resumeSession(sessionId, cwd).pipe(
             Effect.tap(() => Effect.sync(() => this.postTab(tab, { type: "notice", key: "chat.resumedNoHistory" }))),
@@ -970,6 +975,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (replaced) {
       yield* this.closeSessionOnAgent(replacedOn, replaced);
     }
+    this.changes.clear(tab);
     yield* this.loadInto(tab, running, sessionId, cwd).pipe(
       // Fall back to a fresh session so the tab stays usable.
       Effect.tapError(() => this.ensureSession(tab)),

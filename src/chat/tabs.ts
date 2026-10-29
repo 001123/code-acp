@@ -109,7 +109,7 @@ export interface Tab extends DraftHolder {
   /** Tells the agent, with the next prompt, which messages the user took back. */
   rewindNote?: string;
   /** While session/load replays the history: the user message being replayed, kept in `sent` by its turn. */
-  replaying?: { turn?: number; blocks: acp.ContentBlock[] };
+  replaying?: { turn?: number; blocks: acp.ContentBlock[]; turns: number[] };
   /** Pending `postChanges`. */
   changesTimer?: ReturnType<typeof setTimeout>;
 }

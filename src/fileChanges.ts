@@ -26,6 +26,8 @@ const Checkpoint = Schema.Struct({
   label: Schema.String,
   /** Epoch ms. */
   at: Schema.Finite,
+  /** Position of its user message in the session's history, from 0, to find the message again when it replays. */
+  message: Schema.optional(Schema.Int),
 });
 type Checkpoint = typeof Checkpoint.Type;
 
@@ -35,6 +37,7 @@ export const SavedChanges = Schema.Struct({
   base: Schema.optional(Schema.String),
   checkpoints: Schema.Array(Checkpoint),
   reverted: Schema.optional(Schema.Array(Schema.String)),
+  messages: Schema.optional(Schema.Int),
 });
 export type SavedChanges = typeof SavedChanges.Type;
 
@@ -66,11 +69,19 @@ export class ChangeSet {
   files: ChangedFile[] = [];
   /** Turns whose checkpoint differs from the work tree, as of the last `refresh`. */
   turns: number[] = [];
+  /** User messages in the session's history so far; undefined when not known (saved before it was counted). */
+  messages?: number = 0;
 
   get saved(): SavedChanges | undefined {
     return this.root === undefined
       ? undefined
-      : { root: this.root, base: this.base, checkpoints: this.checkpoints, reverted: [...this.reverted] };
+      : {
+          root: this.root,
+          base: this.base,
+          checkpoints: this.checkpoints,
+          reverted: [...this.reverted],
+          messages: this.messages,
+        };
   }
 
   static fromSaved(saved: SavedChanges | undefined): ChangeSet {
@@ -79,6 +90,7 @@ export class ChangeSet {
       changes.root = saved.root;
       changes.base = saved.base;
       changes.checkpoints = [...saved.checkpoints];
+      changes.messages = saved.messages;
       for (const file of saved.reverted ?? []) {
         changes.reverted.add(file);
       }
@@ -86,6 +98,7 @@ export class ChangeSet {
     return changes;
   }
 
+  /** Forgets the checkpoints and changes; `messages` stays, as it counts the session's messages. */
   clear(): void {
     this.root = undefined;
     this.base = undefined;
@@ -109,6 +122,27 @@ export class ChangeSet {
    * A note for the agent on the files put back since its last turn, cleared once taken: it has to read them
    * again before editing them.
    */
+  /** Counts a user message sent to the session; its position, when known. */
+  countMessage(): number | undefined {
+    const position = this.messages;
+    this.messages = position === undefined ? undefined : position + 1;
+    return position;
+  }
+
+  /**
+   * After the session's history replayed with `turns` for its user messages, in order: moves each checkpoint onto
+   * its message's turn. When the count differs from the one kept, the positions can't be trusted and are dropped.
+   */
+  matchReplay(turns: ReadonlyArray<number>): void {
+    const matches = this.messages === turns.length;
+    this.checkpoints = this.checkpoints.map((c) => {
+      if (c.message === undefined) return c;
+      const turn = matches ? turns[c.message] : undefined;
+      return turn === undefined ? { ...c, message: undefined } : { ...c, turn };
+    });
+    this.messages = turns.length;
+  }
+
   takeNote(): string | undefined {
     if (this.reverted.size === 0) {
       return undefined;
@@ -133,6 +167,7 @@ export const beginTurn = Effect.fn("ChangeSet.beginTurn")(function* (
   root: string,
   turn: number,
   message: string,
+  position: number | undefined,
 ) {
   if (changes.disabled) {
     return;
@@ -149,6 +184,7 @@ export const beginTurn = Effect.fn("ChangeSet.beginTurn")(function* (
     tree,
     label: label.length > LABEL_LENGTH ? `${label.slice(0, LABEL_LENGTH - 1)}…` : label,
     at: Date.now(),
+    message: position,
   });
   changes.checkpoints.splice(0, Math.max(0, changes.checkpoints.length - MAX_CHECKPOINTS));
 });
