@@ -307,6 +307,22 @@ details[open] > summary::before {
 .activity-failed {
   color: var(--vscode-testing-iconFailed);
 }
+.activity-subagents svg,
+.tool-subagent svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+.activity-subagents,
+.tool-subagent {
+  color: var(--vscode-charts-purple);
+}
+.tool-subagent {
+  margin-right: 6px;
+}
+.tool-waiting {
+  color: var(--vscode-editorWarning-foreground);
+}
 .activity-body {
   display: flex;
   flex-direction: column;
@@ -344,6 +360,14 @@ details[open] > summary::before {
 }
 .tool-body {
   padding-left: 16px;
+}
+/* The tool calls of a subagent, under the call that started it. */
+.subagent-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 4px 12px;
+  border-left: 1px solid var(--vscode-widget-border, transparent);
 }
 
 pre {

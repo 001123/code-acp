@@ -27,6 +27,7 @@ import circleCheckIcon from "@tabler/icons/outline/circle-check.svg";
 import circleDashedIcon from "@tabler/icons/outline/circle-dashed.svg";
 import circleXIcon from "@tabler/icons/outline/circle-x.svg";
 import loaderIcon from "@tabler/icons/outline/loader-2.svg";
+import usersIcon from "@tabler/icons/outline/users.svg";
 import eyeIcon from "@tabler/icons/outline/eye.svg";
 import eyeOffIcon from "@tabler/icons/outline/eye-off.svg";
 import undoIcon from "@tabler/icons/outline/arrow-back-up.svg";
@@ -93,18 +94,26 @@ type Item =
   | { kind: "assistant" | "user" | "thought"; id: number; text: string; tokens?: Token[] }
   /** `turn` is set for messages sent from this chat, not for replayed ones. */
   | { kind: "userMessage"; id: number; text: string; attachments: SentAttachment[]; turn?: number }
-  | {
-      kind: "tool";
-      id: number;
-      toolCallId: string;
-      title?: string;
-      status?: acp.ToolCallStatus;
-      content?: acp.ToolCallContent[];
-      locations?: acp.ToolCallLocation[];
-    }
+  | ToolItem
   | { kind: "plan"; id: number; entries: acp.PlanEntry[] }
   | { kind: "permission"; id: number; requestId: number; toolCall: acp.ToolCallUpdate; options: acp.PermissionOption[]; done: boolean }
   | { kind: "notice" | "error"; id: number; text: Text };
+
+interface ToolItem {
+  kind: "tool";
+  id: number;
+  toolCallId: string;
+  title?: string;
+  status?: acp.ToolCallStatus;
+  content?: acp.ToolCallContent[];
+  locations?: acp.ToolCallLocation[];
+  /** The call starts a subagent. */
+  subagent?: boolean;
+  /** The tool calls of the subagent that this call started. */
+  children?: ToolItem[];
+  /** The open permission requests of that subagent. */
+  waiting?: number[];
+}
 
 interface Transcript {
   items: Item[];
@@ -162,6 +171,21 @@ function clipContent(content: acp.ToolCallContent[] | null | undefined): acp.Too
   });
 }
 
+/** A string field of claude-agent-acp's `_meta.claudeCode` extension. */
+function claudeMeta(u: acp.ToolCall | acp.ToolCallUpdate, key: "parentToolUseId" | "toolName"): string | undefined {
+  const claude = u._meta?.["claudeCode"];
+  const value = typeof claude === "object" && claude !== null ? (claude as Record<string, unknown>)[key] : undefined;
+  return typeof value === "string" ? value : undefined;
+}
+
+/** The Agent/Task call that started the subagent making this call. */
+function parentToolUseId(u: acp.ToolCall | acp.ToolCallUpdate): string | undefined {
+  return claudeMeta(u, "parentToolUseId");
+}
+
+/** Claude Code's tools that start a subagent; `Task` is the older name of `Agent`. */
+const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
+
 function transcript(state: Transcript, action: Action): Transcript {
   const add = (item: DistributiveOmit<Item, "id">, streaming?: boolean): Transcript => ({
     ...state,
@@ -193,39 +217,75 @@ function transcript(state: Transcript, action: Action): Transcript {
     }
     case "toolCall": {
       const u = action.update;
-      const existing = state.items.find((i) => i.kind === "tool" && i.toolCallId === u.toolCallId);
-      if (!existing) {
-        return add({
-          kind: "tool",
-          toolCallId: u.toolCallId,
-          title: u.title ?? undefined,
-          status: u.status ?? undefined,
-          content: clipContent(u.content),
-          locations: u.locations ?? undefined,
-        });
+      const toolName = claudeMeta(u, "toolName");
+      const merge = (i: ToolItem): ToolItem => ({
+        ...i,
+        ...(toolName !== undefined && SUBAGENT_TOOLS.has(toolName) ? { subagent: true } : {}),
+        ...(u.title ? { title: u.title } : {}),
+        ...(u.status ? { status: u.status } : {}),
+        ...(u.content ? { content: clipContent(u.content) } : {}),
+        ...(u.locations ? { locations: u.locations } : {}),
+      });
+      const isTool = (i: Item): i is ToolItem => i.kind === "tool";
+      const parentId = parentToolUseId(u);
+      const parent = parentId === undefined ? undefined : state.items.find((i) => isTool(i) && i.toolCallId === parentId);
+      const holder = state.items.find((i) => isTool(i) && i.children?.some((c) => c.toolCallId === u.toolCallId));
+      if (holder && isTool(holder)) {
+        const children = holder.children!.map((c) => (c.toolCallId === u.toolCallId ? merge(c) : c));
+        return { ...state, items: replace(holder.id, () => ({ ...holder, children })) };
       }
-      return {
-        ...state,
-        items: replace(existing.id, (i) => ({
-          ...i,
-          ...(u.title ? { title: u.title } : {}),
-          ...(u.status ? { status: u.status } : {}),
-          ...(u.content ? { content: clipContent(u.content) } : {}),
-          ...(u.locations ? { locations: u.locations } : {}),
-        })),
-      };
+      const existing = state.items.find((i) => isTool(i) && i.toolCallId === u.toolCallId);
+      if (parent && isTool(parent) && parent !== existing) {
+        // A subagent's call goes under the call that started it, also when an earlier update did not say so.
+        const child = existing && isTool(existing)
+          ? merge(existing)
+          : merge({ kind: "tool", id: state.nextId, toolCallId: u.toolCallId });
+        const open = state.items.flatMap((i) =>
+          i.kind === "permission" && !i.done && i.toolCall.toolCallId === u.toolCallId ? [i.requestId] : [],
+        );
+        const waiting = [...(parent.waiting ?? []), ...open.filter((id) => !parent.waiting?.includes(id))];
+        const items = state.items
+          .filter((i) => i !== existing)
+          .map((i) => (i === parent ? { ...parent, subagent: true, children: [...(parent.children ?? []), child], waiting } : i));
+        return { ...state, items, nextId: existing ? state.nextId : state.nextId + 1 };
+      }
+      if (!existing) {
+        return add(merge({ kind: "tool", id: state.nextId, toolCallId: u.toolCallId }));
+      }
+      return { ...state, items: replace(existing.id, (i) => merge(i as ToolItem)) };
     }
     case "plan":
       if (state.planId !== undefined && state.items.some((i) => i.id === state.planId)) {
         return { ...state, items: replace(state.planId, (i) => ({ ...i, entries: action.entries })) };
       }
       return { ...add({ kind: "plan", entries: action.entries }), planId: state.nextId };
-    case "add":
-      return add(action.item);
+    case "add": {
+      const next = add(action.item);
+      if (action.item.kind !== "permission") return next;
+      // A subagent's request also shows on the call that started the subagent.
+      const { toolCall, requestId } = action.item;
+      const parentId = parentToolUseId(toolCall);
+      const parent = next.items.find(
+        (i) =>
+          i.kind === "tool" &&
+          (parentId === undefined ? i.children?.some((c) => c.toolCallId === toolCall.toolCallId) : i.toolCallId === parentId),
+      );
+      if (!parent || parent.kind !== "tool") return next;
+      return {
+        ...next,
+        items: next.items.map((i) => (i === parent ? { ...parent, waiting: [...(parent.waiting ?? []), requestId] } : i)),
+      };
+    }
     case "permissionDone":
       return {
         ...state,
-        items: state.items.map((i) => (i.kind === "permission" && i.requestId === action.requestId ? { ...i, done: true } : i)),
+        items: state.items.map((i) =>
+          i.kind === "permission" && i.requestId === action.requestId
+            ? { ...i, done: true }
+            : i.kind === "tool" && i.waiting?.includes(action.requestId)
+              ? { ...i, waiting: i.waiting.filter((id) => id !== action.requestId) }
+              : i,
+        ),
       };
     case "endStream":
       return { ...state, streaming: undefined };
@@ -448,7 +508,7 @@ function render(t: Translate, text: Text): string {
   return "raw" in text ? text.raw : t(text.key, ...(text.args ?? []));
 }
 
-type ActivityItem = { kind: "thought"; id: number; text: string } | Extract<Item, { kind: "tool" }>;
+type ActivityItem = { kind: "thought"; id: number; text: string } | ToolItem;
 
 /** Groups each run of consecutive thoughts and tool calls into one entry. */
 function groupActivity(items: Item[]): (Item | ActivityItem[])[] {
@@ -497,12 +557,21 @@ const ActivityView = memo(
     if (tools.length === 0 && items.length === 1) return <ItemView item={items[0]!} />;
     const running = tools.some((i) => i.status === "pending" || i.status === "in_progress");
     const failed = tools.filter((i) => i.status === "failed").length;
+    const waiting = tools.some((i) => i.waiting && i.waiting.length > 0);
+    const subagents = tools.filter((i) => i.subagent).length;
     return (
       <details className="activity" data-running={running || undefined}>
         <summary>
           {t("chat.thought")}
           {tools.length > 0 && <span className="activity-count"> · {t("chat.toolCount", tools.length)}</span>}
+          {subagents > 0 && (
+            <span className="activity-subagents" title={t("chat.subagentCount", subagents)}>
+              {" · "}
+              <Icon svg={usersIcon} /> {subagents}
+            </span>
+          )}
           {failed > 0 && <span className="activity-failed"> · {t("chat.toolFailed", failed)}</span>}
+          {waiting && <span className="tool-waiting"> · {t("chat.needsInput")}</span>}
         </summary>
         <div className="activity-body">
           {items.map((item) =>
@@ -564,19 +633,37 @@ const ItemView = memo(function ItemView({ item }: { item: Item }) {
           <RestoreButton turn={item.turn} />
         </div>
       );
-    case "tool":
+    case "tool": {
+      const children = item.children ?? [];
+      const failed = children.filter((c) => c.status === "failed").length;
       return (
         <details className="tool" data-status={item.status}>
           <summary>
             <span className="tool-status">{item.status && TOOL_ICON[item.status] && <Icon svg={TOOL_ICON[item.status]} />}</span>
+            {item.subagent && (
+              <span className="tool-subagent" title={t("chat.subagent")}>
+                <Icon svg={usersIcon} />
+              </span>
+            )}
             <span className="tool-title">{item.title}</span>
+            {children.length > 0 && <span className="activity-count"> · {t("chat.toolCount", children.length)}</span>}
+            {failed > 0 && <span className="activity-failed"> · {t("chat.toolFailed", failed)}</span>}
+            {item.waiting && item.waiting.length > 0 && <span className="tool-waiting"> · {t("chat.needsInput")}</span>}
           </summary>
           <div className="tool-body">
             <Locations locations={item.locations} />
+            {children.length > 0 && (
+              <div className="subagent-tools">
+                {children.map((child) => (
+                  <ItemView key={child.id} item={child} />
+                ))}
+              </div>
+            )}
             <ToolContent content={item.content} />
           </div>
         </details>
       );
+    }
     case "plan":
       return (
         <div className="plan">
