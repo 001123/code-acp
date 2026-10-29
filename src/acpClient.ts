@@ -88,6 +88,9 @@ const PackageVersion = Schema.Struct({ version: Schema.String });
 /** How long the agent may take to answer `initialize`; a first `uvx` run downloads its packages first. */
 const INIT_TIMEOUT_SECONDS = 120;
 
+/** How long a failed `initialize` waits for the process exit that may explain it. */
+const EXIT_GRACE_MS = 1000;
+
 function isAuthRequired(error: unknown): boolean {
   return error instanceof acp.RequestError && error.code === acp.RequestError.authRequired().code;
 }
@@ -103,7 +106,13 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
   );
   const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
   const exited = yield* Deferred.make<AgentExit>();
-  const terminals = yield* makeAgentTerminals((snapshot) => handlers.onTerminal?.(snapshot));
+  /** The folder of each session, for the commands it runs in client terminals. */
+  const sessionCwds = new Map<string, string>();
+  const terminals = yield* makeAgentTerminals(
+    (snapshot) => handlers.onTerminal?.(snapshot),
+    (sessionId) => sessionCwds.get(sessionId),
+  );
+  const remember = (sessionId: string, cwd: string) => Effect.sync(() => void sessionCwds.set(sessionId, cwd));
   const { command, args, env } = agentCommand;
   yield* Effect.logInfo(`[agent] spawn ${command} ${args.join(" ")}`);
 
@@ -205,6 +214,11 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
       },
     }),
   ).pipe(
+    // The SDK fails the pending request as soon as stdout closes, a moment before the exit is seen; an exit
+    // (or a failed spawn) says more than "connection closed".
+    Effect.catchTag("AgentRequestError", (err) =>
+      exitedEarly.pipe(Effect.timeoutOrElse({ duration: `${EXIT_GRACE_MS} millis`, orElse: () => Effect.fail(err) })),
+    ),
     Effect.raceFirst(exitedEarly),
     // A hung agent would otherwise keep its tabs on "starting" forever.
     Effect.timeoutOrElse({
@@ -225,6 +239,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         Effect.flatMap((mcpServers) =>
           request("session/new", (agent) => agent.request(acp.methods.agent.session.new, { cwd, mcpServers })),
         ),
+        Effect.tap((res) => remember(res.sessionId, cwd)),
       ),
     listSessions: (cwd, cursor) =>
       request("session/list", (agent) => agent.request(acp.methods.agent.session.list, { cwd, cursor })),
@@ -235,6 +250,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
             agent.request(acp.methods.agent.session.load, { sessionId, cwd, mcpServers }),
           ),
         ),
+        Effect.tap(() => remember(sessionId, cwd)),
       ),
     resumeSession: (sessionId, cwd) =>
       mcpServers.pipe(
@@ -243,9 +259,11 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
             agent.request(acp.methods.agent.session.resume, { sessionId, cwd, mcpServers }),
           ),
         ),
+        Effect.tap(() => remember(sessionId, cwd)),
       ),
     closeSession: (sessionId) =>
       request("session/close", (agent) => agent.request(acp.methods.agent.session.close, { sessionId })).pipe(
+        Effect.tap(() => Effect.sync(() => sessionCwds.delete(sessionId))),
         Effect.asVoid,
       ),
     prompt: (sessionId, prompt) =>

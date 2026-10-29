@@ -2,12 +2,12 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { Context, Deferred, Effect, Layer, Predicate, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as vscode from "vscode";
-import * as os from "node:os";
 import { spawnAgent, type AcpAgent } from "./acpClient";
 import { AgentManager } from "./agentManager";
 import { t } from "./i18n";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
 import { readSettings } from "./settings";
+import { defaultCwd } from "./workspace";
 
 /** A repository whose commit message box we fill: a `vscode.SourceControl` or a git extension repository. */
 export interface CommitTarget {
@@ -271,8 +271,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
             onUpdate: () => {},
             requestPermission: () => Effect.succeed(CANCELLED),
           });
-          const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir();
-          const session = yield* agent.newSession(cwd);
+          const session = yield* agent.newSession(defaultCwd());
           const option = modelOption(session.configOptions);
           return option ? modelsOf(option) : [];
         },

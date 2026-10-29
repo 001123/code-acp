@@ -24,6 +24,8 @@ export type FromWebview =
   | { type: "login" }
   | { type: "selectAgent" }
   | { type: "setAgent"; tab: number; id: string }
+  /** Moves `tab` to another workspace folder; it starts over in a fresh session there. */
+  | { type: "setCwd"; tab: number; cwd: string }
   | { type: "manageAgents" }
   | { type: "permission"; id: number; optionId: string | null }
   | { type: "setConfig"; tab: number; configId: string; value: string }
@@ -60,6 +62,12 @@ export interface ChangesMessage {
   turns: number[];
 }
 
+/** The workspace folders a tab can run in ("folders" message); the picker shows when there are several. */
+export interface WorkspaceFolderInfo {
+  name: string;
+  path: string;
+}
+
 /** A chat tab as the webview shows it in the tab strip. */
 export interface TabInfo {
   id: number;
@@ -70,6 +78,8 @@ export interface TabInfo {
   createdAt?: number;
   /** The installed agent picked for the tab; undefined until it has one. */
   agentId?: string;
+  /** The folder the tab's session runs in. */
+  cwd: string;
   /** Unsent composer content; the webview only uses it for tabs it has no draft for yet. */
   draft?: Draft;
 }

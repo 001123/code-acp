@@ -1,6 +1,6 @@
 import { Context, Effect, FiberSet, Layer, Option, Stream } from "effect";
 import * as vscode from "vscode";
-import type { Attachment } from "./chatViewProvider";
+import type { Attachment } from "./chat/protocol";
 import { t } from "./i18n";
 import { thenable, type VscodeError } from "./runtime";
 

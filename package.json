@@ -18,6 +18,15 @@
     "Chat"
   ],
   "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "%capabilities.virtualWorkspaces%"
+    }
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -430,7 +439,8 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
+    "test": "vitest run",
     "package": "node esbuild.mjs --production && vsce package --out release/",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
@@ -438,6 +448,7 @@
     "@agentclientprotocol/sdk": "2.1.0",
     "@effect/platform-node-shared": "4.1.0",
     "@effect/tsgo": "0.63.0",
+    "@effect/vitest": "4.1.0",
     "@tabler/icons": "^3.50.0",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
@@ -452,7 +463,8 @@
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "5.0.5"
   },
   "allowScripts": {
     "esbuild@0.28.2": true

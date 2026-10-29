@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import * as vscode from "vscode";
 import { AgentManager } from "./agentManager";
 import { AgentUpdates } from "./agentUpdates";
-import { ChatViewProvider } from "./chatViewProvider";
+import { ChatViewProvider } from "./chat/chatViewProvider";
 import { CommitMessage } from "./commitMessage";
 import { DropViewProvider } from "./dropView";
 import { t } from "./i18n";

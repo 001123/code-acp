@@ -1,10 +1,9 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { Deferred, Effect, Schema, Scope } from "effect";
 import { execa } from "execa";
-import * as os from "node:os";
-import * as vscode from "vscode";
 import { t } from "./i18n";
 import { stopProcess } from "./processTree";
+import { defaultCwd } from "./workspace";
 
 /** A terminal's state as the chat shows it. */
 export interface TerminalSnapshot {
@@ -78,6 +77,8 @@ function quoteArg(arg: string): string {
  */
 export const makeAgentTerminals = Effect.fn("makeAgentTerminals")(function* (
   onChange: (snapshot: TerminalSnapshot) => void,
+  /** The folder of a session, where its commands run unless they name another. */
+  cwdOf: (sessionId: string) => string | undefined = () => undefined,
 ): Effect.fn.Return<AgentTerminals, never, Scope.Scope> {
   const terminals = new Map<string, Terminal>();
   let nextId = 1;
@@ -128,7 +129,7 @@ export const makeAgentTerminals = Effect.fn("makeAgentTerminals")(function* (
   const create = Effect.fn("AgentTerminals.create")(function* (request: acp.CreateTerminalRequest) {
     const terminalId = `terminal-${nextId++}`;
     const args = request.args ?? [];
-    const cwd = request.cwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir();
+    const cwd = request.cwd ?? cwdOf(request.sessionId) ?? defaultCwd();
     const exited = yield* Deferred.make<acp.TerminalExitStatus>();
     // Agents often send a whole command line without arguments; a shell runs it as typed.
     const child = execa(request.command, args, {

@@ -752,6 +752,10 @@ mark.token.image:hover {
   cursor: default;
   opacity: 0.8;
 }
+#folder {
+  height: 22px;
+  font-size: 0.88em;
+}
 #actions label {
   display: inline-flex;
   align-items: center;

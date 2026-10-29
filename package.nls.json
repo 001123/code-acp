@@ -34,5 +34,6 @@
   "config.mcpServers": "Extra MCP servers passed to every agent session, on top of the agent's own MCP config. Keyed by server name, in the `.mcp.json` shape: `{ \"command\": \"npx\", \"args\": [...], \"env\": {...} }` for stdio, or `{ \"type\": \"http\" | \"sse\", \"url\": \"...\", \"headers\": {...} }`. Changes apply to new or reopened sessions.",
   "config.commitMessage.agent": "Id of the installed agent that generates commit messages. Empty: the default agent.",
   "config.commitMessage.model": "Model for generating commit messages (its id or name, as the agent lists it). Empty: the agent's default model.",
-  "config.commitMessage.instructions": "Extra instructions for generating commit messages, e.g. a convention such as Conventional Commits."
+  "config.commitMessage.instructions": "Extra instructions for generating commit messages, e.g. a convention such as Conventional Commits.",
+  "capabilities.virtualWorkspaces": "Agents run as processes that need the workspace folders on disk."
 }
