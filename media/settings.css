@@ -9,7 +9,7 @@ body {
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
-  padding: 0 24px 32px;
+  padding: 0 20px 32px;
   margin: 0 auto;
   max-width: 980px;
   line-height: 1.45;
@@ -42,8 +42,9 @@ h1 {
 /* Sections: a sidebar beside the panel; a scrolling strip above it when the view is narrow. */
 .layout {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 28px;
+  /* As wide as the longest label, up to a cap; the panel takes the rest. */
+  grid-template-columns: fit-content(170px) minmax(0, 1fr);
+  gap: 20px;
   align-items: start;
 }
 .tabs {
@@ -57,9 +58,9 @@ h1 {
 .tab {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 7px 10px;
+  padding: 5px 8px;
   background: none;
   color: var(--vscode-descriptionForeground);
   border: none;
@@ -466,16 +467,26 @@ button.with-icon {
 }
 
 /* Usage tab */
+/* The page's width decides the layout: four tiles in a row or two by two, never three and one. */
+.usage {
+  container-type: inline-size;
+}
 .usage-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+@container (min-width: 640px) {
+  .usage-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 .usage-tile {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 14px 16px;
+  min-width: 0;
+  padding: 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -484,7 +495,10 @@ button.with-icon {
   margin-top: 0;
 }
 .usage-tile-value {
-  font-size: 1.6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.5em;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -504,29 +518,43 @@ button.with-icon {
 }
 .usage th,
 .usage td {
-  padding: 8px 12px;
+  padding: 7px 8px;
   text-align: left;
+}
+.usage th:first-child,
+.usage td:first-child {
+  padding-left: 12px;
+}
+.usage th:last-child,
+.usage td:last-child {
+  padding-right: 12px;
 }
 .usage tbody td {
   border-top: 1px solid var(--border);
 }
+/* Headings may wrap: they, not the figures, would set the columns' widths. */
 .usage th {
   font-weight: 600;
   color: var(--vscode-descriptionForeground);
-  white-space: nowrap;
+  vertical-align: bottom;
 }
 .usage tbody tr:hover {
   background: var(--surface-hover);
 }
 .usage .num {
   text-align: right;
+}
+.usage td.num {
   white-space: nowrap;
 }
 .usage .nowrap {
   white-space: nowrap;
 }
+/* The conversation takes what the other columns leave, cutting long titles short. */
 .usage-session {
-  max-width: 280px;
+  width: 100%;
+  max-width: 0;
+  min-width: 120px;
 }
 .usage-session > span {
   display: block;
@@ -553,10 +581,28 @@ button.with-icon {
 }
 .usage-footer {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 20px;
+  gap: 24px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.usage-note {
+  display: flex;
+  gap: 8px;
+  max-width: 60ch;
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+.usage-note .svg-icon svg {
+  margin-top: 2px;
+  opacity: 0.8;
+}
+.usage-footer button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .usage-section-head {
   display: flex;
@@ -604,4 +650,50 @@ button.with-icon {
 }
 .usage-none {
   padding: 12px 0;
+}
+/* Rows open to their details: a chevron column, then the breakdown beneath on a tinted band. */
+.usage .usage-toggle {
+  width: 16px;
+  padding-right: 0;
+  color: var(--vscode-descriptionForeground);
+}
+.usage-toggle .svg-icon svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  transition: transform 0.15s;
+}
+.usage-row {
+  cursor: pointer;
+}
+.usage-row[aria-expanded="true"] .usage-toggle svg {
+  transform: rotate(90deg);
+}
+.usage-row:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.usage tbody tr.usage-details-row:hover {
+  background: none;
+}
+.usage tbody .usage-details-row td {
+  padding: 4px 12px 12px 36px;
+  border-top: none;
+}
+.usage-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px 20px;
+  margin: 0;
+}
+.usage-details dt {
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+.usage-details dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }

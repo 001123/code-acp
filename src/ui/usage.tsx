@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import chartIcon from "@tabler/icons/outline/chart-bar.svg";
+import chevronIcon from "@tabler/icons/outline/chevron-right.svg";
+import infoIcon from "@tabler/icons/outline/info-circle.svg";
 import searchIcon from "@tabler/icons/outline/search.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import type { UsageView } from "../settingsPanel";
@@ -22,7 +24,9 @@ function useFormat() {
         new Intl.NumberFormat(lang, {
           style: "currency",
           currency,
-          maximumFractionDigits: 4,
+          // Cents once there are whole units; small amounts keep enough digits to show.
+          minimumFractionDigits: 2,
+          maximumFractionDigits: amount >= 1 ? 2 : 4,
         }).format(amount),
       );
     return parts.length ? parts.join(" + ") : "—";
@@ -36,10 +40,14 @@ function useFormat() {
     }).format(new Date(`${day}T00:00`));
   const month = (key: string) =>
     new Intl.DateTimeFormat(lang, { month: "long", year: "numeric" }).format(new Date(`${key}-01T00:00`));
+  /** The year only when it isn't this one. */
   const time = (ms: number) =>
     new Intl.DateTimeFormat(lang, {
-      dateStyle: "medium",
-      timeStyle: "short",
+      day: "numeric",
+      month: "short",
+      year: new Date(ms).getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     }).format(ms);
   return { t, exact, cost, tokens, date, month, time };
 }
@@ -72,37 +80,115 @@ function Tile({ label, totals }: { label: string; totals: Totals }) {
   );
 }
 
-/** Token columns shared by both tables. */
+/** The token column shared by the tables: the total; a row's details break it down. */
 function TokenCells({ tokens: n }: { tokens: Tokens }) {
   const { t, exact, tokens } = useFormat();
-  const title = tokenTitle(t, exact, n);
   return (
-    <>
-      <td className="num" title={title}>
-        {tokens(n.input)}
-      </td>
-      <td className="num" title={title}>
-        {tokens(n.output)}
-      </td>
-      <td className="num" title={title}>
-        {tokens(n.cachedRead + n.cachedWrite)}
-      </td>
-      <td className="num" title={title}>
-        {tokens(n.total)}
-      </td>
-    </>
+    <td className="num" title={tokenTitle(t, exact, n)}>
+      {tokens(n.total)}
+    </td>
   );
 }
 
 function TokenHeads() {
   const { t } = useL10n();
+  return <th className="num">{t("usage.tokens")}</th>;
+}
+
+type Detail = readonly [label: string, value: ReactNode];
+
+/** What the tokens are made of, as row details; kinds the agent never reported are left out. */
+function useTokenDetails(): (tokens: Tokens) => Detail[] {
+  const { t, exact } = useFormat();
+  return (n) =>
+    (
+      [
+        [t("usage.input"), n.input],
+        [t("usage.output"), n.output],
+        [t("usage.cachedRead"), n.cachedRead],
+        [t("usage.cachedWrite"), n.cachedWrite],
+        [t("usage.thought"), n.thought],
+      ] as const
+    )
+      .filter(([, v]) => v > 0)
+      .map(([label, v]) => [label, exact.format(v)] as const);
+}
+
+/** A table row that opens to show its details beneath, so the table itself keeps only the headline figures. */
+function Row({ cells, details }: { cells: ReactNode; details: ReadonlyArray<Detail> }) {
+  const [open, setOpen] = useState(false);
+  if (!details.length) {
+    return (
+      <tr>
+        <td className="usage-toggle" />
+        {cells}
+      </tr>
+    );
+  }
+  const toggle = () => setOpen(!open);
   return (
     <>
-      <th className="num">{t("usage.input")}</th>
-      <th className="num">{t("usage.output")}</th>
-      <th className="num">{t("usage.cache")}</th>
-      <th className="num">{t("usage.total")}</th>
+      <tr
+        className="usage-row"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle();
+          }
+        }}
+      >
+        <td className="usage-toggle">
+          <Icon svg={chevronIcon} />
+        </td>
+        {cells}
+      </tr>
+      {open && (
+        <tr className="usage-details-row">
+          <td colSpan={99}>
+            <dl className="usage-details">
+              {details.map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </td>
+        </tr>
+      )}
     </>
+  );
+}
+
+/**
+ * A table that scrolls sideways when it is wider than the page. The mouse wheel scrolls it too, not only Shift+wheel
+ * or a trackpad; at either end the wheel scrolls the page again.
+ */
+function TableScroll({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+      const max = el.scrollWidth - el.clientWidth;
+      if (max <= 0) return;
+      const delta = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 16 : e.deltaY;
+      if ((delta < 0 && el.scrollLeft <= 0) || (delta > 0 && el.scrollLeft >= max - 1)) return;
+      e.preventDefault();
+      el.scrollLeft += delta;
+    };
+    // Not passive, so the page doesn't scroll as well.
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+  return (
+    <div ref={ref} className="card usage-table">
+      {children}
+    </div>
   );
 }
 
@@ -131,6 +217,7 @@ function byMonth(days: UsageView["days"]): Array<Totals & { key: string }> {
 
 function Periods({ usage }: { usage: UsageView }) {
   const { t, exact, cost, date, month } = useFormat();
+  const tokenDetails = useTokenDetails();
   const [grouping, setGrouping] = useState<"day" | "month">("day");
   const [shown, setShown] = useState(DAY_PAGE);
   const rows =
@@ -158,10 +245,11 @@ function Periods({ usage }: { usage: UsageView }) {
           ))}
         </div>
       </div>
-      <div className="card usage-table">
+      <TableScroll>
         <table>
           <thead>
             <tr>
+              <th className="usage-toggle" />
               <th>{t(grouping === "day" ? "usage.day" : "usage.month1")}</th>
               <th className="num">{t("usage.turns")}</th>
               <TokenHeads />
@@ -170,18 +258,24 @@ function Periods({ usage }: { usage: UsageView }) {
           </thead>
           <tbody>
             {rows.slice(0, shown).map((r) => (
-              <tr key={r.key}>
-                <td className="nowrap" title={r.key}>
-                  {r.label}
-                </td>
-                <td className="num">{exact.format(r.turns)}</td>
-                <TokenCells tokens={r.tokens} />
-                <td className="num">{cost(r.cost)}</td>
-              </tr>
+              <Row
+                key={r.key}
+                details={tokenDetails(r.tokens)}
+                cells={
+                  <>
+                    <td className="nowrap" title={r.key}>
+                      {r.label}
+                    </td>
+                    <td className="num">{exact.format(r.turns)}</td>
+                    <TokenCells tokens={r.tokens} />
+                    <td className="num">{cost(r.cost)}</td>
+                  </>
+                }
+              />
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       {rows.length > shown && <ShowMore shown={shown} total={rows.length} onClick={() => setShown(shown + DAY_PAGE)} />}
     </section>
   );
@@ -201,13 +295,15 @@ function ShowMore({ shown, total, onClick }: { shown: number; total: number; onC
 
 function Agents({ usage }: { usage: UsageView }) {
   const { t, exact, cost } = useFormat();
+  const tokenDetails = useTokenDetails();
   return (
     <section className="usage-section">
       <h3>{t("usage.byAgent")}</h3>
-      <div className="card usage-table">
+      <TableScroll>
         <table>
           <thead>
             <tr>
+              <th className="usage-toggle" />
               <th>{t("usage.agent")}</th>
               <th className="num">{t("usage.sessions")}</th>
               <th className="num">{t("usage.turns")}</th>
@@ -217,23 +313,30 @@ function Agents({ usage }: { usage: UsageView }) {
           </thead>
           <tbody>
             {usage.agents.map((a) => (
-              <tr key={a.agentId}>
-                <td>{a.agentName}</td>
-                <td className="num">{exact.format(a.sessions)}</td>
-                <td className="num">{exact.format(a.turns)}</td>
-                <TokenCells tokens={a.tokens} />
-                <td className="num">{cost(a.cost)}</td>
-              </tr>
+              <Row
+                key={a.agentId}
+                details={tokenDetails(a.tokens)}
+                cells={
+                  <>
+                    <td className="nowrap">{a.agentName}</td>
+                    <td className="num">{exact.format(a.sessions)}</td>
+                    <td className="num">{exact.format(a.turns)}</td>
+                    <TokenCells tokens={a.tokens} />
+                    <td className="num">{cost(a.cost)}</td>
+                  </>
+                }
+              />
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
     </section>
   );
 }
 
 function Sessions({ usage, onQuery }: { usage: UsageView; onQuery: (text: string, limit: number) => void }) {
   const { t, exact, cost, time } = useFormat();
+  const tokenDetails = useTokenDetails();
   const [text, setText] = useState(usage.query.text);
   // Asks again once typing pauses; a new search starts from the first page.
   useEffect(() => {
@@ -259,13 +362,12 @@ function Sessions({ usage, onQuery }: { usage: UsageView; onQuery: (text: string
       {usage.sessionCount === 0 ? (
         <div className="desc usage-none">{t("usage.noMatch")}</div>
       ) : (
-        <div className="card usage-table">
+        <TableScroll>
           <table>
             <thead>
               <tr>
+                <th className="usage-toggle" />
                 <th>{t("usage.session")}</th>
-                <th>{t("usage.agent")}</th>
-                <th>{t("usage.lastUsed")}</th>
                 <th className="num">{t("usage.turns")}</th>
                 <TokenHeads />
                 <th className="num">{t("usage.cost")}</th>
@@ -273,21 +375,31 @@ function Sessions({ usage, onQuery }: { usage: UsageView; onQuery: (text: string
             </thead>
             <tbody>
               {usage.sessions.map((s) => (
-                <tr key={`${s.agentId} ${s.sessionId}`}>
-                  <td className="usage-session" title={`${s.title ?? s.sessionId}\n${s.cwd}`}>
-                    <span className="usage-session-title">{s.title || t("chat.untitled")}</span>
-                    <span className="desc">{s.folder}</span>
-                  </td>
-                  <td>{s.agentName}</td>
-                  <td className="nowrap">{time(s.lastAt)}</td>
-                  <td className="num">{exact.format(s.turns)}</td>
-                  <TokenCells tokens={s.tokens} />
-                  <td className="num">{cost(s.cost)}</td>
-                </tr>
+                <Row
+                  key={`${s.agentId} ${s.sessionId}`}
+                  details={[
+                    [t("usage.agent"), s.agentName],
+                    [t("usage.folder"), <span title={s.cwd}>{s.cwd}</span>],
+                    [t("usage.firstUsed"), time(s.firstAt)],
+                    [t("usage.lastUsed"), time(s.lastAt)],
+                    ...tokenDetails(s.tokens),
+                  ]}
+                  cells={
+                    <>
+                      <td className="usage-session" title={s.title ?? s.sessionId}>
+                        <span className="usage-session-title">{s.title || t("chat.untitled")}</span>
+                        <span className="desc">{`${s.folder} · ${time(s.lastAt)}`}</span>
+                      </td>
+                      <td className="num">{exact.format(s.turns)}</td>
+                      <TokenCells tokens={s.tokens} />
+                      <td className="num">{cost(s.cost)}</td>
+                    </>
+                  }
+                />
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
       {usage.sessionCount > usage.sessions.length && (
         <ShowMore
@@ -334,7 +446,10 @@ export function UsageTab({
         </>
       )}
       <div className="usage-footer">
-        <span className="desc">{t("usage.note")}</span>
+        <p className="usage-note">
+          <Icon svg={infoIcon} />
+          <span>{t("usage.note")}</span>
+        </p>
         <button className="secondary with-icon" disabled={empty} onClick={onClear}>
           <Icon svg={trashIcon} />
           {t("usage.clear")}
