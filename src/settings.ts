@@ -35,6 +35,8 @@ export const Settings = Schema.Struct({
   customAgents: Schema.Record(Schema.String, CustomAgentEntry),
   env: Schema.Record(Schema.String, Schema.String),
   nodePath: Schema.String,
+  /** Path of the ccusage executable for the Usage tab; empty runs a pinned release through `npx -y`. */
+  ccusagePath: Schema.String,
   /** Look for agent updates in the ACP Registry on startup and offer to install them. */
   checkAgentUpdates: Schema.Boolean,
   /** Open the files the agent reads and edits in the editor, at the line it is on. */
@@ -63,6 +65,7 @@ export const SETTING_KEYS = [
   "customAgents",
   "env",
   "nodePath",
+  "ccusagePath",
   "checkAgentUpdates",
   "followAgent",
   "autoScroll",
@@ -84,6 +87,7 @@ const DEFAULTS: Settings = {
   customAgents: {},
   env: {},
   nodePath: "node",
+  ccusagePath: "",
   checkAgentUpdates: true,
   followAgent: false,
   autoScroll: true,
@@ -114,6 +118,7 @@ export function readSettings(): Settings {
     customAgents: read("customAgents"),
     env: read("env"),
     nodePath: read("nodePath"),
+    ccusagePath: read("ccusagePath"),
     checkAgentUpdates: read("checkAgentUpdates"),
     followAgent: read("followAgent"),
     autoScroll: read("autoScroll"),

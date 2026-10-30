@@ -6,10 +6,11 @@ import searchIcon from "@tabler/icons/outline/search.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import type { UsageView } from "../settingsPanel";
 import type { Costs, Tokens, Totals } from "../usageLedger";
+import { CcusageUsage } from "./ccusage";
 import { Icon } from "./icon";
 import { useL10n, type Translate } from "./l10n";
 
-function useFormat() {
+export function useFormat() {
   const { t, lang } = useL10n();
   const exact = new Intl.NumberFormat(lang);
   const compact = new Intl.NumberFormat(lang, {
@@ -81,7 +82,7 @@ function Tile({ label, totals }: { label: string; totals: Totals }) {
 }
 
 /** The token column shared by the tables: the total; a row's details break it down. */
-function TokenCells({ tokens: n }: { tokens: Tokens }) {
+export function TokenCells({ tokens: n }: { tokens: Tokens }) {
   const { t, exact, tokens } = useFormat();
   return (
     <td className="num" title={tokenTitle(t, exact, n)}>
@@ -90,15 +91,15 @@ function TokenCells({ tokens: n }: { tokens: Tokens }) {
   );
 }
 
-function TokenHeads() {
+export function TokenHeads() {
   const { t } = useL10n();
   return <th className="num">{t("usage.tokens")}</th>;
 }
 
-type Detail = readonly [label: string, value: ReactNode];
+export type Detail = readonly [label: string, value: ReactNode];
 
 /** What the tokens are made of, as row details; kinds the agent never reported are left out. */
-function useTokenDetails(): (tokens: Tokens) => Detail[] {
+export function useTokenDetails(): (tokens: Tokens) => Detail[] {
   const { t, exact } = useFormat();
   return (n) =>
     (
@@ -115,7 +116,7 @@ function useTokenDetails(): (tokens: Tokens) => Detail[] {
 }
 
 /** A table row that opens to show its details beneath, so the table itself keeps only the headline figures. */
-function Row({ cells, details }: { cells: ReactNode; details: ReadonlyArray<Detail> }) {
+export function Row({ cells, details }: { cells: ReactNode; details: ReadonlyArray<Detail> }) {
   const [open, setOpen] = useState(false);
   if (!details.length) {
     return (
@@ -167,7 +168,7 @@ function Row({ cells, details }: { cells: ReactNode; details: ReadonlyArray<Deta
  * A table that scrolls sideways when it is wider than the page. The mouse wheel scrolls it too, not only Shift+wheel
  * or a trackpad; at either end the wheel scrolls the page again.
  */
-function TableScroll({ children }: { children: ReactNode }) {
+export function TableScroll({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -193,7 +194,7 @@ function TableScroll({ children }: { children: ReactNode }) {
 }
 
 /** Rows of the day table shown at first, and added with each "show more". */
-const DAY_PAGE = 31;
+export const DAY_PAGE = 31;
 
 function addTotals(a: Totals, b: Totals): Totals {
   const cost: Record<string, number> = { ...a.cost };
@@ -281,7 +282,7 @@ function Periods({ usage }: { usage: UsageView }) {
   );
 }
 
-function ShowMore({ shown, total, onClick }: { shown: number; total: number; onClick: () => void }) {
+export function ShowMore({ shown, total, onClick }: { shown: number; total: number; onClick: () => void }) {
   const { t, exact } = useFormat();
   return (
     <div className="usage-more">
@@ -412,21 +413,58 @@ function Sessions({ usage, onQuery }: { usage: UsageView; onQuery: (text: string
   );
 }
 
-/** The Usage tab of the settings page: totals for today, 7 and 30 days and all time, then by period, agent and session. */
+/** Where the Usage tab's figures come from: what agents report here, or their local logs read by ccusage. */
+export type UsageSource = "ledger" | "ccusage";
+
+/** The Usage tab of the settings page, from either source. */
 export function UsageTab({
+  source,
+  onSource,
+  usage,
+  onClear,
+  onQuery,
+  onCcusage,
+}: {
+  source: UsageSource;
+  onSource: (source: UsageSource) => void;
+  usage: UsageView | undefined;
+  onClear: () => void;
+  onQuery: (text: string, limit: number) => void;
+  onCcusage: (source: string, refresh: boolean) => void;
+}) {
+  const { t } = useL10n();
+  return (
+    <div className="usage">
+      <div className="segmented usage-source" role="radiogroup" aria-label={t("usage.source")}>
+        {(["ledger", "ccusage"] as const).map((s) => (
+          <button key={s} type="button" role="radio" aria-checked={source === s} onClick={() => onSource(s)}>
+            {t(s === "ledger" ? "usage.sourceLedger" : "usage.sourceCcusage")}
+          </button>
+        ))}
+      </div>
+      {source === "ccusage" ? (
+        <CcusageUsage onLoad={onCcusage} />
+      ) : (
+        usage && <LedgerUsage usage={usage} onClear={onClear} onQuery={onQuery} />
+      )}
+    </div>
+  );
+}
+
+/** Totals for today, 7 and 30 days and all time, then by period, agent and session. */
+function LedgerUsage({
   usage,
   onClear,
   onQuery,
 }: {
-  usage: UsageView | undefined;
+  usage: UsageView;
   onClear: () => void;
   onQuery: (text: string, limit: number) => void;
 }) {
   const { t } = useL10n();
-  if (!usage) return null;
   const empty = !usage.days.length && !usage.agents.length;
   return (
-    <div className="usage">
+    <>
       <div className="usage-tiles">
         <Tile label={t("usage.today")} totals={usage.today} />
         <Tile label={t("usage.week")} totals={usage.week} />
@@ -455,6 +493,6 @@ export function UsageTab({
           {t("usage.clear")}
         </button>
       </div>
-    </div>
+    </>
   );
 }

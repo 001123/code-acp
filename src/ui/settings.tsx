@@ -7,7 +7,7 @@ import type { UsageView } from "../settingsPanel";
 import { Icon } from "./icon";
 import { useL10n, type MessageKey } from "./l10n";
 import { mount } from "./mount";
-import { UsageTab } from "./usage";
+import { UsageTab, type UsageSource } from "./usage";
 import { getState, poster, setState as saveState, useMessages } from "./vscode";
 import settingsIcon from "@tabler/icons/outline/settings.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
@@ -600,7 +600,7 @@ const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: 
     label: "settings.agent",
     desc: "settings.agentDesc",
     icon: robotIcon,
-    keys: ["checkAgentUpdates", "nodePath", "env"],
+    keys: ["checkAgentUpdates", "nodePath", "ccusagePath", "env"],
   },
   {
     id: "commit",
@@ -620,9 +620,20 @@ const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: 
   { id: "usage", label: "settings.usage", desc: "settings.usageDesc", icon: chartIcon, keys: [] },
 ];
 
+type Saved = { tab?: unknown; usageSource?: unknown };
+
 function savedTab(): Tab {
-  const state = getState() as { tab?: unknown } | undefined;
+  const state = getState() as Saved | undefined;
   return TABS.find((tab) => tab.id === state?.tab)?.id ?? "general";
+}
+
+function savedUsageSource(): UsageSource {
+  return (getState() as Saved | undefined)?.usageSource === "ccusage" ? "ccusage" : "ledger";
+}
+
+/** Keeps `patch` in the webview's saved state, beside what is there. */
+function save(patch: Saved): void {
+  saveState({ ...(getState() as Saved | undefined), ...patch });
 }
 
 function Tabs(props: { active: Tab; onSelect: (tab: Tab) => void; badge: (tab: Tab) => ReactNode }) {
@@ -711,9 +722,10 @@ function App() {
   const [loaded, setLoaded] = useState<LoadedOptions>({});
   const [tab, setTab] = useState(savedTab);
   const [usage, setUsage] = useState<UsageView>();
+  const [usageSource, setUsageSource] = useState(savedUsageSource);
   const select = (next: Tab) => {
     setTab(next);
-    saveState({ tab: next });
+    save({ tab: next });
   };
 
   useMessages((msg) => {
@@ -856,6 +868,19 @@ function App() {
                 />
               </Field>
               <Field
+                id="ccusagePath"
+                label="settings.ccusagePath"
+                desc="settings.ccusagePathDesc"
+                overridden={overridden("ccusagePath")}
+              >
+                <Text
+                  id="ccusagePath"
+                  placeholder="ccusage"
+                  value={str("ccusagePath")}
+                  onCommit={(s) => set("ccusagePath", s.trim())}
+                />
+              </Field>
+              <Field
                 id="env"
                 label="settings.env"
                 desc="settings.envDesc"
@@ -918,9 +943,15 @@ function App() {
           {tab === "custom" && <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} />}
 
           {tab === "usage" && <UsageTab
+              source={usageSource}
+              onSource={(next) => {
+                setUsageSource(next);
+                save({ usageSource: next });
+              }}
               usage={usage}
               onClear={() => post({ type: "clearUsage" })}
               onQuery={(text, limit) => post({ type: "usageQuery", text, limit })}
+              onCcusage={(source, refresh) => post({ type: "ccusage", source, refresh })}
             />}
         </main>
       </div>

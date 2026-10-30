@@ -410,6 +410,11 @@
           "default": "node",
           "description": "%config.nodePath%"
         },
+        "codeAcp.ccusagePath": {
+          "type": "string",
+          "default": "",
+          "description": "%config.ccusagePath%"
+        },
         "codeAcp.checkAgentUpdates": {
           "type": "boolean",
           "default": true,
@@ -545,6 +550,7 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "test": "vitest run",
+    "check": "npm run typecheck && npm test",
     "package": "node esbuild.mjs --production && vsce package --out release/",
     "reinstall": "npm run package && code --install-extension release/code-acp-$npm_package_version.vsix --force",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"

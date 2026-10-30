@@ -2,6 +2,7 @@ import { Effect, Predicate } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { AgentManager } from "./agentManager";
+import { Ccusage, isCcusageSource } from "./ccusage";
 import { CommitMessage } from "./commitMessage";
 import { onDidChangeLocale, t, webviewL10n } from "./i18n";
 import { ManagerPanel } from "./managerPanel";
@@ -20,6 +21,8 @@ export type FromWebview =
   | { type: "clearUsage" }
   /** The sessions the Usage tab lists: those matching `text`, the `limit` most recent. */
   | { type: "usageQuery"; text: string; limit: number }
+  /** The ccusage report of a source, run again when `refresh`; answered with a "ccusage" message. */
+  | { type: "ccusage"; source: string; refresh: boolean }
   /** Asks an agent (empty: the default one) for its models, and the efforts of `model` (empty: its default one). */
   | { type: "loadModels"; agentId: string; model: string };
 
@@ -126,6 +129,16 @@ export class SettingsPanel {
         this.usageQuery = { text: msg.text, limit: Math.max(USAGE_PAGE, msg.limit) };
         yield* this.renderUsage;
         break;
+      case "ccusage": {
+        const source = msg.source;
+        if (!isCcusageSource(source)) break;
+        const result = yield* Ccusage.use((ccusage) => ccusage.report(source, msg.refresh)).pipe(
+          Effect.map((view) => ({ view })),
+          Effect.catchTag("CcusageError", (err) => Effect.logError(err.message).pipe(Effect.as({ error: err.message }))),
+        );
+        void this.panel.webview.postMessage({ type: "ccusage", source: msg.source, ...result });
+        break;
+      }
       case "clearUsage": {
         const ok = yield* thenable(() =>
           vscode.window.showWarningMessage(t("usage.clearConfirm"), { modal: true }, t("usage.clear")),

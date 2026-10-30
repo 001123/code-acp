@@ -6,6 +6,7 @@ import { FetchHttpClient } from "effect/http";
 import * as vscode from "vscode";
 import { AgentManager } from "./agentManager";
 import { AgentUpdates } from "./agentUpdates";
+import { Ccusage } from "./ccusage";
 import { ShadowGit } from "./checkpoints";
 import { ClaudeSettings } from "./claudeSettings";
 import { CommitMessage } from "./commitMessage";
@@ -61,7 +62,7 @@ const appLayer = (context: vscode.ExtensionContext, channel: vscode.OutputChanne
     FetchHttpClient.layer,
     Logger.layer([outputLogger(channel)]),
   );
-  const services = Layer.mergeAll(AgentManager.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer, Problems.layer, TerminalContext.layer, ShadowGit.layer, UsageLedger.layer).pipe(Layer.provideMerge(base));
+  const services = Layer.mergeAll(AgentManager.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer, Problems.layer, TerminalContext.layer, ShadowGit.layer, UsageLedger.layer, Ccusage.layer).pipe(Layer.provideMerge(base));
   return Layer.mergeAll(CommitMessage.layer, AgentUpdates.layer).pipe(Layer.provideMerge(services));
 };
 
