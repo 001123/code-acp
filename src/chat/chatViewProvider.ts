@@ -1005,6 +1005,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.tabs.active = tab;
     this.postTabs();
     yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+    this.post({ type: "focusComposer" });
     yield* this.ensureSession(tab);
   });
 

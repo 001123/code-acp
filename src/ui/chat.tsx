@@ -210,6 +210,8 @@ function App() {
         return;
       case "quote":
         return composer.quote(msg.text);
+      case "focusComposer":
+        return composer.focus();
       case "sessionTotals":
         return update(tab, (s) => ({ ...s, totals: msg.totals ?? undefined }));
       case "renameTab":
