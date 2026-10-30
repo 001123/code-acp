@@ -1,6 +1,7 @@
 // Messages and shapes shared by the chat view's host (src/chat/*) and its webview (src/ui/chat/*).
 import type { TerminalSnapshot } from "../agentTerminals";
 import type { ChangedFile } from "../fileChanges";
+import type { ProblemScope } from "../problems";
 
 export type { ChangedFile, TerminalSnapshot };
 
@@ -43,6 +44,8 @@ export type FromWebview =
   /** Moves `tab` to another workspace folder; it starts over in a fresh session there. */
   | { type: "setCwd"; tab: number; cwd: string }
   | { type: "manageAgents" }
+  /** Opens the usage summary (clicking the context meter). */
+  | { type: "showUsage" }
   /** Installs the registry version the agent picker offers for agent `id`. */
   | { type: "updateAgent"; id: string }
   | { type: "permission"; id: number; optionId: string | null }
@@ -57,6 +60,8 @@ export type FromWebview =
   | { type: "listSkills" }
   /** A terminal command offered with the files; answered with "addAttachments". */
   | { type: "attachTerminal"; id: number }
+  /** Problems offered with the files; answered with "addAttachments". */
+  | { type: "attachProblems"; scope: ProblemScope }
   /** Stops the command running in one of the agent's terminals. */
   | { type: "killTerminal"; tab: number; terminalId: string }
   /**
@@ -134,7 +139,9 @@ export type Attachment =
   /** Lines selected in an editor; `startLine`/`endLine` are 1-based and inclusive. */
   | { kind: "snippet"; uri: string; name: string; languageId: string; startLine: number; endLine: number; text: string }
   /** Terminal text: a command's output, or a selection (no `commandLine`). */
-  | { kind: "terminal"; name: string; terminal: string; shell?: string; commandLine?: string; cwd?: string; exitCode?: number; text: string };
+  | { kind: "terminal"; name: string; terminal: string; shell?: string; commandLine?: string; cwd?: string; exitCode?: number; text: string }
+  /** Problems VS Code reports (errors, warnings), one per line. */
+  | { kind: "problems"; name: string; text: string };
 
 /** A text run of the composer, or an attachment; inline ones carry the `token` that stands for them in the text. */
 export type PromptPart = string | (Attachment & { token?: string });

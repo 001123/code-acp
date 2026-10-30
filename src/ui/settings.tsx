@@ -3,9 +3,11 @@ import type { AgentChoice } from "../agentManager";
 import type { AgentOptions } from "../sessionOptions";
 import type { FromWebview as SettingsMessage } from "../settingsPanel";
 import type { McpServerEntry, SettingKey } from "../settings";
+import type { UsageView } from "../settingsPanel";
 import { Icon } from "./icon";
 import { useL10n, type MessageKey } from "./l10n";
 import { mount } from "./mount";
+import { UsageTab } from "./usage";
 import { getState, poster, setState as saveState, useMessages } from "./vscode";
 import settingsIcon from "@tabler/icons/outline/settings.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
@@ -19,6 +21,7 @@ import pencilIcon from "@tabler/icons/outline/pencil.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import serverIcon from "@tabler/icons/outline/server.svg";
 import worldIcon from "@tabler/icons/outline/world.svg";
+import chartIcon from "@tabler/icons/outline/chart-bar.svg";
 
 interface State {
   values: Partial<Record<SettingKey, unknown>>;
@@ -588,10 +591,10 @@ function AgentModelFields(props: {
   );
 }
 
-type Tab = "general" | "agent" | "commit" | "mcp" | "custom";
+type Tab = "general" | "agent" | "commit" | "mcp" | "custom" | "usage";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "notifications"] },
   {
     id: "agent",
     label: "settings.agent",
@@ -614,6 +617,7 @@ const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: 
     icon: terminalIcon,
     keys: ["customAgents"],
   },
+  { id: "usage", label: "settings.usage", desc: "settings.usageDesc", icon: chartIcon, keys: [] },
 ];
 
 function savedTab(): Tab {
@@ -706,6 +710,7 @@ function App() {
   const [envError, setEnvError] = useState<string>();
   const [loaded, setLoaded] = useState<LoadedOptions>({});
   const [tab, setTab] = useState(savedTab);
+  const [usage, setUsage] = useState<UsageView>();
   const select = (next: Tab) => {
     setTab(next);
     saveState({ tab: next });
@@ -713,6 +718,8 @@ function App() {
 
   useMessages((msg) => {
     if (msg.type === "state") setState(msg);
+    if (msg.type === "usage") setUsage(msg.usage);
+    if (msg.type === "selectTab" && TABS.some((x) => x.id === msg.tab)) select(msg.tab);
     // Answers for an agent no longer selected are dropped.
     if (msg.type === "models") setLoaded((l) => ({ ...l, [optionsKey(msg.agentId, msg.model)]: msg }));
   });
@@ -787,6 +794,15 @@ function App() {
                 inline
               >
                 <Toggle id="autoScroll" checked={v.autoScroll !== false} onChange={(checked) => set("autoScroll", checked)} />
+              </Field>
+              <Field
+                id="notifications"
+                label="settings.notifications"
+                desc="settings.notificationsDesc"
+                overridden={overridden("notifications")}
+                inline
+              >
+                <Toggle id="notifications" checked={v.notifications !== false} onChange={(checked) => set("notifications", checked)} />
               </Field>
             </section>
           )}
@@ -900,6 +916,12 @@ function App() {
           {tab === "mcp" && <EntryList value={v.mcpServers} overridden={overridden("mcpServers")} />}
 
           {tab === "custom" && <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} />}
+
+          {tab === "usage" && <UsageTab
+              usage={usage}
+              onClear={() => post({ type: "clearUsage" })}
+              onQuery={(text, limit) => post({ type: "usageQuery", text, limit })}
+            />}
         </main>
       </div>
     </>

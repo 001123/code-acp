@@ -166,6 +166,9 @@ export const attachmentBlock = Effect.fn("attachmentBlock")(function* (
     const body = commandLine === undefined ? text : `$ ${commandLine}\n${text}`;
     return { type: "text", text: `${title}:\n${fenced(body, "console")}` };
   }
+  if (attachment.kind === "problems") {
+    return { type: "text", text: `Problems reported by VS Code:\n${fenced(attachment.text, "text")}` };
+  }
   const uri = vscode.Uri.parse(attachment.uri);
   const name = uri.scheme === "file" ? vscode.workspace.asRelativePath(uri) : attachment.name;
   if (attachment.kind === "snippet") {

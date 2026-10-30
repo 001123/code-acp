@@ -168,6 +168,22 @@
       {
         "command": "codeAcp.forkTab",
         "title": "%command.forkTab%"
+      },
+      {
+        "command": "codeAcp.addProblems",
+        "title": "%command.addProblems%"
+      },
+      {
+        "command": "codeAcp.showUsage",
+        "title": "%command.showUsage%"
+      },
+      {
+        "command": "codeAcp.addWorkspaceProblems",
+        "title": "%command.addWorkspaceProblems%"
+      },
+      {
+        "command": "codeAcp.fixProblems",
+        "title": "%command.fixProblems%"
       }
     ],
     "menus": {
@@ -211,6 +227,11 @@
           "command": "codeAcp.attach",
           "when": "resourceScheme == file",
           "group": "codeAcp@1"
+        },
+        {
+          "command": "codeAcp.addProblems",
+          "when": "resourceScheme == file",
+          "group": "codeAcp@2"
         }
       ],
       "terminal/context": [
@@ -280,6 +301,10 @@
         },
         {
           "command": "codeAcp.forkTab",
+          "when": "false"
+        },
+        {
+          "command": "codeAcp.fixProblems",
           "when": "false"
         }
       ],
@@ -400,6 +425,11 @@
           "default": true,
           "description": "%config.autoScroll%"
         },
+        "codeAcp.notifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.notifications%"
+        },
         "codeAcp.commitMessage.agent": {
           "type": "string",
           "default": "",
@@ -471,7 +501,44 @@
           }
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "codeAcp.chat.focus",
+        "key": "ctrl+alt+a",
+        "mac": "cmd+alt+a"
+      },
+      {
+        "command": "codeAcp.newSession",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "focusedView == 'codeAcp.chat'"
+      },
+      {
+        "command": "codeAcp.cancel",
+        "key": "ctrl+.",
+        "mac": "cmd+.",
+        "when": "focusedView == 'codeAcp.chat'"
+      },
+      {
+        "command": "codeAcp.addSelection",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l",
+        "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "codeAcp.addTerminalSelection",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l",
+        "when": "terminalFocus && terminalTextSelected"
+      },
+      {
+        "command": "codeAcp.addProblems",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
+        "when": "editorTextFocus"
+      }
+    ]
   },
   "scripts": {
     "build": "node esbuild.mjs",

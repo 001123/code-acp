@@ -2,6 +2,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import type { Attachment, Draft, PromptPart, QueuedInfo, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import type { FileSuggestion, SkillSuggestion } from "../../completions";
+import type { ProblemSuggestion } from "../../problems";
 import type { TerminalSuggestion } from "../../terminalContext";
 import { Icon } from "../icon";
 import { useL10n, type Translate } from "../l10n";
@@ -193,6 +194,7 @@ export function useComposer(options: ComposerOptions) {
   const [selected, setSelected] = useState(0);
   const [files, setFiles] = useState<FileSuggestion[]>([]);
   const [terminals, setTerminals] = useState<TerminalSuggestion[]>([]);
+  const [problems, setProblems] = useState<ProblemSuggestion[]>([]);
   const [skills, setSkills] = useState<SkillSuggestion[]>([]);
   /** Id of the latest file search; older answers are dropped. */
   const searchId = useRef(0);
@@ -216,6 +218,7 @@ export function useComposer(options: ComposerOptions) {
       if (trigger?.sigil !== "@" || trigger.start !== next.start) {
         setFiles([]);
         setTerminals([]);
+        setProblems([]);
       }
       post({ type: "searchFiles", id: ++searchId.current, query: next.query });
     }
@@ -244,6 +247,16 @@ export function useComposer(options: ComposerOptions) {
             pick: () => addAttachment({ kind: "uri", uri: s.uri, name: s.name }, trigger),
           }))
         : [
+            ...problems.map((p) => ({
+              key: `problems:${p.scope}`,
+              label: p.label,
+              detail: p.detail,
+              // Read when picked, so the list is current; it comes back as "addAttachments".
+              pick: () => {
+                replaceTrigger(trigger, "");
+                post({ type: "attachProblems", scope: p.scope });
+              },
+            })),
             ...terminals.map((c) => ({
               key: `terminal:${c.id}`,
               label: c.label,
@@ -424,10 +437,16 @@ export function useComposer(options: ComposerOptions) {
   }
 
   /** The "files" answer to the latest search; older ones are dropped. */
-  function setSearchResults(id: number, files: FileSuggestion[], terminals: TerminalSuggestion[] | undefined): void {
+  function setSearchResults(
+    id: number,
+    files: FileSuggestion[],
+    terminals: TerminalSuggestion[] | undefined,
+    problems: ProblemSuggestion[] | undefined,
+  ): void {
     if (id !== searchId.current) return;
     setFiles(files);
     setTerminals(terminals ?? []);
+    setProblems(problems ?? []);
   }
 
   const focus = () => editor.view.focus();

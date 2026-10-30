@@ -9,11 +9,14 @@ import { ClaudeSettings } from "../claudeSettings";
 import { Completions } from "../completions";
 import { ChangeSet } from "../fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
+import { Problems, type ProblemScope } from "../problems";
 import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output } from "../runtime";
 import { readSettings } from "../settings";
 import { TerminalContext } from "../terminalContext";
+import { UsageLedger, type SessionRef } from "../usageLedger";
 import { webviewHtml, webviewRoots } from "../webview";
 import { AgentPool, stopAll } from "./agents";
+import { Attention, type AttentionReason } from "./attention";
 import { activeFileBlocks, activeFileName, attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
 import { ChangeReview, confirm } from "./changes";
 import { DraftStore } from "./drafts";
@@ -66,8 +69,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     shown: (tab, id, req) => {
       this.view?.show(true);
       this.postTab(tab, { type: "permissionRequest", id, toolCall: req.toolCall, options: req.options });
+      this.attention.raise(tab, "permission");
     },
-    done: (tab, id) => this.postTab(tab, { type: "permissionDone", id }),
+    done: (tab, id) => {
+      this.postTab(tab, { type: "permissionDone", id });
+      this.attention.settle(tab, "permission");
+    },
+  });
+  /** Tabs that finished or wait for a permission while the user looked elsewhere: the view's badge and notifications. */
+  private readonly attention = new Attention<Tab>({
+    sees: (tab) => vscode.window.state.focused && this.view?.visible === true && this.tabs.active === tab,
+    badge: () => this.showBadge(),
+    notify: (tab, reason) => this.notify(tab, reason),
   });
   private readonly changes = new ChangeReview({
     postTab: (tab, message) => this.postTab(tab, message),
@@ -137,6 +150,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
+      vscode.window.onDidChangeWindowState(() => this.attention.refresh()),
       vscode.window.onDidChangeActiveTextEditor(() => this.postActiveFile()),
       // Edits the user saves change the counts.
       vscode.workspace.onDidSaveTextDocument((doc) => {
@@ -165,8 +179,43 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     view.webview.options = { enableScripts: true, localResourceRoots: webviewRoots(root) };
     view.webview.html = webviewHtml(view.webview, root, "chat", `${view.webview.cspSource} data: https://cdn.agentclientprotocol.com`);
     view.webview.onDidReceiveMessage((msg: FromWebview) => this.run(this.onMessage(msg), this.tabOf(msg)));
+    view.onDidChangeVisibility(() => this.attention.refresh());
     view.onDidDispose(() => (this.view = undefined));
+    this.showBadge();
   }
+
+  private showBadge(): void {
+    if (this.view) {
+      const count = this.attention.count;
+      this.view.badge = count ? { value: count, tooltip: t("attention.badge", count) } : undefined;
+    }
+  }
+
+  /** Announces a tab that wants the user (codeAcp.notifications); "Show" brings it up. */
+  private notify(tab: Tab, reason: AttentionReason): void {
+    if (!readSettings().notifications) {
+      return;
+    }
+    const title = tab.name ?? tab.title ?? t("chat.untitled");
+    const show = t("attention.show");
+    const message = t(reason === "permission" ? "attention.permission" : "attention.finished", title);
+    void vscode.window.showInformationMessage(message, show).then((picked) => {
+      if (picked === show) {
+        this.run(this.reveal(tab), tab);
+      }
+    });
+  }
+
+  /** Shows the chat with `tab` active. */
+  private readonly reveal = Effect.fn("ChatView.reveal")(function* (this: ChatViewProvider, tab: Tab) {
+    if (!this.tabs.has(tab)) {
+      return;
+    }
+    yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+    if (this.tabs.active !== tab) {
+      yield* this.selectTab(tab);
+    }
+  });
 
   private post(message: unknown): void {
     void this.view?.webview.postMessage(message);
@@ -182,6 +231,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   private postTabs(): void {
     this.post({ type: "tabs", tabs: this.tabs.info, active: this.tabs.active.id });
+    this.attention.refresh();
     this.saveTabs();
   }
 
@@ -252,7 +302,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const { compactAt, ...reported } = usage;
     this.postTab(tab, { type: "update", update: { sessionUpdate: "usage_update", ...reported } });
     this.postTab(tab, { type: "compactWindow", size: compactAt ?? null });
+    this.run(this.postSessionTotals(tab), tab);
   }
+
+  /** The ledger entry of a tab's session; undefined until it has one and knows its agent. */
+  private sessionRef(tab: Tab, sessionId: string | undefined = tab.sessionId): SessionRef | undefined {
+    const agentId = tab.running?.agentId ?? tab.reopen?.agentId ?? tab.agentId;
+    return agentId && sessionId ? { agentId, sessionId, cwd: tab.cwd, title: tab.name ?? tab.title } : undefined;
+  }
+
+  /** The tokens and cost recorded for the tab's session, shown with its context usage. */
+  private readonly postSessionTotals = Effect.fn("ChatView.postSessionTotals")(function* (this: ChatViewProvider, tab: Tab) {
+    const ref = this.sessionRef(tab, tab.sessionId ?? tab.reopen?.sessionId);
+    const totals = ref ? yield* (yield* UsageLedger).session(ref.agentId, ref.sessionId) : undefined;
+    this.postTab(tab, { type: "sessionTotals", totals: totals ?? null });
+  });
 
   private tabOf(msg: FromWebview): Tab | undefined {
     return "tab" in msg ? this.tabs.byId(msg.tab) : undefined;
@@ -391,6 +455,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "manageAgents":
         yield* thenable(() => vscode.commands.executeCommand("codeAcp.manageAgents"));
         break;
+      case "showUsage":
+        yield* thenable(() => vscode.commands.executeCommand("codeAcp.showUsage"));
+        break;
       case "updateAgent": {
         const update = (yield* this.updates.pending).find((u) => u.installed.id === msg.id);
         if (update) {
@@ -426,7 +493,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           Effect.orElseSucceed(() => []),
         );
         const terminals = yield* (yield* TerminalContext).suggestions(msg.query);
-        this.post({ type: "files", id: msg.id, files, terminals });
+        const problems = yield* (yield* Problems).suggestions(msg.query);
+        this.post({ type: "files", id: msg.id, files, terminals, problems });
+        break;
+      }
+      case "attachProblems": {
+        const attachment = yield* (yield* Problems).attachment(msg.scope);
+        if (Option.isSome(attachment)) {
+          this.attachments.add([attachment.value]);
+        }
         break;
       }
       case "attachTerminal": {
@@ -639,6 +714,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     if (update.sessionUpdate === "usage_update") {
       const { used, size, cost } = update;
+      const ref = this.sessionRef(tab, n.sessionId);
+      if (cost && ref) {
+        // Read before it is replaced: a reopened session's last cost is not new spending.
+        const previous = usageOf(tab, n.sessionId)?.cost ?? undefined;
+        this.run(
+          UsageLedger.use((ledger) => ledger.recordCost(ref, cost, previous)).pipe(Effect.andThen(this.postSessionTotals(tab))),
+          tab,
+        );
+      }
       const compactAt = tab.usageSessionId === n.sessionId ? tab.usage?.compactAt : undefined;
       tab.usage = { used, size, cost, compactAt };
       tab.usageSessionId = n.sessionId;
@@ -941,6 +1025,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     this.permissions.cancel(tab);
     this.follower.forget(tab);
+    this.attention.clear(tab);
     const index = this.tabs.remove(tab);
     if (index < 0) {
       // Closed by another caller while its turn was being cancelled.
@@ -1044,8 +1129,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       Effect.ensuring(Effect.sync(() => (tab.sending = false))),
       Effect.onExit((exit) =>
         Effect.sync(() => {
+          const stopReason = Exit.isSuccess(exit) ? exit.value : undefined;
+          // A turn the user stopped needs no word; one the queue follows is not the end yet.
+          if (stopReason && stopReason !== "cancelled" && !(stopReason === "end_turn" && tab.queue.length) && this.tabs.has(tab)) {
+            this.attention.raise(tab, "finished");
+          }
           // The queue waits while the user looks at a turn they stopped, or that failed.
-          if (tab.steer || (Exit.isSuccess(exit) && exit.value === "end_turn")) {
+          if (tab.steer || stopReason === "end_turn") {
             this.sendQueued(tab);
           }
         }),
@@ -1307,6 +1397,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     tab.busy = true;
     this.status(tab, "chat.working");
     return yield* agent.prompt(sessionId, prompt).pipe(
+      Effect.tap((res) => {
+        const ref = this.sessionRef(tab, sessionId);
+        // `usage` is unstable in ACP, so the stable PromptResponse leaves it out.
+        const usage = Predicate.hasProperty(res, "usage") ? res.usage : undefined;
+        return ref
+          ? UsageLedger.use((ledger) => ledger.recordTurn(ref, usage)).pipe(Effect.andThen(this.postSessionTotals(tab)))
+          : Effect.void;
+      }),
       Effect.map((res) => {
         this.postTab(tab, { type: "turnEnd", stopReason: res.stopReason });
         return res.stopReason;
@@ -1384,6 +1482,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       return;
     }
     yield* this.queueAndFocus([command.value]);
+  });
+
+  /** Adds the problems of the active editor's file, or of the workspace, to the composer. */
+  readonly attachProblems = Effect.fn("ChatView.attachProblems")(function* (this: ChatViewProvider, scope: ProblemScope) {
+    const attachment = yield* (yield* Problems).attachment(scope);
+    if (Option.isNone(attachment)) {
+      void vscode.window.showInformationMessage(t(scope === "file" ? "problems.noneInFile" : "problems.none"));
+      return;
+    }
+    yield* this.queueAndFocus([attachment.value]);
+  });
+
+  /** Adds problems and the code around them to the composer ("Fix with Code ACP" quick fix). */
+  readonly fixProblems = Effect.fn("ChatView.fixProblems")(function* (
+    this: ChatViewProvider,
+    uri: vscode.Uri,
+    diagnostics: ReadonlyArray<vscode.Diagnostic>,
+  ) {
+    const attachments = yield* (yield* Problems).forDiagnostics(uri, diagnostics);
+    if (attachments.length) {
+      yield* this.queueAndFocus(attachments);
+    }
   });
 
   /** Runs a tab context menu action (webview context menu); pinned tabs are never closed. */

@@ -41,5 +41,10 @@
   "config.commitMessage.effort": "Effort (level of thinking) for generating commit messages, as the agent lists it. Empty: the agent's default. \"lowest\": the least the agent offers.",
   "config.commitMessage.fastMode": "Turn the agent's fast mode on or off for generating commit messages. \"default\": leave it as the agent has it.",
   "config.commitMessage.instructions": "Extra instructions for generating commit messages, e.g. a convention such as Conventional Commits.",
-  "capabilities.virtualWorkspaces": "Agents run as processes that need the workspace folders on disk."
+  "capabilities.virtualWorkspaces": "Agents run as processes that need the workspace folders on disk.",
+  "command.addProblems": "Code ACP: Add File Problems to Chat",
+  "command.addWorkspaceProblems": "Code ACP: Add Workspace Problems to Chat",
+  "command.fixProblems": "Fix with Code ACP",
+  "config.notifications": "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
+  "command.showUsage": "Code ACP: Show Usage"
 }

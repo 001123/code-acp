@@ -464,3 +464,144 @@ button.with-icon {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
 }
+
+/* Usage tab */
+.usage-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.usage-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.usage-tile .desc {
+  margin-top: 0;
+}
+.usage-tile-value {
+  font-size: 1.6em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.usage-section h3 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 24px 0 8px;
+}
+.usage-table {
+  padding: 0;
+  overflow-x: auto;
+}
+.usage table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.usage th,
+.usage td {
+  padding: 8px 12px;
+  text-align: left;
+}
+.usage tbody td {
+  border-top: 1px solid var(--border);
+}
+.usage th {
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+.usage tbody tr:hover {
+  background: var(--surface-hover);
+}
+.usage .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.usage .nowrap {
+  white-space: nowrap;
+}
+.usage-session {
+  max-width: 280px;
+}
+.usage-session > span {
+  display: block;
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-session-title {
+  font-weight: 500;
+}
+.usage-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 0;
+  color: var(--vscode-descriptionForeground);
+}
+.usage-empty svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.6;
+}
+.usage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+}
+.usage-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 24px 0 8px;
+}
+.usage-section-head h3 {
+  margin: 0;
+}
+.usage-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 300px;
+}
+.usage-search .svg-icon svg {
+  position: absolute;
+  left: 8px;
+  color: var(--vscode-descriptionForeground);
+  pointer-events: none;
+}
+.usage-search input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px 6px 30px;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--border));
+  border-radius: 4px;
+}
+.usage-search input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.usage-more {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+.usage-none {
+  padding: 12px 0;
+}

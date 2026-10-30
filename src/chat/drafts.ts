@@ -25,6 +25,7 @@ export const SavedAttachment = Schema.Union([
     exitCode: Schema.optional(Schema.Int),
     text: Schema.String,
   }),
+  Schema.Struct({ kind: Schema.Literal("problems"), name: Schema.String, text: Schema.String }),
   Schema.Struct({ kind: Schema.Literal("stored"), name: Schema.String, mimeType: Schema.String, file: Schema.String }),
 ]);
 export type SavedAttachment = typeof SavedAttachment.Type;

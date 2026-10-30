@@ -1,6 +1,7 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useEffect, useRef, useState } from "react";
 import type { Attachment, ChangesMessage, QueuedInfo, TabInfo, TerminalSnapshot } from "../../chat/protocol";
+import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import pinIcon from "@tabler/icons/outline/pin.svg";
@@ -25,6 +26,8 @@ export interface TabState {
   usage?: Usage;
   /** Auto-compact window the host read from the agent's settings. */
   compactAt?: number;
+  /** Tokens, cost and turns recorded for the session ("sessionTotals"). */
+  totals?: Totals;
   status: Status;
   attachments: Attachment[];
   /** Slash commands the agent offers in this session. */

@@ -18,6 +18,8 @@ export function attachmentKey(a: Attachment): string | undefined {
       return a.uri;
     case "snippet":
       return `${a.uri}#L${a.startLine}-${a.endLine}`;
+    case "problems":
+      return `problems:${a.text}`;
     case "data":
     case "terminal":
       return undefined;
@@ -32,6 +34,7 @@ export function attachmentTitle(t: Translate, a: Attachment): string {
       return a.uri;
     case "snippet":
     case "terminal":
+    case "problems":
       return a.text.length > MAX_TITLE_CHARS ? `${a.text.slice(0, MAX_TITLE_CHARS)}…` : a.text;
     case "data":
       return `${a.name} (${a.mimeType || t("chat.unknownType")})`;

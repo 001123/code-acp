@@ -41,6 +41,8 @@ export const Settings = Schema.Struct({
   followAgent: Schema.Boolean,
   /** Keep the chat scrolled to the end as new content arrives. */
   autoScroll: Schema.Boolean,
+  /** Show a notification when a tab the user isn't looking at finishes or asks for permission. */
+  notifications: Schema.Boolean,
   /** Installed agent id for commit messages; empty means the default agent. */
   "commitMessage.agent": Schema.String,
   /** Model value (or name) to pick in the commit session; empty keeps the agent's default. */
@@ -64,6 +66,7 @@ export const SETTING_KEYS = [
   "checkAgentUpdates",
   "followAgent",
   "autoScroll",
+  "notifications",
   "commitMessage.agent",
   "commitMessage.model",
   "commitMessage.instructions",
@@ -84,6 +87,7 @@ const DEFAULTS: Settings = {
   checkAgentUpdates: true,
   followAgent: false,
   autoScroll: true,
+  notifications: true,
   "commitMessage.agent": "",
   "commitMessage.model": "",
   "commitMessage.instructions": DEFAULT_COMMIT_INSTRUCTIONS,
@@ -113,6 +117,7 @@ export function readSettings(): Settings {
     checkAgentUpdates: read("checkAgentUpdates"),
     followAgent: read("followAgent"),
     autoScroll: read("autoScroll"),
+    notifications: read("notifications"),
     "commitMessage.agent": read("commitMessage.agent"),
     "commitMessage.model": read("commitMessage.model"),
     "commitMessage.instructions": read("commitMessage.instructions"),

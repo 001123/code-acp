@@ -41,5 +41,10 @@
   "config.commitMessage.effort": "Effort (mức suy nghĩ) khi tạo commit message, theo tên agent liệt kê. Để trống: mặc định của agent. \"lowest\": mức thấp nhất agent có.",
   "config.commitMessage.fastMode": "Bật hoặc tắt fast mode của agent khi tạo commit message. \"default\": giữ như agent đang đặt.",
   "config.commitMessage.instructions": "Hướng dẫn thêm khi tạo commit message, ví dụ quy ước như Conventional Commits.",
-  "capabilities.virtualWorkspaces": "Agent chạy như tiến trình và cần thư mục workspace nằm trên ổ đĩa."
+  "capabilities.virtualWorkspaces": "Agent chạy như tiến trình và cần thư mục workspace nằm trên ổ đĩa.",
+  "command.addProblems": "Code ACP: Thêm lỗi của file vào chat",
+  "command.addWorkspaceProblems": "Code ACP: Thêm lỗi của workspace vào chat",
+  "command.fixProblems": "Sửa bằng Code ACP",
+  "config.notifications": "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
+  "command.showUsage": "Code ACP: Xem mức sử dụng"
 }

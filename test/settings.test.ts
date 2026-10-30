@@ -14,6 +14,7 @@ describe("readSettings", () => {
     assert.isTrue(s.checkAgentUpdates);
     assert.isFalse(s.followAgent);
     assert.isTrue(s.autoScroll);
+    assert.isTrue(s.notifications);
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
   });
 

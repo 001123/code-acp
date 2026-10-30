@@ -68,6 +68,18 @@ export class Range {
     readonly endCharacter: number,
   ) {}
 }
+export enum DiagnosticSeverity {
+  Error = 0,
+  Warning = 1,
+  Information = 2,
+  Hint = 3,
+}
+
+export class CodeActionKind {
+  static readonly QuickFix = new CodeActionKind("quickfix");
+  private constructor(readonly value: string) {}
+}
+
 export class WorkspaceEdit {
   readonly replaced: Array<{ uri: Uri; range: Range; text: string }> = [];
   replace(uri: Uri, range: Range, text: string) {

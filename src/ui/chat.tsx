@@ -43,6 +43,7 @@ function App() {
     config,
     usage,
     compactAt,
+    totals,
     status,
     attachments,
     commands,
@@ -96,7 +97,7 @@ function App() {
     setHover,
     settings: (
       <>
-        <UsageMeter usage={usage} compactAt={compactAt} />
+        <UsageMeter usage={usage} compactAt={compactAt} totals={totals} />
         <ChatSettings followAgent={followAgent} autoScroll={autoScroll} />
       </>
     ),
@@ -209,16 +210,18 @@ function App() {
         return;
       case "quote":
         return composer.quote(msg.text);
+      case "sessionTotals":
+        return update(tab, (s) => ({ ...s, totals: msg.totals ?? undefined }));
       case "renameTab":
         return setRenaming(msg.tab);
       case "files":
-        return composer.setSearchResults(msg.id, msg.files, msg.terminals);
+        return composer.setSearchResults(msg.id, msg.files, msg.terminals, msg.problems);
       case "skills":
         return composer.setSkills(msg.skills);
       case "reset":
         if (tab !== undefined) composer.endEdit(tab);
         dispatch(tab, { type: "reset" });
-        update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined, terminals: {}, queue: [] }));
+        update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined, totals: undefined, terminals: {}, queue: [] }));
         return;
     }
   });

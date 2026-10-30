@@ -7,6 +7,7 @@ import { CommitMessage } from "./commitMessage";
 import { DropViewProvider } from "./dropView";
 import { t } from "./i18n";
 import { ManagerPanel } from "./managerPanel";
+import { FixProblemsActions } from "./problems";
 import { makeRuntime, runIn, thenable, type AppServices } from "./runtime";
 import { SettingsPanel } from "./settingsPanel";
 
@@ -81,6 +82,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.manageAgents", () => ManagerPanel.show(context, runtime, manager)),
     vscode.commands.registerCommand("codeAcp.selectAgent", run(selectAgent)),
     vscode.commands.registerCommand("codeAcp.openSettings", () => SettingsPanel.show(context, runtime, manager)),
+    vscode.commands.registerCommand("codeAcp.showUsage", () => SettingsPanel.show(context, runtime, manager, "usage")),
     vscode.commands.registerCommand("codeAcp.newSession", run(() => provider.newSession())),
     vscode.commands.registerCommand("codeAcp.history", run(() => provider.showHistory())),
     vscode.commands.registerCommand("codeAcp.cancel", run(() => provider.cancel())),
@@ -116,6 +118,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return editor ? provider.attachSelection(editor) : Effect.void;
       }),
     ),
+    vscode.commands.registerCommand("codeAcp.addProblems", run(() => provider.attachProblems("file"))),
+    vscode.commands.registerCommand("codeAcp.addWorkspaceProblems", run(() => provider.attachProblems("workspace"))),
+    // The "Fix with Code ACP" quick fix passes the document's uri and the diagnostics under the cursor.
+    vscode.commands.registerCommand(
+      "codeAcp.fixProblems",
+      run((uri?: unknown, diagnostics?: unknown) =>
+        uri instanceof vscode.Uri && Array.isArray(diagnostics) ? provider.fixProblems(uri, diagnostics) : Effect.void,
+      ),
+    ),
+    vscode.languages.registerCodeActionsProvider({ scheme: "file" }, new FixProblemsActions(), {
+      providedCodeActionKinds: FixProblemsActions.kinds,
+    }),
     vscode.commands.registerCommand("codeAcp.addTerminalSelection", run(() => provider.attachTerminalSelection())),
     vscode.commands.registerCommand("codeAcp.addTerminalOutput", run(() => provider.attachTerminalOutput(false))),
     vscode.commands.registerCommand("codeAcp.addTerminalFailure", run(() => provider.attachTerminalOutput(true))),
