@@ -1,0 +1,103 @@
+#status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+}
+#usage {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  --usage-color: var(--vscode-progressBar-background);
+}
+#usage:hover,
+#usage:focus-visible {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+#usage svg {
+  width: 16px;
+  height: 16px;
+  /* Start the ring at 12 o'clock. */
+  transform: rotate(-90deg);
+}
+#usage circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+#usage .usage-track {
+  stroke: color-mix(in srgb, var(--vscode-foreground) 15%, transparent);
+}
+#usage .usage-fill {
+  stroke: var(--usage-color);
+  stroke-linecap: round;
+}
+#usage[data-level="medium"] {
+  --usage-color: var(--vscode-editorWarning-foreground);
+}
+#usage[data-level="high"] {
+  --usage-color: var(--vscode-editorError-foreground);
+}
+/* Opens upward on hover or focus, aligned to the ring's right edge. */
+#usage-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-menu-border, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#usage:hover #usage-panel,
+#usage:focus-visible #usage-panel {
+  display: flex;
+}
+#usage-panel .usage-head,
+#usage-panel .usage-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+#usage-panel .usage-head {
+  font-weight: 600;
+}
+#usage-panel .usage-hint {
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+#usage-panel .usage-row > :first-child {
+  color: var(--vscode-descriptionForeground);
+}
+#usage-panel .usage-bar {
+  display: block;
+  height: 4px;
+  margin-bottom: 2px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--vscode-foreground) 15%, transparent);
+}
+#usage-panel .usage-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--usage-color);
+}
+#status button {
+  padding: 2px 8px;
+  font-size: 0.95em;
+}

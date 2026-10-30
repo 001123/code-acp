@@ -1,0 +1,122 @@
+#tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+}
+#tab-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  max-width: 120px;
+  height: 26px;
+  padding: 0 4px 0 8px;
+  border-radius: 6px 6px 0 0;
+  border-bottom: 2px solid transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  user-select: none;
+}
+.tab:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+.tab[data-active] {
+  color: var(--vscode-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+.tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-name {
+  min-width: 0;
+  width: 100%;
+  padding: 0 2px;
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 3px;
+  outline: none;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
+.tab-dot {
+  display: none;
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.tab[data-busy] .tab-dot {
+  display: block;
+  background: var(--vscode-progressBar-background);
+  animation: tab-pulse 1.2s ease-in-out infinite;
+}
+.tab[data-waiting] .tab-dot {
+  display: block;
+  background: var(--vscode-editorWarning-foreground);
+  animation: none;
+}
+@keyframes tab-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.tab-close,
+.tab-pin {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  visibility: hidden;
+}
+/* The pin button only takes room on hover, unless the tab is pinned. */
+.tab-pin {
+  display: none;
+}
+.tab:hover .tab-close,
+.tab[data-active] .tab-close,
+.tab:hover .tab-pin,
+.tab[data-pinned] .tab-pin {
+  display: inline-flex;
+  visibility: visible;
+}
+.tab-close:hover,
+.tab-pin:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+.tab-close svg,
+.tab-pin svg {
+  width: 12px;
+  height: 12px;
+}
+.tab[data-dragging] {
+  opacity: 0.5;
+}
+.tab[data-drop="before"] {
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder);
+}
+.tab[data-drop="after"] {
+  box-shadow: inset -2px 0 0 var(--vscode-focusBorder);
+}
+#new-tab {
+  flex-shrink: 0;
+  background: none;
+  color: var(--vscode-foreground);
+}
+#new-tab:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}

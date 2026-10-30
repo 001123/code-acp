@@ -1,0 +1,91 @@
+#changes {
+  margin: 0 10px 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-widget-border, color-mix(in srgb, var(--vscode-foreground) 15%, transparent));
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+#changes > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+#changes > summary button {
+  padding: 1px 8px;
+  font-size: 0.95em;
+}
+#changes .spacer {
+  flex: 1;
+}
+.changes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  max-height: 160px;
+  overflow: auto;
+}
+.changes-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.changes-file > a {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family);
+}
+.changes-base {
+  flex: none;
+}
+.changes-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+.changes-file.deleted .changes-base {
+  text-decoration: line-through;
+}
+.changes-tag {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+}
+.changes-tag.created {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+  background: color-mix(in srgb, currentColor 15%, transparent);
+}
+.changes-tag.deleted {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-testing-iconFailed));
+  background: color-mix(in srgb, currentColor 15%, transparent);
+}
+/* Per-file actions stay quiet until the row is hovered or focused. */
+.changes-actions {
+  display: flex;
+  flex: none;
+  opacity: 0.5;
+  transition: opacity 0.1s;
+}
+.changes-file:hover .changes-actions,
+.changes-file:focus-within .changes-actions {
+  opacity: 1;
+}
+.changes-stats {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.changes-stats .added {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+.changes-stats .removed {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-testing-iconFailed));
+}

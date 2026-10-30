@@ -1,0 +1,115 @@
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+}
+
+#root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.spacer {
+  flex: 1;
+}
+/* Wrapper of inline SVG icons (src/ui/icon.tsx); the <svg> lays out as if it were the child. */
+.svg-icon {
+  display: contents;
+}
+/* Keep `hidden` working on elements that set their own display. */
+[hidden] {
+  display: none !important;
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+}
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-btn.small {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+}
+.icon-btn.small:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+.icon-btn.small svg {
+  width: 14px;
+  height: 14px;
+}
+.icon-btn.small[aria-pressed="true"] {
+  color: var(--vscode-textLink-foreground);
+}
+
+button {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+button.secondary {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+button.secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+button[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.link {
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+button.output-more {
+  display: block;
+  margin: 2px 0 2px -6px;
+  font-family: var(--vscode-font-family);
+  font-weight: normal;
+}
+button.link:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+pre {
+  margin: 4px 0;
+  padding: 6px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  background: var(--vscode-textCodeBlock-background);
+}

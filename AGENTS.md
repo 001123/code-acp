@@ -4,9 +4,9 @@ VS Code extension "Code ACP": chat with coding agents over ACP, install agents f
 
 ## Rules
 
-- Runtime: Node 24, VS Code ≥ 1.144. Keep `engines.vscode`, `@types/vscode`, `@types/node` and esbuild `target` in sync.
+- Runtime: Node 24, VS Code ≥ 1.144 (Chromium 150). Keep `engines.vscode`, `@types/vscode`, `@types/node` and the esbuild targets (`node24`, `chrome150`) in sync.
 - Node APIs only; `vscode` stays external.
-- Webviews are React (`src/ui/*.tsx`, bundled by esbuild to `dist/webview/`; styles stay in `media/*.css`). They may only `import type` from host modules.
+- Webviews are React (`src/ui/*.tsx`, bundled by esbuild to `dist/webview/`; styles stay in `media/*.css`, one entry per page that `@import`s its partials from `media/<page>/`, bundled to `dist/webview/` too). They may only `import type` from host modules.
 - New `@types/*` package → add to `types` in `tsconfig.json`.
 - Code, names, comments: English.
 - User-facing strings: never hard-code. Add a key to `src/l10n/en.ts` and `src/l10n/vi.ts`; use `t()` from `src/i18n.ts` in the host, `useL10n().t` in webviews (`src/ui/l10n.ts`). `package.json` strings go in `package.nls.json` + `package.nls.vi.json`.

@@ -1,0 +1,298 @@
+#composer {
+  margin: 0 10px 10px;
+  padding: 8px 8px 6px;
+  border-radius: 10px;
+  background: var(--vscode-input-background);
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+/* A light sweeps around the border while the agent works. */
+@property --composer-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+#composer[data-busy] {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--vscode-input-background), var(--vscode-input-background)) padding-box,
+    conic-gradient(
+        from var(--composer-angle),
+        color-mix(in srgb, var(--vscode-progressBar-background) 20%, transparent),
+        var(--vscode-progressBar-background) 25%,
+        color-mix(in srgb, var(--vscode-progressBar-background) 20%, transparent) 50%
+      )
+      border-box;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--vscode-progressBar-background) 25%, transparent), 0 2px 10px rgba(0, 0, 0, 0.18);
+  animation: composer-sweep 2.4s linear infinite;
+}
+@keyframes composer-sweep {
+  to {
+    --composer-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #composer[data-busy] {
+    animation: none;
+  }
+}
+#composer:focus-within {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent), 0 2px 12px rgba(0, 0, 0, 0.22);
+}
+#composer[data-busy]:focus-within {
+  border-color: transparent;
+}
+#input-box {
+  position: relative;
+}
+/* The Tiptap editor; each paragraph is one line of the Markdown typed. */
+#input {
+  min-height: 40px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.45;
+  color: var(--vscode-input-foreground);
+  outline: none;
+  padding: 2px 4px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  scrollbar-gutter: stable;
+}
+#input p {
+  margin: 0;
+  min-height: 1.45em;
+}
+#input p.md-placeholder::before {
+  content: attr(data-placeholder);
+  color: var(--vscode-input-placeholderForeground);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+/* Markdown syntax: dimmed on the caret's line, hidden elsewhere. */
+#input .md-marker {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+}
+#input .md-hidden {
+  display: none;
+}
+/*
+ * Always hidden but still holding the caret, which display: none can't; font-size: 0 would shrink the caret. Laid out
+ * just left of the text, so a caret after it shows at the line's start at full height.
+ */
+#input p {
+  position: relative;
+}
+#input .md-prefix {
+  position: absolute;
+  right: calc(100% - var(--md-indent, 0px));
+  white-space: pre;
+  color: transparent;
+  caret-color: var(--vscode-editorCursor-foreground, var(--vscode-foreground));
+}
+#input .md-prefix::selection {
+  background: transparent;
+}
+#input p.md-h1,
+#input p.md-h2,
+#input p.md-h3,
+#input p.md-h4,
+#input p.md-h5,
+#input p.md-h6 {
+  font-weight: 600;
+  line-height: 1.3;
+}
+#input p.md-h1 {
+  font-size: 1.3em;
+}
+#input p.md-h2 {
+  font-size: 1.15em;
+}
+#input p.md-quote {
+  --md-indent: 10px;
+  border-left: 3px solid var(--vscode-textBlockQuote-border);
+  padding-left: var(--md-indent);
+  color: var(--vscode-descriptionForeground);
+}
+#input p.md-fence-open,
+#input p.md-fence-close,
+#input p.md-codeblock {
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size, 0.92em);
+  background: var(--vscode-textCodeBlock-background, color-mix(in srgb, var(--vscode-foreground) 8%, transparent));
+  padding: 0 8px;
+}
+#input p.md-fence-open {
+  border-radius: 6px 6px 0 0;
+  padding-top: 4px;
+}
+#input p.md-fence-close {
+  border-radius: 0 0 6px 6px;
+  padding-bottom: 4px;
+}
+/* The fences of a block the caret is not in: only the block's padding is left. */
+#input p.md-collapsed {
+  min-height: 0;
+}
+/* A collapsed opening fence shows the block's language instead. */
+#input p.md-collapsed[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  padding-bottom: 2px;
+  font-family: var(--vscode-font-family);
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+/* Syntax colors of fenced code (highlight.ts), Dark+ and Light+. */
+#input {
+  --hl-token-keyword: #569cd6;
+  --hl-token-constant: #4fc1ff;
+  --hl-token-string: #ce9178;
+  --hl-token-string-expression: #ce9178;
+  --hl-token-comment: #6a9955;
+  --hl-token-function: #dcdcaa;
+  --hl-token-parameter: #9cdcfe;
+  --hl-token-punctuation: inherit;
+  --hl-token-link: var(--vscode-textLink-foreground);
+}
+body.vscode-light #input {
+  --hl-token-keyword: #0000ff;
+  --hl-token-constant: #0070c1;
+  --hl-token-string: #a31515;
+  --hl-token-string-expression: #a31515;
+  --hl-token-comment: #008000;
+  --hl-token-function: #795e26;
+  --hl-token-parameter: #001080;
+}
+#input p.md-hr {
+  border-bottom: 1px solid color-mix(in srgb, var(--vscode-foreground) 25%, transparent);
+  margin-bottom: 0.6em;
+}
+#input .md-bullet {
+  color: var(--vscode-textLink-foreground);
+}
+#input .md-strong {
+  font-weight: 600;
+}
+#input .md-em {
+  font-style: italic;
+}
+#input .md-strike {
+  text-decoration: line-through;
+}
+#input .md-code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+  background: var(--vscode-textCodeBlock-background, color-mix(in srgb, var(--vscode-foreground) 10%, transparent));
+  border-radius: 4px;
+  padding: 0.1em 0.2em;
+}
+#input .md-link {
+  color: var(--vscode-textLink-foreground);
+}
+mark.token {
+  color: inherit;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--vscode-textLink-foreground) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-textLink-foreground) 22%, transparent);
+}
+mark.token.image,
+mark.token.file {
+  cursor: pointer;
+}
+mark.token.image:hover,
+mark.token.file:hover {
+  text-decoration: underline;
+}
+/* "@" / "$" / "/" suggestions, above the composer. */
+#suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--vscode-quickInput-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--vscode-widget-border, color-mix(in srgb, var(--vscode-foreground) 15%, transparent));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+.suggest-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.suggest-item[aria-selected="true"] {
+  color: var(--vscode-quickInputList-focusForeground, var(--vscode-list-activeSelectionForeground));
+  background: var(--vscode-quickInputList-focusBackground, var(--vscode-list-activeSelectionBackground));
+}
+.suggest-label {
+  flex-shrink: 0;
+}
+.suggest-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+  font-size: 0.92em;
+}
+
+/* Messages waiting for the turn to end, and the banner of an edit, above the input. */
+#queue {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.queued,
+#editing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px 2px 6px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+}
+.queued > .svg-icon svg,
+#editing > .svg-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.queued > .svg-icon,
+#editing > .svg-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--vscode-descriptionForeground);
+}
+.queued-text,
+.editing-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queued-more {
+  flex: none;
+  color: var(--vscode-descriptionForeground);
+}
+#editing {
+  margin-bottom: 6px;
+  color: var(--vscode-textLink-foreground);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground) 10%, transparent);
+}

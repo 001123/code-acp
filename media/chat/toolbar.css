@@ -1,0 +1,158 @@
+#actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+#agent-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 11px;
+  font-size: 0.88em;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  cursor: pointer;
+}
+#agent-update:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+#agent-update svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+#folder {
+  height: 22px;
+  font-size: 0.88em;
+}
+#actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.88em;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  user-select: none;
+}
+#actions label:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+#actions input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  flex: none;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, currentColor));
+  border-radius: 3px;
+  background: var(--vscode-checkbox-background, transparent);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+#actions input[type="checkbox"]:checked {
+  border-color: var(--vscode-button-background);
+  background: var(--vscode-button-background);
+}
+/* Checkmark: a rotated L drawn with borders. */
+#actions input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-button-foreground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+#actions input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+#cancel svg {
+  width: 12px;
+  height: 12px;
+}
+#cancel {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+#cancel:not([hidden]) + #send {
+  display: none;
+}
+#actions label svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.75;
+  opacity: 0.8;
+}
+#actions .label-text {
+  max-width: 16ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#actions input[type="checkbox"]:not(:checked) ~ .svg-icon svg,
+#actions input[type="checkbox"]:not(:checked) ~ .label-text {
+  opacity: 0.5;
+}
+
+.config-item {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  flex-shrink: 0;
+  padding-left: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+  font-size: 0.92em;
+  transition: border-color 0.15s, background 0.15s;
+}
+.config-item:hover {
+  background: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+}
+.config-item:focus-within {
+  border-color: var(--vscode-focusBorder);
+}
+.config-name {
+  display: inline-flex;
+  color: var(--vscode-descriptionForeground);
+}
+.config-name svg {
+  width: 14px;
+  height: 14px;
+}
+.config-item select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 100%;
+  /* Fit the selected value, not the widest option. */
+  field-sizing: content;
+  max-width: 130px;
+  padding: 0 18px 0 4px;
+  border: none;
+  outline: none;
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+  color: var(--vscode-foreground);
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23888' stroke-width='2' d='M4 6l4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat right 6px center;
+  text-overflow: ellipsis;
+}
+.config-item select option {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+}

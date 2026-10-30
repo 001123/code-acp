@@ -1,0 +1,130 @@
+#history {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 8px 16px;
+}
+#history-header .icon-btn {
+  background: none;
+  color: var(--vscode-descriptionForeground);
+}
+#history-header .icon-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+#history-title {
+  font-weight: 600;
+  font-size: 1.05em;
+}
+/* Lines up with the list items below it. */
+#history-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin: 0 8px 8px;
+  padding: 0 4px 0 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+  background: var(--vscode-input-background);
+  color: var(--vscode-descriptionForeground);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+#history-search:focus-within {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 20%, transparent);
+}
+#history-search > .svg-icon svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+#history-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
+#history-search input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+#history-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.history-message {
+  padding: 8px 18px;
+  color: var(--vscode-descriptionForeground);
+}
+#history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: none;
+  color: var(--vscode-foreground);
+  text-align: left;
+}
+.history-item:hover:not(:disabled) {
+  background: var(--vscode-list-hoverBackground);
+}
+.history-item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.history-item[data-current] {
+  background: var(--vscode-list-inactiveSelectionBackground);
+}
+.history-item:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.history-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-item-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  color: var(--vscode-descriptionForeground);
+  background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
+.history-item-badge[data-current] {
+  color: var(--vscode-textLink-foreground);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground) 15%, transparent);
+}
+.history-item-meta {
+  flex-shrink: 0;
+  min-width: 4.5em;
+  text-align: right;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  color: var(--vscode-descriptionForeground);
+}
