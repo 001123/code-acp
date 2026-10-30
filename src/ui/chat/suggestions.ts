@@ -6,11 +6,10 @@ export interface Trigger {
   query: string;
 }
 
-/** The trigger before the caret, if any: "@" and "$" start a word, "/" only the whole message. */
-export function triggerIn(el: HTMLTextAreaElement): Trigger | undefined {
-  if (el.selectionStart !== el.selectionEnd) return undefined;
-  const end = el.selectionStart;
-  const before = el.value.slice(0, end);
+/** The trigger before `caret` in `text`, if any: "@" and "$" start a word, "/" only the whole message. */
+export function triggerIn(text: string, caret: number): Trigger | undefined {
+  const end = caret;
+  const before = text.slice(0, end);
   const m = /(^|\s)([@$])([^\s@$]*)$/.exec(before) ?? /^(\s*)(\/)(\S*)$/.exec(before);
   if (!m) return undefined;
   return { sigil: m[2] as Trigger["sigil"], start: m.index + m[1]!.length, end, query: m[3]! };

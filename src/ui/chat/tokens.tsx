@@ -1,7 +1,6 @@
-import { Fragment, useContext } from "react";
+import { useContext } from "react";
 import { useL10n } from "../l10n";
 import { HoverPreview, OpenPreview } from "./context";
-import { splitTokens } from "../markdown";
 import { openFile } from "./post";
 
 /** An inline token; `src` is set for images, which open in the lightbox, `path` for files, which open in an editor. */
@@ -9,13 +8,6 @@ export interface Token {
   token: string;
   src?: string;
   path?: string;
-}
-
-/** `text` with its attachment tokens highlighted. */
-export function Tokens({ text, tokens }: { text: string; tokens: Token[] }) {
-  return splitTokens(text, tokens).map((part, i) =>
-    typeof part === "string" ? <Fragment key={i}>{part}</Fragment> : <TokenMark key={i} token={part} />,
-  );
 }
 
 /** One highlighted token: images open in the lightbox, files in an editor. */

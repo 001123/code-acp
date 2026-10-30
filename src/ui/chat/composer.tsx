@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent, type MutableRefObject, type ReactNode } from "react";
+import { EditorContent, useEditor } from "@tiptap/react";
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import type { Attachment, Draft, PromptPart, QueuedInfo, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import type { FileSuggestion, SkillSuggestion } from "../../completions";
 import type { TerminalSuggestion } from "../../terminalContext";
@@ -11,13 +12,14 @@ import clockIcon from "@tabler/icons/outline/clock.svg";
 import pencilIcon from "@tabler/icons/outline/pencil.svg";
 import sendNowIcon from "@tabler/icons/outline/player-track-next.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
-import { attachmentKey, attachmentTitle, editText, imageSrc, inCodeFence, nameFromUri, urisFrom } from "./attachments";
+import { attachmentKey, attachmentTitle, imageSrc, nameFromUri, urisFrom } from "./attachments";
 import type { Hover, Preview } from "./context";
+import { composerExtensions, flatText, offsetAt, replaceText, resetText, setCaret, textOf, tokensIn, type TokenInfo } from "./editor";
+import { FENCE, styleLines } from "./livePreview";
 import { post } from "./post";
 import { byName, triggerIn, type Suggestion, type Trigger } from "./suggestions";
 import { isTabDrag, type TabState } from "./tabs";
 import { splitTokens } from "../markdown";
-import { Tokens } from "./tokens";
 import { AgentPanel, FolderSelect, type AgentChoices } from "./toolbar";
 
 const MAX_DATA_BYTES = 20 * 1024 * 1024;
@@ -62,6 +64,11 @@ function appendContent(content: Content, added: Content): Content {
   return { text: lead + text, inline, attachments: [...content.attachments, ...added.attachments] };
 }
 
+/** Tokens drawn as chips in the editor. */
+function tokenInfos(inline: Map<string, Attachment>): TokenInfo[] {
+  return [...inline].map(([token, a]) => ({ token, image: imageSrc(a) !== undefined }));
+}
+
 export interface ComposerOptions {
   /** The active tab; also as a ref for callbacks registered once (drop, FileReader). */
   active: number | undefined;
@@ -100,9 +107,30 @@ export function useComposer(options: ComposerOptions) {
   const { t } = useL10n();
   const [includeFile, setIncludeFile] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const input = useRef<HTMLTextAreaElement>(null);
+  /** Handlers of the latest render, for the editor's callbacks, which are registered once. */
+  const handlers = useRef<{ update(): void; select(): void; keyDown(e: KeyboardEvent): boolean; paste(e: ClipboardEvent): boolean }>(undefined);
+  const placeholder = useRef(t("chat.placeholder"));
+  placeholder.current = t("chat.placeholder");
+  const editor = useEditor({
+    extensions: composerExtensions(() => placeholder.current),
+    immediatelyRender: true,
+    // The webview CSP allows no inline styles; media/chat.css has what the editor needs.
+    injectCSS: false,
+    editorProps: {
+      attributes: { id: "input", role: "textbox", "aria-multiline": "true", "aria-label": placeholder.current },
+      handleKeyDown: (_, e) => handlers.current?.keyDown(e) ?? false,
+      handlePaste: (_, e) => handlers.current?.paste(e) ?? false,
+      // Copies keep the lines as typed; the default puts a blank line between paragraphs.
+      clipboardTextSerializer: (slice) => slice.content.textBetween(0, slice.content.size, "\n", (leaf) => leaf.attrs.token ?? ""),
+      // Drops are handled for the whole view, in the capture listener below.
+      handleDOMEvents: { drop: () => true },
+    },
+    onUpdate: () => handlers.current?.update(),
+    onSelectionUpdate: () => handlers.current?.select(),
+    onBlur: () => setTrigger(undefined),
+  });
   const form = useRef<HTMLFormElement>(null);
-  /** Unsent text per tab; the textarea holds the active tab's. */
+  /** Unsent text per tab; the editor holds the active tab's. */
   const drafts = useRef(new Map<number, string>());
   const shownDraft = useRef<number>(undefined);
   /** A draft not yet sent to the extension, which keeps it across reloads. */
@@ -122,9 +150,6 @@ export function useComposer(options: ComposerOptions) {
 
   /** Files and snippets per tab, by the token that stands for them in the composer text. */
   const inline = useRef(new Map<number, Map<string, Attachment>>());
-  /** Mirrors the textarea for the token highlight behind it. */
-  const [inputText, setInputText] = useState("");
-  const backdrop = useRef<HTMLDivElement>(null);
 
   function inlineOf(tab: number): Map<string, Attachment> {
     let map = inline.current.get(tab);
@@ -135,21 +160,23 @@ export function useComposer(options: ComposerOptions) {
   /** Adds `a` as a token at the caret, or in place of the typed trigger `at` (which also gives the sigil). */
   function addAttachment(a: Attachment, at?: Trigger): void {
     const tab = activeRef.current;
-    const el = input.current;
-    if (tab === undefined || !el) {
+    if (tab === undefined) {
       update(tab, (s) => ({ ...s, attachments: [...s.attachments, a] }));
       return;
     }
-    const start = at?.start ?? el.selectionStart;
-    const end = at?.end ?? el.selectionEnd;
+    const { view } = editor;
+    const { doc, selection } = view.state;
+    const start = at?.start ?? offsetAt(doc, selection.from);
+    const end = at?.end ?? offsetAt(doc, selection.to);
+    view.focus();
     // Attachments go inline as a token; a file already in the text is not added again.
     const key = attachmentKey(a);
     const tokens = inlineOf(tab);
+    const shown = tokensIn(doc);
     for (const [token, x] of tokens) {
-      if (!el.value.includes(token)) tokens.delete(token);
+      if (!shown.has(token)) tokens.delete(token);
       else if (key !== undefined && attachmentKey(x) === key) {
-        if (at) editText(el, "", start, end);
-        autosize();
+        if (at) replaceText(view, start, end, "");
         return;
       }
     }
@@ -157,9 +184,8 @@ export function useComposer(options: ComposerOptions) {
     let token = `${sigil}${a.name}`;
     for (let n = 2; tokens.has(token); n++) token = `${sigil}${a.name} (${n})`;
     tokens.set(token, a);
-    const space = start > 0 && !/\s/.test(el.value[start - 1]!) ? " " : "";
-    editText(el, `${space}${token} `, start, end);
-    autosize();
+    const space = start > 0 && !/\s/.test(flatText(doc)[start - 1]!) ? " " : "";
+    replaceText(view, start, end, `${space}${token} `, [{ token, image: imageSrc(a) !== undefined }]);
   }
 
   const [trigger, setTrigger] = useState<Trigger>();
@@ -174,10 +200,8 @@ export function useComposer(options: ComposerOptions) {
 
   /** Opens, updates or closes the popup for the text before the caret. */
   function refreshTrigger(): void {
-    const el = input.current;
-    let next = el ? triggerIn(el) : undefined;
-    // The text of a token already placed is not a trigger.
-    if (next && active !== undefined && [...inlineOf(active).keys()].some((x) => el!.value.startsWith(x, next!.start))) next = undefined;
+    const { doc, selection } = editor.state;
+    let next = selection.empty ? triggerIn(flatText(doc), offsetAt(doc, selection.from)) : undefined;
     if (next?.start !== dismissed.current) dismissed.current = undefined;
     if (dismissed.current !== undefined) next = undefined;
     if (next?.sigil === trigger?.sigil && next?.query === trigger?.query && next?.start === trigger?.start) {
@@ -199,10 +223,7 @@ export function useComposer(options: ComposerOptions) {
 
   /** Replaces the typed trigger with `text`. */
   function replaceTrigger(at: Trigger, text: string): void {
-    const el = input.current;
-    if (!el) return;
-    editText(el, text, at.start, at.end);
-    autosize();
+    replaceText(editor.view, at.start, at.end, text);
   }
 
   const suggestions: Suggestion[] = !trigger
@@ -244,12 +265,12 @@ export function useComposer(options: ComposerOptions) {
   function pick(s: Suggestion): void {
     setTrigger(undefined);
     s.pick();
-    input.current?.focus();
+    editor.view.focus();
   }
 
   /** Popup keys; true when the key was used. */
-  function suggestKey(e: ReactKeyboardEvent<HTMLTextAreaElement>): boolean {
-    if (!trigger || suggestions.length === 0 || e.nativeEvent.isComposing) return false;
+  function suggestKey(e: KeyboardEvent): boolean {
+    if (!trigger || suggestions.length === 0 || e.isComposing) return false;
     switch (e.key) {
       case "ArrowDown":
         setSelected((shown + 1) % suggestions.length);
@@ -270,48 +291,38 @@ export function useComposer(options: ComposerOptions) {
     return false;
   }
 
-  /** Backspace right after a token deletes the whole token. */
-  function deleteToken(): boolean {
-    const el = input.current;
-    const tab = activeRef.current;
-    if (!el || tab === undefined || el.selectionStart !== el.selectionEnd) return false;
-    const before = el.value.slice(0, el.selectionStart);
-    const token = [...inlineOf(tab).keys()].sort((a, b) => b.length - a.length).find((x) => before.endsWith(x));
-    if (!token) return false;
-    editText(el, "", el.selectionStart - token.length, el.selectionStart);
-    autosize();
-    return true;
+  /** The editor's flat text and the selection as offsets in it. */
+  function selectionText(): { text: string; from: number; to: number } {
+    const { doc, selection } = editor.state;
+    return { text: flatText(doc), from: offsetAt(doc, selection.from), to: offsetAt(doc, selection.to) };
   }
 
   /** Shift+Enter in a Markdown list item starts the next item; in an empty one, ends the list. True when the key was used. */
-  function continueList(el: HTMLTextAreaElement): boolean {
-    const caret = el.selectionStart;
-    if (caret !== el.selectionEnd) return false;
-    const start = el.value.lastIndexOf("\n", caret - 1) + 1;
-    const line = el.value.slice(start, caret);
+  function continueList(): boolean {
+    const { text, from: caret, to } = selectionText();
+    if (caret !== to) return false;
+    const start = text.lastIndexOf("\n", caret - 1) + 1;
+    const line = text.slice(start, caret);
     const m = /^(\s*)(?:([-*+])|(\d+)([.)]))(\s+)(\[[ xX]\]\s+)?/.exec(line);
     if (!m) return false;
-    const end = el.value.indexOf("\n", caret);
-    if (m[0].length === line.length && !el.value.slice(caret, end < 0 ? undefined : end).trim()) {
-      editText(el, "", start, caret);
+    const end = text.indexOf("\n", caret);
+    if (m[0].length === line.length && !text.slice(caret, end < 0 ? undefined : end).trim()) {
+      replaceText(editor.view, start, caret, "");
     } else {
       const marker = m[2] ?? `${Number(m[3]) + 1}${m[4]}`;
-      editText(el, `\n${m[1]}${marker}${m[5]}${m[6] ? "[ ] " : ""}`, caret, caret);
+      replaceText(editor.view, caret, caret, `\n${m[1]}${marker}${m[5]}${m[6] ? "[ ] " : ""}`);
     }
-    autosize();
     return true;
   }
 
   /** Inserts `text` as a Markdown quote at the caret. */
   function quote(text: string): void {
-    const el = input.current;
-    if (!el) return;
-    const before = el.value.slice(0, el.selectionStart);
+    const { text: current, from, to } = selectionText();
+    const before = current.slice(0, from);
     const lead = before && !before.endsWith("\n") ? "\n\n" : "";
-    const quoted = text.trimEnd().split(/\r?\n/).map((l) => (l ? `> ${l}` : ">")).join("\n");
-    editText(el, `${lead}${quoted}\n\n`, el.selectionStart, el.selectionEnd);
-    el.focus();
-    autosize();
+    const quoted = text.trimEnd().split(/\r?\n/).map((l) => (l ? `> ${l}` : "> ")).join("\n");
+    replaceText(editor.view, from, to, `${lead}${quoted}\n\n`);
+    editor.view.focus();
   }
 
   function readFile(file: File): void {
@@ -370,24 +381,21 @@ export function useComposer(options: ComposerOptions) {
 
   /** What the composer of `tab` holds, shown or not. */
   function contentIn(tab: number): Content {
-    const el = input.current;
-    const text = tab === shownDraft.current && el ? el.value : (drafts.current.get(tab) ?? "");
+    const text = tab === shownDraft.current ? textOf(editor.state.doc) : (drafts.current.get(tab) ?? "");
     return { text, inline: new Map(inlineOf(tab)), attachments: statesRef.current[tab]?.attachments ?? [] };
   }
 
   function setContent(tab: number, content: Content): void {
     inline.current.set(tab, new Map(content.inline));
     update(tab, (s) => ({ ...s, attachments: content.attachments }));
-    const el = input.current;
-    if (tab !== shownDraft.current || !el) {
+    if (tab !== shownDraft.current) {
       // Shown, and saved, when the tab is next selected.
       drafts.current.set(tab, content.text);
       return;
     }
-    el.value = content.text;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-    autosize();
+    resetText(editor.view, content.text, tokenInfos(content.inline));
+    editor.view.focus();
+    saveDraft(content.text);
   }
 
   /**
@@ -421,13 +429,12 @@ export function useComposer(options: ComposerOptions) {
     setTerminals(terminals ?? []);
   }
 
-  const focus = () => input.current?.focus();
+  const focus = () => editor.view.focus();
 
   // Swaps the composer text when another tab becomes active.
   useLayoutEffect(() => {
-    const el = input.current;
-    if (!el || shownDraft.current === active) return;
-    if (shownDraft.current !== undefined) drafts.current.set(shownDraft.current, el.value);
+    if (shownDraft.current === active) return;
+    if (shownDraft.current !== undefined) drafts.current.set(shownDraft.current, textOf(editor.state.doc));
     for (const id of drafts.current.keys()) {
       if (!tabs.some((x) => x.id === id)) drafts.current.delete(id);
     }
@@ -440,14 +447,15 @@ export function useComposer(options: ComposerOptions) {
     for (const id of beforeEdit.current.keys()) {
       if (!tabs.some((x) => x.id === id)) beforeEdit.current.delete(id);
     }
-    el.value = (active !== undefined && drafts.current.get(active)) || "";
+    const text = (active !== undefined && drafts.current.get(active)) || "";
+    resetText(editor.view, text, active !== undefined ? tokenInfos(inlineOf(active)) : []);
     shownDraft.current = active;
     setTrigger(undefined);
-    autosize();
-    el.focus();
+    saveDraft(text);
+    editor.view.focus();
   }, [active]);
 
-  // Drops anywhere in the view attach files; capture so the textarea's own drop handling never runs.
+  // Drops anywhere in the view attach files; the editor leaves drops to this listener.
   useEffect(() => {
     let depth = 0;
     const enter = (e: DragEvent) => {
@@ -474,13 +482,11 @@ export function useComposer(options: ComposerOptions) {
       depth = 0;
       setDragging(false);
       if (!e.dataTransfer) return;
-      const el = input.current;
-      if (!takeTransfer(e.dataTransfer) && el) {
+      if (!takeTransfer(e.dataTransfer)) {
         const text = e.dataTransfer.getData("text/plain");
-        if (text) editText(el, text, el.selectionStart, el.selectionEnd);
-        autosize();
+        if (text) insertText(text);
       }
-      el?.focus();
+      editor.view.focus();
     };
     window.addEventListener("dragenter", enter, true);
     window.addEventListener("dragleave", leave, true);
@@ -494,20 +500,23 @@ export function useComposer(options: ComposerOptions) {
     };
   }, []);
 
-  function onPaste(e: ClipboardEvent<HTMLTextAreaElement>): void {
-    const dt = e.clipboardData;
-    // Plain text keeps the default paste; only files (e.g. screenshots) become attachments.
-    if (Array.from(dt.items).some((it) => it.kind === "file") && takeTransfer(dt)) e.preventDefault();
+  /** Puts `text` in place of the selection. */
+  function insertText(text: string): void {
+    const { from, to } = selectionText();
+    replaceText(editor.view, from, to, text.replace(/\r\n?/g, "\n"));
   }
 
-  function autosize(): void {
-    const el = input.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
-    setInputText(el.value);
-    syncScroll();
-    saveDraft(el.value);
+  function onPaste(e: ClipboardEvent): boolean {
+    const dt = e.clipboardData;
+    if (!dt) return false;
+    // Files (e.g. screenshots) become attachments.
+    if (Array.from(dt.items).some((it) => it.kind === "file") && takeTransfer(dt)) return true;
+    // Copies from the composer keep their tokens; anything else goes in as the Markdown it is.
+    if (dt.getData("text/html").includes("data-pm-slice")) return false;
+    const text = dt.getData("text/plain");
+    if (!text) return false;
+    insertText(text);
+    return true;
   }
 
   function flushDraft(): void {
@@ -543,33 +552,109 @@ export function useComposer(options: ComposerOptions) {
 
   // Attachments outside the text change without an edit.
   useEffect(() => {
-    if (input.current) saveDraft(input.current.value);
+    saveDraft(textOf(editor.state.doc));
   }, [attachments]);
 
-  /** The image token drawn under the pointer; the backdrop sits behind the textarea, so hit-test its rects. */
-  function imageTokenAt(x: number, y: number): { src: string; name: string; token: string; rect: DOMRect } | undefined {
-    if (active === undefined) return undefined;
-    for (const mark of backdrop.current?.querySelectorAll<HTMLElement>("mark.image") ?? []) {
-      for (const rect of mark.getClientRects()) {
-        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
-        const token = mark.dataset.token!;
-        const a = inlineOf(active).get(token);
-        const src = a && imageSrc(a);
-        return a && src ? { src, name: a.name, token, rect } : undefined;
-      }
-    }
-    return undefined;
+  /** The image token at `target`. */
+  function imageTokenAt(target: EventTarget): { src: string; name: string; token: string; rect: DOMRect } | undefined {
+    const mark = target instanceof Element ? target.closest<HTMLElement>("mark.token.image") : null;
+    if (!mark || active === undefined) return undefined;
+    const token = mark.dataset.token!;
+    const a = inlineOf(active).get(token);
+    const src = a && imageSrc(a);
+    return a && src ? { src, name: a.name, token, rect: mark.getBoundingClientRect() } : undefined;
   }
 
-  function syncScroll(): void {
-    if (backdrop.current && input.current) backdrop.current.scrollTop = input.current.scrollTop;
+  /**
+   * Enter in fenced code adds a line; on the opening fence it also closes the block. Shift+Enter, or Enter on the
+   * block's empty last line, leaves it (closing it if open). Down on a block that ends the text adds a line after it.
+   * True when the key was used.
+   */
+  function codeKey(key: "Enter" | "ArrowDown", shift: boolean): boolean {
+    const { text, from, to } = selectionText();
+    if (from !== to) return false;
+    const lines = text.split("\n");
+    const styles = styleLines(lines);
+    let i = 0;
+    let start = 0;
+    while (start + lines[i]!.length < from) start += lines[i++]!.length + 1;
+    const { block, fence } = styles[i]!;
+    if (fence === undefined) return false;
+    const view = editor.view;
+    const lineEnd = start + lines[i]!.length;
+    const close = block === "fence-close" ? i : styles.findIndex((s, j) => j > i && s.block === "fence-close" && s.fence === fence);
+    if (key === "ArrowDown") {
+      if (i !== lines.length - 1) return false;
+      replaceText(view, text.length, text.length, "\n");
+      return true;
+    }
+    if (block === "fence-open" && !shift) {
+      insertText("\n");
+      if (close < 0 && from === lineEnd) {
+        replaceText(view, from + 1, from + 1, `\n${FENCE.exec(lines[i]!)![1]}`);
+        setCaret(view, from + 1);
+      }
+      return true;
+    }
+    const emptyLast = block === "codeblock" && lines[i] === "" && (close < 0 ? i === lines.length - 1 : i === close - 1);
+    if (!shift && !emptyLast && block !== "fence-close") {
+      insertText("\n");
+      return true;
+    }
+    if (close < 0) {
+      // The empty last line becomes the closing fence.
+      const marker = FENCE.exec(lines[fence]!)![1];
+      if (emptyLast) replaceText(view, start, lineEnd, `${marker}\n`);
+      else replaceText(view, lineEnd, lineEnd, `\n${marker}\n`);
+      return true;
+    }
+    let closeEnd = lines.slice(0, close + 1).join("\n").length;
+    if (emptyLast) {
+      replaceText(view, start - 1, lineEnd, "");
+      closeEnd -= lineEnd - start + 1;
+    }
+    if (close + 1 < lines.length && lines[close + 1] === "") setCaret(view, closeEnd + 1);
+    else replaceText(view, closeEnd, closeEnd, "\n");
+    return true;
   }
+
+  function onKeyDown(e: KeyboardEvent): boolean {
+    if (suggestKey(e)) return true;
+    if (e.isComposing) return false;
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      submit(true);
+      return true;
+    }
+    if ((e.key === "Enter" || (e.key === "ArrowDown" && !e.shiftKey && !e.altKey)) && codeKey(e.key, e.shiftKey)) return true;
+    if (e.key === "Enter" && e.shiftKey) {
+      if (!continueList()) insertText("\n");
+      return true;
+    }
+    if (e.key === "Enter") {
+      submit(false);
+      return true;
+    }
+    if (e.key === "Escape" && editing !== undefined && active !== undefined) {
+      endEdit(active);
+      return true;
+    }
+    return false;
+  }
+
+  handlers.current = {
+    update: () => {
+      saveDraft(textOf(editor.state.doc));
+      refreshTrigger();
+    },
+    select: refreshTrigger,
+    keyDown: onKeyDown,
+    paste: onPaste,
+  };
 
   /** Sends the composer content; while the agent works it is queued, unless `now`. An edit replaces its message. */
   function submit(now: boolean): void {
-    const el = input.current;
-    if (!el || active === undefined) return;
-    const text = el.value;
+    if (active === undefined) return;
+    const text = textOf(editor.state.doc);
     const tokens = [...inlineOf(active)].map(([token, a]) => ({ ...a, token }));
     const parts: PromptPart[] = [...splitTokens(text, tokens), ...attachments];
     if (parts.every((p) => typeof p === "string" && !p.trim())) return;
@@ -578,8 +663,8 @@ export function useComposer(options: ComposerOptions) {
       endEdit(active);
       return;
     }
-    el.value = "";
-    autosize();
+    resetText(editor.view, "", []);
+    saveDraft("");
     update(active, (s) => ({ ...s, attachments: [] }));
     inline.current.delete(active);
   }
@@ -603,7 +688,7 @@ export function useComposer(options: ComposerOptions) {
               className="suggest-item"
               aria-selected={i === shown}
               ref={i === shown ? (n) => n?.scrollIntoView({ block: "nearest" }) : undefined}
-              // Keeps the focus in the textarea.
+              // Keeps the focus in the editor.
               onMouseDown={(e) => {
                 e.preventDefault();
                 pick(s);
@@ -702,74 +787,31 @@ export function useComposer(options: ComposerOptions) {
           </span>
         ))}
       </div>
-      <div id="input-box">
-        {/* Same text as the textarea, transparent, so tokens get a highlight behind them. */}
-        <div id="input-backdrop" ref={backdrop} aria-hidden="true">
-          <Tokens
-            text={inputText}
-            tokens={active !== undefined ? [...inlineOf(active)].map(([token, a]) => ({ token, src: imageSrc(a) })) : []}
-          />
-          {"\n"}
-        </div>
-        <textarea
-          id="input"
-          ref={input}
-          rows={2}
-          placeholder={t("chat.placeholder")}
-          onInput={() => {
-            autosize();
-            refreshTrigger();
-          }}
-          onSelect={refreshTrigger}
-          onBlur={() => setTrigger(undefined)}
-          onScroll={() => {
-            syncScroll();
-            setHover(undefined);
-          }}
-          onPaste={onPaste}
-          onMouseMove={(e) => {
-            const hit = imageTokenAt(e.clientX, e.clientY);
-            e.currentTarget.style.cursor = hit ? "pointer" : "";
-            // Keep the same object while on the same token, so moving within it doesn't re-render.
-            setHover((h) => (hit ? (h?.src === hit.src && h.rect.top === hit.rect.top ? h : hit) : undefined));
-          }}
-          onMouseLeave={() => setHover(undefined)}
-          onClick={(e) => {
-            const hit = imageTokenAt(e.clientX, e.clientY);
-            if (hit && e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
-              setHover(undefined);
-              const tab = active!;
-              setPreview({
-                src: hit.src,
-                name: hit.name,
-                replace: (b) => {
-                  inlineOf(tab).set(hit.token, b);
-                  if (input.current) saveDraft(input.current.value);
-                },
-              });
-            }
-          }}
-          onKeyDown={(e) => {
-            if (suggestKey(e)) {
-              e.preventDefault();
-            } else if (e.key === "Enter" && e.shiftKey && !e.nativeEvent.isComposing && continueList(e.currentTarget)) {
-              e.preventDefault();
-            } else if (
-              e.key === "Enter" &&
-              !e.shiftKey &&
-              !e.nativeEvent.isComposing &&
-              (e.ctrlKey || e.metaKey || !inCodeFence(e.currentTarget.value, e.currentTarget.selectionStart))
-            ) {
-              e.preventDefault();
-              submit(e.ctrlKey || e.metaKey);
-            } else if (e.key === "Escape" && editing !== undefined && active !== undefined) {
-              e.preventDefault();
-              endEdit(active);
-            } else if (e.key === "Backspace" && !e.nativeEvent.isComposing && deleteToken()) {
-              e.preventDefault();
-            }
-          }}
-        />
+      <div
+        id="input-box"
+        onMouseMove={(e) => {
+          const hit = imageTokenAt(e.target);
+          // Keep the same object while on the same token, so moving within it doesn't re-render.
+          setHover((h) => (hit ? (h?.src === hit.src && h.rect.top === hit.rect.top ? h : hit) : undefined));
+        }}
+        onMouseLeave={() => setHover(undefined)}
+        onScrollCapture={() => setHover(undefined)}
+        onClick={(e) => {
+          const hit = imageTokenAt(e.target);
+          if (!hit) return;
+          setHover(undefined);
+          const tab = active!;
+          setPreview({
+            src: hit.src,
+            name: hit.name,
+            replace: (b) => {
+              inlineOf(tab).set(hit.token, b);
+              if (tab === shownDraft.current) saveDraft(textOf(editor.state.doc));
+            },
+          });
+        }}
+      >
+        <EditorContent editor={editor} />
       </div>
       <div id="actions">
         <AgentPanel tab={tabs.find((x) => x.id === active)} choices={agents}>

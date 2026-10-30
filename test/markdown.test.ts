@@ -1,7 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { inCodeFence } from "../src/ui/chat/attachments";
 import { MarkdownView } from "../src/ui/markdown";
 
 const html = (text: string, tokens: string[] = []) =>
@@ -23,11 +22,4 @@ describe("user Markdown", () => {
     assert.notInclude(html("<mark data-token-index=\"0\">x</mark>", ["y"]), "<b>");
   });
 
-  it("tells when the caret is inside a code fence", () => {
-    assert.isFalse(inCodeFence("hello", 5));
-    assert.isTrue(inCodeFence("```ts", 5));
-    assert.isTrue(inCodeFence("```ts\nconst a = 1", 16));
-    assert.isFalse(inCodeFence("```ts\nx\n```", 11));
-    assert.isTrue(inCodeFence("````\n```\n", 9));
-  });
 });
