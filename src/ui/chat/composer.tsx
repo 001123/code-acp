@@ -13,6 +13,7 @@ import pencilIcon from "@tabler/icons/outline/pencil.svg";
 import sendNowIcon from "@tabler/icons/outline/player-track-next.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { attachmentKey, attachmentTitle, imageSrc, nameFromUri, urisFrom } from "./attachments";
+import { copiedImages, pastedContent } from "./clipboard";
 import type { Hover, Preview } from "./context";
 import { composerExtensions, flatText, offsetAt, replaceText, resetText, setCaret, textOf, tokensIn, type TokenInfo } from "./editor";
 import { FENCE, styleLines } from "./livePreview";
@@ -509,6 +510,8 @@ export function useComposer(options: ComposerOptions) {
   function onPaste(e: ClipboardEvent): boolean {
     const dt = e.clipboardData;
     if (!dt) return false;
+    // A message copied from the chat brings its images back as tokens, not as the single PNG beside it.
+    if (pasteMessage(dt)) return true;
     // Files (e.g. screenshots) become attachments.
     if (Array.from(dt.items).some((it) => it.kind === "file") && takeTransfer(dt)) return true;
     // Copies from the composer keep their tokens; anything else goes in as the Markdown it is.
@@ -516,6 +519,22 @@ export function useComposer(options: ComposerOptions) {
     const text = dt.getData("text/plain");
     if (!text) return false;
     insertText(text);
+    return true;
+  }
+
+  /** Pastes a message copied from the chat with its images. True when the clipboard held one. */
+  function pasteMessage(dt: DataTransfer): boolean {
+    const tab = activeRef.current;
+    const images = copiedImages(dt.getData("text/html"));
+    const text = dt.getData("text/plain").replace(/\r\n?/g, "\n");
+    if (tab === undefined || !images?.length || !text) return false;
+    const tokens = inlineOf(tab);
+    const shown = tokensIn(editor.state.doc);
+    for (const token of tokens.keys()) if (!shown.has(token)) tokens.delete(token);
+    const pasted = pastedContent(text, images, (token) => tokens.has(token));
+    for (const { token, attachment } of pasted.inline) tokens.set(token, attachment);
+    const { from, to } = selectionText();
+    replaceText(editor.view, from, to, pasted.text, tokenInfos(new Map(pasted.inline.map((x) => [x.token, x.attachment]))));
     return true;
   }
 

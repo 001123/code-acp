@@ -1,5 +1,6 @@
 import { useContext } from "react";
 import { useL10n } from "../l10n";
+import { tokenImages } from "./clipboard";
 import { HoverPreview, OpenPreview } from "./context";
 import { openFile } from "./post";
 
@@ -21,6 +22,9 @@ export function TokenMark({ token }: { token: Token }) {
       <mark
         className="token image"
         data-token={token.token}
+        ref={(el) => {
+          if (el) tokenImages.set(el, src);
+        }}
         aria-label={t("chat.previewImage")}
         onMouseEnter={(e) => hover({ src, rect: e.currentTarget.getBoundingClientRect() })}
         onMouseLeave={() => hover(undefined)}

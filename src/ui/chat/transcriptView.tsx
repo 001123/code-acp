@@ -1,5 +1,5 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { Fragment, memo, useContext, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, memo, useContext, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import type { SentAttachment } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { diffLines, hunks } from "../lineDiff";
@@ -18,6 +18,7 @@ import refreshIcon from "@tabler/icons/outline/refresh.svg";
 import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import copyIcon from "@tabler/icons/outline/copy.svg";
 import checkIcon from "@tabler/icons/outline/check.svg";
+import { copyMessage } from "./clipboard";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { clip, contentText, fileLinkTokens, type ActivityItem, type Item, type Text } from "./transcript";
@@ -226,19 +227,19 @@ function Locations({ locations }: { locations?: acp.ToolCallLocation[] }) {
 }
 
 /** On a user message: copy it; when sent from this chat, also restore its checkpoint, edit it, send it again, fork before it. */
-function MessageActions({ turn, text }: { turn?: number; text: string }) {
+function MessageActions({ turn, text, tokens }: { turn?: number; text: string; tokens: Token[] }) {
   const { t } = useL10n();
   const tab = useContext(ShownTab);
   const [copied, setCopied] = useState(false);
   const id = tab.id;
   const sent = turn !== undefined && id !== undefined;
-  const action = (label: string, svg: string, onClick: () => void) => (
+  const action = (label: string, svg: string, onClick: (e: MouseEvent<HTMLButtonElement>) => void) => (
     <button className="icon-btn small" title={label} aria-label={label} onClick={onClick}>
       <Icon svg={svg} />
     </button>
   );
-  const copy = () =>
-    void navigator.clipboard.writeText(text).then(() => {
+  const copy = (e: MouseEvent<HTMLButtonElement>) =>
+    void copyMessage(text, tokens, e.currentTarget.closest(".msg")?.querySelector(":scope > .md")).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -361,10 +362,11 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
       return <MarkdownView className="msg assistant md" text={item.text} onOpenFile={openFile} />;
     case "user": {
       const replayed = fileLinkTokens(item.text);
+      const tokens = [...(item.tokens ?? []), ...replayed.tokens];
       return (
         <div className="msg user">
-          <UserText text={replayed.text} tokens={[...(item.tokens ?? []), ...replayed.tokens]} />
-          <MessageActions turn={item.turn} text={replayed.text} />
+          <UserText text={replayed.text} tokens={tokens} />
+          <MessageActions turn={item.turn} text={replayed.text} tokens={tokens} />
         </div>
       );
     }
@@ -375,14 +377,16 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
           <MarkdownView className="text md" text={item.text} onOpenFile={openFile} />
         </details>
       );
-    case "userMessage":
+    case "userMessage": {
+      const tokens = item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []));
       return (
         <div className="msg user">
-          <UserText text={item.text} tokens={item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []))} />
+          <UserText text={item.text} tokens={tokens} />
           <SentAttachments attachments={item.attachments.filter((a) => !a.token)} />
-          <MessageActions turn={item.turn} text={item.text} />
+          <MessageActions turn={item.turn} text={item.text} tokens={tokens} />
         </div>
       );
+    }
     case "tool": {
       const children = item.children ?? [];
       const failed = children.filter((c) => c.status === "failed").length;

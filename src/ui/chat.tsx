@@ -15,6 +15,7 @@ import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
 import { ChatSettings, ConfigSelect, UsageMeter, type AgentChoices } from "./chat/toolbar";
 import { clipContent, contentText, groupActivity, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
+import { copySelection } from "./chat/clipboard";
 
 function App() {
   const { t } = useL10n();
@@ -353,6 +354,15 @@ function App() {
     };
     window.addEventListener("contextmenu", onContextMenu, true);
     return () => window.removeEventListener("contextmenu", onContextMenu, true);
+  }, []);
+
+  // A selection copied with images takes them along in its HTML.
+  useEffect(() => {
+    const el = messages.current;
+    if (!el) return;
+    const onCopy = (e: ClipboardEvent) => void copySelection(e, el);
+    document.addEventListener("copy", onCopy);
+    return () => document.removeEventListener("copy", onCopy);
   }, []);
   return (
     <OpenPreview.Provider value={setPreview}>
