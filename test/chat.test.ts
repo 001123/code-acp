@@ -97,7 +97,7 @@ describe("TabList", () => {
 
   it("saves what it restored", () => {
     const list = new TabList(saved, () => "/default");
-    const again = Schema.decodeUnknownSync(SavedTabs)(list.saved);
+    const again = Schema.decodeSync(SavedTabs)(list.saved);
     assert.strictEqual(again.active, 1);
     assert.deepStrictEqual(
       again.tabs.map((t) => [t.sessionId, t.cwd, t.pinned]),
@@ -176,11 +176,13 @@ describe("Permissions", () => {
     const permissions = new Permissions<string>({ shown: (_, id) => void shown.push(id), done: (_, id) => void done.push(id) });
     return { permissions, shown, done };
   };
+  // The agent's own signals come from outside Effect.
+  const never = new AbortController().signal;
 
   it.effect("answers with the option the user picked", () =>
     Effect.gen(function* () {
       const { permissions, shown, done } = make();
-      const fiber = yield* Effect.forkChild(permissions.request("tab", request, new AbortController().signal));
+      const fiber = yield* Effect.forkChild(permissions.request("tab", request, never));
       yield* Effect.yieldNow;
       assert.deepStrictEqual(shown, [1]);
       permissions.answer(1, "allow");
@@ -192,13 +194,13 @@ describe("Permissions", () => {
     }),
   );
 
-  it.effect("cancels the requests of one tab, and when the agent aborts", () =>
-    Effect.gen(function* () {
+  it.effect("cancels the requests of one tab, and when the agent aborts", () => {
+    const abort = new AbortController();
+    return Effect.gen(function* () {
       const { permissions } = make();
-      const abort = new AbortController();
-      const a = yield* Effect.forkChild(permissions.request("a", request, new AbortController().signal));
+      const a = yield* Effect.forkChild(permissions.request("a", request, never));
       const b = yield* Effect.forkChild(permissions.request("b", request, abort.signal));
-      const c = yield* Effect.forkChild(permissions.request("c", request, new AbortController().signal));
+      const c = yield* Effect.forkChild(permissions.request("c", request, never));
       yield* Effect.yieldNow;
       permissions.cancel("a");
       assert.deepStrictEqual(yield* Fiber.join(a), CANCELLED);
@@ -206,8 +208,8 @@ describe("Permissions", () => {
       assert.deepStrictEqual(yield* Fiber.join(b), CANCELLED);
       permissions.cancel();
       assert.deepStrictEqual(yield* Fiber.join(c), CANCELLED);
-    }),
-  );
+    });
+  });
 });
 
 describe("DraftStore", () => {
