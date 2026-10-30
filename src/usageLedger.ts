@@ -2,9 +2,12 @@ import { Context, DateTime, Effect, FileSystem, Layer, Option, Path, Schema, Sem
 import * as vscode from "vscode";
 import { ExtensionCtx, thenable } from "./runtime";
 
-/** Where the first versions kept the ledger; moved to the file on first use. */
+/** Where earlier versions kept the whole ledger; split into month files on first use. */
 const LEGACY_KEY = "codeAcp.usage";
-const LEDGER_FILE = "usage.json";
+const LEGACY_FILE = "usage.json";
+/** The ledger's folder in the global storage: one file a month, `YYYY/MM.json`. */
+const LEDGER_DIR = "usage";
+const MONTH_FILE = /^(\d{4})[/\\](\d{2})\.json$/;
 
 const Tokens = Schema.Struct({
   input: Schema.Finite,
@@ -147,6 +150,59 @@ export function addCost(ledger: Ledger, ref: SessionRef, cost: Cost, day: string
   return record(ledger, ref, day, now, { ...NO_TOTALS, cost: delta > 0 ? { [cost.currency]: delta } : {} }, cost);
 }
 
+/** The month a local date falls in, `YYYY-MM`. */
+export const monthOf = (day: string) => day.slice(0, 7);
+
+/** A session's records from two months as one: totals summed, the rest from the later one. */
+function mergeSession(a: SessionEntry, b: SessionEntry): SessionEntry {
+  const [earlier, later] = a.lastAt <= b.lastAt ? [a, b] : [b, a];
+  return {
+    ...later,
+    ...addTotals(a, b),
+    title: later.title ?? earlier.title,
+    firstAt: Math.min(a.firstAt, b.firstAt),
+    lastCost: later.lastCost ?? earlier.lastCost,
+  };
+}
+
+/** The month ledgers as one; a session kept on across months is summed. */
+export function mergeLedgers(ledgers: ReadonlyArray<Ledger>): Ledger {
+  const days: Record<string, Totals> = {};
+  const sessions: Record<string, SessionEntry> = {};
+  for (const ledger of ledgers) {
+    for (const [day, totals] of Object.entries(ledger.days)) {
+      days[day] = days[day] ? addTotals(days[day], totals) : totals;
+    }
+    for (const [key, session] of Object.entries(ledger.sessions)) {
+      sessions[key] = sessions[key] ? mergeSession(sessions[key], session) : session;
+    }
+  }
+  return { days, sessions };
+}
+
+/**
+ * A whole ledger as month ledgers by `YYYY-MM`. Days split exactly; a session goes to the month it was last used in,
+ * as the old ledger doesn't say what it used in which month.
+ */
+export function splitByMonth(ledger: Ledger, monthOfTime: (ms: number) => string): Map<string, Ledger> {
+  const months = new Map<string, { days: Record<string, Totals>; sessions: Record<string, SessionEntry> }>();
+  const monthLedger = (month: string) => {
+    let found = months.get(month);
+    if (!found) {
+      found = { days: {}, sessions: {} };
+      months.set(month, found);
+    }
+    return found;
+  };
+  for (const [day, totals] of Object.entries(ledger.days)) {
+    monthLedger(monthOf(day)).days[day] = totals;
+  }
+  for (const [key, session] of Object.entries(ledger.sessions)) {
+    monthLedger(monthOfTime(session.lastAt)).sessions[key] = session;
+  }
+  return months;
+}
+
 /** Which sessions the usage page lists: those matching `text`, the `limit` most recent. */
 export interface SessionQuery {
   text: string;
@@ -215,8 +271,8 @@ export function summarize(
 }
 
 /**
- * Tokens and cost the agents report, by session and by local day, kept for good in a file of the global storage
- * (shared by every workspace).
+ * Tokens and cost the agents report, by session and by local day, kept for good in the global storage (shared by
+ * every workspace): one file a month, `usage/YYYY/MM.json`, so a record rewrites only the current month.
  */
 export class UsageLedger extends Context.Service<UsageLedger, {
   /** Fires after every record and after a clear. */
@@ -237,86 +293,146 @@ export class UsageLedger extends Context.Service<UsageLedger, {
         Effect.sync(() => new vscode.EventEmitter<void>()),
         (emitter) => Effect.sync(() => emitter.dispose()),
       );
-      // Serializes read-modify-write in this window; other windows write the same file.
+      // Serializes read-modify-write in this window; other windows write the same files.
       const lock = yield* Semaphore.make(1);
       const zone = DateTime.zoneMakeLocal();
-      const dir = context.globalStorageUri.fsPath;
-      const file = path.join(dir, LEDGER_FILE);
+      const storage = context.globalStorageUri.fsPath;
+      const dir = path.join(storage, LEDGER_DIR);
+      const legacyFile = path.join(storage, LEGACY_FILE);
+      const fileOf = (month: string) => path.join(dir, month.slice(0, 4), `${month.slice(5, 7)}.json`);
 
       /** The local date `daysAgo` days before now, `YYYY-MM-DD`. */
       const localDay = (daysAgo: number) =>
         Effect.map(DateTime.now, (now) => DateTime.formatIsoDate(DateTime.subtract(DateTime.setZone(now, zone), { days: daysAgo })));
+      const monthOfTime = (ms: number) => monthOf(DateTime.formatIsoDate(DateTime.setZone(DateTime.makeUnsafe(ms), zone)));
 
-      /** The ledger last read or written, and the file's mtime then; read again when another window wrote it. */
-      let cache: { mtime: number | undefined; ledger: Ledger } | undefined;
-      const mtimeOf = fs.stat(file).pipe(
-        Effect.map((info) => Option.getOrUndefined(info.mtime)?.getTime()),
-        Effect.orElseSucceed(() => undefined),
+      const mtimeOf = (file: string) =>
+        fs.stat(file).pipe(
+          Effect.map((info) => Option.getOrUndefined(info.mtime)?.getTime()),
+          Effect.orElseSucceed(() => undefined),
+        );
+
+      /** Each month file last read or written, and its mtime then; read again when another window wrote it. */
+      const cache = new Map<string, { mtime: number | undefined; ledger: Ledger }>();
+
+      const readMonth = (month: string) =>
+        Effect.gen(function* () {
+          const file = fileOf(month);
+          const mtime = yield* mtimeOf(file);
+          const cached = cache.get(month);
+          if (cached && cached.mtime === mtime) {
+            return cached.ledger;
+          }
+          const ledger =
+            mtime === undefined
+              ? EMPTY_LEDGER
+              : yield* fs.readFileString(file).pipe(
+                  Effect.map((text) => Option.getOrElse(decodeLedger(JSON.parse(text)), () => EMPTY_LEDGER)),
+                  // A damaged file starts over rather than failing every turn.
+                  Effect.catchCause(() => Effect.succeed(EMPTY_LEDGER)),
+                );
+          cache.set(month, { mtime, ledger });
+          return ledger;
+        });
+
+      /** The months on disk, `YYYY-MM`, oldest first. */
+      const months = fs.readDirectory(dir, { recursive: true }).pipe(
+        Effect.map((entries) =>
+          entries
+            .flatMap((entry) => {
+              const match = MONTH_FILE.exec(entry);
+              return match ? [`${match[1]}-${match[2]}`] : [];
+            })
+            .sort(),
+        ),
+        Effect.orElseSucceed((): string[] => []),
       );
 
-      const legacy = Effect.sync(() => Option.getOrElse(decodeLedger(context.globalState.get(LEGACY_KEY)), () => EMPTY_LEDGER));
-
-      const read = Effect.gen(function* () {
-        const mtime = yield* mtimeOf;
-        if (cache && cache.mtime === mtime) {
-          return cache.ledger;
+      /** Every month as one ledger. */
+      const readAll = Effect.gen(function* () {
+        const found = yield* months;
+        for (const month of cache.keys()) {
+          if (!found.includes(month)) {
+            cache.delete(month);
+          }
         }
-        const ledger =
-          mtime === undefined
-            ? yield* legacy
-            : yield* fs.readFileString(file).pipe(
-                Effect.map((text) => Option.getOrElse(decodeLedger(JSON.parse(text)), () => EMPTY_LEDGER)),
-                // A damaged file starts over rather than failing every turn.
-                Effect.catchCause(() => Effect.succeed(EMPTY_LEDGER)),
-              );
-        cache = { mtime, ledger };
-        return ledger;
+        return mergeLedgers(yield* Effect.forEach(found, readMonth));
       });
 
-      const write = (ledger: Ledger) =>
+      const writeMonth = (month: string, ledger: Ledger) =>
         Effect.gen(function* () {
-          yield* fs.makeDirectory(dir, { recursive: true });
+          const file = fileOf(month);
+          yield* fs.makeDirectory(path.dirname(file), { recursive: true });
           // Written aside, then renamed over: a reader never sees half a file.
           const temp = `${file}.${process.pid}.tmp`;
           yield* fs.writeFileString(temp, JSON.stringify(ledger));
           yield* fs.rename(temp, file);
-          cache = { mtime: yield* mtimeOf, ledger };
-          if (context.globalState.get(LEGACY_KEY) !== undefined) {
-            yield* thenable(() => context.globalState.update(LEGACY_KEY, undefined));
-          }
-          changed.fire();
-        }).pipe(
-          // Usage is a nicety: a failed write must not break the chat.
-          Effect.catch((err) => Effect.logWarning(`Saving usage failed: ${err.message}`)),
-        );
+          cache.set(month, { mtime: yield* mtimeOf(file), ledger });
+        });
 
-      const modify = (f: (ledger: Ledger, day: string, now: number) => Ledger) =>
+      /** Usage is a nicety: a failed write must not break the chat. */
+      const logFailure = Effect.catch((err: { message: string }) => Effect.logWarning(`Saving usage failed: ${err.message}`));
+
+      /** Splits the ledger earlier versions kept whole (in `usage.json`, or before that in globalState) into months. */
+      const migrate = Effect.gen(function* () {
+        if (yield* fs.exists(dir)) {
+          return;
+        }
+        const fromFile = yield* fs.readFileString(legacyFile).pipe(
+          Effect.map((text) => decodeLedger(JSON.parse(text))),
+          Effect.orElseSucceed(() => Option.none<Ledger>()),
+        );
+        const old = Option.orElse(fromFile, () => decodeLedger(context.globalState.get(LEGACY_KEY)));
+        if (Option.isSome(old)) {
+          yield* Effect.forEach(splitByMonth(old.value, monthOfTime), ([month, ledger]) => writeMonth(month, ledger), {
+            discard: true,
+          });
+        }
+        yield* fs.remove(legacyFile, { force: true });
+        if (context.globalState.get(LEGACY_KEY) !== undefined) {
+          yield* thenable(() => context.globalState.update(LEGACY_KEY, undefined));
+        }
+      }).pipe(logFailure);
+      yield* lock.withPermits(1)(migrate);
+
+      const modify = (f: (month: Ledger, all: Ledger, day: string, now: number) => Ledger) =>
         lock.withPermits(1)(
           Effect.gen(function* () {
             const day = yield* localDay(0);
             const now = DateTime.toEpochMillis(yield* DateTime.now);
-            yield* write(f(yield* read, day, now));
-          }),
+            const month = monthOf(day);
+            yield* writeMonth(month, f(yield* readMonth(month), yield* readAll, day, now));
+            changed.fire();
+          }).pipe(logFailure),
         );
 
       const recordTurn = (ref: SessionRef, usage: unknown) =>
-        modify((ledger, day, now) => addTurn(ledger, ref, usage, day, now)).pipe(Effect.withSpan("UsageLedger.recordTurn"));
+        modify((ledger, _, day, now) => addTurn(ledger, ref, usage, day, now)).pipe(Effect.withSpan("UsageLedger.recordTurn"));
 
+      // A session kept on from an earlier month has its last cost there.
       const recordCost = (ref: SessionRef, cost: Cost, previous?: Cost) =>
-        modify((ledger, day, now) => addCost(ledger, ref, cost, day, now, previous)).pipe(Effect.withSpan("UsageLedger.recordCost"));
+        modify((ledger, all, day, now) =>
+          addCost(ledger, ref, cost, day, now, all.sessions[sessionKey(ref.agentId, ref.sessionId)]?.lastCost ?? previous),
+        ).pipe(Effect.withSpan("UsageLedger.recordCost"));
 
       const session = (agentId: string, sessionId: string) =>
-        Effect.map(read, (ledger): Totals | undefined => {
+        Effect.map(readAll, (ledger): Totals | undefined => {
           const entry = ledger.sessions[sessionKey(agentId, sessionId)];
           return entry && { turns: entry.turns, tokens: entry.tokens, cost: entry.cost };
         });
 
       const summary = (query: SessionQuery, searchText?: (session: SessionEntry) => string) =>
         Effect.gen(function* () {
-          return summarize(yield* read, yield* localDay(0), yield* localDay(6), yield* localDay(29), query, searchText);
+          return summarize(yield* readAll, yield* localDay(0), yield* localDay(6), yield* localDay(29), query, searchText);
         });
 
-      const clear = lock.withPermits(1)(write(EMPTY_LEDGER));
+      const clear = lock.withPermits(1)(
+        Effect.gen(function* () {
+          yield* fs.remove(dir, { recursive: true, force: true });
+          cache.clear();
+          changed.fire();
+        }).pipe(logFailure),
+      );
 
       return UsageLedger.of({ onDidChange: changed.event, recordTurn, recordCost, session, summary, clear });
     }),

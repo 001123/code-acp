@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { addCost, addTurn, EMPTY_LEDGER, summarize, type Ledger } from "../src/usageLedger";
+import { addCost, addTurn, EMPTY_LEDGER, mergeLedgers, splitByMonth, summarize, type Ledger } from "../src/usageLedger";
 
 const ref = { agentId: "claude", sessionId: "s1", cwd: "/work/app", title: "Fix tests" };
 const usage = { totalTokens: 150, inputTokens: 100, outputTokens: 50, cachedReadTokens: 20, thoughtTokens: null };
@@ -102,5 +102,34 @@ describe("summarize", () => {
     );
     const byName = summarize(ledger, "2026-10-31", "2026-10-25", "2026-10-02", { text: "sonnet", limit: 10 }, () => "Claude Sonnet");
     assert.strictEqual(byName.sessionCount, 4);
+  });
+});
+
+describe("month files", () => {
+  const cost = (amount: number) => ({ amount, currency: "USD" });
+
+  it("sums a session kept on across months, keeping the later month's title and cost", () => {
+    const october = addCost(addTurn(EMPTY_LEDGER, ref, usage, "2026-10-31", 1), ref, cost(0.5), "2026-10-31", 2);
+    const renamed = { ...ref, title: "Fix more tests" };
+    const november = addTurn(EMPTY_LEDGER, renamed, usage, "2026-11-01", 3);
+    const merged = mergeLedgers([october, addCost(november, renamed, cost(0.75), "2026-11-01", 4, cost(0.5))]);
+    const session = merged.sessions["claude s1"]!;
+    assert.strictEqual(session.turns, 2);
+    assert.strictEqual(session.tokens.total, 300);
+    assert.closeTo(session.cost.USD!, 0.75, 1e-9);
+    assert.strictEqual(session.title, "Fix more tests");
+    assert.strictEqual(session.firstAt, 1);
+    assert.strictEqual(session.lastAt, 4);
+    assert.deepStrictEqual(session.lastCost, cost(0.75));
+    assert.deepStrictEqual(Object.keys(merged.days).sort(), ["2026-10-31", "2026-11-01"]);
+  });
+
+  it("splits a whole ledger by month without losing anything", () => {
+    let ledger = addTurn(EMPTY_LEDGER, ref, usage, "2026-09-30", Date.UTC(2026, 8, 30));
+    ledger = addTurn(ledger, { ...ref, sessionId: "s2" }, usage, "2026-10-01", Date.UTC(2026, 9, 1));
+    const months = splitByMonth(ledger, (ms) => new Date(ms).toISOString().slice(0, 7));
+    assert.deepStrictEqual([...months.keys()].sort(), ["2026-09", "2026-10"]);
+    assert.deepStrictEqual(Object.keys(months.get("2026-09")!.sessions), ["claude s1"]);
+    assert.deepStrictEqual(mergeLedgers([...months.values()]), ledger);
   });
 });
