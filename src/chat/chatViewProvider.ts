@@ -163,7 +163,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.view = view;
     const root = this.context.extensionUri;
     view.webview.options = { enableScripts: true, localResourceRoots: webviewRoots(root) };
-    view.webview.html = webviewHtml(view.webview, root, "chat", `${view.webview.cspSource} data:`);
+    view.webview.html = webviewHtml(view.webview, root, "chat", `${view.webview.cspSource} data: https://cdn.agentclientprotocol.com`);
     view.webview.onDidReceiveMessage((msg: FromWebview) => this.run(this.onMessage(msg), this.tabOf(msg)));
     view.onDidDispose(() => (this.view = undefined));
   }
@@ -202,6 +202,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       const agents = (yield* this.manager.agents).map((a) => ({
         id: a.id,
         name: a.version ? `${a.name} ${a.version}` : a.name,
+        icon: a.icon,
         update: pending.get(a.id),
       }));
       this.post({ type: "agent", agents, activeId });

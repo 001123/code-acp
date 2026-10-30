@@ -18,7 +18,7 @@ import { byName, triggerIn, type Suggestion, type Trigger } from "./suggestions"
 import { isTabDrag, type TabState } from "./tabs";
 import { splitTokens } from "../markdown";
 import { Tokens } from "./tokens";
-import { AgentSelect, FolderSelect, type AgentChoices } from "./toolbar";
+import { AgentPanel, FolderSelect, type AgentChoices } from "./toolbar";
 
 const MAX_DATA_BYTES = 20 * 1024 * 1024;
 
@@ -87,11 +87,15 @@ export interface ComposerOptions {
   error: (key: Parameters<Translate>[0], ...args: unknown[]) => void;
   setPreview: (preview: Preview | undefined) => void;
   setHover: (hover: Hover | undefined | ((h: Hover | undefined) => Hover | undefined)) => void;
+  /** Shown before the stop and send buttons. */
+  settings: ReactNode;
+  /** The session's config options, shown in the agent panel. */
+  agentConfig: ReactNode;
 }
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, activeFile, remote, update, error, setPreview, setHover } =
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, activeFile, remote, update, error, setPreview, setHover, settings, agentConfig } =
     options;
   const { t } = useL10n();
   const [includeFile, setIncludeFile] = useState(false);
@@ -584,6 +588,7 @@ export function useComposer(options: ComposerOptions) {
     <form
       id="composer"
       ref={form}
+      data-busy={busy || undefined}
       onSubmit={(e) => {
         e.preventDefault();
         submit(false);
@@ -767,7 +772,9 @@ export function useComposer(options: ComposerOptions) {
         />
       </div>
       <div id="actions">
-        <AgentSelect tab={tabs.find((x) => x.id === active)} choices={agents} />
+        <AgentPanel tab={tabs.find((x) => x.id === active)} choices={agents}>
+          {agentConfig}
+        </AgentPanel>
         <FolderSelect tab={tabs.find((x) => x.id === active)} folders={folders} />
         <label title={activeFile ? t("chat.includeFileNamed", activeFile) : t("chat.includeFile")}>
           <input type="checkbox" id="include-file" checked={includeFile} onChange={(e) => setIncludeFile(e.target.checked)} />
@@ -775,6 +782,7 @@ export function useComposer(options: ComposerOptions) {
           <span className="label-text">{activeFile ? activeFile.split("/").pop() : t("chat.includeFile")}</span>
         </label>
         <span className="spacer" />
+        {settings}
         <button
           type="button"
           id="cancel"

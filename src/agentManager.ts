@@ -39,6 +39,8 @@ export interface AgentChoice {
   readonly id: string;
   readonly name: string;
   readonly version?: string;
+  /** Registry icon URL (a monochrome SVG). */
+  readonly icon?: string;
 }
 
 /** Prefix of the ids of codeAcp.customAgents entries; keeps them apart from registry ids. */
@@ -340,7 +342,7 @@ export class AgentManager extends Context.Service<AgentManager, {
         list: Effect.map(state, Object.values),
         get: (id) => Effect.map(state, (agents) => agents[id]),
         agents: Effect.gen(function* () {
-          const installed = Object.values(yield* state).map(({ id, name, version }): AgentChoice => ({ id, name, version }));
+          const installed = Object.values(yield* state).map(({ id, name, version, icon }): AgentChoice => ({ id, name, version, icon }));
           const custom = [...(yield* customAgents)].map(([id, { name }]): AgentChoice => ({ id, name }));
           return [...installed, ...custom];
         }),

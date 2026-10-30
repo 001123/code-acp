@@ -1,15 +1,10 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { TabInfo, TerminalSnapshot, WorkspaceFolderInfo } from "../chat/protocol";
-import { Icon } from "./icon";
 import { Lightbox } from "./lightbox";
 import { useL10n, type Translate } from "./l10n";
 import { mount } from "./mount";
 import { useMessages } from "./vscode";
-import eyeIcon from "@tabler/icons/outline/eye.svg";
-import eyeOffIcon from "@tabler/icons/outline/eye-off.svg";
-import scrollIcon from "@tabler/icons/outline/arrow-bar-to-down.svg";
-import scrollOffIcon from "@tabler/icons/outline/arrow-bar-to-down-dashed.svg";
 import { ChangesBar } from "./chat/changes";
 import { HoverPreview, OpenPreview, ShownTab, Terminals, type Hover, type Preview } from "./chat/context";
 import { useComposer } from "./chat/composer";
@@ -17,7 +12,7 @@ import { HistoryView, type History } from "./chat/history";
 import { post } from "./chat/post";
 import { NEW_TAB, TabStrip, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
-import { ConfigSelect, UsageMeter, type AgentChoices } from "./chat/toolbar";
+import { ChatSettings, ConfigSelect, UsageMeter, type AgentChoices } from "./chat/toolbar";
 import { clipContent, contentText, groupActivity, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 
@@ -69,7 +64,6 @@ function App() {
     [active, status.busy, canFork, checkpointTurns],
   );
   const now = useNow(busySince !== undefined);
-  const elapsed = busySince !== undefined ? Math.max(0, now - busySince) : 0;
   const silent = busySince !== undefined ? Math.max(0, now - (lastActivity ?? busySince)) : 0;
 
   const update = (tab: number | undefined, f: (s: TabState) => TabState) => {
@@ -99,6 +93,30 @@ function App() {
     error,
     setPreview,
     setHover,
+    settings: (
+      <>
+        <UsageMeter usage={usage} compactAt={compactAt} />
+        <ChatSettings followAgent={followAgent} autoScroll={autoScroll} />
+      </>
+    ),
+    agentConfig:
+      active !== undefined &&
+      config.map((opt) =>
+        opt.type === "select" ? (
+          <ConfigSelect
+            key={opt.id}
+            tab={active}
+            option={opt}
+            // Shown right away; the agent's answer replaces the whole list.
+            onChange={(value) =>
+              update(active, (s) => ({
+                ...s,
+                config: s.config.map((o) => (o.id === opt.id ? ({ ...o, currentValue: value } as typeof o) : o)),
+              }))
+            }
+          />
+        ) : null,
+      ),
   });
 
   useMessages((msg) => {
@@ -356,68 +374,14 @@ function App() {
           {t("chat.dropHint")}
         </div>
         {active !== undefined && <ChangesBar tab={active} changes={changes} />}
-        <div id="status">
-          <span id="status-text">
-            {status.text}
-            {busySince !== undefined && elapsed >= 1000 && <span className="elapsed"> · {formatDuration(elapsed)}</span>}
-          </span>
-          <button id="login" hidden={!status.needsLogin} onClick={() => post({ type: "login" })}>
-            {t("chat.login")}
-          </button>
-          <button id="manage" hidden={!status.needsAgent} onClick={() => post({ type: "selectAgent" })}>
-            {t("chat.installAgent")}
-          </button>
-          <span className="spacer" />
-          <UsageMeter usage={usage} compactAt={compactAt} />
-        </div>
-        {composer.element}
-        <div id="toolbar">
-          <div
-            id="config"
-            // A vertical wheel scrolls the single row sideways.
-            onWheel={(e) => {
-              if (e.deltaX === 0) e.currentTarget.scrollLeft += e.deltaY;
-            }}
-          >
-            {active !== undefined &&
-              config.map((opt) =>
-                opt.type === "select" ? (
-                  <ConfigSelect
-                    key={opt.id}
-                    tab={active}
-                    option={opt}
-                    // Shown right away; the agent's answer replaces the whole list.
-                    onChange={(value) =>
-                      update(active, (s) => ({
-                        ...s,
-                        config: s.config.map((o) => (o.id === opt.id ? ({ ...o, currentValue: value } as typeof o) : o)),
-                      }))
-                    }
-                  />
-                ) : null,
-              )}
+        {(status.needsLogin || status.needsAgent) && (
+          <div id="status">
+            <span id="status-text">{status.text}</span>
+            {status.needsLogin && <button onClick={() => post({ type: "login" })}>{t("chat.login")}</button>}
+            {status.needsAgent && <button onClick={() => post({ type: "selectAgent" })}>{t("chat.installAgent")}</button>}
           </div>
-          <button
-            id="follow"
-            className="config-item"
-            title={t("chat.followAgent")}
-            aria-label={t("chat.followAgent")}
-            aria-pressed={followAgent}
-            onClick={() => post({ type: "setFollowAgent", enabled: !followAgent })}
-          >
-            <Icon svg={followAgent ? eyeIcon : eyeOffIcon} />
-          </button>
-          <button
-            id="auto-scroll"
-            className="config-item"
-            title={t("chat.autoScroll")}
-            aria-label={t("chat.autoScroll")}
-            aria-pressed={autoScroll}
-            onClick={() => post({ type: "setAutoScroll", enabled: !autoScroll })}
-          >
-            <Icon svg={autoScroll ? scrollIcon : scrollOffIcon} />
-          </button>
-        </div>
+        )}
+        {composer.element}
         {preview && (
           <Lightbox
             key={preview.src}

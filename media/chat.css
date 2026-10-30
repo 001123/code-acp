@@ -138,48 +138,6 @@ body {
 #new-tab:hover {
   background: var(--vscode-toolbar-hoverBackground);
 }
-/* Sits under the composer. */
-#toolbar {
-  margin-top: -4px;
-  padding: 0 10px 6px;
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-}
-#config:empty {
-  display: none;
-}
-/* Session config scrolls; the follow and auto-scroll toggles stay pinned at the end. */
-#config {
-  flex: 1;
-  min-width: 0;
-}
-#follow,
-#auto-scroll {
-  padding: 0 6px;
-  color: var(--vscode-descriptionForeground);
-  font: inherit;
-  font-size: 0.92em;
-  cursor: pointer;
-}
-#follow {
-  margin-left: auto;
-}
-#follow svg,
-#auto-scroll svg {
-  width: 14px;
-  height: 14px;
-}
-#follow:hover,
-#auto-scroll:hover {
-  color: var(--vscode-foreground);
-}
-#follow[aria-pressed="true"],
-#auto-scroll[aria-pressed="true"] {
-  color: var(--vscode-textLink-foreground);
-  background: color-mix(in srgb, var(--vscode-textLink-foreground) 14%, transparent);
-  border-color: color-mix(in srgb, var(--vscode-textLink-foreground) 35%, transparent);
-}
 button.link {
   background: none;
   color: var(--vscode-textLink-foreground);
@@ -196,19 +154,6 @@ button.output-more {
 }
 button.link:hover {
   background: var(--vscode-toolbar-hoverBackground);
-}
-#config {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 4px;
-  max-width: 100%;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-#config:hover {
-  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
 }
 .config-item {
   display: inline-flex;
@@ -694,43 +639,92 @@ pre.terminal-output {
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
 }
-#status-text:not(:empty)::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  border-radius: 50%;
-  vertical-align: middle;
-  background: var(--vscode-testing-iconPassed);
-}
-#status .elapsed {
-  font-variant-numeric: tabular-nums;
-}
 #usage {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  white-space: nowrap;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   cursor: default;
+  outline: none;
+  --usage-color: var(--vscode-progressBar-background);
 }
-#usage-meter {
-  width: 40px;
+#usage:hover,
+#usage:focus-visible {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+#usage svg {
+  width: 16px;
+  height: 16px;
+  /* Start the ring at 12 o'clock. */
+  transform: rotate(-90deg);
+}
+#usage circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+#usage .usage-track {
+  stroke: color-mix(in srgb, var(--vscode-foreground) 15%, transparent);
+}
+#usage .usage-fill {
+  stroke: var(--usage-color);
+  stroke-linecap: round;
+}
+#usage[data-level="medium"] {
+  --usage-color: var(--vscode-editorWarning-foreground);
+}
+#usage[data-level="high"] {
+  --usage-color: var(--vscode-editorError-foreground);
+}
+/* Opens upward on hover or focus, aligned to the ring's right edge. */
+#usage-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-menu-border, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#usage:hover #usage-panel,
+#usage:focus-visible #usage-panel {
+  display: flex;
+}
+#usage-panel .usage-head,
+#usage-panel .usage-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+#usage-panel .usage-head {
+  font-weight: 600;
+}
+#usage-panel .usage-row > :first-child {
+  color: var(--vscode-descriptionForeground);
+}
+#usage-panel .usage-bar {
+  display: block;
   height: 4px;
+  margin-bottom: 2px;
   border-radius: 2px;
   overflow: hidden;
   background: color-mix(in srgb, var(--vscode-foreground) 15%, transparent);
 }
-#usage-fill {
+#usage-panel .usage-bar > span {
   display: block;
   height: 100%;
-  background: var(--vscode-progressBar-background);
-}
-#usage[data-level="medium"] #usage-fill {
-  background: var(--vscode-editorWarning-foreground);
-}
-#usage[data-level="high"] #usage-fill {
-  background: var(--vscode-editorError-foreground);
+  background: var(--usage-color);
 }
 #status button {
   padding: 2px 8px;
@@ -747,9 +741,42 @@ pre.terminal-output {
   transition: border-color 0.15s, box-shadow 0.15s;
   position: relative;
 }
+/* A light sweeps around the border while the agent works. */
+@property --composer-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+#composer[data-busy] {
+  border-color: transparent;
+  background:
+    linear-gradient(var(--vscode-input-background), var(--vscode-input-background)) padding-box,
+    conic-gradient(
+        from var(--composer-angle),
+        color-mix(in srgb, var(--vscode-progressBar-background) 20%, transparent),
+        var(--vscode-progressBar-background) 25%,
+        color-mix(in srgb, var(--vscode-progressBar-background) 20%, transparent) 50%
+      )
+      border-box;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--vscode-progressBar-background) 25%, transparent), 0 2px 10px rgba(0, 0, 0, 0.18);
+  animation: composer-sweep 2.4s linear infinite;
+}
+@keyframes composer-sweep {
+  to {
+    --composer-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #composer[data-busy] {
+    animation: none;
+  }
+}
 #composer:focus-within {
   border-color: var(--vscode-focusBorder);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent), 0 2px 12px rgba(0, 0, 0, 0.22);
+}
+#composer[data-busy]:focus-within {
+  border-color: transparent;
 }
 #input {
   display: block;
@@ -855,19 +882,6 @@ mark.token.file:hover {
   gap: 6px;
   margin-top: 6px;
 }
-#agent {
-  height: 22px;
-  padding-left: 0;
-  font-size: 0.88em;
-}
-#agent select {
-  max-width: 160px;
-  padding-left: 9px;
-}
-#agent select:disabled {
-  cursor: default;
-  opacity: 0.8;
-}
 #agent-update {
   display: inline-flex;
   align-items: center;
@@ -972,6 +986,231 @@ mark.token.file:hover {
 #cancel {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
+}
+#chat-settings,
+#agent {
+  position: relative;
+  display: inline-flex;
+}
+/* A registry icon is a monochrome SVG: paint it with the text color. */
+.agent-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+#chat-settings > .icon-btn,
+#agent > .icon-btn {
+  background: none;
+  color: var(--vscode-descriptionForeground);
+}
+#chat-settings > .icon-btn:hover,
+#chat-settings > .icon-btn[aria-expanded="true"],
+#agent > .icon-btn:hover,
+#agent > .icon-btn[aria-expanded="true"] {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+/* A dot on the agent button when an update is available. */
+#agent > .icon-btn {
+  position: relative;
+}
+#agent > .icon-btn[data-update]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vscode-activityBarBadge-background, var(--vscode-button-background));
+}
+/* Menus open upward: the gear's aligned to its right edge, the agent's to its left. */
+#chat-settings-menu {
+  right: 0;
+}
+#agent-panel {
+  left: 0;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+}
+.popup-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  min-width: 200px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 10px;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-menu-border, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+#chat-settings-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+#chat-settings-menu > button:hover,
+#chat-settings-menu > button:focus-visible {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, inherit);
+  outline: none;
+}
+.popup-menu .menu-label {
+  flex: 1;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+}
+.panel-head .agent-switch {
+  flex: 1;
+  min-width: 0;
+}
+.submenu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px 4px 8px;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.panel-head .submenu-trigger {
+  padding-left: 4px;
+  font-weight: 600;
+}
+.submenu-trigger:hover,
+.submenu-trigger[aria-expanded="true"],
+.submenu-trigger:focus-visible {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, inherit);
+  outline: none;
+}
+.submenu-trigger .menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.submenu-value {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--vscode-descriptionForeground);
+}
+.submenu-chevron svg {
+  width: 12px;
+  height: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.panel-row > .submenu-trigger > .svg-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--vscode-descriptionForeground);
+}
+/* A sub-menu sits beside its row, placed in the viewport by the script. */
+.popup-menu.submenu {
+  position: fixed;
+  bottom: auto;
+  z-index: 30;
+  min-width: 160px;
+  max-width: min(320px, calc(100vw - 8px));
+  max-height: calc(100vh - 8px);
+  overflow-y: auto;
+}
+.submenu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.submenu > button .menu-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.submenu > button:hover,
+.submenu > button:focus-visible {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, inherit);
+  outline: none;
+}
+.menu-check svg {
+  width: 14px;
+  height: 14px;
+}
+.submenu > button[aria-checked="false"] .menu-check {
+  visibility: hidden;
+}
+.menu-heading {
+  padding: 6px 8px 2px;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+.menu-separator {
+  height: 1px;
+  margin: 3px 4px;
+  background: var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+}
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vscode-foreground) 22%, transparent);
+  transition: background 0.15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--vscode-foreground);
+  transition: transform 0.15s, background 0.15s;
+}
+[aria-checked="true"] > .switch {
+  background: var(--vscode-button-background);
+}
+[aria-checked="true"] > .switch::after {
+  transform: translateX(12px);
+  background: var(--vscode-button-foreground);
 }
 #cancel:not([hidden]) + #send {
   display: none;
@@ -1159,7 +1398,7 @@ button.chip-remove {
   border-color: var(--vscode-focusBorder);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 20%, transparent);
 }
-#history-search > svg {
+#history-search > .svg-icon svg {
   flex: none;
   width: 15px;
   height: 15px;
