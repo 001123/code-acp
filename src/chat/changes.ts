@@ -16,7 +16,7 @@ export interface ChangesHost {
   /** Saves the tabs (their checkpoints with them). */
   saveTabs(): void;
   run<E>(effect: Effect.Effect<void, E, AppServices>, tab: Tab): void;
-  openFile(file: string, line: number | undefined): Effect.Effect<void, VscodeError>;
+  openFile(file: string, line: number | undefined): Effect.Effect<void, VscodeError, AppServices>;
 }
 
 /** Asks before a change that can't be taken back; true to go ahead. */

@@ -1,3 +1,5 @@
+import { Effect } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -64,3 +66,27 @@ export function excludeGlob(): string {
   }
   return `{${[...globs].join(",")}}`;
 }
+
+/**
+ * The files of `uris` that git ignores (`.gitignore`, `info/exclude`, `core.excludesFile`), as paths. Files
+ * outside a git repository, or when git is missing, count as not ignored.
+ */
+export const gitIgnored = Effect.fn("gitIgnored")(function* (uris: ReadonlyArray<vscode.Uri>) {
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const byFolder = new Map<string, Array<string>>();
+  for (const uri of uris) {
+    const folder = folderOf(uri.fsPath);
+    if (folder) {
+      byFolder.set(folder.path, [...(byFolder.get(folder.path) ?? []), uri.fsPath]);
+    }
+  }
+  const outputs = yield* Effect.forEach(
+    byFolder,
+    ([cwd, files]) =>
+      spawner
+        .string(ChildProcess.make("git", ["-c", "core.quotePath=false", "check-ignore", "--", ...files], { cwd }))
+        .pipe(Effect.orElseSucceed(() => "")),
+    { concurrency: "unbounded" },
+  );
+  return new Set(outputs.flatMap((out) => out.split("\n").filter(Boolean).map((file) => path.resolve(file))));
+});

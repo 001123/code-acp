@@ -1,0 +1,72 @@
+/* Panel */
+main {
+  padding-top: 20px;
+}
+.panel-head {
+  margin-bottom: 14px;
+}
+h2 {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 16px;
+}
+
+.field {
+  padding: 14px 0;
+}
+.card > .field + .field {
+  border-top: 1px solid var(--border);
+}
+.field-head label {
+  display: block;
+  font-weight: 600;
+}
+.field-control {
+  margin-top: 8px;
+}
+.field.inline {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 16px;
+  align-items: center;
+}
+.field.inline .field-control {
+  margin-top: 0;
+}
+.field.inline .note {
+  grid-column: 1 / -1;
+}
+
+.desc {
+  color: var(--vscode-descriptionForeground);
+  margin-top: 2px;
+}
+.note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.92em;
+}
+.note.muted {
+  color: var(--vscode-descriptionForeground);
+}
+.note.error {
+  color: var(--vscode-errorForeground);
+}
+.note.warning {
+  color: var(--vscode-editorWarning-foreground);
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}

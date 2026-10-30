@@ -35,7 +35,7 @@ import {
   type Tab,
 } from "./tabs";
 import { replayedParts } from "./replay";
-import { cwdForNewTab, defaultCwd, excludeGlob, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
+import { cwdForNewTab, defaultCwd, excludeGlob, folderOf, gitIgnored, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
 
 /** `_meta` key on Claude agents' `usage_update` naming the model the usage belongs to. */
 const CLAUDE_MODEL_META = "_claude/model";
@@ -587,7 +587,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     yield* thenable(() => vscode.commands.executeCommand("vscode.open", uri, options));
   });
 
-  /** Workspace files ending in `file`: the only match, the picked one, `null` if the pick was dismissed. */
+  /** Workspace files ending in `file`, git-ignored ones left out: the only match, the picked one, `null` if the pick was dismissed. */
   private readonly findInWorkspace = Effect.fn("ChatView.findInWorkspace")(function* (file: string) {
     const name = file.replace(/^\.\//, "").replace(/\/$/, "");
     if (!name || name.split("/").includes("..")) {
@@ -595,7 +595,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     // Brackets and braces in a name are glob syntax; `[x]` matches the character itself.
     const glob = `**/${name.replace(/[[\]{}]/g, "[$&]")}`;
-    const uris = yield* thenable(() => vscode.workspace.findFiles(glob, excludeGlob(), 50));
+    const found = yield* thenable(() => vscode.workspace.findFiles(glob, excludeGlob(), 50));
+    // Build output and other ignored files only when nothing else matches.
+    const ignored = yield* gitIgnored(found);
+    const kept = found.filter((uri) => !ignored.has(uri.fsPath));
+    const uris = kept.length > 0 ? kept : found;
     if (uris.length <= 1) {
       return uris[0];
     }

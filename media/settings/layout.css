@@ -1,0 +1,119 @@
+/* Sections: a sidebar beside the panel; a scrolling strip above it when the view is narrow. */
+.layout {
+  display: grid;
+  /* As wide as the longest label, up to a cap; the panel takes the rest. */
+  grid-template-columns: fit-content(170px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.tabs {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 20px;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  border: none;
+  border-radius: var(--radius);
+  text-align: left;
+  white-space: nowrap;
+}
+.tab-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab:hover {
+  background: var(--surface-hover);
+  color: var(--vscode-foreground);
+}
+.tab[aria-selected="true"] {
+  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+  background: var(--vscode-list-activeSelectionBackground, var(--surface-hover));
+}
+.tab:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+@media (max-width: 600px) {
+  .layout {
+    display: block;
+  }
+  .tabs {
+    top: 0;
+    z-index: 1;
+    flex-direction: row;
+    padding-top: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+    background: var(--vscode-editor-background);
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs::-webkit-scrollbar {
+    height: 6px;
+  }
+  .tabs::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background);
+    border-radius: 3px;
+  }
+  .tabs:hover::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+  }
+  /* Fades the side with more tabs, so a cut-off strip reads as scrollable. */
+  .tabs.more-left {
+    mask-image: linear-gradient(to right, transparent, black 32px);
+  }
+  .tabs.more-right {
+    mask-image: linear-gradient(to left, transparent, black 32px);
+  }
+  .tabs.more-left.more-right {
+    mask-image: linear-gradient(to right, transparent, black 32px, black calc(100% - 32px), transparent);
+  }
+  .tab {
+    width: auto;
+    flex-shrink: 0;
+    padding: 9px 12px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+  }
+  .tab:hover,
+  .tab[aria-selected="true"] {
+    background: none;
+  }
+  .tab[aria-selected="true"] {
+    color: var(--vscode-foreground);
+    border-bottom-color: var(--vscode-focusBorder);
+  }
+}
+.count {
+  min-width: 16px;
+  padding: 0 5px;
+  font-size: 0.8em;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 8px;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.dot.warning {
+  background: var(--vscode-editorWarning-foreground);
+}
