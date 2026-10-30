@@ -1,9 +1,9 @@
-import { Clock, Context, Effect, Layer, Option, Result, Schema } from "effect";
+import { Context, Effect, Layer, Result } from "effect";
 import * as vscode from "vscode";
 import { AgentManager, installKind, type InstalledAgent } from "./agentManager";
 import { t } from "./i18n";
 import { AcpRegistry, type RegistryAgent } from "./registry";
-import { ExtensionCtx, messageOf, thenable } from "./runtime";
+import { messageOf, thenable } from "./runtime";
 import { readSettings } from "./settings";
 
 /** An installed agent whose registry entry has a different (newer) version. */
@@ -12,17 +12,11 @@ export interface AgentUpdate {
   readonly latest: RegistryAgent;
 }
 
-const LAST_CHECK_KEY = "codeAcp.lastUpdateCheck";
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-const decodeLastCheck = Schema.decodeUnknownOption(Schema.Finite);
-
 /** Finds registry updates for installed agents and installs them. */
 export class AgentUpdates extends Context.Service<AgentUpdates, {
   /**
    * Looks for updates in the registry, unless checks are off (codeAcp.checkAgentUpdates). Returns the ones to
-   * notify about: empty when a notification already went out in the last day (in any window) or the registry
-   * cannot be loaded.
+   * notify about: those not yet offered since the window opened; empty when the registry cannot be loaded.
    */
   readonly due: Effect.Effect<ReadonlyArray<AgentUpdate>>;
   /** Updates the last check found that are still not installed. */
@@ -35,7 +29,6 @@ export class AgentUpdates extends Context.Service<AgentUpdates, {
   static readonly layer = Layer.effect(
     AgentUpdates,
     Effect.gen(function* () {
-      const context = yield* ExtensionCtx;
       const manager = yield* AgentManager;
       const registry = yield* AcpRegistry;
 
@@ -43,6 +36,8 @@ export class AgentUpdates extends Context.Service<AgentUpdates, {
       yield* Effect.addFinalizer(() => Effect.sync(() => changed.dispose()));
       /** Registry entries of installed agents, by id, as of the last check. */
       let latest = new Map<string, RegistryAgent>();
+      /** `id@version` of the updates already offered in this window. */
+      const offered = new Set<string>();
 
       const pending = Effect.gen(function* () {
         return (yield* manager.list).flatMap((installed): Array<AgentUpdate> => {
@@ -65,13 +60,10 @@ export class AgentUpdates extends Context.Service<AgentUpdates, {
           return [];
         }
         yield* check;
-        const updates = yield* pending;
-        const now = yield* Clock.currentTimeMillis;
-        const last = Option.getOrElse(decodeLastCheck(context.globalState.get(LAST_CHECK_KEY)), () => 0);
-        if (!updates.length || now - last < CHECK_INTERVAL_MS) {
-          return [];
+        const updates = (yield* pending).filter((u) => !offered.has(`${u.latest.id}@${u.latest.version}`));
+        for (const u of updates) {
+          offered.add(`${u.latest.id}@${u.latest.version}`);
         }
-        yield* thenable(() => context.globalState.update(LAST_CHECK_KEY, now));
         return updates;
       }).pipe(
         Effect.catch((err) => Effect.logWarning(`[updates] check failed: ${messageOf(err)}`).pipe(Effect.as([]))),

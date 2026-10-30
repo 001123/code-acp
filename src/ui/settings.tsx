@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { AgentChoice } from "../agentManager";
-import type { CommitModel } from "../commitMessage";
+import type { AgentOptions } from "../sessionOptions";
 import type { FromWebview as SettingsMessage } from "../settingsPanel";
 import type { McpServerEntry, SettingKey } from "../settings";
 import { Icon } from "./icon";
@@ -27,12 +27,18 @@ interface State {
   activeId?: string;
 }
 
-/** Models loaded for the commit agent `agentId`; undefined `models` while loading. */
-interface Models {
+/** Options loaded for the agent `agentId` and its model `model`; neither `options` nor `error` while loading. */
+interface Loaded {
   agentId: string;
-  models?: ReadonlyArray<CommitModel>;
+  model: string;
+  options?: AgentOptions;
   error?: string;
 }
+
+/** Loaded options by agent and model. */
+type LoadedOptions = Readonly<Record<string, Loaded>>;
+
+const optionsKey = (agentId: string, model: string) => JSON.stringify([agentId, model]);
 
 const post = poster<SettingsMessage>();
 
@@ -94,7 +100,7 @@ function Field(props: {
   );
 }
 
-function Toggle(props: { id: string; checked: boolean; onChange: (checked: boolean) => void }) {
+function Toggle(props: { id: string; checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean }) {
   return (
     <span className="toggle">
       <input
@@ -102,6 +108,7 @@ function Toggle(props: { id: string; checked: boolean; onChange: (checked: boole
         type="checkbox"
         role="switch"
         checked={props.checked}
+        disabled={props.disabled}
         onChange={(e) => props.onChange(e.target.checked)}
       />
       <span className="track" aria-hidden />
@@ -423,6 +430,164 @@ function EntryList(props: { agents?: boolean; value: unknown; overridden: boolea
   );
 }
 
+/** Buttons of which one is picked, for a short list of choices. */
+function Segmented(props: {
+  id: string;
+  value: string | undefined;
+  options: ReadonlyArray<{ value: string; label: string; title?: string }>;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div id={props.id} className="segmented" role="radiogroup">
+      {props.options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={o.value === props.value}
+          title={o.title}
+          disabled={props.disabled}
+          onClick={() => o.value !== props.value && props.onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The agent and session settings of a feature that runs its own agent sessions (commit messages). */
+function AgentModelFields(props: {
+  id: string;
+  agentKey: SettingKey;
+  modelKey: SettingKey;
+  effortKey: SettingKey;
+  fastModeKey: SettingKey;
+  /** The effort setting's default, put back when another agent is picked. */
+  effortDefault: string;
+  agentDesc: MessageKey;
+  effortDesc: MessageKey;
+  state: State;
+  loaded: LoadedOptions;
+  load: (agentId: string, model: string) => void;
+}) {
+  const { t } = useL10n();
+  const { id, agentKey, modelKey, effortKey, fastModeKey, state } = props;
+  const str = (key: SettingKey, fallback = "") => (typeof state.values[key] === "string" ? (state.values[key] as string) : fallback);
+  const agent = str(agentKey);
+  const model = str(modelKey);
+  const effort = str(effortKey, props.effortDefault);
+  const fastMode = str(fastModeKey, "default");
+  const ready = state.agents.length > 0;
+  const loaded = props.loaded[optionsKey(agent, model)];
+  const loading = !loaded || (!loaded.options && loaded.error === undefined);
+  const options = loaded?.options;
+  // The agent's models don't depend on the model picked: those listed stay while another model's efforts load.
+  const models = options?.models ?? Object.values(props.loaded).find((l) => l.agentId === agent && l.options)?.options?.models;
+
+  // The agent's options are read as soon as the page shows them, then whenever another agent or model is picked.
+  useEffect(() => {
+    if (ready && !loaded) props.load(agent, model);
+  }, [ready, agent, model]);
+
+  const efforts = options?.efforts;
+  // "lowest" picks the first level the model has; empty (the agent's default) picks none.
+  const pickedEffort = effort === "lowest" && efforts?.length ? efforts[0]!.value : effort;
+  const unknownEffort = !!efforts && effort !== "" && effort !== "lowest" && !efforts.some((e) => e.value === effort);
+  // Until the levels are read, the setting alone is shown.
+  const effortChoices = efforts
+    ? efforts.map((e) => ({ value: e.value, label: e.name, title: e.description }))
+    : effort
+      ? [{ value: pickedEffort, label: effort === "lowest" ? t("settings.effortLowest") : effort }]
+      : [];
+  const effortNote = efforts?.find((e) => e.value === pickedEffort)?.description;
+
+  const noFastMode = !!options && !options.fastMode;
+  const fastOn = fastMode === "on" || (fastMode === "default" && options?.defaultFastMode === true);
+
+  return (
+    <>
+      <Field id={`${id}-agent`} label="settings.commitAgent" desc={props.agentDesc} overridden={state.overridden.includes(agentKey)}>
+        <select
+          id={`${id}-agent`}
+          value={agent}
+          onChange={(e) => {
+            set(agentKey, e.target.value);
+            // Another agent's options don't apply.
+            set(modelKey, "");
+            set(effortKey, props.effortDefault);
+            set(fastModeKey, "default");
+          }}
+        >
+          <option value="">{t("settings.commitAgentDefault")}</option>
+          {state.agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.version ? `${a.name} ${a.version}` : a.name}
+            </option>
+          ))}
+          {agent && !state.agents.some((a) => a.id === agent) && <option value={agent}>{agent}</option>}
+        </select>
+      </Field>
+      <Field
+        id={`${id}-model`}
+        label="settings.commitModel"
+        desc="settings.commitModelDesc"
+        overridden={state.overridden.includes(modelKey)}
+        error={loaded?.error}
+      >
+        <div className="row">
+          <select id={`${id}-model`} value={model} onChange={(e) => set(modelKey, e.target.value)}>
+            <option value="">{t("settings.commitModelDefault")}</option>
+            {models?.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.name}
+              </option>
+            ))}
+            {model && !models?.some((m) => m.value === model) && <option value={model}>{model}</option>}
+          </select>
+          <button className="secondary" disabled={loading} title={t("settings.reloadOptionsTitle")} onClick={() => props.load(agent, model)}>
+            {t("settings.reloadOptions")}
+          </button>
+        </div>
+        {loading && <div className="note muted">{t("settings.loadingOptions")}</div>}
+        {models?.length === 0 && <div className="note muted">{t("settings.noModels")}</div>}
+      </Field>
+      <Field id={`${id}-effort`} label="settings.effort" desc={props.effortDesc} overridden={state.overridden.includes(effortKey)}>
+        {efforts?.length === 0 ? (
+          <div className="note muted">{t("settings.noEfforts")}</div>
+        ) : (
+          <Segmented
+            id={`${id}-effort`}
+            value={pickedEffort}
+            options={effortChoices}
+            onChange={(value) => set(effortKey, value)}
+            disabled={!efforts}
+          />
+        )}
+        {effortNote && <div className="note muted">{effortNote}</div>}
+        {unknownEffort && <div className="note warning">{t("settings.effortNotOffered", effort)}</div>}
+      </Field>
+      <Field
+        id={`${id}-fast`}
+        label="settings.fastMode"
+        desc={noFastMode ? "settings.noFastMode" : "settings.fastModeDesc"}
+        overridden={state.overridden.includes(fastModeKey)}
+        inline
+      >
+        <Toggle
+          id={`${id}-fast`}
+          checked={fastOn}
+          // Left on while set, so it can be turned off.
+          disabled={noFastMode && !fastOn}
+          // Back to the agent's own state, nothing is kept in settings.json.
+          onChange={(checked) => set(fastModeKey, checked === (options?.defaultFastMode ?? false) ? "default" : checked ? "on" : "off")}
+        />
+      </Field>
+    </>
+  );
+}
+
 type Tab = "general" | "agent" | "commit" | "mcp" | "custom";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
@@ -439,7 +604,7 @@ const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: 
     label: "settings.commit",
     desc: "settings.commitDesc",
     icon: commitIcon,
-    keys: ["commitMessage.agent", "commitMessage.model", "commitMessage.instructions"],
+    keys: ["commitMessage.agent", "commitMessage.model", "commitMessage.effort", "commitMessage.fastMode", "commitMessage.instructions"],
   },
   { id: "mcp", label: "settings.mcp", desc: "settings.mcpDesc", icon: plugIcon, keys: ["mcpServers"] },
   {
@@ -459,6 +624,40 @@ function savedTab(): Tab {
 function Tabs(props: { active: Tab; onSelect: (tab: Tab) => void; badge: (tab: Tab) => ReactNode }) {
   const { t } = useL10n();
   const refs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+  const strip = useRef<HTMLElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+
+  // Which sides have tabs scrolled out of view, while the strip is horizontal (narrow views).
+  useEffect(() => {
+    const el = strip.current;
+    if (!el) return;
+    const measure = () => {
+      const left = el.scrollLeft > 1;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
+    };
+    // A vertical wheel (most mice) scrolls the strip sideways.
+    const wheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      el.scrollBy({ left: e.deltaY });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    el.addEventListener("scroll", measure, { passive: true });
+    el.addEventListener("wheel", wheel, { passive: false });
+    measure();
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("scroll", measure);
+      el.removeEventListener("wheel", wheel);
+    };
+  }, []);
+
+  // The selected tab is scrolled into view.
+  useEffect(() => {
+    refs.current[props.active]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [props.active]);
   const move = (delta: number) => {
     const i = TABS.findIndex((tab) => tab.id === props.active);
     const next = TABS[(i + delta + TABS.length) % TABS.length].id;
@@ -467,7 +666,8 @@ function Tabs(props: { active: Tab; onSelect: (tab: Tab) => void; badge: (tab: T
   };
   return (
     <nav
-      className="tabs"
+      ref={strip}
+      className={`tabs${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`}
       role="tablist"
       aria-label={t("settings.sections")}
       onKeyDown={(e) => {
@@ -504,7 +704,7 @@ function App() {
   const { t } = useL10n();
   const [state, setState] = useState<State>({ values: {}, overridden: [], agents: [] });
   const [envError, setEnvError] = useState<string>();
-  const [models, setModels] = useState<Models>();
+  const [loaded, setLoaded] = useState<LoadedOptions>({});
   const [tab, setTab] = useState(savedTab);
   const select = (next: Tab) => {
     setTab(next);
@@ -514,7 +714,7 @@ function App() {
   useMessages((msg) => {
     if (msg.type === "state") setState(msg);
     // Answers for an agent no longer selected are dropped.
-    if (msg.type === "models") setModels((m) => (m?.agentId === msg.agentId ? msg : m));
+    if (msg.type === "models") setLoaded((l) => ({ ...l, [optionsKey(msg.agentId, msg.model)]: msg }));
   });
   // After useMessages, so the listener is in place before the extension answers.
   useEffect(() => post({ type: "ready" }), []);
@@ -523,12 +723,9 @@ function App() {
   const str = (key: SettingKey, fallback = "") => (typeof v[key] === "string" ? (v[key] as string) : fallback);
   const overridden = (key: SettingKey) => state.overridden.includes(key);
   const env = formatPairs(v.env as Record<string, string> | undefined);
-  const commitAgent = str("commitMessage.agent");
-  const commitModel = str("commitMessage.model");
-  const loaded = models?.agentId === commitAgent ? models : undefined;
-  const loadModels = () => {
-    setModels({ agentId: commitAgent });
-    post({ type: "loadModels", agentId: commitAgent });
+  const load = (agentId: string, model: string) => {
+    setLoaded((l) => ({ ...l, [optionsKey(agentId, model)]: { agentId, model } }));
+    post({ type: "loadModels", agentId, model });
   };
   const mcpCount = serversOf(v.mcpServers).length;
   const customCount = serversOf(v.customAgents).length;
@@ -550,201 +747,161 @@ function App() {
         </button>
       </header>
 
-      <Tabs active={tab} onSelect={select} badge={badge} />
+      <div className="layout">
+        <Tabs active={tab} onSelect={select} badge={badge} />
 
-      <main id="panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        <div className="panel-head">
-          <h2>{t(current.label)}</h2>
-          <div className="desc">{t(current.desc)}</div>
-        </div>
+        <main id="panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+          <div className="panel-head">
+            <h2>{t(current.label)}</h2>
+            <div className="desc">{t(current.desc)}</div>
+          </div>
 
-        {tab === "general" && (
-          <section className="card">
-            <Field
-              id="language"
-              label="settings.language"
-              desc="settings.languageDesc"
-              overridden={overridden("language")}
-            >
-              <select id="language" value={str("language", "auto")} onChange={(e) => set("language", e.target.value)}>
-                <option value="auto">{t("settings.languageAuto")}</option>
-                <option value="en">English</option>
-                <option value="vi">Tiếng Việt</option>
-              </select>
-            </Field>
-            <Field
-              id="followAgent"
-              label="settings.followAgent"
-              desc="settings.followAgentDesc"
-              overridden={overridden("followAgent")}
-              inline
-            >
-              <Toggle id="followAgent" checked={v.followAgent === true} onChange={(checked) => set("followAgent", checked)} />
-            </Field>
-            <Field
-              id="autoScroll"
-              label="settings.autoScroll"
-              desc="settings.autoScrollDesc"
-              overridden={overridden("autoScroll")}
-              inline
-            >
-              <Toggle id="autoScroll" checked={v.autoScroll !== false} onChange={(checked) => set("autoScroll", checked)} />
-            </Field>
-          </section>
-        )}
-
-        {tab === "agent" && (
-          <section className="card">
-            <Field id="active-agent" label="settings.activeAgent" desc="settings.activeAgentDesc">
-              <div className="row">
-                <select
-                  id="active-agent"
-                  disabled={!state.agents.length}
-                  value={state.activeId ?? ""}
-                  onChange={(e) => post({ type: "use", id: e.target.value })}
-                >
-                  {!state.agents.length && <option value="">{t("settings.noAgents")}</option>}
-                  {state.agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.version ? `${a.name} ${a.version}` : a.name}
-                    </option>
-                  ))}
-                </select>
-                <button className="secondary" onClick={() => post({ type: "manageAgents" })}>
-                  {t("settings.manageAgents")}
-                </button>
-              </div>
-            </Field>
-            <Field
-              id="checkAgentUpdates"
-              label="settings.checkUpdates"
-              desc="settings.checkUpdatesDesc"
-              overridden={overridden("checkAgentUpdates")}
-              inline
-            >
-              <Toggle
-                id="checkAgentUpdates"
-                checked={v.checkAgentUpdates !== false}
-                onChange={(checked) => set("checkAgentUpdates", checked)}
-              />
-            </Field>
-            <Field
-              id="nodePath"
-              label="settings.nodePath"
-              desc="settings.nodePathDesc"
-              overridden={overridden("nodePath")}
-            >
-              <Text
-                id="nodePath"
-                placeholder="node"
-                value={str("nodePath")}
-                onCommit={(s) => set("nodePath", s.trim())}
-              />
-            </Field>
-            <Field
-              id="env"
-              label="settings.env"
-              desc="settings.envDesc"
-              overridden={overridden("env")}
-              error={envError}
-            >
-              <Text
-                id="env"
-                rows={4}
-                placeholder="KEY=VALUE"
-                value={env}
-                onReset={() => setEnvError(undefined)}
-                onCommit={(text) => {
-                  const parsed = parsePairs(text);
-                  if (typeof parsed === "number") {
-                    setEnvError(t("settings.envInvalid", parsed));
-                    return;
-                  }
-                  setEnvError(undefined);
-                  set("env", parsed);
-                }}
-              />
-            </Field>
-          </section>
-        )}
-
-        {tab === "commit" && (
-          <section className="card">
-            <Field
-              id="commit-agent"
-              label="settings.commitAgent"
-              desc="settings.commitAgentDesc"
-              overridden={overridden("commitMessage.agent")}
-            >
-              <select
-                id="commit-agent"
-                value={commitAgent}
-                onChange={(e) => {
-                  set("commitMessage.agent", e.target.value);
-                  // Another agent's models don't apply.
-                  set("commitMessage.model", "");
-                }}
+          {tab === "general" && (
+            <section className="card">
+              <Field
+                id="language"
+                label="settings.language"
+                desc="settings.languageDesc"
+                overridden={overridden("language")}
               >
-                <option value="">{t("settings.commitAgentDefault")}</option>
-                {state.agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.version ? `${a.name} ${a.version}` : a.name}
-                  </option>
-                ))}
-                {commitAgent && !state.agents.some((a) => a.id === commitAgent) && (
-                  <option value={commitAgent}>{commitAgent}</option>
-                )}
-              </select>
-            </Field>
-            <Field
-              id="commit-model"
-              label="settings.commitModel"
-              desc="settings.commitModelDesc"
-              overridden={overridden("commitMessage.model")}
-              error={loaded?.error}
-            >
-              <div className="row">
-                <select
-                  id="commit-model"
-                  value={commitModel}
-                  onChange={(e) => set("commitMessage.model", e.target.value)}
-                >
-                  <option value="">{t("settings.commitModelDefault")}</option>
-                  {loaded?.models?.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.name}
-                    </option>
-                  ))}
-                  {commitModel && !loaded?.models?.some((m) => m.value === commitModel) && (
-                    <option value={commitModel}>{commitModel}</option>
-                  )}
+                <select id="language" value={str("language", "auto")} onChange={(e) => set("language", e.target.value)}>
+                  <option value="auto">{t("settings.languageAuto")}</option>
+                  <option value="en">English</option>
+                  <option value="vi">Tiếng Việt</option>
                 </select>
-                <button className="secondary" disabled={!!loaded && !loaded.models} onClick={loadModels}>
-                  {loaded && !loaded.models ? t("settings.loadingModels") : t("settings.loadModels")}
-                </button>
-              </div>
-              {loaded?.models?.length === 0 && !loaded.error && <div className="note">{t("settings.noModels")}</div>}
-            </Field>
-            <Field
-              id="commit-instructions"
-              label="settings.commitInstructions"
-              desc="settings.commitInstructionsDesc"
-              overridden={overridden("commitMessage.instructions")}
-            >
-              <Text
-                id="commit-instructions"
-                rows={5}
-                value={str("commitMessage.instructions")}
-                onCommit={(s) => set("commitMessage.instructions", s.trim())}
+              </Field>
+              <Field
+                id="followAgent"
+                label="settings.followAgent"
+                desc="settings.followAgentDesc"
+                overridden={overridden("followAgent")}
+                inline
+              >
+                <Toggle id="followAgent" checked={v.followAgent === true} onChange={(checked) => set("followAgent", checked)} />
+              </Field>
+              <Field
+                id="autoScroll"
+                label="settings.autoScroll"
+                desc="settings.autoScrollDesc"
+                overridden={overridden("autoScroll")}
+                inline
+              >
+                <Toggle id="autoScroll" checked={v.autoScroll !== false} onChange={(checked) => set("autoScroll", checked)} />
+              </Field>
+            </section>
+          )}
+
+          {tab === "agent" && (
+            <section className="card">
+              <Field id="active-agent" label="settings.activeAgent" desc="settings.activeAgentDesc">
+                <div className="row">
+                  <select
+                    id="active-agent"
+                    disabled={!state.agents.length}
+                    value={state.activeId ?? ""}
+                    onChange={(e) => post({ type: "use", id: e.target.value })}
+                  >
+                    {!state.agents.length && <option value="">{t("settings.noAgents")}</option>}
+                    {state.agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.version ? `${a.name} ${a.version}` : a.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="secondary" onClick={() => post({ type: "manageAgents" })}>
+                    {t("settings.manageAgents")}
+                  </button>
+                </div>
+              </Field>
+              <Field
+                id="checkAgentUpdates"
+                label="settings.checkUpdates"
+                desc="settings.checkUpdatesDesc"
+                overridden={overridden("checkAgentUpdates")}
+                inline
+              >
+                <Toggle
+                  id="checkAgentUpdates"
+                  checked={v.checkAgentUpdates !== false}
+                  onChange={(checked) => set("checkAgentUpdates", checked)}
+                />
+              </Field>
+              <Field
+                id="nodePath"
+                label="settings.nodePath"
+                desc="settings.nodePathDesc"
+                overridden={overridden("nodePath")}
+              >
+                <Text
+                  id="nodePath"
+                  placeholder="node"
+                  value={str("nodePath")}
+                  onCommit={(s) => set("nodePath", s.trim())}
+                />
+              </Field>
+              <Field
+                id="env"
+                label="settings.env"
+                desc="settings.envDesc"
+                overridden={overridden("env")}
+                error={envError}
+              >
+                <Text
+                  id="env"
+                  rows={4}
+                  placeholder="KEY=VALUE"
+                  value={env}
+                  onReset={() => setEnvError(undefined)}
+                  onCommit={(text) => {
+                    const parsed = parsePairs(text);
+                    if (typeof parsed === "number") {
+                      setEnvError(t("settings.envInvalid", parsed));
+                      return;
+                    }
+                    setEnvError(undefined);
+                    set("env", parsed);
+                  }}
+                />
+              </Field>
+            </section>
+          )}
+
+          {tab === "commit" && (
+            <section className="card">
+              <AgentModelFields
+                id="commit"
+                agentKey="commitMessage.agent"
+                modelKey="commitMessage.model"
+                effortKey="commitMessage.effort"
+                fastModeKey="commitMessage.fastMode"
+                effortDefault="lowest"
+                agentDesc="settings.commitAgentDesc"
+                effortDesc="settings.commitEffortDesc"
+                state={state}
+                loaded={loaded}
+                load={load}
               />
-            </Field>
-          </section>
-        )}
+              <Field
+                id="commit-instructions"
+                label="settings.commitInstructions"
+                desc="settings.commitInstructionsDesc"
+                overridden={overridden("commitMessage.instructions")}
+              >
+                <Text
+                  id="commit-instructions"
+                  rows={5}
+                  value={str("commitMessage.instructions")}
+                  onCommit={(s) => set("commitMessage.instructions", s.trim())}
+                />
+              </Field>
+            </section>
+          )}
 
-        {tab === "mcp" && <EntryList value={v.mcpServers} overridden={overridden("mcpServers")} />}
+          {tab === "mcp" && <EntryList value={v.mcpServers} overridden={overridden("mcpServers")} />}
 
-        {tab === "custom" && <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} />}
-      </main>
+          {tab === "custom" && <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} />}
+        </main>
+      </div>
     </>
   );
 }

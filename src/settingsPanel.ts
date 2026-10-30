@@ -5,6 +5,7 @@ import { CommitMessage } from "./commitMessage";
 import { onDidChangeLocale, t, webviewL10n } from "./i18n";
 import { ManagerPanel } from "./managerPanel";
 import { runIn, thenable, type AppRuntime, type AppServices } from "./runtime";
+import { LOWEST_EFFORT } from "./sessionOptions";
 import { DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, SETTING_KEYS, type SettingKey } from "./settings";
 import { webviewHtml, webviewRoots } from "./webview";
 
@@ -14,8 +15,8 @@ export type FromWebview =
   | { type: "use"; id: string }
   | { type: "manageAgents" }
   | { type: "openNative" }
-  /** Asks the commit message agent for its models. */
-  | { type: "loadModels"; agentId: string };
+  /** Asks an agent (empty: the default one) for its models, and the efforts of `model` (empty: its default one). */
+  | { type: "loadModels"; agentId: string; model: string };
 
 /** Values equal to the default are removed from settings.json instead of written. */
 function isDefault(key: SettingKey, value: unknown): boolean {
@@ -24,6 +25,8 @@ function isDefault(key: SettingKey, value: unknown): boolean {
   if (key === "checkAgentUpdates") return value === true;
   if (key === "followAgent") return value === false;
   if (key === "autoScroll") return value === true;
+  if (key === "commitMessage.effort") return value === LOWEST_EFFORT;
+  if (key === "commitMessage.fastMode") return value === "default";
   // Empty is a real choice here: no extra instructions.
   if (key === "commitMessage.instructions") return value === DEFAULT_COMMIT_INSTRUCTIONS;
   if (Array.isArray(value)) return value.length === 0;
@@ -97,11 +100,11 @@ export class SettingsPanel {
         ManagerPanel.show(this.context, this.runtime, this.manager);
         break;
       case "loadModels": {
-        const result = yield* CommitMessage.use((commit) => commit.models(msg.agentId)).pipe(
-          Effect.map((models) => ({ models })),
-          Effect.catchTag("CommitMessageError", (err) => Effect.succeed({ models: [], error: err.message })),
+        const result = yield* CommitMessage.use((commit) => commit.options(msg.agentId, msg.model)).pipe(
+          Effect.map((options) => ({ options })),
+          Effect.catchTag("CommitMessageError", (err) => Effect.succeed({ error: err.message })),
         );
-        void this.panel.webview.postMessage({ type: "models", agentId: msg.agentId, ...result });
+        void this.panel.webview.postMessage({ type: "models", agentId: msg.agentId, model: msg.model, ...result });
         break;
       }
       case "openNative":

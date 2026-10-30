@@ -7,7 +7,7 @@ import loaderIcon from "@tabler/icons/outline/loader-2.svg";
 import packageIcon from "@tabler/icons/outline/package.svg";
 import playIcon from "@tabler/icons/outline/player-play.svg";
 import refreshIcon from "@tabler/icons/outline/refresh.svg";
-import settingsIcon from "@tabler/icons/outline/settings.svg";
+import backIcon from "@tabler/icons/outline/arrow-left.svg";
 import searchIcon from "@tabler/icons/outline/search.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import updateIcon from "@tabler/icons/outline/arrow-up-circle.svg";
@@ -142,7 +142,14 @@ function App() {
     <>
       <header>
         <div className="heading">
-          <h1>ACP Agents</h1>
+          <button
+            className="icon-button header-button"
+            title={t("manager.settings")}
+            onClick={() => post({ type: "settings" })}
+          >
+            <Icon svg={backIcon} />
+            {t("manager.settings")}
+          </button>
           <span className="count">{t("manager.count", agents.length)}</span>
         </div>
         <div className="search">
@@ -160,21 +167,14 @@ function App() {
           <span>{t("manager.installedOnly")}</span>
         </label>
         <button
-          className={"icon-button" + (state.loading ? " loading" : "")}
+          className={"icon-button header-button" + (state.loading ? " loading" : "")}
           disabled={state.loading}
           title={state.loading ? t("manager.loading") : t("manager.refresh")}
           aria-label={state.loading ? t("manager.loading") : t("manager.refresh")}
           onClick={() => post({ type: "refresh" })}
         >
           <Icon svg={refreshIcon} />
-        </button>
-        <button
-          className="icon-button"
-          title={t("manager.settings")}
-          aria-label={t("manager.settings")}
-          onClick={() => post({ type: "settings" })}
-        >
-          <Icon svg={settingsIcon} />
+          {state.loading ? t("manager.loading") : t("manager.refresh")}
         </button>
       </header>
       <div id="error" hidden={!state.error}>

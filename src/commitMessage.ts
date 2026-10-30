@@ -6,6 +6,7 @@ import { spawnAgent, type AcpAgent } from "./acpClient";
 import { AgentManager } from "./agentManager";
 import { t } from "./i18n";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
+import { agentOptions, configureSession, type AgentOptions } from "./sessionOptions";
 import { readSettings } from "./settings";
 import { defaultCwd } from "./workspace";
 
@@ -65,24 +66,6 @@ const DIFF_EXCLUDES = [
 ].map((name) => `:(exclude,glob)**/${name}`);
 const CANCELLED: acp.RequestPermissionResponse = { outcome: { outcome: "cancelled" } };
 
-/** A model the commit agent offers. */
-export interface CommitModel {
-  readonly value: string;
-  readonly name: string;
-}
-
-/** The session's model picker: the select option of category "model" (or id "model"). */
-const modelOption = (options: ReadonlyArray<acp.SessionConfigOption> | null | undefined) =>
-  options?.find(
-    (o): o is acp.SessionConfigOption & { type: "select" } =>
-      o.type === "select" && (o.category === "model" || o.id === "model"),
-  );
-
-const modelsOf = (option: acp.SessionConfigOption & { type: "select" }): Array<CommitModel> =>
-  option.options
-    .flatMap((o) => ("options" in o ? o.options : [o]))
-    .map((o) => ({ value: o.value, name: o.name }));
-
 const isCommitTarget = (arg: unknown): arg is CommitTarget =>
   Predicate.hasProperty(arg, "rootUri") &&
   arg.rootUri instanceof vscode.Uri &&
@@ -96,8 +79,11 @@ export class CommitMessage extends Context.Service<CommitMessage, {
   /** Commits with the message in the box (generating one when it is empty), then pushes. */
   commitAndPush(arg: unknown): Effect.Effect<void, CommitMessageError>;
   readonly cancel: Effect.Effect<void>;
-  /** Models of the agent `agentId` (empty: the default agent), read from a throwaway session. */
-  models(agentId: string): Effect.Effect<ReadonlyArray<CommitModel>, CommitMessageError>;
+  /**
+   * What the agent `agentId` (empty: the default agent) offers to pick, read from a throwaway session; the efforts
+   * are those of `model` (empty: the agent's default one).
+   */
+  options(agentId: string, model: string): Effect.Effect<AgentOptions, CommitMessageError>;
 }>()("code-acp/CommitMessage") {
   static readonly layer = Layer.effect(
     CommitMessage,
@@ -174,24 +160,6 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         return command;
       });
 
-      /** Picks the model named by the setting (by value, else by name); keeps the default when there is none. */
-      const selectModel = Effect.fn("CommitMessage.selectModel")(function* (
-        agent: AcpAgent,
-        session: acp.NewSessionResponse,
-        model: string,
-      ) {
-        const option = modelOption(session.configOptions);
-        const wanted = model.trim().toLowerCase();
-        const match = option && modelsOf(option).find((m) => m.value.toLowerCase() === wanted || m.name.toLowerCase() === wanted);
-        if (!option || !match) {
-          output.appendLine(`[commit] ${t("commit.modelNotFound", model)}`);
-          return;
-        }
-        if (option.currentValue !== match.value) {
-          yield* agent.setConfigOption(session.sessionId, option.id, match.value);
-        }
-      });
-
       const buildPrompt = (changes: Effect.Success<ReturnType<typeof collectChanges>>, instructions: string): string =>
         [
           "Write a git commit message for the changes below.",
@@ -240,9 +208,12 @@ export class CommitMessage extends Context.Service<CommitMessage, {
           });
           const session = yield* agent.newSession(cwd);
           sessionId = session.sessionId;
-          if (settings["commitMessage.model"].trim()) {
-            yield* selectModel(agent, session, settings["commitMessage.model"]);
-          }
+          yield* configureSession(
+            agent,
+            session,
+            { model: settings["commitMessage.model"], effort: settings["commitMessage.effort"], fastMode: settings["commitMessage.fastMode"] },
+            (what, value) => output.appendLine(`[commit] ${t(what === "model" ? "commit.modelNotFound" : "commit.effortNotFound", value)}`),
+          );
           const prompt = buildPrompt(changes, settings["commitMessage.instructions"]);
           yield* agent.prompt(sessionId, [{ type: "text", text: prompt }]).pipe(
             Effect.onInterrupt(() => Effect.sync(() => (target.inputBox.value = previous))),
@@ -265,15 +236,14 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         }),
       );
 
-      const models = Effect.fn("CommitMessage.models")(
-        function* (agentId: string) {
+      const options = Effect.fn("CommitMessage.options")(
+        function* (agentId: string, model: string) {
           const agent = yield* spawnAgent(yield* commandFor(agentId), {
             onUpdate: () => {},
             requestPermission: () => Effect.succeed(CANCELLED),
           });
           const session = yield* agent.newSession(defaultCwd());
-          const option = modelOption(session.configOptions);
-          return option ? modelsOf(option) : [];
+          return agentOptions(yield* configureSession(agent, session, { model, effort: "", fastMode: "default" }));
         },
         Effect.scoped,
         Effect.provideService(Output, output),
@@ -373,7 +343,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
       return CommitMessage.of({
         generate,
         commitAndPush,
-        models,
+        options,
         cancel: Effect.suspend(() => (stop ? Deferred.succeed(stop, undefined).pipe(Effect.asVoid) : Effect.void)),
       });
     }),

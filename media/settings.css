@@ -11,7 +11,7 @@ body {
   color: var(--vscode-foreground);
   padding: 0 24px 32px;
   margin: 0 auto;
-  max-width: 760px;
+  max-width: 980px;
   line-height: 1.45;
 }
 
@@ -39,43 +39,105 @@ h1 {
   margin: 0 auto 0 0;
 }
 
-/* Tabs */
+/* Sections: a sidebar beside the panel; a scrolling strip above it when the view is narrow. */
+.layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
 .tabs {
   position: sticky;
-  top: 0;
-  z-index: 1;
+  top: 16px;
   display: flex;
+  flex-direction: column;
   gap: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  background: var(--vscode-editor-background);
-  border-bottom: 1px solid var(--border);
+  padding-top: 20px;
 }
 .tab {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 9px 12px;
-  margin-bottom: -1px;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
   background: none;
   color: var(--vscode-descriptionForeground);
   border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius);
+  text-align: left;
   white-space: nowrap;
 }
+.tab-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .tab:hover {
-  background: none;
+  background: var(--surface-hover);
   color: var(--vscode-foreground);
 }
 .tab[aria-selected="true"] {
-  color: var(--vscode-foreground);
-  border-bottom-color: var(--vscode-focusBorder);
+  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+  background: var(--vscode-list-activeSelectionBackground, var(--surface-hover));
 }
 .tab:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
+}
+
+@media (max-width: 600px) {
+  .layout {
+    display: block;
+  }
+  .tabs {
+    top: 0;
+    z-index: 1;
+    flex-direction: row;
+    padding-top: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+    background: var(--vscode-editor-background);
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs::-webkit-scrollbar {
+    height: 6px;
+  }
+  .tabs::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background);
+    border-radius: 3px;
+  }
+  .tabs:hover::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+  }
+  /* Fades the side with more tabs, so a cut-off strip reads as scrollable. */
+  .tabs.more-left {
+    mask-image: linear-gradient(to right, transparent, black 32px);
+  }
+  .tabs.more-right {
+    mask-image: linear-gradient(to left, transparent, black 32px);
+  }
+  .tabs.more-left.more-right {
+    mask-image: linear-gradient(to right, transparent, black 32px, black calc(100% - 32px), transparent);
+  }
+  .tab {
+    width: auto;
+    flex-shrink: 0;
+    padding: 9px 12px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+  }
+  .tab:hover,
+  .tab[aria-selected="true"] {
+    background: none;
+  }
+  .tab[aria-selected="true"] {
+    color: var(--vscode-foreground);
+    border-bottom-color: var(--vscode-focusBorder);
+  }
 }
 .count {
   min-width: 16px;
@@ -249,6 +311,12 @@ select:focus {
   transform: translateX(16px);
   background: var(--vscode-button-foreground);
 }
+.toggle input:disabled {
+  cursor: default;
+}
+.toggle input:disabled + .track {
+  opacity: 0.5;
+}
 .toggle input:focus-visible + .track {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: 2px;
@@ -375,4 +443,24 @@ button.with-icon {
 }
 .mcp-editor > .row:last-child {
   margin-top: 14px;
+}
+
+/* A short list of choices of which one is picked (effort, fast mode). */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.segmented button {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  padding: 4px 12px;
+}
+.segmented button:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+.segmented button[aria-checked="true"],
+.segmented button[aria-checked="true"]:hover:not(:disabled) {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
 }

@@ -44,24 +44,23 @@ header {
 }
 .heading {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
   margin-right: auto;
-}
-h1 {
-  font-size: 1.4em;
-  font-weight: 600;
-  margin: 0;
 }
 .count {
   color: var(--vscode-descriptionForeground);
   font-size: 0.9em;
+  white-space: nowrap;
 }
 
 .search {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1 1 110px;
+  min-width: 110px;
+  max-width: 240px;
 }
 .search svg {
   position: absolute;
@@ -72,7 +71,9 @@ h1 {
   pointer-events: none;
 }
 #search {
-  width: 240px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   padding: 6px 10px 6px 30px;
   font: inherit;
   color: var(--vscode-input-foreground);
@@ -341,6 +342,9 @@ button.icon-button {
 }
 button.icon-button:hover {
   background: var(--surface-hover);
+}
+button.header-button {
+  padding: 6px 12px;
 }
 button.icon-button.danger:hover {
   color: var(--vscode-errorForeground);

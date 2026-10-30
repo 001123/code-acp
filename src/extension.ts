@@ -62,7 +62,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       );
     }
   });
-  // Polls hourly so the agent picker shows new releases; `due` notifies at most once a day.
+  // Checks on startup, then polls hourly so the agent picker shows new releases; `due` offers each version once per window.
   void run(offerUpdates)();
   const updateTimer = setInterval(run(offerUpdates), UPDATE_POLL_MS);
 

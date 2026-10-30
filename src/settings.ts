@@ -1,5 +1,6 @@
 import { Option, Schema } from "effect";
 import * as vscode from "vscode";
+import { LOWEST_EFFORT } from "./sessionOptions";
 
 /** One entry of codeAcp.mcpServers, in the `.mcp.json` shape: stdio when `url` is absent. */
 export const McpServerEntry = Schema.Union([
@@ -25,6 +26,8 @@ export const CustomAgentEntry = Schema.Struct({
 });
 export type CustomAgentEntry = typeof CustomAgentEntry.Type;
 
+const FastModeSetting = Schema.Literals(["default", "on", "off"]);
+
 /** Schemas of the codeAcp.* settings; keep in sync with `contributes.configuration` in package.json. */
 export const Settings = Schema.Struct({
   language: Schema.Literals(["auto", "en", "vi"]),
@@ -32,7 +35,7 @@ export const Settings = Schema.Struct({
   customAgents: Schema.Record(Schema.String, CustomAgentEntry),
   env: Schema.Record(Schema.String, Schema.String),
   nodePath: Schema.String,
-  /** Look for agent updates in the ACP Registry once a day and offer to install them. */
+  /** Look for agent updates in the ACP Registry on startup and offer to install them. */
   checkAgentUpdates: Schema.Boolean,
   /** Open the files the agent reads and edits in the editor, at the line it is on. */
   followAgent: Schema.Boolean,
@@ -43,6 +46,10 @@ export const Settings = Schema.Struct({
   /** Model value (or name) to pick in the commit session; empty keeps the agent's default. */
   "commitMessage.model": Schema.String,
   "commitMessage.instructions": Schema.String,
+  /** Level of thinking to pick in the commit session; empty keeps the agent's default, "lowest" the least. */
+  "commitMessage.effort": Schema.String,
+  /** Turn the agent's fast mode on or off in the commit session; "default" leaves it as it is. */
+  "commitMessage.fastMode": FastModeSetting,
   /** Extra MCP servers for every session, by name. */
   mcpServers: Schema.Record(Schema.String, McpServerEntry),
 });
@@ -60,6 +67,8 @@ export const SETTING_KEYS = [
   "commitMessage.agent",
   "commitMessage.model",
   "commitMessage.instructions",
+  "commitMessage.effort",
+  "commitMessage.fastMode",
   "mcpServers",
 ] as const satisfies ReadonlyArray<SettingKey>;
 
@@ -78,6 +87,9 @@ const DEFAULTS: Settings = {
   "commitMessage.agent": "",
   "commitMessage.model": "",
   "commitMessage.instructions": DEFAULT_COMMIT_INSTRUCTIONS,
+  // A commit message wants a quick answer more than a long thought.
+  "commitMessage.effort": LOWEST_EFFORT,
+  "commitMessage.fastMode": "default",
   mcpServers: {},
 };
 
@@ -104,6 +116,8 @@ export function readSettings(): Settings {
     "commitMessage.agent": read("commitMessage.agent"),
     "commitMessage.model": read("commitMessage.model"),
     "commitMessage.instructions": read("commitMessage.instructions"),
+    "commitMessage.effort": read("commitMessage.effort"),
+    "commitMessage.fastMode": read("commitMessage.fastMode"),
     mcpServers: read("mcpServers"),
   };
 }

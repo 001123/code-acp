@@ -410,6 +410,17 @@
           "default": "",
           "description": "%config.commitMessage.model%"
         },
+        "codeAcp.commitMessage.effort": {
+          "type": "string",
+          "default": "lowest",
+          "description": "%config.commitMessage.effort%"
+        },
+        "codeAcp.commitMessage.fastMode": {
+          "type": "string",
+          "enum": ["default", "on", "off"],
+          "default": "default",
+          "description": "%config.commitMessage.fastMode%"
+        },
         "codeAcp.commitMessage.instructions": {
           "type": "string",
           "default": "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Write a single subject line only, no body.",
