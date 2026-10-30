@@ -1,5 +1,6 @@
 {
   "description": "Chat with coding agents over the Agent Client Protocol, install agents from the ACP Registry",
+  "view.chat": "Threads",
   "view.drop": "Attach",
   "command.manageAgents": "Code ACP: Manage Agents",
   "command.selectAgent": "Code ACP: Select Agent",

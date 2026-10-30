@@ -1,5 +1,6 @@
 {
   "description": "Chat với các coding agent qua Agent Client Protocol, cài agent từ ACP Registry",
+  "view.chat": "Threads",
   "view.drop": "Đính kèm",
   "command.manageAgents": "Code ACP: Quản lý agent",
   "command.selectAgent": "Code ACP: Chọn agent",

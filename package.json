@@ -45,7 +45,7 @@
         {
           "type": "webview",
           "id": "codeAcp.chat",
-          "name": "Chat",
+          "name": "%view.chat%",
           "icon": "media/icon.svg",
           "initialSize": 10
         },
