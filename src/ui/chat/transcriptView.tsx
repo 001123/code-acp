@@ -21,7 +21,7 @@ import checkIcon from "@tabler/icons/outline/check.svg";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { clip, contentText, fileLinkTokens, type ActivityItem, type Item, type Text } from "./transcript";
-import { Tokens } from "./tokens";
+import { TokenMark, type Token } from "./tokens";
 
 const HOVER_WIDTH = 240;
 const HOVER_HEIGHT = 180;
@@ -339,6 +339,20 @@ function SentAttachments({ attachments }: { attachments: SentAttachment[] }) {
   );
 }
 
+/** A user message as Markdown, typed newlines kept, with its attachment tokens highlighted. */
+function UserText({ text, tokens }: { text: string; tokens: Token[] }) {
+  return (
+    <MarkdownView
+      className="md"
+      text={text}
+      breaks
+      onOpenFile={openFile}
+      tokens={tokens.map((x) => x.token)}
+      renderToken={(i) => <TokenMark token={tokens[i]!} />}
+    />
+  );
+}
+
 /** One transcript entry; memoized so a streamed chunk only re-renders the entry it extends. */
 export const ItemView = memo(function ItemView({ item }: { item: Item }) {
   const { t } = useL10n();
@@ -349,7 +363,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
       const replayed = fileLinkTokens(item.text);
       return (
         <div className="msg user">
-          <Tokens text={replayed.text} tokens={[...(item.tokens ?? []), ...replayed.tokens]} />
+          <UserText text={replayed.text} tokens={[...(item.tokens ?? []), ...replayed.tokens]} />
           <MessageActions turn={item.turn} text={replayed.text} />
         </div>
       );
@@ -364,7 +378,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
     case "userMessage":
       return (
         <div className="msg user">
-          <Tokens text={item.text} tokens={item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []))} />
+          <UserText text={item.text} tokens={item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []))} />
           <SentAttachments attachments={item.attachments.filter((a) => !a.token)} />
           <MessageActions turn={item.turn} text={item.text} />
         </div>

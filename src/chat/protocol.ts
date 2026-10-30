@@ -43,6 +43,8 @@ export type FromWebview =
   /** Moves `tab` to another workspace folder; it starts over in a fresh session there. */
   | { type: "setCwd"; tab: number; cwd: string }
   | { type: "manageAgents" }
+  /** Installs the registry version the agent picker offers for agent `id`. */
+  | { type: "updateAgent"; id: string }
   | { type: "permission"; id: number; optionId: string | null }
   | { type: "setConfig"; tab: number; configId: string; value: string }
   /** A file path from agent output; relative paths resolve against the tab's folder. `line` is 1-based. */

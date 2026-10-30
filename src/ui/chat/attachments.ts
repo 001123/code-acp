@@ -48,6 +48,18 @@ export function editText(el: HTMLTextAreaElement, text: string, start: number, e
   if (!document.execCommand(text ? "insertText" : "delete", false, text)) el.setRangeText(text, start, end, "end");
 }
 
+/** True when `at` sits inside an unclosed ``` or ~~~ block, where Enter adds a line instead of sending. */
+export function inCodeFence(text: string, at: number): boolean {
+  let fence: string | undefined;
+  for (const line of text.slice(0, at).split("\n")) {
+    const m = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (!m) continue;
+    if (!fence) fence = m[1];
+    else if (m[1]![0] === fence[0] && m[1]!.length >= fence.length && !line.slice(m[0].length).trim()) fence = undefined;
+  }
+  return fence !== undefined;
+}
+
 /** URIs from VS Code (explorer, tabs) or other apps, one per line; "#" lines are comments. */
 export function urisFrom(dt: DataTransfer): string[] {
   const raw = dt.getData("application/vnd.code.uri-list") || dt.getData("text/uri-list");

@@ -868,6 +868,27 @@ mark.token.file:hover {
   cursor: default;
   opacity: 0.8;
 }
+#agent-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 11px;
+  font-size: 0.88em;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  cursor: pointer;
+}
+#agent-update:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+#agent-update svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
 #folder {
   height: 22px;
   font-size: 0.88em;
@@ -1229,6 +1250,7 @@ button.chip-remove {
 
 /* Markdown (src/ui/markdown.tsx) */
 .msg.md,
+.msg.user > .md,
 .thought .text.md {
   white-space: normal;
 }

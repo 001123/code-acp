@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { canFork, spawnAgent, type AgentRequestError, type AgentStartError } from "../acpClient";
 import type { AgentManager } from "../agentManager";
+import type { AgentUpdate, AgentUpdates } from "../agentUpdates";
 import { ClaudeSettings } from "../claudeSettings";
 import { Completions } from "../completions";
 import { ChangeSet } from "../fileChanges";
@@ -101,6 +102,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private readonly context: vscode.ExtensionContext,
     private readonly runtime: AppRuntime,
     private readonly manager: AgentManager["Service"],
+    private readonly updates: AgentUpdates["Service"],
   ) {
     this.tabs = new TabList(context.workspaceState.get(TABS_KEY), defaultCwd);
     this.nextTurn = this.tabs.lastTurn + 1;
@@ -121,6 +123,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           }),
         ),
       ),
+      updates.onDidChange(() => this.run(this.postAgent)),
       this.changes,
       this.follower,
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -191,13 +194,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.post({ type: "activeFile", name: activeFileName() });
   }
 
-  /** The composer's agent picker: installed and custom agents, and the default for new tabs. */
+  /** The composer's agent picker: installed and custom agents, their pending updates, and the default for new tabs. */
   private get postAgent(): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       const activeId = yield* this.manager.activeId;
+      const pending = new Map((yield* this.updates.pending).map((u) => [u.installed.id, u.latest.version]));
       const agents = (yield* this.manager.agents).map((a) => ({
         id: a.id,
         name: a.version ? `${a.name} ${a.version}` : a.name,
+        update: pending.get(a.id),
       }));
       this.post({ type: "agent", agents, activeId });
     });
@@ -385,6 +390,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "manageAgents":
         yield* thenable(() => vscode.commands.executeCommand("codeAcp.manageAgents"));
         break;
+      case "updateAgent": {
+        const update = (yield* this.updates.pending).find((u) => u.installed.id === msg.id);
+        if (update) {
+          yield* this.updateAgents([update]);
+        }
+        break;
+      }
       case "permission":
         this.permissions.answer(msg.id, msg.optionId);
         break;
@@ -1485,6 +1497,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     } else {
       yield* agent.authenticate(picked.id);
       yield* this.ensureSession(this.tabs.active);
+    }
+  });
+
+  /** Installs the updates, then offers to restart the updated agents that are running on the old version. */
+  readonly updateAgents = Effect.fn("ChatView.updateAgents")(function* (
+    this: ChatViewProvider,
+    updates: ReadonlyArray<AgentUpdate>,
+  ) {
+    const updated = yield* this.updates.install(updates);
+    if (!updated.length) {
+      return;
+    }
+    const list = updated.map((agent) => `${agent.name} ${agent.version}`).join(", ");
+    const running = updated.filter((agent) => this.agents.ids().includes(agent.id));
+    if (!running.length) {
+      void vscode.window.showInformationMessage(t("updates.done", list));
+      return;
+    }
+    const restart = t("updates.restart");
+    const picked = yield* thenable(() => vscode.window.showInformationMessage(t("updates.doneRestart", list), restart));
+    if (picked === restart) {
+      for (const agent of running) {
+        yield* this.restart(agent.id);
+      }
     }
   });
 

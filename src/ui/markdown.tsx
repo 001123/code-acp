@@ -1,6 +1,8 @@
 import { mount, render, type Mounted } from "pele";
-import { memo, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import type { ElementContent, Root, RootContent } from "hast";
+import { memo, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
 /**
@@ -105,21 +107,89 @@ const components: Components = {
   },
 };
 
+/**
+ * Splits `text` at the first occurrence of each item's token; an item whose token is gone from the text is left out.
+ * At the same position the longer token wins, so "@a.ts (2)" isn't read as "@a.ts".
+ */
+export function splitTokens<T extends { token: string }>(text: string, items: Iterable<T>): Array<string | T> {
+  const left = [...items].sort((a, b) => b.token.length - a.token.length);
+  const out: Array<string | T> = [];
+  let from = 0;
+  for (;;) {
+    let next: { at: number; item: T } | undefined;
+    for (const item of left) {
+      const at = text.indexOf(item.token, from);
+      if (at >= 0 && (!next || at < next.at)) next = { at, item };
+    }
+    if (!next) break;
+    if (next.at > from) out.push(text.slice(from, next.at));
+    out.push(next.item);
+    left.splice(left.indexOf(next.item), 1);
+    from = next.at + next.item.token.length;
+  }
+  if (from < text.length) out.push(text.slice(from));
+  return out;
+}
+
 const remarkPlugins = [remarkGfm];
+const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks];
+
+/** Wraps the first occurrence of each token outside code in `<mark data-token-index>`, in document order. */
+function rehypeTokens(tokens: readonly string[]) {
+  return () => (tree: Root) => {
+    const left = tokens.map((token, index) => ({ token, index }));
+    const walk = <T extends ElementContent>(children: T[]): (T | ElementContent)[] =>
+      children.flatMap((child): (T | ElementContent)[] => {
+        if (child.type === "element") {
+          if (child.tagName !== "code" && child.tagName !== "pre") child.children = walk(child.children);
+          return [child];
+        }
+        if (child.type !== "text" || left.length === 0) return [child];
+        return splitTokens(child.value, left).map((part): ElementContent => {
+          if (typeof part === "string") return { type: "text", value: part };
+          left.splice(left.indexOf(part), 1);
+          return {
+            type: "element",
+            tagName: "mark",
+            properties: { dataTokenIndex: part.index },
+            children: [{ type: "text", value: part.token }],
+          };
+        });
+      });
+    tree.children = tree.children.flatMap((child): RootContent[] => (child.type === "doctype" ? [child] : walk([child])));
+  };
+}
 
 /**
  * Agent text rendered as GitHub-flavored Markdown; ```mermaid blocks become diagrams. Local links and
- * inline code that names a file call `onOpenFile`.
+ * inline code that names a file call `onOpenFile`. Each of `tokens` found outside code is drawn by `renderToken`.
  */
 export const MarkdownView = memo(function MarkdownView({
   text,
   className,
   onOpenFile,
+  breaks,
+  tokens,
+  renderToken,
 }: {
   text: string;
   className?: string;
   onOpenFile?: (ref: FileRef) => void;
+  /** A single newline breaks the line, as typed in the composer. */
+  breaks?: boolean;
+  tokens?: readonly string[];
+  renderToken?: (index: number) => ReactNode;
 }) {
+  const rehypePlugins = tokens && tokens.length > 0 && renderToken ? [rehypeTokens(tokens)] : undefined;
+  const parts: Components = rehypePlugins
+    ? {
+        ...components,
+        mark: ({ node, children, ...props }) => {
+          const index = node?.properties.dataTokenIndex;
+          return typeof index === "number" ? renderToken!(index) : <mark {...props}>{children}</mark>;
+        },
+      }
+    : components;
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const target = (e.target as Element).closest<HTMLElement>("[data-file]");
     if (!target || !onOpenFile) return;
@@ -129,7 +199,11 @@ export const MarkdownView = memo(function MarkdownView({
   };
   return (
     <div className={className} onClick={onClick}>
-      <Markdown remarkPlugins={remarkPlugins} components={components}>
+      <Markdown
+        remarkPlugins={breaks ? remarkPluginsWithBreaks : remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={parts}
+      >
         {text}
       </Markdown>
     </div>

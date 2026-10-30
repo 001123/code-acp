@@ -3,6 +3,7 @@ import type { TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import adjustmentsIcon from "@tabler/icons/outline/adjustments.svg";
+import updateIcon from "@tabler/icons/outline/cloud-download.svg";
 import boltIcon from "@tabler/icons/outline/bolt.svg";
 import brainIcon from "@tabler/icons/outline/brain.svg";
 import cpuIcon from "@tabler/icons/outline/cpu.svg";
@@ -63,42 +64,60 @@ export function ConfigSelect({
 }
 
 export interface AgentChoices {
-  agents: ReadonlyArray<{ id: string; name: string }>;
+  /** `update`: the newer registry version the agent can be updated to. */
+  agents: ReadonlyArray<{ id: string; name: string; update?: string }>;
   activeId?: string;
 }
 
 const MANAGE_AGENTS = "\0manage";
 
-/** Picks the tab's agent from the installed and custom ones; the last entry opens the agent manager. */
+/**
+ * Picks the tab's agent from the installed and custom ones; the last entry opens the agent manager. A button beside
+ * it installs the picked agent's update.
+ */
 export function AgentSelect({ tab, choices }: { tab: TabInfo | undefined; choices: AgentChoices }) {
   const { t } = useL10n();
   const { agents, activeId } = choices;
   // A tab without a pick yet gets the default.
   const picked = tab?.agentId ?? activeId;
-  const value = agents.find((a) => a.id === picked)?.id ?? "";
+  const current = agents.find((a) => a.id === picked);
+  const value = current?.id ?? "";
   return (
-    <span id="agent" className="config-item" title={t("chat.switchAgent")}>
-      <select
-        value={value}
-        onChange={(e) => {
-          const id = e.target.value;
-          if (id === MANAGE_AGENTS) post({ type: "manageAgents" });
-          else if (id && tab) post({ type: "setAgent", tab: tab.id, id });
-        }}
-      >
-        {value === "" && (
-          <option value="" disabled>
-            {t("chat.noAgentSelected")}
-          </option>
-        )}
-        {agents.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-        <option value={MANAGE_AGENTS}>{t("chat.manageAgents")}</option>
-      </select>
-    </span>
+    <>
+      <span id="agent" className="config-item" title={t("chat.switchAgent")}>
+        <select
+          value={value}
+          onChange={(e) => {
+            const id = e.target.value;
+            if (id === MANAGE_AGENTS) post({ type: "manageAgents" });
+            else if (id && tab) post({ type: "setAgent", tab: tab.id, id });
+          }}
+        >
+          {value === "" && (
+            <option value="" disabled>
+              {t("chat.noAgentSelected")}
+            </option>
+          )}
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.update ? `${a.name} ↑ ${a.update}` : a.name}
+            </option>
+          ))}
+          <option value={MANAGE_AGENTS}>{t("chat.manageAgents")}</option>
+        </select>
+      </span>
+      {current?.update && (
+        <button
+          type="button"
+          id="agent-update"
+          title={t("chat.updateAgent", current.update)}
+          onClick={() => post({ type: "updateAgent", id: current.id })}
+        >
+          <Icon svg={updateIcon} />
+          <span className="label-text">{current.update}</span>
+        </button>
+      )}
+    </>
   );
 }
 

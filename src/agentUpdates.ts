@@ -20,12 +20,17 @@ const decodeLastCheck = Schema.decodeUnknownOption(Schema.Finite);
 /** Finds registry updates for installed agents and installs them. */
 export class AgentUpdates extends Context.Service<AgentUpdates, {
   /**
-   * Updates found by a background check: empty when checks are off (codeAcp.checkAgentUpdates),
-   * already ran in the last day (in any window) or the registry cannot be loaded.
+   * Looks for updates in the registry, unless checks are off (codeAcp.checkAgentUpdates). Returns the ones to
+   * notify about: empty when a notification already went out in the last day (in any window) or the registry
+   * cannot be loaded.
    */
   readonly due: Effect.Effect<ReadonlyArray<AgentUpdate>>;
-  /** Installs the updates one by one behind a progress notification, then reports the outcome. */
-  install(updates: ReadonlyArray<AgentUpdate>): Effect.Effect<void>;
+  /** Updates the last check found that are still not installed. */
+  readonly pending: Effect.Effect<ReadonlyArray<AgentUpdate>>;
+  /** Fires when a check finds a different set of registry versions. */
+  readonly onDidChange: vscode.Event<void>;
+  /** Installs the updates one by one behind a progress notification, reports failures and returns the agents updated. */
+  install(updates: ReadonlyArray<AgentUpdate>): Effect.Effect<ReadonlyArray<RegistryAgent>>;
 }>()("code-acp/AgentUpdates") {
   static readonly layer = Layer.effect(
     AgentUpdates,
@@ -34,24 +39,38 @@ export class AgentUpdates extends Context.Service<AgentUpdates, {
       const manager = yield* AgentManager;
       const registry = yield* AcpRegistry;
 
-      const available = Effect.gen(function* () {
-        const latest = new Map((yield* registry.fetch).agents.map((a) => [a.id, a]));
+      const changed = new vscode.EventEmitter<void>();
+      yield* Effect.addFinalizer(() => Effect.sync(() => changed.dispose()));
+      /** Registry entries of installed agents, by id, as of the last check. */
+      let latest = new Map<string, RegistryAgent>();
+
+      const pending = Effect.gen(function* () {
         return (yield* manager.list).flatMap((installed): Array<AgentUpdate> => {
           const agent = latest.get(installed.id);
           return agent && agent.version !== installed.version && installKind(agent) ? [{ installed, latest: agent }] : [];
         });
       });
 
+      const check = Effect.gen(function* () {
+        const agents = (yield* registry.fetch).agents;
+        const before = [...latest.values()].map((a) => `${a.id}@${a.version}`).join();
+        latest = new Map(agents.map((a) => [a.id, a]));
+        if ([...latest.values()].map((a) => `${a.id}@${a.version}`).join() !== before) {
+          changed.fire();
+        }
+      });
+
       const due = Effect.gen(function* () {
         if (!readSettings().checkAgentUpdates) {
           return [];
         }
+        yield* check;
+        const updates = yield* pending;
         const now = yield* Clock.currentTimeMillis;
         const last = Option.getOrElse(decodeLastCheck(context.globalState.get(LAST_CHECK_KEY)), () => 0);
-        if (now - last < CHECK_INTERVAL_MS) {
+        if (!updates.length || now - last < CHECK_INTERVAL_MS) {
           return [];
         }
-        const updates = yield* available;
         yield* thenable(() => context.globalState.update(LAST_CHECK_KEY, now));
         return updates;
       }).pipe(
@@ -74,20 +93,15 @@ export class AgentUpdates extends Context.Service<AgentUpdates, {
           ),
         ).pipe(Effect.orDie);
 
-        const updated = results.filter(({ result }) => Result.isSuccess(result));
-        if (updated.length) {
-          void vscode.window.showInformationMessage(
-            t("updates.done", updated.map(({ agent }) => `${agent.name} ${agent.version}`).join(", ")),
-          );
-        }
         for (const { agent, result } of results) {
           if (Result.isFailure(result)) {
             void vscode.window.showErrorMessage(t("manager.installFailed", agent.name, result.failure.message));
           }
         }
+        return results.flatMap(({ agent, result }) => (Result.isSuccess(result) ? [agent] : []));
       });
 
-      return AgentUpdates.of({ due, install });
+      return AgentUpdates.of({ due, pending, onDidChange: changed.event, install });
     }),
   );
 }

@@ -11,12 +11,13 @@ import clockIcon from "@tabler/icons/outline/clock.svg";
 import pencilIcon from "@tabler/icons/outline/pencil.svg";
 import sendNowIcon from "@tabler/icons/outline/player-track-next.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
-import { attachmentKey, attachmentTitle, editText, imageSrc, nameFromUri, urisFrom } from "./attachments";
+import { attachmentKey, attachmentTitle, editText, imageSrc, inCodeFence, nameFromUri, urisFrom } from "./attachments";
 import type { Hover, Preview } from "./context";
 import { post } from "./post";
 import { byName, triggerIn, type Suggestion, type Trigger } from "./suggestions";
 import { isTabDrag, type TabState } from "./tabs";
-import { splitTokens, Tokens } from "./tokens";
+import { splitTokens } from "../markdown";
+import { Tokens } from "./tokens";
 import { AgentSelect, FolderSelect, type AgentChoices } from "./toolbar";
 
 const MAX_DATA_BYTES = 20 * 1024 * 1024;
@@ -274,6 +275,25 @@ export function useComposer(options: ComposerOptions) {
     const token = [...inlineOf(tab).keys()].sort((a, b) => b.length - a.length).find((x) => before.endsWith(x));
     if (!token) return false;
     editText(el, "", el.selectionStart - token.length, el.selectionStart);
+    autosize();
+    return true;
+  }
+
+  /** Shift+Enter in a Markdown list item starts the next item; in an empty one, ends the list. True when the key was used. */
+  function continueList(el: HTMLTextAreaElement): boolean {
+    const caret = el.selectionStart;
+    if (caret !== el.selectionEnd) return false;
+    const start = el.value.lastIndexOf("\n", caret - 1) + 1;
+    const line = el.value.slice(start, caret);
+    const m = /^(\s*)(?:([-*+])|(\d+)([.)]))(\s+)(\[[ xX]\]\s+)?/.exec(line);
+    if (!m) return false;
+    const end = el.value.indexOf("\n", caret);
+    if (m[0].length === line.length && !el.value.slice(caret, end < 0 ? undefined : end).trim()) {
+      editText(el, "", start, caret);
+    } else {
+      const marker = m[2] ?? `${Number(m[3]) + 1}${m[4]}`;
+      editText(el, `\n${m[1]}${marker}${m[5]}${m[6] ? "[ ] " : ""}`, caret, caret);
+    }
     autosize();
     return true;
   }
@@ -727,7 +747,14 @@ export function useComposer(options: ComposerOptions) {
           onKeyDown={(e) => {
             if (suggestKey(e)) {
               e.preventDefault();
-            } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            } else if (e.key === "Enter" && e.shiftKey && !e.nativeEvent.isComposing && continueList(e.currentTarget)) {
+              e.preventDefault();
+            } else if (
+              e.key === "Enter" &&
+              !e.shiftKey &&
+              !e.nativeEvent.isComposing &&
+              (e.ctrlKey || e.metaKey || !inCodeFence(e.currentTarget.value, e.currentTarget.selectionStart))
+            ) {
               e.preventDefault();
               submit(e.ctrlKey || e.metaKey);
             } else if (e.key === "Escape" && editing !== undefined && active !== undefined) {

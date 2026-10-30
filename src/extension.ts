@@ -10,6 +10,8 @@ import { ManagerPanel } from "./managerPanel";
 import { makeRuntime, runIn, thenable, type AppServices } from "./runtime";
 import { SettingsPanel } from "./settingsPanel";
 
+const UPDATE_POLL_MS = 60 * 60 * 1000;
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const log = vscode.window.createOutputChannel("Code ACP");
   const runtime = makeRuntime(context, log);
@@ -20,7 +22,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     (...args: A) =>
       runIn(runtime, Effect.suspend(() => command(...args)), showError);
 
-  const provider = new ChatViewProvider(context, runtime, manager);
+  const updates = await runtime.runPromise(AgentUpdates.use(Effect.succeed));
+  const provider = new ChatViewProvider(context, runtime, manager, updates);
   const dropView = new DropViewProvider(run((uris: ReadonlyArray<vscode.Uri>) => provider.attach(uris)));
 
   const selectAgent = Effect.fn("selectAgent")(function* () {
@@ -42,15 +45,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   /** Offers to install the updates a background check found. */
   const offerUpdates = Effect.fn("offerUpdates")(function* () {
-    const updates = yield* AgentUpdates.use((u) => u.due);
-    if (!updates.length) {
+    const due = yield* updates.due;
+    if (!due.length) {
       return;
     }
-    const list = updates.map((u) => `${u.latest.name} ${u.installed.version} → ${u.latest.version}`).join(", ");
+    const list = due.map((u) => `${u.latest.name} ${u.installed.version} → ${u.latest.version}`).join(", ");
     const [update, manage, disable] = [t("updates.update"), t("settings.manageAgents"), t("updates.disable")];
     const picked = yield* thenable(() => vscode.window.showInformationMessage(t("updates.available", list), update, manage, disable));
     if (picked === update) {
-      yield* AgentUpdates.use((u) => u.install(updates));
+      yield* provider.updateAgents(due);
     } else if (picked === manage) {
       ManagerPanel.show(context, runtime, manager);
     } else if (picked === disable) {
@@ -59,10 +62,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       );
     }
   });
+  // Polls hourly so the agent picker shows new releases; `due` notifies at most once a day.
   void run(offerUpdates)();
+  const updateTimer = setInterval(run(offerUpdates), UPDATE_POLL_MS);
 
   context.subscriptions.push(
     log,
+    { dispose: () => clearInterval(updateTimer) },
     provider,
     dropView,
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, provider, {
