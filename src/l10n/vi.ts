@@ -190,6 +190,7 @@ const vi: Record<MessageKey, string> = {
   "chat.pickAuth": "Chọn cách đăng nhập",
   "chat.agentSettings": "Cài đặt agent",
   "chat.switchAgent": "Đổi agent",
+  "chat.loadingOptions": "Đang tải tùy chọn của agent…",
   "chat.startOverConfirm": "Bắt đầu phiên mới? Cuộc hội thoại của tab này sẽ bị đóng; các thay đổi file của agent vẫn được giữ.",
   "chat.startOverBusyConfirm": "Agent vẫn đang làm việc. Dừng lại và bắt đầu phiên mới? Cuộc hội thoại của tab này sẽ bị đóng; các thay đổi file của agent vẫn được giữ.",
   "chat.startOver": "Bắt đầu phiên mới",

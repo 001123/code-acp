@@ -23,6 +23,8 @@ export interface Status {
 export interface TabState {
   transcript: Transcript;
   config: acp.SessionConfigOption[];
+  /** The conversation started over: the options of its next session have yet to come. */
+  configLoading?: boolean;
   usage?: Usage;
   /** Auto-compact window the host read from the agent's settings. */
   compactAt?: number;

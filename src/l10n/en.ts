@@ -189,6 +189,7 @@ const en = {
   "chat.pickAuth": "Choose a login method",
   "chat.agentSettings": "Agent settings",
   "chat.switchAgent": "Switch agent",
+  "chat.loadingOptions": "Loading the agent's options…",
   "chat.startOverConfirm": "Start a new session? This tab's conversation will be closed; the agent's file changes stay.",
   "chat.startOverBusyConfirm": "The agent is still working. Stop it and start a new session? This tab's conversation will be closed; the agent's file changes stay.",
   "chat.startOver": "Start New Session",

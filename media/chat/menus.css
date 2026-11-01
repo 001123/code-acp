@@ -142,6 +142,24 @@
   height: 14px;
   color: var(--vscode-descriptionForeground);
 }
+.config-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 8px;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+.config-loading svg {
+  width: 14px;
+  height: 14px;
+  animation: config-spin 1s linear infinite;
+}
+@keyframes config-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 /* A sub-menu sits beside its row, placed in the viewport by the script. */
 .popup-menu.submenu {
   position: fixed;

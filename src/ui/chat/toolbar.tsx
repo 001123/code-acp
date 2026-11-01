@@ -21,6 +21,7 @@ import checkIcon from "@tabler/icons/outline/check.svg";
 import chevronIcon from "@tabler/icons/outline/chevron-right.svg";
 import brainIcon from "@tabler/icons/outline/brain.svg";
 import cpuIcon from "@tabler/icons/outline/cpu.svg";
+import loaderIcon from "@tabler/icons/outline/loader-2.svg";
 import folderIcon from "@tabler/icons/outline/folder.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
 import settingsIcon from "@tabler/icons/outline/settings.svg";
@@ -286,6 +287,17 @@ export function ConfigSelect({
         post({ type: "setConfig", tab, configId: option.id, value });
       }}
     />
+  );
+}
+
+/** Stands in for the config options while the tab's new session starts. */
+export function ConfigLoading() {
+  const { t } = useL10n();
+  return (
+    <div className="config-loading" role="status">
+      <Icon svg={loaderIcon} />
+      <span className="menu-label">{t("chat.loadingOptions")}</span>
+    </div>
   );
 }
 

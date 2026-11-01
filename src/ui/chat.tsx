@@ -12,7 +12,7 @@ import { HistoryView, type History } from "./chat/history";
 import { post } from "./chat/post";
 import { NEW_TAB, TabStrip, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
-import { ChatSettings, ConfigSelect, UsageMeter, type AgentChoices } from "./chat/toolbar";
+import { ChatSettings, ConfigLoading, ConfigSelect, UsageMeter, type AgentChoices } from "./chat/toolbar";
 import { clipContent, contentText, groupActivity, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
@@ -40,6 +40,7 @@ function App() {
   const {
     transcript: state,
     config,
+    configLoading,
     usage,
     compactAt,
     totals,
@@ -103,22 +104,27 @@ function App() {
     ),
     agentConfig:
       active !== undefined &&
-      config.map((opt) =>
-        opt.type === "select" ? (
-          <ConfigSelect
-            key={opt.id}
-            tab={active}
-            option={opt}
-            // Shown right away; the agent's answer replaces the whole list.
-            onChange={(value) =>
-              update(active, (s) => ({
-                ...s,
-                config: s.config.map((o) => (o.id === opt.id ? ({ ...o, currentValue: value } as typeof o) : o)),
-              }))
-            }
-          />
-        ) : null,
-      ),
+      (configLoading ? (
+        // The options of the agent switched from would apply to a session that is gone.
+        <ConfigLoading />
+      ) : (
+        config.map((opt) =>
+          opt.type === "select" ? (
+            <ConfigSelect
+              key={opt.id}
+              tab={active}
+              option={opt}
+              // Shown right away; the agent's answer replaces the whole list.
+              onChange={(value) =>
+                update(active, (s) => ({
+                  ...s,
+                  config: s.config.map((o) => (o.id === opt.id ? ({ ...o, currentValue: value } as typeof o) : o)),
+                }))
+              }
+            />
+          ) : null,
+        )
+      )),
   });
 
   useMessages((msg) => {
@@ -168,7 +174,7 @@ function App() {
       case "session":
         // A loaded session's replayed history ends here.
         dispatch(tab, { type: "endStream" });
-        return update(tab, (s) => ({ ...s, config: msg.configOptions ?? [] }));
+        return update(tab, (s) => ({ ...s, config: msg.configOptions ?? [], configLoading: false }));
       case "history":
         return setHistory(msg);
       case "notice":
@@ -176,7 +182,7 @@ function App() {
       case "compactWindow":
         return update(tab, (s) => ({ ...s, compactAt: msg.size ?? undefined }));
       case "configOptions":
-        if (msg.configOptions) update(tab, (s) => ({ ...s, config: msg.configOptions }));
+        if (msg.configOptions) update(tab, (s) => ({ ...s, config: msg.configOptions, configLoading: false }));
         return;
       case "permissionRequest":
         return dispatch(tab, {
@@ -201,9 +207,13 @@ function App() {
       case "status":
         return update(tab, (s) => {
           const busySince = msg.busy ? (s.busySince ?? Date.now()) : undefined;
-          return { ...s, status: msg, busySince, lastActivity: msg.busy ? s.lastActivity : undefined };
+          // No session is coming until the user acts.
+          const configLoading = s.configLoading && !msg.needsLogin && !msg.needsAgent && !msg.stopped;
+          return { ...s, status: msg, busySince, lastActivity: msg.busy ? s.lastActivity : undefined, configLoading };
         });
       case "error":
+        // E.g. the agent failed to start.
+        update(tab, (s) => ({ ...s, configLoading: false }));
         return dispatch(tab, { type: "add", item: { kind: "error", text: { raw: msg.text } } });
       case "agent":
         return setAgents({ agents: msg.agents, activeId: msg.activeId });
@@ -231,7 +241,16 @@ function App() {
       case "reset":
         if (tab !== undefined) composer.endEdit(tab);
         dispatch(tab, { type: "reset" });
-        update(tab, (s) => ({ ...s, usage: undefined, compactAt: undefined, totals: undefined, terminals: {}, queue: [] }));
+        update(tab, (s) => ({
+          ...s,
+          config: [],
+          configLoading: true,
+          usage: undefined,
+          compactAt: undefined,
+          totals: undefined,
+          terminals: {},
+          queue: [],
+        }));
         return;
     }
   });
@@ -258,7 +277,7 @@ function App() {
       case "plan":
         return dispatch(tab, { type: "plan", entries: u.entries });
       case "config_option_update":
-        return update(tab, (s) => ({ ...s, config: u.configOptions }));
+        return update(tab, (s) => ({ ...s, config: u.configOptions, configLoading: false }));
       case "available_commands_update":
         return update(tab, (s) => ({ ...s, commands: u.availableCommands }));
       case "usage_update":
