@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import * as vscode from "vscode";
 import { AgentManager } from "./agentManager";
 import { AgentUpdates } from "./agentUpdates";
+import { ASKS, AskAgentActions } from "./askAgent";
 import { ChatViewProvider } from "./chat/chatViewProvider";
 import { CommitMessage } from "./commitMessage";
 import { DropViewProvider } from "./dropView";
@@ -119,6 +120,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return editor ? provider.attachSelection(editor) : Effect.void;
       }),
     ),
+    // "Ask Code ACP": the editor context submenu, the palette and the lightbulb.
+    ...ASKS.map(({ command, prompt }) =>
+      vscode.commands.registerCommand(
+        command,
+        run(() => {
+          const editor = vscode.window.activeTextEditor;
+          return editor ? provider.askAboutSelection(editor, t(prompt)) : Effect.void;
+        }),
+      ),
+    ),
+    vscode.languages.registerCodeActionsProvider({ scheme: "file" }, new AskAgentActions(), {
+      providedCodeActionKinds: AskAgentActions.kinds,
+    }),
     vscode.commands.registerCommand("codeAcp.addProblems", run(() => provider.attachProblems("file"))),
     vscode.commands.registerCommand("codeAcp.addWorkspaceProblems", run(() => provider.attachProblems("workspace"))),
     // The "Fix with Code ACP" quick fix passes the document's uri and the diagnostics under the cursor.

@@ -96,11 +96,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   });
   private readonly history = new HistoryRequests();
   /** Attachments added before the webview was ready are delivered on "ready". */
-  private readonly attachments = new AttachmentQueue((attachments) => {
+  private readonly attachments = new AttachmentQueue((attachments, prompt) => {
     if (!this.view) {
       return false;
     }
-    this.post({ type: "addAttachments", attachments });
+    this.post({ type: "addAttachments", attachments, prompt });
     return true;
   });
   private readonly statusBar = new ChatStatusBar(ChatViewProvider.showAttentionCommand);
@@ -1521,10 +1521,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     );
   });
 
-  /** Adds attachments to the composer and shows the chat. */
-  private readonly queueAndFocus = Effect.fn("ChatView.queueAndFocus")(function* (this: ChatViewProvider, attachments: Attachment[]) {
+  /** Adds attachments, after `prompt` when there is one, to the composer and shows the chat. */
+  private readonly queueAndFocus = Effect.fn("ChatView.queueAndFocus")(function* (
+    this: ChatViewProvider,
+    attachments: Attachment[],
+    prompt?: string,
+  ) {
     // Queued first: they reach the composer once the view shows, even if focusing fails.
-    this.attachments.add(attachments);
+    this.attachments.add(attachments, prompt);
     yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
   });
 
@@ -1539,6 +1543,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     editor: vscode.TextEditor,
   ) {
     yield* this.queueAndFocus(selectionAttachments(editor));
+  });
+
+  /** Adds `prompt` and the editor's non-empty selections to the composer ("Ask Code ACP" menu and code actions). */
+  readonly askAboutSelection = Effect.fn("ChatView.askAboutSelection")(function* (
+    this: ChatViewProvider,
+    editor: vscode.TextEditor,
+    prompt: string,
+  ) {
+    const attachments = selectionAttachments(editor);
+    if (attachments.length) {
+      yield* this.queueAndFocus(attachments, prompt);
+    }
   });
 
   /** Adds the active terminal's selection to the composer (terminal context menu). */

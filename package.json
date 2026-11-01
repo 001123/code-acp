@@ -188,6 +188,27 @@
       {
         "command": "codeAcp.fixProblems",
         "title": "%command.fixProblems%"
+      },
+      {
+        "command": "codeAcp.explainSelection",
+        "title": "%command.explainSelection%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "codeAcp.refactorSelection",
+        "title": "%command.refactorSelection%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "codeAcp.testSelection",
+        "title": "%command.testSelection%",
+        "category": "%command.category%"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "codeAcp.ask",
+        "label": "%submenu.ask%"
       }
     ],
     "menus": {
@@ -224,6 +245,11 @@
       "editor/context": [
         {
           "command": "codeAcp.addSelection",
+          "when": "editorHasSelection",
+          "group": "codeAcp@0"
+        },
+        {
+          "submenu": "codeAcp.ask",
           "when": "editorHasSelection",
           "group": "codeAcp@0"
         },
@@ -310,6 +336,32 @@
         {
           "command": "codeAcp.fixProblems",
           "when": "false"
+        },
+        {
+          "command": "codeAcp.explainSelection",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "codeAcp.refactorSelection",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "codeAcp.testSelection",
+          "when": "editorHasSelection"
+        }
+      ],
+      "codeAcp.ask": [
+        {
+          "command": "codeAcp.explainSelection",
+          "group": "ask@0"
+        },
+        {
+          "command": "codeAcp.refactorSelection",
+          "group": "ask@1"
+        },
+        {
+          "command": "codeAcp.testSelection",
+          "group": "ask@2"
         }
       ],
       "webview/context": [

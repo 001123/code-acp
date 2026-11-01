@@ -76,8 +76,20 @@ export enum DiagnosticSeverity {
 }
 
 export class CodeActionKind {
+  static readonly Empty = new CodeActionKind("");
   static readonly QuickFix = new CodeActionKind("quickfix");
   private constructor(readonly value: string) {}
+  append(part: string): CodeActionKind {
+    return new CodeActionKind(this.value ? `${this.value}.${part}` : part);
+  }
+}
+
+export class CodeAction {
+  command?: { command: string; title: string; arguments?: unknown[] };
+  constructor(
+    readonly title: string,
+    readonly kind?: CodeActionKind,
+  ) {}
 }
 
 export class WorkspaceEdit {

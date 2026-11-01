@@ -205,6 +205,7 @@ function App() {
       case "environment":
         return setRemote(msg.remote);
       case "addAttachments":
+        if (msg.prompt) composer.write(msg.prompt);
         for (const a of msg.attachments) composer.addAttachment(a);
         composer.focus();
         return;

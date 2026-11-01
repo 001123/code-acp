@@ -197,21 +197,29 @@ export const attachmentBlock = Effect.fn("attachmentBlock")(function* (
   return { type: "resource_link", uri: uri.toString(), name, size: stat.size, mimeType: imageMime };
 });
 
-/** Attachments added from VS Code (context menus, terminal picks) while the webview may not be ready yet. */
+/**
+ * Attachments added from VS Code (context menus, terminal picks) while the webview may not be ready yet,
+ * with the prompts written before them ("Ask Code ACP").
+ */
 export class AttachmentQueue {
   private queued: Attachment[] = [];
+  private prompts: string[] = [];
 
-  constructor(private readonly deliver: (attachments: Attachment[]) => boolean) {}
+  constructor(private readonly deliver: (attachments: Attachment[], prompt: string | undefined) => boolean) {}
 
-  add(attachments: ReadonlyArray<Attachment>): void {
+  add(attachments: ReadonlyArray<Attachment>, prompt?: string): void {
     this.queued.push(...attachments);
+    if (prompt) {
+      this.prompts.push(prompt);
+    }
     this.flush();
   }
 
-  /** Hands the queued attachments to the webview, when there is one. */
+  /** Hands the queued attachments and prompts to the webview, when there is one. */
   flush(): void {
-    if (this.queued.length && this.deliver(this.queued)) {
+    if ((this.queued.length || this.prompts.length) && this.deliver(this.queued, this.prompts.join("\n\n") || undefined)) {
       this.queued = [];
+      this.prompts = [];
     }
   }
 }

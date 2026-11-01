@@ -60,6 +60,13 @@ const vi: Record<MessageKey, string> = {
   "problems.noneInFile": "File đang mở không có lỗi hay cảnh báo nào.",
   "problems.fix": "Sửa bằng Code ACP",
 
+  "ask.explain": "Giải thích bằng Code ACP",
+  "ask.refactor": "Refactor bằng Code ACP",
+  "ask.tests": "Viết test bằng Code ACP",
+  "ask.explain.prompt": "Giải thích đoạn code này làm gì và hoạt động thế nào.",
+  "ask.refactor.prompt": "Refactor đoạn code này cho rõ ràng và đơn giản hơn, không thay đổi hành vi.",
+  "ask.tests.prompt": "Viết test cho đoạn code này, theo cách tổ chức test và quy ước sẵn có của dự án.",
+
   "settings.usage": "Mức sử dụng",
   "settings.usageDesc": "Token và chi phí agent báo về, theo ngày và theo cuộc trò chuyện.",
   "usage.today": "Hôm nay",

@@ -59,6 +59,13 @@ const en = {
   "problems.noneInFile": "No errors or warnings in the active file.",
   "problems.fix": "Fix with Code ACP",
 
+  "ask.explain": "Explain with Code ACP",
+  "ask.refactor": "Refactor with Code ACP",
+  "ask.tests": "Write tests with Code ACP",
+  "ask.explain.prompt": "Explain what this code does and how it works.",
+  "ask.refactor.prompt": "Refactor this code to make it clearer and simpler, without changing its behavior.",
+  "ask.tests.prompt": "Write tests for this code, following the project's existing test setup and conventions.",
+
   "settings.usage": "Usage",
   "settings.usageDesc": "Tokens and cost the agents reported, by day and by conversation.",
   "usage.today": "Today",

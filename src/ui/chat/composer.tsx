@@ -329,6 +329,15 @@ export function useComposer(options: ComposerOptions) {
     return true;
   }
 
+  /** Inserts `text` at the caret, as a paragraph of its own. */
+  function write(text: string): void {
+    const { text: current, from, to } = selectionText();
+    const before = current.slice(0, from);
+    const lead = before.trim() ? (before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n") : "";
+    replaceText(editor.view, from, to, `${lead}${text}\n`);
+    editor.view.focus();
+  }
+
   /** Inserts `text` as a Markdown quote at the caret. */
   function quote(text: string): void {
     const { text: current, from, to } = selectionText();
@@ -887,5 +896,5 @@ export function useComposer(options: ComposerOptions) {
     </form>
   );
 
-  return { element, dragging, addAttachment, quote, seed, setSearchResults, setSkills, focus, load, endEdit };
+  return { element, dragging, addAttachment, write, quote, seed, setSearchResults, setSkills, focus, load, endEdit };
 }
