@@ -179,6 +179,24 @@ describe("Permissions", () => {
   // The agent's own signals come from outside Effect.
   const never = new AbortController().signal;
 
+  it.effect("lists the tabs with pending requests, each once", () =>
+    Effect.gen(function* () {
+      const { permissions } = make();
+      const fibers = [
+        yield* Effect.forkChild(permissions.request("b", request, never)),
+        yield* Effect.forkChild(permissions.request("a", request, never)),
+        yield* Effect.forkChild(permissions.request("b", request, never)),
+      ];
+      yield* Effect.yieldNow;
+      assert.deepStrictEqual(permissions.owners, ["b", "a"]);
+      permissions.cancel("b");
+      assert.deepStrictEqual(permissions.owners, ["a"]);
+      permissions.cancel();
+      assert.deepStrictEqual(permissions.owners, []);
+      yield* Fiber.joinAll(fibers);
+    }),
+  );
+
   it.effect("answers with the option the user picked", () =>
     Effect.gen(function* () {
       const { permissions, shown, done } = make();

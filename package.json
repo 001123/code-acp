@@ -178,6 +178,10 @@
         "title": "%command.showUsage%"
       },
       {
+        "command": "codeAcp.showAttention",
+        "title": "%command.showAttention%"
+      },
+      {
         "command": "codeAcp.addWorkspaceProblems",
         "title": "%command.addWorkspaceProblems%"
       },

@@ -11,6 +11,7 @@ import { ChangeSet } from "../fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
 import { Problems, type ProblemScope } from "../problems";
 import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output } from "../runtime";
+import { choicesOf, modelOption } from "../sessionOptions";
 import { readSettings } from "../settings";
 import { TerminalContext } from "../terminalContext";
 import { UsageLedger, type SessionRef } from "../usageLedger";
@@ -23,6 +24,7 @@ import { DraftStore } from "./drafts";
 import { Follower } from "./follow";
 import { canReopen, HistoryRequests, listHistory } from "./history";
 import { CANCELLED, Permissions } from "./permissions";
+import { ChatStatusBar } from "./statusBar";
 import type { Attachment, Draft, FromWebview, LoadComposer, QueuedInfo, SentAttachment } from "./protocol";
 import {
   messageText,
@@ -60,6 +62,8 @@ class NoAgentError extends Schema.TaggedError<NoAgentError>()("NoAgentError", {}
 /** The chat view: tabs of ACP sessions, each on the process of its agent. */
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewId = "codeAcp.chat";
+  /** Run by the status bar item: shows the tab that needs the user. */
+  static readonly showAttentionCommand = "codeAcp.showAttention";
 
   private view?: vscode.WebviewView;
   private readonly agents = new AgentPool();
@@ -70,10 +74,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.view?.show(true);
       this.postTab(tab, { type: "permissionRequest", id, toolCall: req.toolCall, options: req.options });
       this.attention.raise(tab, "permission");
+      this.updateStatusBar();
     },
     done: (tab, id) => {
       this.postTab(tab, { type: "permissionDone", id });
       this.attention.settle(tab, "permission");
+      this.updateStatusBar();
     },
   });
   /** Tabs that finished or wait for a permission while the user looked elsewhere: the view's badge and notifications. */
@@ -97,6 +103,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.post({ type: "addAttachments", attachments });
     return true;
   });
+  private readonly statusBar = new ChatStatusBar(ChatViewProvider.showAttentionCommand);
+  /** A status bar update is due; several changes in one tick share it. */
+  private statusBarDue = false;
+  /** Counts status bar updates, so one that took longer doesn't overwrite a newer one. */
+  private statusBarRun = 0;
   private readonly disposables: vscode.Disposable[] = [];
   /** Pending `writeTabs`; flushed on dispose. */
   private saveTimer?: ReturnType<typeof setTimeout>;
@@ -123,9 +134,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.drafts = new DraftStore(path.join((context.storageUri ?? context.globalStorageUri).fsPath, "drafts"), () => this.tabs.all);
     this.run(pruneTempFiles);
     this.disposables.push(
+      this.statusBar,
       manager.onDidChange(() =>
         this.run(
           Effect.gen({ self: this }, function* () {
+            this.updateStatusBar();
             yield* this.postAgent;
             // A removed agent's tabs move to the default agent.
             for (const id of this.agents.ids()) {
@@ -160,12 +173,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }),
       onDidChangeLocale(() => {
         this.post(webviewL10n());
+        this.updateStatusBar();
         this.run(this.postAgent);
         for (const tab of this.tabs.all) {
           this.refreshStatus(tab);
         }
       }),
     );
+    this.updateStatusBar();
   }
 
   /** Runs an effect from a VS Code callback, showing failures in the chat (in `tab`, else the active one). */
@@ -185,6 +200,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   private showBadge(): void {
+    this.updateStatusBar();
     if (this.view) {
       const count = this.attention.count;
       this.view.badge = count ? { value: count, tooltip: t("attention.badge", count) } : undefined;
@@ -206,6 +222,52 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     });
   }
 
+  /** Shows the active tab's agent and model in the status bar, and what the tabs are doing. */
+  private updateStatusBar(): void {
+    if (this.statusBarDue) {
+      return;
+    }
+    this.statusBarDue = true;
+    queueMicrotask(() => {
+      this.statusBarDue = false;
+      this.run(this.showStatusBar);
+    });
+  }
+
+  private get showStatusBar(): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const run = ++this.statusBarRun;
+      const tab = this.tabs.active;
+      const agentId = tab.running?.agentId ?? (yield* this.agentIdOf(tab));
+      const agent = agentId === undefined ? undefined : (yield* this.manager.agents).find((a) => a.id === agentId)?.name;
+      if (run !== this.statusBarRun) {
+        return;
+      }
+      const model = modelOption(tab.configOptions);
+      this.statusBar.show({
+        agent,
+        model: model && choicesOf(model).find((c) => c.value === model.currentValue)?.name,
+        waiting: this.permissions.owners.length,
+        finished: this.attention.owners("finished").length,
+        running: this.tabs.all.filter((t) => t.busy).length,
+      });
+    });
+  }
+
+  /**
+   * Shows the tab that needs the user (status bar item): the first waiting for a permission, else one that finished
+   * unseen, else a running one when the active tab is idle, else the active tab.
+   */
+  readonly showAttention = Effect.fn("ChatView.showAttention")(function* (this: ChatViewProvider) {
+    const active = this.tabs.active;
+    const tab =
+      this.permissions.owners[0] ??
+      this.attention.owners("finished")[0] ??
+      (active.busy ? undefined : this.tabs.all.find((t) => t.busy)) ??
+      active;
+    yield* this.reveal(tab);
+  });
+
   /** Shows the chat with `tab` active. */
   private readonly reveal = Effect.fn("ChatView.reveal")(function* (this: ChatViewProvider, tab: Tab) {
     if (!this.tabs.has(tab)) {
@@ -216,6 +278,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       yield* this.selectTab(tab);
     }
   });
+
+  /** Keeps the session's config options (null or absent: unchanged) for the status bar. */
+  private setConfigOptions(tab: Tab, options: ReadonlyArray<acp.SessionConfigOption> | null | undefined): void {
+    if (options) {
+      tab.configOptions = options;
+      this.updateStatusBar();
+    }
+  }
 
   private post(message: unknown): void {
     void this.view?.webview.postMessage(message);
@@ -232,6 +302,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private postTabs(): void {
     this.post({ type: "tabs", tabs: this.tabs.info, active: this.tabs.active.id });
     this.attention.refresh();
+    this.updateStatusBar();
     this.saveTabs();
   }
 
@@ -261,6 +332,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   private status(tab: Tab, key: MessageKey, extra: Record<string, unknown> = {}): void {
     tab.lastStatus = { key, extra };
+    // Called whenever `busy` changes.
+    this.updateStatusBar();
     this.postTab(tab, { type: "status", text: t(key), busy: tab.busy, ...extra });
   }
 
@@ -471,6 +544,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "setConfig":
         if (tab?.running && tab.sessionId) {
           const res = yield* tab.running.agent.setConfigOption(tab.sessionId, msg.configId, msg.value);
+          this.setConfigOptions(tab, res.configOptions);
           this.postTab(tab, { type: "configOptions", configOptions: res.configOptions });
         }
         break;
@@ -709,6 +783,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.postTabs();
     }
     this.postTab(tab, { type: "update", update, turn: this.replayTurn(tab, update) });
+    if (update.sessionUpdate === "config_option_update") {
+      this.setConfigOptions(tab, update.configOptions);
+    }
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
       this.follower.toolCall(tab, update);
       // The tool may have changed files, however it did.
@@ -772,6 +849,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }
       tab.sessionId = undefined;
       tab.running = undefined;
+      tab.configOptions = undefined;
       tab.busy = false;
       // The queue waits for the user rather than starting the agent again.
       tab.steer = false;
@@ -812,6 +890,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         tab.sessionId = res.sessionId;
         tab.running = running;
+        this.setConfigOptions(tab, res.configOptions);
         this.postTabs();
         this.postTab(tab, { type: "session", sessionId: res.sessionId, configOptions: res.configOptions });
         this.status(tab, "chat.ready");
@@ -901,6 +980,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }),
       ),
     );
+    this.setConfigOptions(tab, res.configOptions);
     this.postTab(tab, { type: "session", sessionId, configOptions: res.configOptions });
     this.postSavedUsage(tab);
     this.status(tab, "chat.ready");
@@ -1325,6 +1405,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.tabs.active = fork;
     this.postTabs();
     this.postTab(fork, { type: "forked", from: tab.id });
+    this.setConfigOptions(fork, res.configOptions);
     this.postTab(fork, { type: "session", sessionId: res.sessionId, configOptions: res.configOptions });
     this.postSavedUsage(fork);
     this.changes.postIfTracked(fork);

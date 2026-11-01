@@ -21,6 +21,11 @@ export class Attention<T> {
     return this.marked.size;
   }
 
+  /** The marked tabs that want the user for `reason`, the earliest first. */
+  owners(reason: AttentionReason): T[] {
+    return [...this.marked].filter(([, r]) => r === reason).map(([owner]) => owner);
+  }
+
   /** `owner` wants the user; marked and announced unless they see it already. */
   raise(owner: T, reason: AttentionReason): void {
     if (this.events.sees(owner) || this.marked.get(owner) === reason) {

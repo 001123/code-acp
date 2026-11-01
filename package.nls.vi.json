@@ -47,5 +47,6 @@
   "command.addWorkspaceProblems": "Code ACP: Thêm lỗi của workspace vào chat",
   "command.fixProblems": "Sửa bằng Code ACP",
   "config.notifications": "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
-  "command.showUsage": "Code ACP: Xem mức sử dụng"
+  "command.showUsage": "Code ACP: Xem mức sử dụng",
+  "command.showAttention": "Code ACP: Mở cuộc trò chuyện đang cần bạn"
 }

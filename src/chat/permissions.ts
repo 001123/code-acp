@@ -40,6 +40,11 @@ export class Permissions<T> {
     );
   });
 
+  /** The owners of the pending requests, the earliest request first, each once. */
+  get owners(): T[] {
+    return [...new Set([...this.pending.values()].map((p) => p.owner))];
+  }
+
   /** The user's pick for request `id`; null dismisses it. */
   answer(id: number, optionId: string | null): void {
     this.resolve(id, optionId ? { outcome: { outcome: "selected", optionId } } : CANCELLED);

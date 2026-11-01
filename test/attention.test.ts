@@ -60,4 +60,13 @@ describe("Attention", () => {
     assert.strictEqual(attention.count, 1);
     assert.deepStrictEqual(badges, [1, 2, 1]);
   });
+
+  it("lists the marked tabs by reason, the earliest first", () => {
+    const { attention } = setup();
+    attention.raise("b", "finished");
+    attention.raise("a", "permission");
+    attention.raise("c", "finished");
+    assert.deepStrictEqual(attention.owners("finished"), ["b", "c"]);
+    assert.deepStrictEqual(attention.owners("permission"), ["a"]);
+  });
 });

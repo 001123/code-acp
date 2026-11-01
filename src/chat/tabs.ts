@@ -77,6 +77,8 @@ export interface Tab extends DraftHolder {
   sessionId?: string;
   /** The process that owns `sessionId`. */
   running?: RunningAgent;
+  /** The session's config options as the agent last reported them; the status bar shows the model. */
+  configOptions?: ReadonlyArray<acp.SessionConfigOption>;
   /** The folder the tab's session runs in: picked for the tab, or the one of the session it opened. */
   cwd: string;
   /** The agent picked for the tab, installed or custom. */
@@ -118,6 +120,7 @@ export interface Tab extends DraftHolder {
 export function resetConversation(tab: Tab): void {
   tab.sessionId = undefined;
   tab.running = undefined;
+  tab.configOptions = undefined;
   tab.busy = false;
   tab.used = false;
   tab.title = undefined;

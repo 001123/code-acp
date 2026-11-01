@@ -86,6 +86,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.newSession", run(() => provider.newSession())),
     vscode.commands.registerCommand("codeAcp.history", run(() => provider.showHistory())),
     vscode.commands.registerCommand("codeAcp.cancel", run(() => provider.cancel())),
+    vscode.commands.registerCommand(ChatViewProvider.showAttentionCommand, run(() => provider.showAttention())),
     vscode.commands.registerCommand("codeAcp.login", run(() => provider.login())),
     vscode.commands.registerCommand("codeAcp.restart", run(() => provider.restart())),
     vscode.commands.registerCommand("codeAcp.showLog", () => log.show()),

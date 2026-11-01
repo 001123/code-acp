@@ -47,5 +47,6 @@
   "command.addWorkspaceProblems": "Code ACP: Add Workspace Problems to Chat",
   "command.fixProblems": "Fix with Code ACP",
   "config.notifications": "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
-  "command.showUsage": "Code ACP: Show Usage"
+  "command.showUsage": "Code ACP: Show Usage",
+  "command.showAttention": "Code ACP: Show Conversation That Needs You"
 }
