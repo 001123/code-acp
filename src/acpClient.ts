@@ -11,12 +11,20 @@ import { mcpServersFor } from "./mcpServers";
 import { stopProcess } from "./processTree";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
 
+/** A form the agent asks the user to fill in: `elicitation/create` in form mode. */
+export type FormElicitation = Extract<acp.CreateElicitationRequest, { mode: "form" }>;
+
 export interface AgentHandlers {
   onUpdate(notification: acp.SessionNotification): void;
   requestPermission(
     request: acp.RequestPermissionRequest,
     signal: AbortSignal,
   ): Effect.Effect<acp.RequestPermissionResponse>;
+  /**
+   * A form the agent asks the user to fill in (`elicitation/create`, form mode). Without it the client offers no
+   * elicitations.
+   */
+  elicit?(request: FormElicitation, signal: AbortSignal): Effect.Effect<acp.CreateElicitationResponse>;
   /**
    * A terminal the agent runs a command in has new output, or its command exited. Without it the client
    * offers no terminals.
@@ -146,6 +154,12 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         .onRequest(acp.methods.client.session.requestPermission, ({ params, signal }) =>
           runPromise(handlers.requestPermission(params, signal)),
         )
+        .onRequest(acp.methods.client.elicitation.create, ({ params, signal }) =>
+          // Only forms are offered; a URL elicitation (or a future mode) is not shown to the user.
+          handlers.elicit && params.mode === "form"
+            ? runPromise(handlers.elicit(params as FormElicitation, signal))
+            : ({ action: "cancel" } satisfies acp.CreateElicitationResponse),
+        )
         .onRequest(acp.methods.client.fs.readTextFile, ({ params }) => runPromise(readTextFile(params)))
         .onRequest(acp.methods.client.fs.writeTextFile, ({ params }) =>
           runPromise(
@@ -220,6 +234,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         fs: { readTextFile: true, writeTextFile: true },
         terminal: handlers.onTerminal !== undefined,
         auth: { terminal: true },
+        ...(handlers.elicit ? { elicitation: { form: {} } } : {}),
       },
     }),
   ).pipe(

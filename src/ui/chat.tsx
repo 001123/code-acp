@@ -189,6 +189,13 @@ function App() {
         });
       case "permissionDone":
         return dispatch(tab, { type: "permissionDone", requestId: msg.id });
+      case "elicitationRequest":
+        return dispatch(tab, {
+          type: "add",
+          item: { kind: "elicitation", requestId: msg.id, message: msg.message, schema: msg.schema, toolCallId: msg.toolCallId ?? undefined },
+        });
+      case "elicitationDone":
+        return dispatch(tab, { type: "elicitationDone", requestId: msg.id, action: msg.action });
       case "status":
         return update(tab, (s) => {
           const busySince = msg.busy ? (s.busySince ?? Date.now()) : undefined;

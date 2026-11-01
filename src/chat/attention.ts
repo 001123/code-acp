@@ -1,5 +1,5 @@
-/** Why a tab wants the user: a permission request, or a turn that ended. */
-export type AttentionReason = "permission" | "finished";
+/** Why a tab wants the user: a permission request, a question from the agent, or a turn that ended. */
+export type AttentionReason = "permission" | "question" | "finished";
 
 /**
  * Tabs that want the user while they look elsewhere: another tab, another view or another window. Their count is the

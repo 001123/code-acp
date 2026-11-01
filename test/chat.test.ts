@@ -7,7 +7,7 @@ import * as path from "node:path";
 import { AgentRequestError, type AcpAgent } from "../src/acpClient";
 import { DraftStore, type DraftHolder } from "../src/chat/drafts";
 import { canReopen, HistoryRequests, listHistory } from "../src/chat/history";
-import { CANCELLED, Permissions } from "../src/chat/permissions";
+import { CANCELLED, ELICITATION_CANCELLED, Permissions, type Answer } from "../src/chat/permissions";
 import type { Attachment } from "../src/chat/protocol";
 import { replayedParts } from "../src/chat/replay";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
@@ -227,6 +227,59 @@ describe("Permissions", () => {
       permissions.cancel();
       assert.deepStrictEqual(yield* Fiber.join(c), CANCELLED);
     });
+  });
+});
+
+describe("Permissions with questions", () => {
+  const permission = { sessionId: "s", toolCall: { toolCallId: "t" }, options: [] } as unknown as acp.RequestPermissionRequest;
+  const question = {
+    sessionId: "s",
+    mode: "form",
+    message: "Which one?",
+    requestedSchema: { type: "object", properties: {} },
+  } as const;
+  const never = new AbortController().signal;
+
+  it.effect("answers a question with what the user filled in, and cancels it with the tab", () =>
+    Effect.gen(function* () {
+      const done: Answer[] = [];
+      const permissions = new Permissions<string>({ shown: () => {}, done: (_, __, answer) => void done.push(answer) });
+      const asked = yield* Effect.forkChild(permissions.elicit("a", question, never));
+      const allowed = yield* Effect.forkChild(permissions.request("a", permission, never));
+      const other = yield* Effect.forkChild(permissions.elicit("b", question, never));
+      yield* Effect.yieldNow;
+      assert.deepStrictEqual(permissions.owners, ["a", "b"]);
+      // An answer of the other kind is ignored.
+      permissions.answer(1, "allow");
+      permissions.answerElicitation(2, { action: "decline" });
+      assert.deepStrictEqual(done, []);
+      permissions.answerElicitation(1, { action: "accept", content: { pick: "x" } });
+      assert.deepStrictEqual(yield* Fiber.join(asked), { action: "accept", content: { pick: "x" } });
+      permissions.cancel("a");
+      assert.deepStrictEqual(yield* Fiber.join(allowed), CANCELLED);
+      permissions.cancel();
+      assert.deepStrictEqual(yield* Fiber.join(other), ELICITATION_CANCELLED);
+      assert.deepStrictEqual(done.map((a) => a.kind), ["elicitation", "permission", "elicitation"]);
+    }),
+  );
+
+  it("shows an open question on the subagent call that asked it, until it is answered", () => {
+    const actions: Action[] = [
+      { type: "toolCall", update: { toolCallId: "agent", title: "Agent", _meta: { claudeCode: { toolName: "Agent" } } } },
+      { type: "toolCall", update: { toolCallId: "ask", title: "Ask", _meta: { claudeCode: { parentToolUseId: "agent" } } } },
+      {
+        type: "add",
+        item: { kind: "elicitation", requestId: 7, message: "Which one?", schema: { type: "object" }, toolCallId: "ask" },
+      },
+    ];
+    const state = actions.reduce(transcript, EMPTY);
+    const parent = () => state.items.find((i) => i.kind === "tool");
+    assert.deepStrictEqual(parent()?.kind === "tool" && parent()?.waiting, [7]);
+    const answered = transcript(state, { type: "elicitationDone", requestId: 7, action: "accept" });
+    const tool = answered.items.find((i) => i.kind === "tool");
+    assert.deepStrictEqual(tool?.kind === "tool" && tool.waiting, []);
+    const form = answered.items.find((i) => i.kind === "elicitation");
+    assert.strictEqual(form?.kind === "elicitation" && form.outcome, "accept");
   });
 });
 

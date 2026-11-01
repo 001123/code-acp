@@ -2,6 +2,7 @@
 @import "./chat/base.css";
 @import "./chat/tabs.css";
 @import "./chat/transcript.css";
+@import "./chat/elicitation.css";
 @import "./chat/changes.css";
 @import "./chat/status.css";
 @import "./chat/composer.css";

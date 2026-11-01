@@ -57,6 +57,27 @@ acp
         await say(JSON.stringify(res.outcome));
         return { stopReason: "end_turn" };
       }
+      case "elicit": {
+        const res = await client.request(acp.methods.client.elicitation.create, {
+          sessionId: params.sessionId,
+          toolCallId: "t1",
+          mode: arg === "url" ? "url" : "form",
+          message: "Which one?",
+          ...(arg === "url"
+            ? { elicitationId: "e1", url: "https://example.com/login" }
+            : {
+                requestedSchema: {
+                  type: "object",
+                  properties: {
+                    question_0: { type: "string", oneOf: [{ const: "a", title: "A" }, { const: "b", title: "B" }] },
+                    question_0_custom: { type: "string", title: "Other" },
+                  },
+                },
+              }),
+        });
+        await say(JSON.stringify(res));
+        return { stopReason: "end_turn" };
+      }
       case "read": {
         const res = await client.request(acp.methods.client.fs.readTextFile, {
           sessionId: params.sessionId,

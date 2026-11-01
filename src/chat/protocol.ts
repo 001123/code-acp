@@ -49,6 +49,8 @@ export type FromWebview =
   /** Installs the registry version the agent picker offers for agent `id`. */
   | { type: "updateAgent"; id: string }
   | { type: "permission"; id: number; optionId: string | null }
+  /** The user's answer to question `id` ("elicitationRequest"). */
+  | { type: "elicitation"; id: number; response: ElicitationAnswer }
   | { type: "setConfig"; tab: number; configId: string; value: string }
   /** A file path from agent output; relative paths resolve against the tab's folder. `line` is 1-based. */
   | { type: "openFile"; path: string; line?: number }
@@ -77,6 +79,16 @@ export type FromWebview =
   | { type: "restoreCheckpoint"; tab: number; turn: number }
   | { type: "setFollowAgent"; enabled: boolean }
   | { type: "setAutoScroll"; enabled: boolean };
+
+/**
+ * What the user did with a form the agent asked them to fill in: sent it with the values of its fields, declined to
+ * answer, or dismissed it (the agent stops what asked).
+ */
+export type ElicitationAnswer =
+  | { action: "accept"; content: Record<string, ElicitationValue> }
+  | { action: "decline" | "cancel" };
+
+export type ElicitationValue = string | number | boolean | string[];
 
 /** The changed files of a tab, and the turns whose checkpoint differs from the work tree. */
 export interface ChangesMessage {

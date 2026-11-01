@@ -37,7 +37,7 @@ describe("statusBarView", () => {
     const view = statusBarView({ ...idle, waiting: 1, finished: 1, running: 1 });
     assert.strictEqual(view.text, "$(bell-dot) Opus · High");
     assert.isTrue(view.warning);
-    assert.include(view.tooltip, "Waiting for your approval: 1");
+    assert.include(view.tooltip, "Waiting for you: 1");
     assert.include(view.tooltip, "Click to show the conversation that needs you");
   });
 
@@ -50,6 +50,6 @@ describe("statusBarView", () => {
   it("follows the language setting", () => {
     __test.setSetting("codeAcp.language", "vi");
     const view = statusBarView({ ...idle, waiting: 1 });
-    assert.include(view.tooltip, "Đang chờ bạn cho phép: 1");
+    assert.include(view.tooltip, "Đang chờ bạn: 1");
   });
 });

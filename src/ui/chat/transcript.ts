@@ -15,7 +15,20 @@ export type Item =
   | ToolItem
   | { kind: "plan"; id: number; entries: acp.PlanEntry[] }
   | { kind: "permission"; id: number; requestId: number; toolCall: acp.ToolCallUpdate; options: acp.PermissionOption[]; done: boolean }
+  | ElicitationItem
   | { kind: "notice" | "error"; id: number; text: Text };
+
+/** A form the agent asks the user to fill in; `outcome` is the answer's action once it was answered or dismissed. */
+export interface ElicitationItem {
+  kind: "elicitation";
+  id: number;
+  requestId: number;
+  message: string;
+  schema: acp.ElicitationSchema;
+  /** The tool call that asks, e.g. Claude Code's AskUserQuestion. */
+  toolCallId?: string;
+  outcome?: string;
+}
 
 export interface ToolItem {
   kind: "tool";
@@ -29,7 +42,7 @@ export interface ToolItem {
   subagent?: boolean;
   /** The tool calls of the subagent that this call started. */
   children?: ToolItem[];
-  /** The open permission requests of that subagent. */
+  /** The open permission requests and questions of that subagent. */
   waiting?: number[];
 }
 
@@ -47,6 +60,7 @@ export type Action =
   | { type: "plan"; entries: acp.PlanEntry[] }
   | { type: "add"; item: DistributiveOmit<Item, "id"> }
   | { type: "permissionDone"; requestId: number }
+  | { type: "elicitationDone"; requestId: number; action: string }
   /** The turn ended: the next chunk starts a new block. */
   | { type: "endStream" }
   /** Drops the user message of `turn` and everything after it. */
@@ -109,6 +123,17 @@ function parentToolUseId(u: acp.ToolCall | acp.ToolCallUpdate): string | undefin
   return claudeMeta(u, "parentToolUseId");
 }
 
+/** The open permission request or question of `item`, and the tool call it is about. */
+export function openRequest(item: DistributiveOmit<Item, "id">): { requestId: number; toolCallId?: string; parentId?: string } | undefined {
+  if (item.kind === "permission" && !item.done) {
+    return { requestId: item.requestId, toolCallId: item.toolCall.toolCallId, parentId: parentToolUseId(item.toolCall) };
+  }
+  if (item.kind === "elicitation" && item.outcome === undefined) {
+    return { requestId: item.requestId, toolCallId: item.toolCallId };
+  }
+  return undefined;
+}
+
 /** Claude Code's tools that start a subagent; `Task` is the older name of `Agent`. */
 const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
 
@@ -166,9 +191,10 @@ export function transcript(state: Transcript, action: Action): Transcript {
         const child = existing && isTool(existing)
           ? merge(existing)
           : merge({ kind: "tool", id: state.nextId, toolCallId: u.toolCallId });
-        const open = state.items.flatMap((i) =>
-          i.kind === "permission" && !i.done && i.toolCall.toolCallId === u.toolCallId ? [i.requestId] : [],
-        );
+        const open = state.items.flatMap((i) => {
+          const request = openRequest(i);
+          return request && request.toolCallId === u.toolCallId ? [request.requestId] : [];
+        });
         const waiting = [...(parent.waiting ?? []), ...open.filter((id) => !parent.waiting?.includes(id))];
         const items = state.items
           .filter((i) => i !== existing)
@@ -187,14 +213,14 @@ export function transcript(state: Transcript, action: Action): Transcript {
       return { ...add({ kind: "plan", entries: action.entries }), planId: state.nextId };
     case "add": {
       const next = add(action.item);
-      if (action.item.kind !== "permission") return next;
+      const request = openRequest(action.item);
+      if (request?.toolCallId === undefined) return next;
       // A subagent's request also shows on the call that started the subagent.
-      const { toolCall, requestId } = action.item;
-      const parentId = parentToolUseId(toolCall);
+      const { toolCallId, parentId, requestId } = request;
       const parent = next.items.find(
         (i) =>
           i.kind === "tool" &&
-          (parentId === undefined ? i.children?.some((c) => c.toolCallId === toolCall.toolCallId) : i.toolCallId === parentId),
+          (parentId === undefined ? i.children?.some((c) => c.toolCallId === toolCallId) : i.toolCallId === parentId),
       );
       if (!parent || parent.kind !== "tool") return next;
       return {
@@ -203,15 +229,19 @@ export function transcript(state: Transcript, action: Action): Transcript {
       };
     }
     case "permissionDone":
+    case "elicitationDone":
       return {
         ...state,
-        items: state.items.map((i) =>
-          i.kind === "permission" && i.requestId === action.requestId
-            ? { ...i, done: true }
-            : i.kind === "tool" && i.waiting?.includes(action.requestId)
-              ? { ...i, waiting: i.waiting.filter((id) => id !== action.requestId) }
-              : i,
-        ),
+        items: state.items.map((i): Item => {
+          if (i.kind === "tool" && i.waiting?.includes(action.requestId)) {
+            return { ...i, waiting: i.waiting.filter((id) => id !== action.requestId) };
+          }
+          if (i.kind === "permission" && i.requestId === action.requestId) return { ...i, done: true };
+          if (i.kind === "elicitation" && i.requestId === action.requestId && action.type === "elicitationDone") {
+            return { ...i, outcome: action.action };
+          }
+          return i;
+        }),
       };
     case "endStream":
       return { ...state, streaming: undefined };

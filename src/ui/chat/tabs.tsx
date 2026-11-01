@@ -10,7 +10,7 @@ import plusIcon from "@tabler/icons/outline/plus.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { post } from "./post";
 import type { Usage } from "./toolbar";
-import { EMPTY, type Transcript } from "./transcript";
+import { EMPTY, openRequest, type Transcript } from "./transcript";
 
 export interface Status {
   text: string;
@@ -129,7 +129,7 @@ export function TabStrip({
       >
         {tabs.map((tab) => {
           const state = states[tab.id];
-          const waiting = state?.transcript.items.some((i) => i.kind === "permission" && !i.done);
+          const waiting = state?.transcript.items.some((i) => openRequest(i) !== undefined);
           const title = tab.title || t("chat.newTab");
           const tooltip = [
             waiting ? `${title} · ${t("chat.tabWaiting")}` : title,

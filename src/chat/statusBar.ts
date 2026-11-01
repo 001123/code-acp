@@ -9,7 +9,7 @@ export interface ChatStatus {
   readonly model?: string;
   /** The active tab's level of thinking, when the agent offers one. */
   readonly effort?: string;
-  /** Tabs waiting for a permission answer. */
+  /** Tabs waiting for the user to allow a tool call or answer a question. */
   readonly waiting: number;
   /** Tabs whose turn ended while the user looked elsewhere. */
   readonly finished: number;

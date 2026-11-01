@@ -24,7 +24,7 @@ import { DraftStore } from "./drafts";
 import { LastOptions } from "./lastOptions";
 import { Follower } from "./follow";
 import { canReopen, HistoryRequests, listHistory } from "./history";
-import { CANCELLED, Permissions } from "./permissions";
+import { CANCELLED, ELICITATION_CANCELLED, Permissions } from "./permissions";
 import { ChatStatusBar } from "./statusBar";
 import type { Attachment, Draft, FromWebview, LoadComposer, QueuedInfo, SentAttachment } from "./protocol";
 import {
@@ -72,15 +72,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly drafts: DraftStore;
   private readonly lastOptions: LastOptions;
   private readonly permissions = new Permissions<Tab>({
-    shown: (tab, id, req) => {
+    shown: (tab, id, ask) => {
       this.view?.show(true);
-      this.postTab(tab, { type: "permissionRequest", id, toolCall: req.toolCall, options: req.options });
-      this.attention.raise(tab, "permission");
+      if (ask.kind === "permission") {
+        const { toolCall, options } = ask.request;
+        this.postTab(tab, { type: "permissionRequest", id, toolCall, options });
+      } else {
+        const { message, requestedSchema } = ask.request;
+        const toolCallId = "toolCallId" in ask.request ? ask.request.toolCallId : undefined;
+        this.postTab(tab, { type: "elicitationRequest", id, message, schema: requestedSchema, toolCallId });
+      }
+      this.attention.raise(tab, ask.kind === "permission" ? "permission" : "question");
       this.updateStatusBar();
     },
-    done: (tab, id) => {
-      this.postTab(tab, { type: "permissionDone", id });
-      this.attention.settle(tab, "permission");
+    done: (tab, id, answer) => {
+      if (answer.kind === "permission") {
+        this.postTab(tab, { type: "permissionDone", id });
+      } else {
+        this.postTab(tab, { type: "elicitationDone", id, action: answer.response.action });
+      }
+      this.attention.settle(tab, answer.kind === "permission" ? "permission" : "question");
       this.updateStatusBar();
     },
   });
@@ -217,7 +228,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     const title = tab.name ?? tab.title ?? t("chat.untitled");
     const show = t("attention.show");
-    const message = t(reason === "permission" ? "attention.permission" : "attention.finished", title);
+    const message = t(`attention.${reason}`, title);
     void vscode.window.showInformationMessage(message, show).then((picked) => {
       if (picked === show) {
         this.run(this.reveal(tab), tab);
@@ -260,7 +271,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   /**
-   * Shows the tab that needs the user (status bar item): the first waiting for a permission, else one that finished
+   * Shows the tab that needs the user (status bar item): the first waiting for a permission or an answer, else one that finished
    * unseen, else a running one when the active tab is idle, else the active tab.
    */
   readonly showAttention = Effect.fn("ChatView.showAttention")(function* (this: ChatViewProvider) {
@@ -546,6 +557,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "permission":
         this.permissions.answer(msg.id, msg.optionId);
         break;
+      case "elicitation":
+        this.permissions.answerElicitation(msg.id, msg.response);
+        break;
       case "setConfig":
         if (tab?.running && tab.sessionId) {
           const { agentId } = tab.running;
@@ -743,6 +757,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         const tab = tabFor(req.sessionId);
         // No tab: it was closed.
         return tab ? this.permissions.request(tab, req, signal) : Effect.succeed(CANCELLED);
+      },
+      elicit: (req, signal) => {
+        // Only questions about a session have a tab to show in.
+        const tab = "sessionId" in req ? tabFor(req.sessionId) : undefined;
+        return tab ? this.permissions.elicit(tab, req, signal) : Effect.succeed(ELICITATION_CANCELLED);
       },
       onTerminal: (snapshot) => {
         const tab = tabFor(snapshot.sessionId);

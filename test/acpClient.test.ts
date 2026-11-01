@@ -14,6 +14,7 @@ const MOCK_AGENT = fileURLToPath(new URL("./fixtures/mock-agent.mjs", import.met
 interface Recorder {
   readonly updates: Array<acp.SessionNotification>;
   readonly permissions: Array<acp.RequestPermissionRequest>;
+  readonly elicitations: Array<acp.CreateElicitationRequest>;
   readonly written: Array<{ sessionId: string; path: string }>;
   readonly handlers: AgentHandlers;
 }
@@ -21,10 +22,12 @@ interface Recorder {
 const recorder = (pick: (req: acp.RequestPermissionRequest) => acp.RequestPermissionResponse): Recorder => {
   const updates: Array<acp.SessionNotification> = [];
   const permissions: Array<acp.RequestPermissionRequest> = [];
+  const elicitations: Array<acp.CreateElicitationRequest> = [];
   const written: Array<{ sessionId: string; path: string }> = [];
   return {
     updates,
     permissions,
+    elicitations,
     written,
     handlers: {
       onUpdate: (n) => void updates.push(n),
@@ -77,8 +80,9 @@ describe("spawnAgent", () => {
         const meta = init._meta as { clientInfo: { name: string; version: string }; clientCapabilities: acp.ClientCapabilities };
         assert.deepStrictEqual(meta.clientInfo, { name: "code-acp", version: "1.2.3" });
         assert.deepStrictEqual(meta.clientCapabilities.fs, { readTextFile: true, writeTextFile: true });
-        // No onTerminal handler: no terminal capability.
+        // No onTerminal handler: no terminal capability; no elicit handler: no elicitations.
         assert.strictEqual(meta.clientCapabilities.terminal, false);
+        assert.isUndefined(meta.clientCapabilities.elicitation);
       }),
     );
   });
@@ -183,6 +187,32 @@ describe("spawnAgent", () => {
         assert.strictEqual(rec.permissions[0]!.toolCall.toolCallId, "t1");
         assert.deepStrictEqual(rec.permissions[0]!.options.map((o) => o.optionId), ["allow", "deny"]);
         assert.deepStrictEqual(JSON.parse(messageText(rec)), { outcome: "selected", optionId: "deny" });
+      }),
+    );
+  });
+
+  it.live("offers form elicitations and round-trips them through the handler", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    const handlers: AgentHandlers = {
+      ...rec.handlers,
+      elicit: (req) => {
+        rec.elicitations.push(req);
+        return Effect.succeed({ action: "accept", content: { question_0_custom: "neither" } });
+      },
+    };
+    return withAgent({}, { ...rec, handlers }, (agent) =>
+      Effect.gen(function* () {
+        const meta = agent.initializeResponse._meta as { clientCapabilities: acp.ClientCapabilities };
+        assert.deepStrictEqual(meta.clientCapabilities.elicitation, { form: {} });
+        yield* prompt(agent, "elicit");
+        assert.strictEqual(rec.elicitations.length, 1);
+        assert.strictEqual(rec.elicitations[0]!.message, "Which one?");
+        assert.deepStrictEqual(JSON.parse(messageText(rec)), { action: "accept", content: { question_0_custom: "neither" } });
+        // A URL elicitation is not offered: it is cancelled without asking the user.
+        rec.updates.length = 0;
+        yield* prompt(agent, "elicit url");
+        assert.strictEqual(rec.elicitations.length, 1);
+        assert.deepStrictEqual(JSON.parse(messageText(rec)), { action: "cancel" });
       }),
     );
   });

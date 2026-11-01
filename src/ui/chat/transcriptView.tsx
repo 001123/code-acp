@@ -19,6 +19,7 @@ import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import copyIcon from "@tabler/icons/outline/copy.svg";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import { copyMessage } from "./clipboard";
+import { ElicitationView } from "./elicitation";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { clip, contentText, fileLinkTokens, type ActivityItem, type Item, type Text } from "./transcript";
@@ -455,6 +456,8 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
           </div>
         </div>
       );
+    case "elicitation":
+      return <ElicitationView item={item} />;
     case "notice":
     case "error":
       return <div className={item.kind}>{render(t, item.text)}</div>;
