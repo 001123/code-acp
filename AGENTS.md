@@ -4,7 +4,7 @@ VS Code extension "Code ACP": chat with coding agents over ACP, install agents f
 
 ## Rules
 
-- Runtime: Node 24, VS Code ≥ 1.144 (Chromium 150). Keep `engines.vscode`, `@types/vscode`, `@types/node` and the esbuild targets (`node24`, `chrome150`) in sync.
+- Runtime: Node 24, VS Code ≥ 1.123 (Chromium 148). Keep `engines.vscode`, `@types/vscode`, `@types/node` and the esbuild targets (`node24`, `chrome148`) in sync.
 - Node APIs only; `vscode` stays external.
 - Webviews are React (`src/ui/*.tsx`, bundled by esbuild to `dist/webview/`; styles stay in `media/*.css`, one entry per page that `@import`s its partials from `media/<page>/`, bundled to `dist/webview/` too). They may only `import type` from host modules.
 - New `@types/*` package → add to `types` in `tsconfig.json`.

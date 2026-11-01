@@ -43,6 +43,8 @@ export const Settings = Schema.Struct({
   followAgent: Schema.Boolean,
   /** Keep the chat scrolled to the end as new content arrives. */
   autoScroll: Schema.Boolean,
+  /** Show the bar above the composer with the files the agent changed, to keep or undo them. */
+  showChanges: Schema.Boolean,
   /** Show a notification when a tab the user isn't looking at finishes or asks for permission. */
   notifications: Schema.Boolean,
   /** Start new chat sessions with the model, effort and fast mode last picked for their agent. */
@@ -71,6 +73,7 @@ export const SETTING_KEYS = [
   "checkAgentUpdates",
   "followAgent",
   "autoScroll",
+  "showChanges",
   "notifications",
   "rememberSessionOptions",
   "commitMessage.agent",
@@ -94,6 +97,7 @@ const DEFAULTS: Settings = {
   checkAgentUpdates: true,
   followAgent: false,
   autoScroll: true,
+  showChanges: true,
   notifications: true,
   rememberSessionOptions: true,
   "commitMessage.agent": "",
@@ -126,6 +130,7 @@ export function readSettings(): Settings {
     checkAgentUpdates: read("checkAgentUpdates"),
     followAgent: read("followAgent"),
     autoScroll: read("autoScroll"),
+    showChanges: read("showChanges"),
     notifications: read("notifications"),
     rememberSessionOptions: read("rememberSessionOptions"),
     "commitMessage.agent": read("commitMessage.agent"),

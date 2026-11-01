@@ -594,7 +594,7 @@ function AgentModelFields(props: {
 type Tab = "general" | "agent" | "commit" | "mcp" | "custom" | "usage";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "notifications", "rememberSessionOptions"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "notifications", "rememberSessionOptions"] },
   {
     id: "agent",
     label: "settings.agent",
@@ -806,6 +806,15 @@ function App() {
                 inline
               >
                 <Toggle id="autoScroll" checked={v.autoScroll !== false} onChange={(checked) => set("autoScroll", checked)} />
+              </Field>
+              <Field
+                id="showChanges"
+                label="settings.showChanges"
+                desc="settings.showChangesDesc"
+                overridden={overridden("showChanges")}
+                inline
+              >
+                <Toggle id="showChanges" checked={v.showChanges !== false} onChange={(checked) => set("showChanges", checked)} />
               </Field>
               <Field
                 id="notifications"

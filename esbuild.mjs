@@ -22,7 +22,7 @@ const contexts = await Promise.all([
     external: ["vscode"],
   }),
   // React webviews and their styles, loaded by src/webview.ts from dist/webview/<page>.{js,css}.
-  // chrome150 is the Chromium of VS Code 1.144 (Electron 43): keep it in sync with engines.vscode.
+  // chrome148 is the Chromium of VS Code 1.123–1.138 (Electron 42), the oldest release on Node 24: keep it in sync with engines.vscode.
   esbuild.context({
     ...common,
     entryPoints: ["chat", "manager", "settings"].flatMap((page) => [
@@ -31,7 +31,7 @@ const contexts = await Promise.all([
     ]),
     format: "iife",
     platform: "browser",
-    target: "chrome150",
+    target: "chrome148",
     outdir: "dist/webview",
     jsx: "automatic",
     define: { "process.env.NODE_ENV": JSON.stringify(production ? "production" : "development") },

@@ -175,6 +175,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         if (e.affectsConfiguration("codeAcp.autoScroll")) {
           this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
         }
+        if (e.affectsConfiguration("codeAcp.showChanges")) {
+          this.post({ type: "showChanges", enabled: readSettings().showChanges });
+        }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
       vscode.window.onDidChangeWindowState(() => this.attention.refresh()),
@@ -416,6 +419,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.postAgent;
         this.post({ type: "followAgent", enabled: this.followAgent });
         this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
+        this.post({ type: "showChanges", enabled: readSettings().showChanges });
         for (const each of this.tabs.all) {
           this.refreshStatus(each);
           this.postSavedUsage(each);

@@ -173,6 +173,8 @@ const en = {
   "settings.followAgent": "Follow the agent",
   "settings.autoScroll": "Auto-scroll",
   "settings.autoScrollDesc": "Keep the chat scrolled to the newest content while the agent replies. Turn off to stay where you scrolled.",
+  "settings.showChanges": "Show changed files",
+  "settings.showChangesDesc": "Show the bar above the message box that lists the files the agent changed, with Undo all and Keep all.",
   "settings.notifications": "Notifications",
   "settings.rememberSessionOptions": "Remember model and effort",
   "settings.rememberSessionOptionsDesc": "Start new chats with the model, effort and fast mode you last picked for the agent.",

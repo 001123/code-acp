@@ -58,6 +58,8 @@ function App() {
   const [autoScroll, setAutoScroll] = useState(true);
   const autoScrollRef = useRef(autoScroll);
   autoScrollRef.current = autoScroll;
+  /** codeAcp.showChanges: the files changed bar above the composer. */
+  const [showChanges, setShowChanges] = useState(true);
   const checkpointTurns = changes?.turns;
   const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;
   const shownTab = useMemo<ShownTab>(
@@ -154,6 +156,8 @@ function App() {
         return setFollowAgent(msg.enabled);
       case "autoScroll":
         return setAutoScroll(msg.enabled);
+      case "showChanges":
+        return setShowChanges(msg.enabled);
       case "turnEnd":
         return dispatch(
           tab,
@@ -392,7 +396,7 @@ function App() {
         <div id="drop-overlay" className={composer.dragging ? "visible" : undefined}>
           {t("chat.dropHint")}
         </div>
-        {active !== undefined && <ChangesBar tab={active} changes={changes} />}
+        {showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} />}
         {(status.needsLogin || status.needsAgent) && (
           <div id="status">
             <span id="status-text">{status.text}</span>

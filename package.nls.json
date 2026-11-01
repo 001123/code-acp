@@ -20,6 +20,7 @@
   "config.ccusagePath": "Path of the ccusage executable for the Usage page (e.g. a global install). Empty runs a pinned release through npx.",
   "config.followAgent": "Open the files the agent reads and edits in the editor, at the line it is working on, and briefly highlight the lines it changes.",
   "config.autoScroll": "Keep the chat scrolled to the newest content while the agent replies. Turn off to stay where you scrolled.",
+  "config.showChanges": "Show the bar above the message box that lists the files the agent changed, with Undo all and Keep all.",
   "config.checkAgentUpdates": "Check the ACP Registry for agent updates on startup and offer to install them.",
   "command.generateCommitMessage": "Code ACP: Generate Commit Message",
   "command.cancelCommitMessage": "Code ACP: Stop Generating Commit Message",

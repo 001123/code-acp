@@ -174,6 +174,8 @@ const vi: Record<MessageKey, string> = {
   "settings.followAgent": "Theo dõi agent",
   "settings.autoScroll": "Tự động cuộn",
   "settings.autoScrollDesc": "Tự động cuộn chat xuống nội dung mới nhất khi agent trả lời. Tắt đi để giữ nguyên vị trí bạn đang xem.",
+  "settings.showChanges": "Hiện file đã thay đổi",
+  "settings.showChangesDesc": "Hiện thanh phía trên ô nhập tin nhắn liệt kê các file agent đã sửa, kèm nút Hoàn tác tất cả và Giữ tất cả.",
   "settings.notifications": "Thông báo",
   "settings.rememberSessionOptions": "Ghi nhớ model và effort",
   "settings.rememberSessionOptionsDesc": "Bắt đầu cuộc trò chuyện mới với model, effort và fast mode bạn chọn gần nhất cho agent.",

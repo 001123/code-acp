@@ -11,7 +11,7 @@
     "url": "https://github.com/001123/code-acp"
   },
   "engines": {
-    "vscode": "^1.144.0"
+    "vscode": "^1.123.0"
   },
   "categories": [
     "AI",
@@ -486,6 +486,11 @@
           "default": true,
           "description": "%config.autoScroll%"
         },
+        "codeAcp.showChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.showChanges%"
+        },
         "codeAcp.notifications": {
           "type": "boolean",
           "default": true,
@@ -629,10 +634,10 @@
     "@tiptap/extensions": "^3.32.1",
     "@tiptap/pm": "^3.32.1",
     "@tiptap/react": "^3.32.1",
-    "@types/node": "^24.19.2",
+    "@types/node": "~24.13.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/vscode": "~1.144.0",
+    "@types/vscode": "~1.120.0",
     "@vscode/vsce": "^4.1.0",
     "effect": "4.1.0",
     "esbuild": "^0.28.2",
