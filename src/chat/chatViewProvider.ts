@@ -18,7 +18,7 @@ import { UsageLedger, type SessionRef } from "../usageLedger";
 import { webviewHtml, webviewRoots } from "../webview";
 import { AgentPool, stopAll } from "./agents";
 import { Attention, type AttentionReason } from "./attention";
-import { activeFileBlocks, activeFileName, attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
+import { attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
 import { ChangeReview, confirm } from "./changes";
 import { DraftStore } from "./drafts";
 import { LastOptions } from "./lastOptions";
@@ -178,7 +178,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
       vscode.window.onDidChangeWindowState(() => this.attention.refresh()),
-      vscode.window.onDidChangeActiveTextEditor(() => this.postActiveFile()),
       // Edits the user saves change the counts.
       vscode.workspace.onDidSaveTextDocument((doc) => {
         for (const tab of this.tabs.all) {
@@ -326,11 +325,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.post({ type: "folders", folders: workspaceFolders() });
   }
 
-  /** The file "include open file" would send, shown beside the checkbox. */
-  private postActiveFile(): void {
-    this.post({ type: "activeFile", name: activeFileName() });
-  }
-
   /** The composer's agent picker: installed and custom agents, their pending updates, and the default for new tabs. */
   private get postAgent(): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
@@ -418,7 +412,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.drafts.load();
         this.post({ type: "environment", remote: vscode.env.remoteName !== undefined });
         this.postFolders();
-        this.postActiveFile();
         this.postTabs();
         yield* this.postAgent;
         this.post({ type: "followAgent", enabled: this.followAgent });
@@ -436,7 +429,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "send":
         if (tab) {
-          const message: OutgoingMessage = { parts: msg.parts, includeActiveFile: msg.includeActiveFile };
+          const message: OutgoingMessage = { parts: msg.parts };
           if (msg.rewind !== undefined) {
             yield* this.resend(tab, msg.rewind, message, true);
           } else if (msg.now) {
@@ -804,7 +797,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       replay.turns.push(replay.turn);
     }
     replay.blocks.push(update.content);
-    tab.sent.set(replay.turn, { parts: replayedParts(replay.blocks), includeActiveFile: false });
+    tab.sent.set(replay.turn, { parts: replayedParts(replay.blocks) });
     return replay.turn;
   }
 
@@ -1462,7 +1455,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     tab: Tab,
     message: OutgoingMessage,
   ) {
-    const { parts, includeActiveFile } = message;
+    const { parts } = message;
     const text = messageText(parts);
     const sessionId = yield* this.ensureSession(tab);
     const agent = tab.running?.agent;
@@ -1498,9 +1491,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     if (prompt.length === 0) {
       return;
-    }
-    if (includeActiveFile) {
-      prompt.push(...activeFileBlocks());
     }
 
     tab.used = true;

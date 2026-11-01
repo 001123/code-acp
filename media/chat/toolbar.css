@@ -29,54 +29,6 @@
   height: 22px;
   font-size: 0.88em;
 }
-#actions label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 0.88em;
-  color: var(--vscode-descriptionForeground);
-  cursor: pointer;
-  user-select: none;
-}
-#actions label:hover {
-  background: var(--vscode-toolbar-hoverBackground);
-  color: var(--vscode-foreground);
-}
-#actions input[type="checkbox"] {
-  appearance: none;
-  position: relative;
-  flex: none;
-  margin: 0;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--vscode-checkbox-border, var(--vscode-input-border, currentColor));
-  border-radius: 3px;
-  background: var(--vscode-checkbox-background, transparent);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-#actions input[type="checkbox"]:checked {
-  border-color: var(--vscode-button-background);
-  background: var(--vscode-button-background);
-}
-/* Checkmark: a rotated L drawn with borders. */
-#actions input[type="checkbox"]:checked::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 4px;
-  height: 8px;
-  border: solid var(--vscode-button-foreground);
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
-}
-#actions input[type="checkbox"]:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: 1px;
-}
 
 #cancel svg {
   width: 12px;
@@ -90,21 +42,11 @@
 #cancel:not([hidden]) + #send {
   display: none;
 }
-#actions label svg {
-  width: 14px;
-  height: 14px;
-  stroke-width: 1.75;
-  opacity: 0.8;
-}
 #actions .label-text {
   max-width: 16ch;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-#actions input[type="checkbox"]:not(:checked) ~ .svg-icon svg,
-#actions input[type="checkbox"]:not(:checked) ~ .label-text {
-  opacity: 0.5;
 }
 
 .config-item {

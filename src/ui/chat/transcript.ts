@@ -268,7 +268,7 @@ const FILE_LINK = /\[(@[^\]\n]+)\]\((file:\/\/[^)\s]+)\)/g;
 /** The adapter's copy of an embedded file, which it appends after the prompt. */
 const CONTEXT = /\n?<context ref="[^"]*">\n[\s\S]*?\n<\/context>/g;
 
-/** The editor selection "include open file" sends (see `activeFileBlocks`): the last prompt block, before any context. */
+/** The editor selection the removed "include open file" option sent, still in older sessions: the last prompt block, before any context. */
 const SELECTION = /Selection \([^\n]*:\d+-\d+\):\n[\s\S]*?(?=\n<context ref="|$)/;
 
 /**

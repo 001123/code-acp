@@ -111,31 +111,6 @@ export function selectionAttachments(editor: vscode.TextEditor): Attachment[] {
   });
 }
 
-/** The workspace-relative name of the file "include open file" sends, if any. */
-export function activeFileName(): string | undefined {
-  const uri = vscode.window.activeTextEditor?.document.uri;
-  return uri?.scheme === "file" ? vscode.workspace.asRelativePath(uri) : undefined;
-}
-
-/** The active editor as context for a prompt: a link to its file, and the selected lines when there are some. */
-export function activeFileBlocks(): acp.ContentBlock[] {
-  const editor = vscode.window.activeTextEditor;
-  const name = activeFileName();
-  if (!editor || name === undefined) {
-    return [];
-  }
-  const uri = editor.document.uri;
-  const blocks: acp.ContentBlock[] = [{ type: "resource_link", uri: uri.toString(), name }];
-  if (!editor.selection.isEmpty) {
-    const sel = editor.selection;
-    blocks.push({
-      type: "text",
-      text: `Selection (${name}:${sel.start.line + 1}-${sel.end.line + 1}):\n${editor.document.getText(sel)}`,
-    });
-  }
-  return blocks;
-}
-
 /**
  * The prompt block for an attachment, as rich as the agent's prompt capabilities allow: images inline, small text
  * files embedded, anything else as a link to a path the agent can read.

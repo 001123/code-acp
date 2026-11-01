@@ -25,7 +25,6 @@ export interface Reopen {
 /** A message as the composer sent it, kept to queue it, or to edit and send it again. */
 export interface OutgoingMessage {
   readonly parts: ReadonlyArray<PromptPart>;
-  readonly includeActiveFile: boolean;
 }
 
 export interface QueuedMessage extends OutgoingMessage {

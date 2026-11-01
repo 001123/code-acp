@@ -12,7 +12,7 @@ export type FromWebview =
    * `now` sent right away, stopping the turn. With `rewind`, it replaces the user message of that turn and the rest
    * of the conversation after it.
    */
-  | { type: "send"; tab: number; parts: PromptPart[]; includeActiveFile: boolean; now?: boolean; rewind?: number }
+  | { type: "send"; tab: number; parts: PromptPart[]; now?: boolean; rewind?: number }
   /** Sends a queued message now, stopping the running turn. */
   | { type: "sendQueuedNow"; tab: number; id: number }
   /** Takes a message out of the queue; with `edit`, it goes back to the composer ("loadComposer"). */

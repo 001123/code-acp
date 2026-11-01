@@ -197,8 +197,6 @@ const en = {
   "chat.login": "Log in",
   "chat.installAgent": "Install agent",
   "chat.placeholder": "Ask anything. @ files & terminal, $ skills, / commands",
-  "chat.includeFile": "Include open file",
-  "chat.includeFileNamed": "Include open file: {0}",
   "chat.stop": "Stop",
   "chat.sendTitle": "Send (Enter)",
   "chat.send": "Send",

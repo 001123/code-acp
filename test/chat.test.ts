@@ -431,9 +431,9 @@ describe("rewind and fork state", () => {
   it("forgets the queue, the sent messages and the rewind note when a tab starts over", () => {
     const tabs = new TabList(undefined, () => "/w");
     const tab = tabs.active;
-    tab.queue.push({ id: 1, parts: ["later"], includeActiveFile: false });
+    tab.queue.push({ id: 1, parts: ["later"] });
     tab.steer = true;
-    tab.sent.set(3, { parts: ["sent"], includeActiveFile: false });
+    tab.sent.set(3, { parts: ["sent"] });
     tab.rewindNote = "note";
     resetConversation(tab);
     assert.deepStrictEqual(tab.queue, []);
