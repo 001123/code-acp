@@ -61,11 +61,13 @@
       {
         "command": "codeAcp.manageAgents",
         "title": "%command.manageAgents%",
+        "category": "%command.category%",
         "icon": "$(extensions)"
       },
       {
         "command": "codeAcp.selectAgent",
-        "title": "%command.selectAgent%"
+        "title": "%command.selectAgent%",
+        "category": "%command.category%"
       },
       {
         "command": "codeAcp.newSession",
@@ -75,6 +77,7 @@
       {
         "command": "codeAcp.history",
         "title": "%command.history%",
+        "category": "%command.category%",
         "icon": "$(history)"
       },
       {
@@ -84,15 +87,18 @@
       },
       {
         "command": "codeAcp.login",
-        "title": "%command.login%"
+        "title": "%command.login%",
+        "category": "%command.category%"
       },
       {
         "command": "codeAcp.restart",
-        "title": "%command.restart%"
+        "title": "%command.restart%",
+        "category": "%command.category%"
       },
       {
         "command": "codeAcp.showLog",
-        "title": "%command.showLog%"
+        "title": "%command.showLog%",
+        "category": "%command.category%"
       },
       {
         "command": "codeAcp.attach",
@@ -102,6 +108,7 @@
       {
         "command": "codeAcp.openSettings",
         "title": "%command.openSettings%",
+        "category": "%command.category%",
         "icon": "$(gear)"
       },
       {
@@ -175,7 +182,8 @@
       },
       {
         "command": "codeAcp.showUsage",
-        "title": "%command.showUsage%"
+        "title": "%command.showUsage%",
+        "category": "%command.category%"
       },
       {
         "command": "codeAcp.showAttention",
@@ -216,17 +224,42 @@
         {
           "command": "codeAcp.history",
           "when": "view == codeAcp.chat",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "codeAcp.manageAgents",
           "when": "view == codeAcp.chat",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeAcp.selectAgent",
+          "when": "view == codeAcp.chat",
+          "group": "1_agent@1"
+        },
+        {
+          "command": "codeAcp.login",
+          "when": "view == codeAcp.chat",
+          "group": "1_agent@2"
+        },
+        {
+          "command": "codeAcp.restart",
+          "when": "view == codeAcp.chat",
+          "group": "1_agent@3"
+        },
+        {
+          "command": "codeAcp.showUsage",
+          "when": "view == codeAcp.chat",
+          "group": "2_info@1"
+        },
+        {
+          "command": "codeAcp.showLog",
+          "when": "view == codeAcp.chat",
+          "group": "2_info@2"
         },
         {
           "command": "codeAcp.openSettings",
           "when": "view == codeAcp.chat",
-          "group": "navigation@9"
+          "group": "3_settings@1"
         }
       ],
       "explorer/context": [
@@ -518,7 +551,11 @@
         },
         "codeAcp.commitMessage.fastMode": {
           "type": "string",
-          "enum": ["default", "on", "off"],
+          "enum": [
+            "default",
+            "on",
+            "off"
+          ],
           "default": "default",
           "description": "%config.commitMessage.fastMode%"
         },

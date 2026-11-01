@@ -192,7 +192,8 @@ export const MarkdownView = memo(function MarkdownView({
     : components;
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const target = (e.target as Element).closest<HTMLElement>("[data-file]");
-    if (!target || !onOpenFile) return;
+    // A drag that selects text in a file name ends in a click: leave the selection to be copied.
+    if (!target || !onOpenFile || !window.getSelection()?.isCollapsed) return;
     e.preventDefault();
     const line = target.dataset.line ? Number(target.dataset.line) : undefined;
     onOpenFile({ path: target.dataset.file!, line });

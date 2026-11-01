@@ -238,7 +238,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     });
   }
 
-  /** Shows the active tab's agent and model in the status bar, and what the tabs are doing. */
+  /** Shows the active tab's agent in the view title, its agent and model in the status bar, and what the tabs are doing. */
   private updateStatusBar(): void {
     if (this.statusBarDue) {
       return;
@@ -258,6 +258,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       const agent = agentId === undefined ? undefined : (yield* this.manager.agents).find((a) => a.id === agentId)?.name;
       if (run !== this.statusBarRun) {
         return;
+      }
+      if (this.view) {
+        this.view.description = agent;
       }
       const model = modelOption(tab.configOptions);
       const thought = thoughtOption(tab.configOptions);
