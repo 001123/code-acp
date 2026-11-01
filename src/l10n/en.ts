@@ -173,6 +173,8 @@ const en = {
   "settings.autoScroll": "Auto-scroll",
   "settings.autoScrollDesc": "Keep the chat scrolled to the newest content while the agent replies. Turn off to stay where you scrolled.",
   "settings.notifications": "Notifications",
+  "settings.rememberSessionOptions": "Remember model and effort",
+  "settings.rememberSessionOptionsDesc": "Start new chats with the model, effort and fast mode you last picked for the agent.",
   "settings.notificationsDesc": "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
   "settings.followAgentDesc": "Open the files the agent reads and edits in the editor, at the line it is working on, and briefly highlight the lines it changes.",
   "checkpoints.gitFailed": "git {0} failed: {1}",

@@ -11,7 +11,7 @@ import { ChangeSet } from "../fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
 import { Problems, type ProblemScope } from "../problems";
 import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output } from "../runtime";
-import { choicesOf, modelOption, thoughtOption } from "../sessionOptions";
+import { choicesOf, configureSession, modelOption, thoughtOption } from "../sessionOptions";
 import { readSettings } from "../settings";
 import { TerminalContext } from "../terminalContext";
 import { UsageLedger, type SessionRef } from "../usageLedger";
@@ -21,6 +21,7 @@ import { Attention, type AttentionReason } from "./attention";
 import { activeFileBlocks, activeFileName, attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
 import { ChangeReview, confirm } from "./changes";
 import { DraftStore } from "./drafts";
+import { LastOptions } from "./lastOptions";
 import { Follower } from "./follow";
 import { canReopen, HistoryRequests, listHistory } from "./history";
 import { CANCELLED, Permissions } from "./permissions";
@@ -69,6 +70,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly agents = new AgentPool();
   private readonly tabs: TabList;
   private readonly drafts: DraftStore;
+  private readonly lastOptions: LastOptions;
   private readonly permissions = new Permissions<Tab>({
     shown: (tab, id, req) => {
       this.view?.show(true);
@@ -130,6 +132,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   ) {
     this.tabs = new TabList(context.workspaceState.get(TABS_KEY), defaultCwd);
     this.nextTurn = this.tabs.lastTurn + 1;
+    this.lastOptions = new LastOptions(context.globalState);
     // Raw bytes of draft attachments, which are too big for workspaceState.
     this.drafts = new DraftStore(path.join((context.storageUri ?? context.globalStorageUri).fsPath, "drafts"), () => this.tabs.all);
     this.run(pruneTempFiles);
@@ -545,7 +548,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "setConfig":
         if (tab?.running && tab.sessionId) {
+          const { agentId } = tab.running;
+          const before = tab.configOptions;
           const res = yield* tab.running.agent.setConfigOption(tab.sessionId, msg.configId, msg.value);
+          const picked = readSettings().rememberSessionOptions
+            ? this.lastOptions.picked(agentId, before, msg.configId, msg.value)
+            : undefined;
+          if (picked) {
+            yield* thenable(() => picked);
+          }
           this.setConfigOptions(tab, res.configOptions);
           this.postTab(tab, { type: "configOptions", configOptions: res.configOptions });
         }
@@ -892,9 +903,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         tab.sessionId = res.sessionId;
         tab.running = running;
-        this.setConfigOptions(tab, res.configOptions);
+        // The model, effort and fast mode last picked for this agent; the agent's defaults for what it no longer offers.
+        const wanted = readSettings().rememberSessionOptions ? this.lastOptions.wanted(running.agentId) : undefined;
+        const configOptions = wanted
+          ? yield* configureSession(running.agent, res, wanted).pipe(
+              Effect.tapError((err) => Effect.logWarning(`Restoring the session options failed: ${err.message}`)),
+              Effect.orElseSucceed(() => res.configOptions),
+            )
+          : res.configOptions;
+        this.setConfigOptions(tab, configOptions);
         this.postTabs();
-        this.postTab(tab, { type: "session", sessionId: res.sessionId, configOptions: res.configOptions });
+        this.postTab(tab, { type: "session", sessionId: res.sessionId, configOptions });
         this.status(tab, "chat.ready");
         return res.sessionId;
       }),

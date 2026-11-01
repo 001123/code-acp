@@ -174,6 +174,8 @@ const vi: Record<MessageKey, string> = {
   "settings.autoScroll": "Tự động cuộn",
   "settings.autoScrollDesc": "Tự động cuộn chat xuống nội dung mới nhất khi agent trả lời. Tắt đi để giữ nguyên vị trí bạn đang xem.",
   "settings.notifications": "Thông báo",
+  "settings.rememberSessionOptions": "Ghi nhớ model và effort",
+  "settings.rememberSessionOptionsDesc": "Bắt đầu cuộc trò chuyện mới với model, effort và fast mode bạn chọn gần nhất cho agent.",
   "settings.notificationsDesc": "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
   "settings.followAgentDesc": "Mở trong editor các file agent đang đọc và sửa, tại dòng agent đang làm việc, và tô sáng trong giây lát những dòng agent vừa sửa.",
   "checkpoints.gitFailed": "git {0} lỗi: {1}",

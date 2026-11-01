@@ -51,6 +51,7 @@
   "command.refactorSelection": "Refactor Selection",
   "command.testSelection": "Write Tests for Selection",
   "submenu.ask": "Ask Code ACP",
+  "config.rememberSessionOptions": "Start new chats with the model, effort and fast mode you last picked for the agent.",
   "config.notifications": "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
   "command.showUsage": "Code ACP: Show Usage",
   "command.showAttention": "Code ACP: Show Conversation That Needs You"

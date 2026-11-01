@@ -491,6 +491,11 @@
           "default": true,
           "description": "%config.notifications%"
         },
+        "codeAcp.rememberSessionOptions": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.rememberSessionOptions%"
+        },
         "codeAcp.commitMessage.agent": {
           "type": "string",
           "default": "",

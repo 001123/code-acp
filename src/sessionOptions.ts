@@ -63,7 +63,7 @@ export const findChoice = (option: Select, wanted: string): Choice | undefined =
 export const levelsOf = (option: Select): Array<Choice> => choicesOf(option).filter((c) => !/^(default|auto)$/i.test(c.value));
 
 /** The value of a fast mode switch that turns it on (or off). */
-const fastValue = (option: Select, on: boolean): string | undefined =>
+export const fastValue = (option: Select, on: boolean): string | undefined =>
   choicesOf(option).find((c) => (on ? /^(on|true|enabled?)$/i : /^(off|false|disabled?)$/i).test(c.value))?.value;
 
 /** What `options` offer to pick. */

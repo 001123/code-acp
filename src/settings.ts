@@ -45,6 +45,8 @@ export const Settings = Schema.Struct({
   autoScroll: Schema.Boolean,
   /** Show a notification when a tab the user isn't looking at finishes or asks for permission. */
   notifications: Schema.Boolean,
+  /** Start new chat sessions with the model, effort and fast mode last picked for their agent. */
+  rememberSessionOptions: Schema.Boolean,
   /** Installed agent id for commit messages; empty means the default agent. */
   "commitMessage.agent": Schema.String,
   /** Model value (or name) to pick in the commit session; empty keeps the agent's default. */
@@ -70,6 +72,7 @@ export const SETTING_KEYS = [
   "followAgent",
   "autoScroll",
   "notifications",
+  "rememberSessionOptions",
   "commitMessage.agent",
   "commitMessage.model",
   "commitMessage.instructions",
@@ -92,6 +95,7 @@ const DEFAULTS: Settings = {
   followAgent: false,
   autoScroll: true,
   notifications: true,
+  rememberSessionOptions: true,
   "commitMessage.agent": "",
   "commitMessage.model": "",
   "commitMessage.instructions": DEFAULT_COMMIT_INSTRUCTIONS,
@@ -123,6 +127,7 @@ export function readSettings(): Settings {
     followAgent: read("followAgent"),
     autoScroll: read("autoScroll"),
     notifications: read("notifications"),
+    rememberSessionOptions: read("rememberSessionOptions"),
     "commitMessage.agent": read("commitMessage.agent"),
     "commitMessage.model": read("commitMessage.model"),
     "commitMessage.instructions": read("commitMessage.instructions"),

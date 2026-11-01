@@ -49,6 +49,7 @@ function isDefault(key: SettingKey, value: unknown): boolean {
   if (key === "followAgent") return value === false;
   if (key === "autoScroll") return value === true;
   if (key === "notifications") return value === true;
+  if (key === "rememberSessionOptions") return value === true;
   if (key === "commitMessage.effort") return value === LOWEST_EFFORT;
   if (key === "commitMessage.fastMode") return value === "default";
   // Empty is a real choice here: no extra instructions.
