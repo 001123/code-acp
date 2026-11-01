@@ -146,6 +146,7 @@ const vi: Record<MessageKey, string> = {
   "statusBar.noAgent": "Chưa có agent",
   "statusBar.agent": "Agent: {0}",
   "statusBar.model": "Model: {0}",
+  "statusBar.effort": "Effort: {0}",
   "statusBar.waiting": "Đang chờ bạn cho phép: {0}",
   "statusBar.finished": "Đã xong khi bạn vắng mặt: {0}",
   "statusBar.running": "Đang chạy: {0}",

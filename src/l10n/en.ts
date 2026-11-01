@@ -145,6 +145,7 @@ const en = {
   "statusBar.noAgent": "No agent",
   "statusBar.agent": "Agent: {0}",
   "statusBar.model": "Model: {0}",
+  "statusBar.effort": "Effort: {0}",
   "statusBar.waiting": "Waiting for your approval: {0}",
   "statusBar.finished": "Done while you were away: {0}",
   "statusBar.running": "Running: {0}",

@@ -11,7 +11,7 @@ import { ChangeSet } from "../fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
 import { Problems, type ProblemScope } from "../problems";
 import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output } from "../runtime";
-import { choicesOf, modelOption } from "../sessionOptions";
+import { choicesOf, modelOption, thoughtOption } from "../sessionOptions";
 import { readSettings } from "../settings";
 import { TerminalContext } from "../terminalContext";
 import { UsageLedger, type SessionRef } from "../usageLedger";
@@ -244,9 +244,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         return;
       }
       const model = modelOption(tab.configOptions);
+      const thought = thoughtOption(tab.configOptions);
       this.statusBar.show({
         agent,
         model: model && choicesOf(model).find((c) => c.value === model.currentValue)?.name,
+        effort: thought && choicesOf(thought).find((c) => c.value === thought.currentValue)?.name,
         waiting: this.permissions.owners.length,
         finished: this.attention.owners("finished").length,
         running: this.tabs.all.filter((t) => t.busy).length,
