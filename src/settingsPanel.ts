@@ -50,6 +50,7 @@ function isDefault(key: SettingKey, value: unknown): boolean {
   if (key === "autoScroll") return value === true;
   if (key === "showChanges") return value === true;
   if (key === "notifications") return value === true;
+  if (key === "notifyFinished") return value === true;
   if (key === "rememberSessionOptions") return value === true;
   if (key === "worktreeForNewTabs") return value === false;
   if (key === "commitMessage.effort") return value === LOWEST_EFFORT;

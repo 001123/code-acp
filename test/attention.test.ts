@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Attention, type AttentionReason } from "../src/chat/attention";
+import { Attention, type AttentionReason, shouldNotify } from "../src/chat/attention";
 
 function setup() {
   const seen = new Set<string>();
@@ -68,5 +68,28 @@ describe("Attention", () => {
     attention.raise("c", "finished");
     assert.deepStrictEqual(attention.owners("finished"), ["b", "c"]);
     assert.deepStrictEqual(attention.owners("permission"), ["a"]);
+  });
+});
+
+describe("shouldNotify", () => {
+  it("notifies every reason by default", () => {
+    const settings = { notifications: true, notifyFinished: true };
+    assert.isTrue(shouldNotify("finished", settings));
+    assert.isTrue(shouldNotify("permission", settings));
+    assert.isTrue(shouldNotify("question", settings));
+  });
+
+  it("drops only finished tabs with notifyFinished off", () => {
+    const settings = { notifications: true, notifyFinished: false };
+    assert.isFalse(shouldNotify("finished", settings));
+    assert.isTrue(shouldNotify("permission", settings));
+    assert.isTrue(shouldNotify("question", settings));
+  });
+
+  it("drops every reason with notifications off", () => {
+    const settings = { notifications: false, notifyFinished: true };
+    assert.isFalse(shouldNotify("finished", settings));
+    assert.isFalse(shouldNotify("permission", settings));
+    assert.isFalse(shouldNotify("question", settings));
   });
 });

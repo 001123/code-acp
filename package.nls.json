@@ -57,6 +57,7 @@
   "submenu.ask": "Ask Code ACP",
   "config.rememberSessionOptions": "Start and reopen chats with the model, effort and fast mode you last picked for the agent.",
   "config.notifications": "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
+  "config.notifyFinished": "Also notify when a conversation you aren't looking at finishes. Approval requests and questions from the agent still notify. Has no effect while codeAcp.notifications is off.",
   "command.showUsage": "Show Usage",
   "command.showAttention": "Code ACP: Show Conversation That Needs You"
 }

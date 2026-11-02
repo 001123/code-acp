@@ -12,7 +12,7 @@ import { readSettings } from "../settings";
 import { webviewHtml, webviewRoots } from "../webview";
 import { Worktrees } from "../worktrees";
 import { AgentPool, stopAll } from "./agents";
-import { Attention, type AttentionReason } from "./attention";
+import { Attention, type AttentionReason, shouldNotify } from "./attention";
 import { AttachmentQueue, pruneTempFiles } from "./attachments";
 import { ChangeReview, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
 import { ComposerCommands } from "./composerCommands";
@@ -282,9 +282,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   }
 
-  /** Announces a tab that wants the user (codeAcp.notifications); "Show" brings it up. */
+  /** Announces a tab that wants the user (codeAcp.notifications, codeAcp.notifyFinished); "Show" brings it up. */
   private notify(tab: Tab, reason: AttentionReason): void {
-    if (!readSettings().notifications) {
+    if (!shouldNotify(reason, readSettings())) {
       return;
     }
     const title = tab.name ?? tab.title ?? t("chat.untitled");

@@ -16,6 +16,7 @@ describe("readSettings", () => {
     assert.isTrue(s.autoScroll);
     assert.isTrue(s.showChanges);
     assert.isTrue(s.notifications);
+    assert.isTrue(s.notifyFinished);
     assert.isTrue(s.rememberSessionOptions);
     assert.isFalse(s.worktreeForNewTabs);
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
@@ -26,6 +27,7 @@ describe("readSettings", () => {
     __test.setSetting("codeAcp.followAgent", true);
     __test.setSetting("codeAcp.autoScroll", false);
     __test.setSetting("codeAcp.showChanges", false);
+    __test.setSetting("codeAcp.notifyFinished", false);
     __test.setSetting("codeAcp.env", { A: "1" });
     __test.setSetting("codeAcp.customAgents", { mine: { command: "x", args: ["a"] } });
     const s = readSettings();
@@ -33,6 +35,7 @@ describe("readSettings", () => {
     assert.isTrue(s.followAgent);
     assert.isFalse(s.autoScroll);
     assert.isFalse(s.showChanges);
+    assert.isFalse(s.notifyFinished);
     assert.deepStrictEqual(s.env, { A: "1" });
     assert.deepStrictEqual(s.customAgents, { mine: { command: "x", args: ["a"] } });
   });

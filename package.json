@@ -552,6 +552,11 @@
           "default": true,
           "description": "%config.notifications%"
         },
+        "codeAcp.notifyFinished": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.notifyFinished%"
+        },
         "codeAcp.rememberSessionOptions": {
           "type": "boolean",
           "default": true,

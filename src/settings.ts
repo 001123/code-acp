@@ -47,6 +47,8 @@ export const Settings = Schema.Struct({
   showChanges: Schema.Boolean,
   /** Show a notification when a tab the user isn't looking at finishes or asks for permission. */
   notifications: Schema.Boolean,
+  /** Among those notifications, also show the one for a tab that finished. */
+  notifyFinished: Schema.Boolean,
   /** Start new chat sessions with the model, effort and fast mode last picked for their agent. */
   rememberSessionOptions: Schema.Boolean,
   /** Run each new chat tab in a git worktree of its own, on a new branch. */
@@ -77,6 +79,7 @@ export const SETTING_KEYS = [
   "autoScroll",
   "showChanges",
   "notifications",
+  "notifyFinished",
   "rememberSessionOptions",
   "worktreeForNewTabs",
   "commitMessage.agent",
@@ -102,6 +105,7 @@ const DEFAULTS: Settings = {
   autoScroll: true,
   showChanges: true,
   notifications: true,
+  notifyFinished: true,
   rememberSessionOptions: true,
   worktreeForNewTabs: false,
   "commitMessage.agent": "",
@@ -136,6 +140,7 @@ export function readSettings(): Settings {
     autoScroll: read("autoScroll"),
     showChanges: read("showChanges"),
     notifications: read("notifications"),
+    notifyFinished: read("notifyFinished"),
     rememberSessionOptions: read("rememberSessionOptions"),
     worktreeForNewTabs: read("worktreeForNewTabs"),
     "commitMessage.agent": read("commitMessage.agent"),

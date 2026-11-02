@@ -57,6 +57,7 @@
   "submenu.ask": "Hỏi Code ACP",
   "config.rememberSessionOptions": "Bắt đầu và mở lại cuộc trò chuyện với model, effort và fast mode bạn chọn gần nhất cho agent.",
   "config.notifications": "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
+  "config.notifyFinished": "Thông báo cả khi một cuộc trò chuyện bạn không xem đã xong. Yêu cầu cho phép và câu hỏi của agent vẫn được thông báo. Không có tác dụng khi codeAcp.notifications đang tắt.",
   "command.showUsage": "Xem mức sử dụng",
   "command.showAttention": "Code ACP: Mở cuộc trò chuyện đang cần bạn"
 }

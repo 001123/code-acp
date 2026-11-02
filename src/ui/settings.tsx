@@ -10,6 +10,8 @@ import { mount } from "./mount";
 import { UsageTab, type UsageSource } from "./usage";
 import { getState, poster, setState as saveState, useMessages } from "./vscode";
 import settingsIcon from "@tabler/icons/outline/settings.svg";
+import bellIcon from "@tabler/icons/outline/bell.svg";
+import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
 import commitIcon from "@tabler/icons/outline/git-commit.svg";
 import plugIcon from "@tabler/icons/outline/plug-connected.svg";
@@ -591,10 +593,12 @@ function AgentModelFields(props: {
   );
 }
 
-type Tab = "general" | "agent" | "commit" | "mcp" | "custom" | "usage";
+type Tab = "general" | "notifications" | "worktree" | "agent" | "commit" | "mcp" | "custom" | "usage";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "notifications", "rememberSessionOptions", "worktreeForNewTabs"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions"] },
+  { id: "notifications", label: "settings.notificationsTab", desc: "settings.notificationsTabDesc", icon: bellIcon, keys: ["notifications", "notifyFinished"] },
+  { id: "worktree", label: "settings.worktree", desc: "settings.worktreeDesc", icon: branchIcon, keys: ["worktreeForNewTabs"] },
   {
     id: "agent",
     label: "settings.agent",
@@ -817,15 +821,6 @@ function App() {
                 <Toggle id="showChanges" checked={v.showChanges !== false} onChange={(checked) => set("showChanges", checked)} />
               </Field>
               <Field
-                id="notifications"
-                label="settings.notifications"
-                desc="settings.notificationsDesc"
-                overridden={overridden("notifications")}
-                inline
-              >
-                <Toggle id="notifications" checked={v.notifications !== false} onChange={(checked) => set("notifications", checked)} />
-              </Field>
-              <Field
                 id="rememberSessionOptions"
                 label="settings.rememberSessionOptions"
                 desc="settings.rememberSessionOptionsDesc"
@@ -838,6 +833,39 @@ function App() {
                   onChange={(checked) => set("rememberSessionOptions", checked)}
                 />
               </Field>
+            </section>
+          )}
+
+          {tab === "notifications" && (
+            <section className="card">
+              <Field
+                id="notifications"
+                label="settings.notifications"
+                desc="settings.notificationsDesc"
+                overridden={overridden("notifications")}
+                inline
+              >
+                <Toggle id="notifications" checked={v.notifications !== false} onChange={(checked) => set("notifications", checked)} />
+              </Field>
+              <Field
+                id="notifyFinished"
+                label="settings.notifyFinished"
+                desc="settings.notifyFinishedDesc"
+                overridden={overridden("notifyFinished")}
+                inline
+              >
+                <Toggle
+                  id="notifyFinished"
+                  checked={v.notifyFinished !== false}
+                  disabled={v.notifications === false}
+                  onChange={(checked) => set("notifyFinished", checked)}
+                />
+              </Field>
+            </section>
+          )}
+
+          {tab === "worktree" && (
+            <section className="card">
               <Field
                 id="worktreeForNewTabs"
                 label="settings.worktreeForNewTabs"
