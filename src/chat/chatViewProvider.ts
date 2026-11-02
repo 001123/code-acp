@@ -594,6 +594,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "showUsage":
         yield* thenable(() => vscode.commands.executeCommand("codeAcp.showUsage"));
         break;
+      case "openSettings":
+        yield* thenable(() => vscode.commands.executeCommand("codeAcp.openSettings"));
+        break;
       case "updateAgent": {
         const update = (yield* this.updates.pending).find((u) => u.installed.id === msg.id);
         if (update) {
@@ -986,14 +989,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         tab.sessionId = res.sessionId;
         tab.running = running;
-        // The model, effort and fast mode last picked for this agent; the agent's defaults for what it no longer offers.
-        const wanted = readSettings().rememberSessionOptions ? this.lastOptions.wanted(running.agentId) : undefined;
-        const configOptions = wanted
-          ? yield* configureSession(running.agent, res, wanted).pipe(
-              Effect.tapError((err) => Effect.logWarning(`Restoring the session options failed: ${err.message}`)),
-              Effect.orElseSucceed(() => res.configOptions),
-            )
-          : res.configOptions;
+        const configOptions = yield* this.restoreOptions(running, res);
         this.setConfigOptions(tab, configOptions);
         this.postTabs();
         this.postTab(tab, { type: "session", sessionId: res.sessionId, configOptions });
@@ -1002,6 +998,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }),
     );
   });
+
+  /**
+   * Sets the model, effort and fast mode last picked for the agent on a session just started or reopened (reopening
+   * gives the agent's defaults too), keeping the defaults for what it no longer offers. Gives the session's options.
+   */
+  private restoreOptions(running: RunningAgent, session: acp.NewSessionResponse) {
+    const wanted = readSettings().rememberSessionOptions ? this.lastOptions.wanted(running.agentId) : undefined;
+    return wanted
+      ? configureSession(running.agent, session, wanted).pipe(
+          Effect.tapError((err) => Effect.logWarning(`Restoring the session options failed: ${err.message}`)),
+          Effect.orElseSucceed(() => session.configOptions),
+        )
+      : Effect.succeed(session.configOptions);
+  }
 
   /** Reopens a saved session in its tab; undefined when it can't be, and the tab should start over. */
   private readonly reopenSession = Effect.fn("ChatView.reopenSession")(function* (
@@ -1084,8 +1094,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }),
       ),
     );
-    this.setConfigOptions(tab, res.configOptions);
-    this.postTab(tab, { type: "session", sessionId, configOptions: res.configOptions });
+    const configOptions = yield* this.restoreOptions(running, { sessionId, configOptions: res.configOptions });
+    this.setConfigOptions(tab, configOptions);
+    this.postTab(tab, { type: "session", sessionId, configOptions });
     this.postSavedUsage(tab);
     this.status(tab, "chat.ready");
     // Messages sent while the session loaded.

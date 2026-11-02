@@ -30,23 +30,33 @@ import settingsIcon from "@tabler/icons/outline/settings.svg";
 import shieldIcon from "@tabler/icons/outline/shield-half.svg";
 import { post } from "./post";
 
-/** Icon for a config option: by its ACP category, else by keywords in its id or name. */
-function configIcon(option: acp.SessionConfigOption): string {
+type SelectOption = acp.SessionConfigOption & { type: "select" };
+
+const CONFIG_ICONS = { mode: shieldIcon, model: cpuIcon, effort: brainIcon, fast: boltIcon, agent: robotIcon };
+
+/** What a config option sets: by its ACP category, else by keywords in its id or name. */
+function configKind(option: acp.SessionConfigOption): keyof typeof CONFIG_ICONS | undefined {
   switch (option.category) {
     case "mode":
-      return shieldIcon;
+      return "mode";
     case "model":
-      return cpuIcon;
+      return "model";
     case "thought_level":
-      return brainIcon;
+      return "effort";
   }
   const key = `${option.id} ${option.name}`.toLowerCase();
-  if (/mode|permission/.test(key) && !/fast/.test(key)) return shieldIcon;
-  if (/model/.test(key)) return cpuIcon;
-  if (/effort|think|reason/.test(key)) return brainIcon;
-  if (/fast|speed/.test(key)) return boltIcon;
-  if (/agent/.test(key)) return robotIcon;
-  return adjustmentsIcon;
+  // Before "mode", which "model" contains.
+  if (/model/.test(key)) return "model";
+  if (/mode|permission/.test(key) && !/fast/.test(key)) return "mode";
+  if (/effort|think|reason/.test(key)) return "effort";
+  if (/fast|speed/.test(key)) return "fast";
+  if (/agent/.test(key)) return "agent";
+  return undefined;
+}
+
+function configIcon(option: acp.SessionConfigOption): string {
+  const kind = configKind(option);
+  return kind ? CONFIG_ICONS[kind] : adjustmentsIcon;
 }
 
 /** An entry of a sub-menu: a pickable value, a group heading, or a separator. */
@@ -258,7 +268,7 @@ export function ConfigSelect({
   onChange,
 }: {
   tab: number;
-  option: acp.SessionConfigOption & { type: "select" };
+  option: SelectOption;
   onChange: (value: string) => void;
 }) {
   const grouped = option.options.some((o) => "options" in o);
@@ -290,6 +300,59 @@ export function ConfigSelect({
       }}
     />
   );
+}
+
+/** Beside the agent button: the session's model and effort, each a dropdown. */
+export function QuickConfig({
+  tab,
+  options,
+  onChange,
+}: {
+  tab: number;
+  options: ReadonlyArray<acp.SessionConfigOption>;
+  onChange: (configId: string, value: string) => void;
+}) {
+  const selects = options.filter((o): o is SelectOption => o.type === "select");
+  const quick = (["model", "effort"] as const).flatMap((kind) => selects.find((o) => configKind(o) === kind) ?? []);
+  return quick.map((option) => {
+    const known = option.options.flatMap((o) => ("options" in o ? o.options : [o])).some((o) => o.value === option.currentValue);
+    return (
+      <span key={option.id} className="config-item quick-config" title={option.description ?? option.name}>
+        <span className="config-name" aria-hidden="true">
+          <Icon svg={configIcon(option)} />
+        </span>
+        <select
+          aria-label={option.name}
+          value={option.currentValue}
+          onChange={(e) => {
+            onChange(option.id, e.target.value);
+            post({ type: "setConfig", tab, configId: option.id, value: e.target.value });
+          }}
+        >
+          {!known && (
+            <option value={option.currentValue} disabled>
+              {option.currentValue}
+            </option>
+          )}
+          {option.options.map((o) =>
+            "options" in o ? (
+              <optgroup key={o.group} label={o.name}>
+                {o.options.map((v) => (
+                  <option key={v.value} value={v.value}>
+                    {v.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : (
+              <option key={o.value} value={o.value}>
+                {o.name}
+              </option>
+            ),
+          )}
+        </select>
+      </span>
+    );
+  });
 }
 
 /** Stands in for the config options while the tab's new session starts. */
@@ -494,7 +557,7 @@ ${tab.cwd}`}
   );
 }
 
-/** The gear beside the send button: a menu of chat view toggles (follow the agent, auto-scroll). */
+/** The gear beside the send button: a menu of chat view toggles (follow the agent, auto-scroll) and a way to the extension settings. */
 export function ChatSettings({ followAgent, autoScroll }: { followAgent: boolean; autoScroll: boolean }) {
   const { t } = useL10n();
   const menu = useHoverMenu();
@@ -531,6 +594,17 @@ export function ChatSettings({ followAgent, autoScroll }: { followAgent: boolean
               <span className="switch" aria-hidden="true" />
             </button>
           ))}
+          <div className="menu-separator" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              post({ type: "openSettings" });
+              menu.toggle();
+            }}
+          >
+            <span className="menu-label">{t("chat.openSettings")}</span>
+          </button>
         </div>
       )}
     </div>

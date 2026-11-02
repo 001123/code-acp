@@ -14,7 +14,7 @@ type Picked = typeof Picked.Type;
 
 const Saved = Schema.Record(Schema.String, Picked);
 
-/** The model, level of thinking and fast mode last picked in a chat, by agent id: new sessions of that agent start with them. */
+/** The model, level of thinking and fast mode last picked in a chat, by agent id: sessions of that agent start or reopen with them. */
 export class LastOptions {
   constructor(private readonly state: vscode.Memento) {}
 

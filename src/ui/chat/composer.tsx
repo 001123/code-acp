@@ -97,11 +97,13 @@ export interface ComposerOptions {
   settings: ReactNode;
   /** The session's config options, shown in the agent panel. */
   agentConfig: ReactNode;
+  /** The session's model and effort, shown beside the agent button. */
+  quickConfig: ReactNode;
 }
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig } =
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig } =
     options;
   const { t } = useL10n();
   const [dragging, setDragging] = useState(false);
@@ -860,6 +862,7 @@ export function useComposer(options: ComposerOptions) {
         <AgentPanel tab={tabs.find((x) => x.id === active)} choices={agents}>
           {agentConfig}
         </AgentPanel>
+        {quickConfig}
         <FolderSelect tab={tabs.find((x) => x.id === active)} folders={folders} />
         <span className="spacer" />
         {settings}

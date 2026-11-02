@@ -53,6 +53,7 @@ export type FromWebview =
   | { type: "manageAgents" }
   /** Opens the usage summary (clicking the context meter). */
   | { type: "showUsage" }
+  | { type: "openSettings" }
   /** Installs the registry version the agent picker offers for agent `id`. */
   | { type: "updateAgent"; id: string }
   | { type: "permission"; id: number; optionId: string | null }

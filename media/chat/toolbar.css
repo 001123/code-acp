@@ -29,6 +29,19 @@
   height: 22px;
   font-size: 0.88em;
 }
+/* Shrink before the buttons of the row when the view is narrow. */
+.quick-config {
+  flex-shrink: 1;
+  min-width: 0;
+  height: 22px;
+  font-size: 0.88em;
+}
+.quick-config .config-name {
+  flex: none;
+}
+.quick-config select {
+  min-width: 0;
+}
 #workspace-bar {
   display: flex;
   align-items: center;

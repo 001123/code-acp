@@ -12,7 +12,7 @@ import { HistoryView, type History } from "./chat/history";
 import { post } from "./chat/post";
 import { NEW_TAB, TabStrip, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
-import { ChatSettings, ConfigLoading, ConfigSelect, UsageMeter, type AgentChoices, WorkspaceBar } from "./chat/toolbar";
+import { ChatSettings, ConfigLoading, ConfigSelect, QuickConfig, UsageMeter, type AgentChoices, WorkspaceBar } from "./chat/toolbar";
 import { clipContent, contentText, groupActivity, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
@@ -80,6 +80,13 @@ function App() {
   const error = (key: Parameters<Translate>[0], ...args: unknown[]) =>
     dispatch(activeRef.current, { type: "add", item: { kind: "error", text: { key, args } } });
 
+  // Shown right away; the agent's answer replaces the whole list.
+  const setConfigValue = (configId: string, value: string) =>
+    update(active, (s) => ({
+      ...s,
+      config: s.config.map((o) => (o.id === configId ? ({ ...o, currentValue: value } as typeof o) : o)),
+    }));
+
   const composer = useComposer({
     active,
     activeRef,
@@ -115,17 +122,12 @@ function App() {
               key={opt.id}
               tab={active}
               option={opt}
-              // Shown right away; the agent's answer replaces the whole list.
-              onChange={(value) =>
-                update(active, (s) => ({
-                  ...s,
-                  config: s.config.map((o) => (o.id === opt.id ? ({ ...o, currentValue: value } as typeof o) : o)),
-                }))
-              }
+              onChange={(value) => setConfigValue(opt.id, value)}
             />
           ) : null,
         )
       )),
+    quickConfig: active !== undefined && !configLoading && <QuickConfig tab={active} options={config} onChange={setConfigValue} />,
   });
 
   useMessages((msg) => {
