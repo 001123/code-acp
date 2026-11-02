@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useEffect, useRef, useState } from "react";
-import type { Attachment, ChangesMessage, QueuedInfo, TabInfo, TerminalSnapshot } from "../../chat/protocol";
+import type { Attachment, ChangeHunk, ChangesMessage, QueuedInfo, TabInfo, TerminalSnapshot } from "../../chat/protocol";
 import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
@@ -41,6 +41,8 @@ export interface TabState {
   /** The agent's terminals, by id. */
   terminals: Record<string, TerminalSnapshot>;
   changes?: ChangesMessage;
+  /** The changes in the files whose changes were asked for, by path ("hunks"). */
+  hunks?: Record<string, ChangeHunk[]>;
   /** Messages waiting for the running turn to end. */
   queue: QueuedInfo[];
   /** The turn whose user message the composer is editing. */

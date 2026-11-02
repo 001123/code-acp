@@ -2,6 +2,10 @@
 import type { TerminalSnapshot } from "../agentTerminals";
 import type { ChangedFile } from "../fileChanges";
 import type { ProblemScope } from "../problems";
+import type { ChangeBlock } from "../ui/lineDiff";
+
+/** One change in a file, to keep or undo on its own. */
+export type ChangeHunk = ChangeBlock;
 
 export type { ChangedFile, TerminalSnapshot };
 
@@ -68,9 +72,15 @@ export type FromWebview =
   | { type: "killTerminal"; tab: number; terminalId: string }
   /**
    * Opens a diff of what the agent changed in `path`; the tool call's texts are used when the change was not
-   * written through the client.
+   * written through the client. `line` is 1-based.
    */
-  | { type: "openDiff"; tab: number; path: string; oldText?: string | null; newText?: string }
+  | { type: "openDiff"; tab: number; path: string; oldText?: string | null; newText?: string; line?: number }
+  /** The changes in `path`, one by one; answered with "hunks". */
+  | { type: "listHunks"; tab: number; path: string }
+  /** Accepts one change to `path`. */
+  | { type: "keepHunk"; tab: number; path: string; hunk: ChangeHunk }
+  /** Takes one change out of `path`. */
+  | { type: "undoHunk"; tab: number; path: string; hunk: ChangeHunk }
   /** Accepts the agent's changes to `path`, or to every changed file. */
   | { type: "keepChanges"; tab: number; path?: string }
   /** Puts back what `path` held before the agent changed it, or every changed file. */

@@ -45,6 +45,22 @@ export class Uri {
   }
 }
 
+export class EventEmitter<T> {
+  private readonly listeners = new Set<(value: T) => void>();
+  readonly event = (listener: (value: T) => void) => {
+    this.listeners.add(listener);
+    return { dispose: () => void this.listeners.delete(listener) };
+  };
+  fire(value: T) {
+    for (const listener of this.listeners) {
+      listener(value);
+    }
+  }
+  dispose() {
+    this.listeners.clear();
+  }
+}
+
 export class FileSystemError extends Error {
   constructor(
     message: string,

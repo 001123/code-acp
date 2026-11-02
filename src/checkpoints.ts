@@ -35,6 +35,8 @@ export class ShadowGit extends Context.Service<ShadowGit, {
   restore(root: string, tree: string, files: ReadonlyArray<string>): Effect.Effect<void, CheckpointError>;
   /** Snapshot `base` with `files` taken from snapshot `from`. */
   merge(root: string, base: string, from: string, files: ReadonlyArray<string>): Effect.Effect<string, CheckpointError>;
+  /** Snapshot `base` with `file`, which is in it, holding `content`. */
+  withFile(root: string, base: string, file: string, content: string): Effect.Effect<string, CheckpointError>;
 }>()("code-acp/ShadowGit") {
   static readonly layer = Layer.effect(
     ShadowGit,
@@ -52,8 +54,9 @@ export class ShadowGit extends Context.Service<ShadowGit, {
 
       /** Runs git in `cwd`; fails unless it exits with code 0. */
       const run = Effect.fn("ShadowGit.run")(
-        function* (cwd: string, args: ReadonlyArray<string>, env?: Record<string, string>) {
-          const handle = yield* spawner.spawn(ChildProcess.make("git", args, { cwd, env, extendEnv: true }));
+        function* (cwd: string, args: ReadonlyArray<string>, env?: Record<string, string>, input?: string) {
+          const stdin = input === undefined ? undefined : Stream.make(new TextEncoder().encode(input));
+          const handle = yield* spawner.spawn(ChildProcess.make("git", args, { cwd, env, extendEnv: true, stdin }));
           const [out, err, code] = yield* Effect.all(
             [
               Stream.mkString(Stream.decodeText(handle.stdout)),
@@ -75,7 +78,7 @@ export class ShadowGit extends Context.Service<ShadowGit, {
       );
 
       /** Runs git on the shadow repository of `root`, with `root` as its work tree. */
-      const git = (root: string, args: ReadonlyArray<string>, env?: Record<string, string>) =>
+      const git = (root: string, args: ReadonlyArray<string>, env?: Record<string, string>, input?: string) =>
         run(
           root,
           [
@@ -91,6 +94,7 @@ export class ShadowGit extends Context.Service<ShadowGit, {
             ...args,
           ],
           env,
+          input,
         );
 
       const init = Effect.fn("ShadowGit.init")(function* (root: string) {
@@ -187,27 +191,55 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         }
       });
 
+      /** The mode and hash in `git ls-tree -z` output for a file: "<mode> blob <hash>\t<file>\0". */
+      const entryOf = (listed: string) => {
+        const match = /^(\d+) \w+ ([0-9a-f]+)\t/.exec(listed);
+        return match ? { mode: match[1]!, hash: match[2]! } : undefined;
+      };
+
+      /** The tree of snapshot `base` after `update`; on a scratch index, so the shared one keeps matching the work tree. */
+      const onScratchIndex = Effect.fnUntraced(function* <E>(
+        root: string,
+        base: string,
+        update: (env: Record<string, string>) => Effect.Effect<void, E>,
+      ) {
+        const index = path.join(gitDirOf(root), `merge-${process.pid}.index`);
+        const env = { GIT_INDEX_FILE: index };
+        yield* git(root, ["read-tree", base], env);
+        yield* update(env);
+        const tree = (yield* git(root, ["write-tree"], env)).trim();
+        yield* fs.remove(index).pipe(Effect.ignore);
+        return tree;
+      });
+
       const merge = Effect.fn("ShadowGit.merge")(function* (
         root: string,
         base: string,
         from: string,
         files: ReadonlyArray<string>,
       ) {
-        // A scratch index, so the shared one keeps matching the work tree.
-        const index = path.join(gitDirOf(root), `merge-${process.pid}.index`);
-        const env = { GIT_INDEX_FILE: index };
-        yield* git(root, ["read-tree", base], env);
-        for (const file of files) {
-          const listed = (yield* git(root, ["ls-tree", "-z", from, "--", file])).replace(/\0$/, "");
-          // "<mode> blob <hash>\t<file>"
-          const match = /^(\d+) \w+ ([0-9a-f]+)\t/.exec(listed);
-          yield* match
-            ? git(root, ["update-index", "--add", "--cacheinfo", `${match[1]},${match[2]},${file}`], env)
-            : git(root, ["update-index", "--force-remove", "--", file], env);
-        }
-        const tree = (yield* git(root, ["write-tree"], env)).trim();
-        yield* fs.remove(index).pipe(Effect.ignore);
-        return tree;
+        return yield* onScratchIndex(root, base, (env) =>
+          Effect.forEach(
+            files,
+            (file) =>
+              Effect.gen(function* () {
+                const match = entryOf(yield* git(root, ["ls-tree", "-z", from, "--", file]));
+                yield* match
+                  ? git(root, ["update-index", "--add", "--cacheinfo", `${match.mode},${match.hash},${file}`], env)
+                  : git(root, ["update-index", "--force-remove", "--", file], env);
+              }),
+            { discard: true },
+          ),
+        );
+      });
+
+      const withFile = Effect.fn("ShadowGit.withFile")(function* (root: string, base: string, file: string, content: string) {
+        const mode = entryOf(yield* git(root, ["ls-tree", "-z", base, "--", file]))?.mode ?? "100644";
+        // No --path: the bytes go in as they are, without the work tree's filters.
+        const hash = (yield* git(root, ["hash-object", "-w", "--stdin"], undefined, content)).trim();
+        return yield* onScratchIndex(root, base, (env) =>
+          git(root, ["update-index", "--add", "--cacheinfo", `${mode},${hash},${file}`], env),
+        );
       });
 
       return ShadowGit.of({
@@ -216,6 +248,7 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         show: (root, tree, file) => withLock(show(root, tree, file)),
         restore: (root, tree, files) => withLock(restore(root, tree, files)),
         merge: (root, base, from, files) => withLock(merge(root, base, from, files)),
+        withFile: (root, base, file, content) => withLock(withFile(root, base, file, content)),
       });
     }),
   );

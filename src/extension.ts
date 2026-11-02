@@ -130,6 +130,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }),
       ),
     ),
+    vscode.languages.registerCodeLensProvider({ scheme: "file" }, provider.hunkLenses),
+    ...provider.hunkCommands(),
     vscode.languages.registerCodeActionsProvider({ scheme: "file" }, new AskAgentActions(), {
       providedCodeActionKinds: AskAgentActions.kinds,
     }),

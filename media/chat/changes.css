@@ -23,7 +23,7 @@
   flex-direction: column;
   gap: 2px;
   margin-top: 4px;
-  max-height: 160px;
+  max-height: 320px;
   overflow: auto;
 }
 .changes-file {
@@ -76,7 +76,9 @@
   transition: opacity 0.1s;
 }
 .changes-file:hover .changes-actions,
-.changes-file:focus-within .changes-actions {
+.changes-file:focus-within .changes-actions,
+.changes-hunk-header:hover .changes-actions,
+.changes-hunk-header:focus-within .changes-actions {
   opacity: 1;
 }
 .changes-stats {
@@ -88,4 +90,30 @@
 }
 .changes-stats .removed {
   color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-testing-iconFailed));
+}
+.changes-toggle svg {
+  transition: transform 0.1s;
+}
+.changes-toggle.open svg {
+  transform: rotate(90deg);
+}
+.changes-hunks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 4px 8px;
+}
+.changes-hunk-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.changes-hunk pre.diff-lines {
+  margin: 0;
+  overflow-x: auto;
+  font-size: 0.95em;
+}
+.changes-no-hunks {
+  margin: 2px 0 4px 8px;
+  color: var(--vscode-descriptionForeground);
 }

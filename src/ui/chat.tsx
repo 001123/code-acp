@@ -51,6 +51,7 @@ function App() {
     lastActivity,
     terminals: agentTerminals,
     changes,
+    hunks,
     queue,
     editing,
   } = current;
@@ -148,6 +149,8 @@ function App() {
       }
       case "changes":
         return update(tab, (s) => ({ ...s, changes: { files: msg.files, turns: msg.turns } }));
+      case "hunks":
+        return update(tab, (s) => ({ ...s, hunks: { ...s.hunks, [msg.path]: msg.hunks } }));
       case "queue":
         return update(tab, (s) => ({ ...s, queue: msg.items }));
       case "loadComposer":
@@ -415,7 +418,7 @@ function App() {
         <div id="drop-overlay" className={composer.dragging ? "visible" : undefined}>
           {t("chat.dropHint")}
         </div>
-        {showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} />}
+        {showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
         {(status.needsLogin || status.needsAgent) && (
           <div id="status">
             <span id="status-text">{status.text}</span>

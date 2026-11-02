@@ -19,14 +19,14 @@ import { webviewHtml, webviewRoots } from "../webview";
 import { AgentPool, stopAll } from "./agents";
 import { Attention, type AttentionReason } from "./attention";
 import { attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
-import { ChangeReview, confirm } from "./changes";
+import { ChangeReview, confirm, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
 import { DraftStore } from "./drafts";
 import { LastOptions } from "./lastOptions";
 import { Follower } from "./follow";
 import { canReopen, HistoryRequests, listHistory } from "./history";
 import { CANCELLED, ELICITATION_CANCELLED, Permissions } from "./permissions";
 import { ChatStatusBar } from "./statusBar";
-import type { Attachment, Draft, FromWebview, LoadComposer, QueuedInfo, SentAttachment } from "./protocol";
+import type { Attachment, ChangeHunk, Draft, FromWebview, LoadComposer, QueuedInfo, SentAttachment } from "./protocol";
 import {
   messageText,
   resetConversation,
@@ -107,6 +107,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     run: (effect, tab) => this.run(effect, tab),
     openFile: (file, line) => this.openFile(file, line),
   });
+  /** Keep and Undo above each change of the active tab, in editors. */
+  readonly hunkLenses: vscode.CodeLensProvider = {
+    onDidChangeCodeLenses: this.changes.onDidChangeLenses,
+    provideCodeLenses: (document) =>
+      this.runtime.runPromise(this.changes.lenses(this.tabs.active, document).pipe(Effect.orElseSucceed(() => []))),
+  };
   private readonly history = new HistoryRequests();
   /** Attachments added before the webview was ready are delivered on "ready". */
   private readonly attachments = new AttachmentQueue((attachments, prompt) => {
@@ -177,6 +183,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         if (e.affectsConfiguration("codeAcp.showChanges")) {
           this.post({ type: "showChanges", enabled: readSettings().showChanges });
+          this.changes.refreshLenses();
         }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
@@ -622,7 +629,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "openDiff":
         if (tab) {
-          yield* this.changes.openDiff(tab, msg.path, msg.oldText, msg.newText);
+          yield* this.changes.openDiff(tab, msg.path, msg.oldText, msg.newText, msg.line);
+        }
+        break;
+      case "listHunks":
+        if (tab) {
+          yield* this.changes.postHunks(tab, msg.path);
+        }
+        break;
+      case "keepHunk":
+        if (tab) {
+          yield* this.changes.keepHunk(tab, msg.path, msg.hunk);
+        }
+        break;
+      case "undoHunk":
+        if (tab) {
+          yield* this.changes.undoHunk(tab, msg.path, msg.hunk);
         }
         break;
       case "keepChanges":
@@ -1133,8 +1155,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     yield* this.ensureSession(tab);
   });
 
+  /** The commands of the lenses, which keep or undo a change of the tab that offered it. */
+  hunkCommands(): vscode.Disposable[] {
+    const register = <E>(command: string, review: (tab: Tab, file: string, hunk: ChangeHunk) => Effect.Effect<void, E, AppServices>) =>
+      vscode.commands.registerCommand(command, (tabId: number, file: string, hunk: ChangeHunk) => {
+        const tab = this.tabs.byId(tabId);
+        if (tab) {
+          this.run(review(tab, file, hunk), tab);
+        }
+      });
+    return [
+      register(KEEP_HUNK_COMMAND, (tab, file, hunk) => this.changes.keepHunk(tab, file, hunk)),
+      register(UNDO_HUNK_COMMAND, (tab, file, hunk) => this.changes.undoHunk(tab, file, hunk)),
+    ];
+  }
+
   private readonly selectTab = Effect.fn("ChatView.selectTab")(function* (this: ChatViewProvider, tab: Tab) {
     this.tabs.active = tab;
+    this.changes.refreshLenses();
     this.postTabs();
     if (!tab.busy) {
       yield* this.ensureSession(tab);

@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { CheckpointError, ShadowGit } from "./checkpoints";
 import { t } from "./i18n";
 import { thenable } from "./runtime";
+import { changeBlocks, keepBlock, replacement, sameBlock, undoBlock, type ChangeBlock } from "./ui/lineDiff";
 
 /** A file changed since the user last reviewed the changes, as the chat lists it. */
 export interface ChangedFile {
@@ -259,6 +260,58 @@ export const undo = Effect.fn("ChangeSet.undo")(function* (changes: ChangeSet, f
   return files;
 });
 
+/**
+ * The changes in `file`, given its current `text`, to review one by one. Created and binary files have none, nor has
+ * text that isn't valid UTF-8, which `git.show` can't give back as it was: those are reviewed as whole files.
+ */
+export const hunksOf = Effect.fn("ChangeSet.hunksOf")(function* (changes: ChangeSet, file: string, text: string) {
+  const before = yield* beforeOf(changes, file);
+  const binary = changes.files.some((f) => f.path === file && f.binary);
+  return before == null || binary || before.includes("\uFFFD") ? [] : changeBlocks(before, text);
+});
+
+/** `file` as its editor has it, saved: a reviewed change has to be on disk too. */
+const savedDocument = Effect.fn("savedDocument")(function* (file: string) {
+  const document = yield* thenable(() => vscode.workspace.openTextDocument(vscode.Uri.file(file)));
+  if (document.isDirty) {
+    yield* thenable(() => document.save());
+  }
+  return document;
+});
+
+/** Accepts one change to `file`: it is no longer listed. False when the file no longer has that change. */
+export const keepHunk = Effect.fn("ChangeSet.keepHunk")(function* (changes: ChangeSet, file: string, hunk: ChangeBlock) {
+  const document = yield* savedDocument(file);
+  const { root, base } = changes;
+  const rel = changes.relative(file);
+  const before = yield* beforeOf(changes, file);
+  if (root === undefined || base === undefined || rel === undefined || before == null) {
+    return false;
+  }
+  if (!(yield* hunksOf(changes, file, document.getText())).some((each) => sameBlock(each, hunk))) {
+    return false;
+  }
+  changes.base = yield* ShadowGit.use((git) => git.withFile(root, base, rel, keepBlock(before, hunk)));
+  return true;
+});
+
+/** Takes one change out of `file`. False when the file no longer has that change. */
+export const undoHunk = Effect.fn("ChangeSet.undoHunk")(function* (changes: ChangeSet, file: string, hunk: ChangeBlock) {
+  const document = yield* savedDocument(file);
+  const rel = changes.relative(file);
+  const text = document.getText();
+  if (rel === undefined || !(yield* hunksOf(changes, file, text)).some((each) => sameBlock(each, hunk))) {
+    return false;
+  }
+  const { start, end, insert } = replacement(text, undoBlock(text, hunk));
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(document.uri, new vscode.Range(document.positionAt(start), document.positionAt(end)), insert);
+  yield* thenable(() => vscode.workspace.applyEdit(edit));
+  yield* thenable(() => document.save());
+  changes.reverted.add(rel);
+  return true;
+});
+
 /** Files restoring the checkpoint of `turn` would put back. */
 export const restorePlan = Effect.fn("ChangeSet.restorePlan")(function* (changes: ChangeSet, turn: number) {
   const { root } = changes;
@@ -328,17 +381,19 @@ export class BeforeDocuments implements vscode.TextDocumentContentProvider, vsco
     return this.contents.get(uri.query) ?? "";
   }
 
-  /** Opens a diff of `before` against `file` as it is now (editable), or against `after` when given. */
+  /** Opens a diff of `before` against `file` as it is now (editable), or against `after` when given, at 1-based `line`. */
   readonly open = Effect.fn("BeforeDocuments.open")(function* (
     this: BeforeDocuments,
     file: string,
     before: string | null,
     after?: string,
+    line?: number,
   ) {
     const left = this.add(file, before ?? "");
     const right = after === undefined ? vscode.Uri.file(file) : this.add(file, after);
     const title = t("changes.diffTitle", path.basename(file));
-    yield* thenable(() => vscode.commands.executeCommand("vscode.diff", left, right, title, { preview: true }));
+    const selection = line === undefined ? undefined : new vscode.Range(line - 1, 0, line - 1, 0);
+    yield* thenable(() => vscode.commands.executeCommand("vscode.diff", left, right, title, { preview: true, selection }));
   });
 
   private add(file: string, content: string): vscode.Uri {
