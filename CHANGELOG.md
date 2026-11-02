@@ -1,0 +1,28 @@
+# Changelog
+
+All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+First public version; nothing has been released yet.
+
+### Added
+
+- Chat with coding agents over the Agent Client Protocol, in tabs you can pin, rename and reorder, with a searchable history.
+- Install, update and switch agents from the ACP Registry, and add your own agents from local commands.
+- Queue, edit, resend and retry messages, and fork a conversation into a new tab.
+- A composer with live Markdown preview, drafts that survive reloads, and `/` agent commands and `$` skills.
+- Permission requests, form questions, plans, tools, subagents and terminals in the chat.
+- Model, effort and fast mode per tab, remembered for each agent.
+- Attach files, folders, images, problems, terminals and selections as context, and annotate images.
+- **Explain**, **Refactor**, **Write Tests** and **Fix with Code ACP** actions.
+- Review the agent's changes with Keep and Undo, restore checkpoints, and follow the agent in the editor.
+- Run a tab in its own git worktree and apply its changes to your checkout.
+- Commit message generation, then commit and push, from the Source Control view.
+- Token and cost tracking, ccusage reports, status bar activity, background notifications and tracing.
+- English and Vietnamese interfaces.
+
+### Security
+
+- Settings that decide what runs (custom agents, MCP servers, environment variables, Node and ccusage paths) apply only at machine scope, so a workspace cannot set them.
+- Registry entries with unsafe paths are refused at install.

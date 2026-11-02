@@ -1,6 +1,6 @@
 # Contributing
 
-Requires Node 24 and VS Code ≥ 1.144.
+Requires Node 24 and VS Code ≥ 1.123.
 
 ```sh
 npm install

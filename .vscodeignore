@@ -6,6 +6,7 @@ tsconfig.json
 scripts/**
 .gitignore
 .claude/**
+.github/**
 .agents/**
 skills/**
 skills-lock.json
