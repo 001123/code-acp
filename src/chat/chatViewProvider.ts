@@ -36,7 +36,7 @@ import { defaultCwd, workspaceFolders } from "../workspace";
 const TABS_KEY = "codeAcp.tabs";
 
 /** Tabs are written to workspaceState at most this often; usage updates arrive many times per turn. */
-const SAVE_TABS_DELAY_MS = 500;
+const SAVE_TABS_INTERVAL_MS = 100;
 
 /** The chat view: tabs of ACP sessions, each on the process of its agent. */
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -135,8 +135,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     openFile: (file, line) => this.openFile(file, line),
   });
   private readonly disposables: vscode.Disposable[] = [];
-  /** Pending `writeTabs`; flushed on dispose. */
+  /** Pending `writeTabs`; flushed on dispose, which is too late to be kept when the window reloads. */
   private saveTimer?: ReturnType<typeof setTimeout>;
+  private lastTabsWrite = 0;
   /** codeAcp.followAgent: the active tab's agent's tool locations are opened in the editor. */
   private followAgent = readSettings().followAgent;
   private readonly follower = new Follower(this.followAgent, {
@@ -370,14 +371,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   }
 
-  /** Saves the tabs so they come back after a reload, batching changes that come in quick succession. */
+  /**
+   * Saves the tabs so they come back after a reload, which drops what isn't written yet. A change alone goes out at
+   * once; a stream of them, such as usage during a turn, at most every SAVE_TABS_INTERVAL_MS.
+   */
   private saveTabs(): void {
-    clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => this.writeTabs(), SAVE_TABS_DELAY_MS);
+    if (this.saveTimer) {
+      return;
+    }
+    const wait = Math.max(0, this.lastTabsWrite + SAVE_TABS_INTERVAL_MS - Date.now());
+    this.saveTimer = setTimeout(() => this.writeTabs(), wait);
   }
 
   private writeTabs(): void {
+    clearTimeout(this.saveTimer);
     this.saveTimer = undefined;
+    this.lastTabsWrite = Date.now();
     const value = this.tabs.saved;
     this.run(thenable(() => this.context.workspaceState.update(TABS_KEY, value)));
   }
@@ -387,7 +396,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     // The tab may have closed while the files were written.
     yield* this.drafts.set(tab, update, () => this.tabs.has(tab));
     if (this.tabs.has(tab)) {
-      this.saveTabs();
+      // Written now, whatever was written just before; the webview batches typing.
+      this.writeTabs();
     }
   });
 

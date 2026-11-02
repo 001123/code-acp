@@ -1,7 +1,7 @@
 import * as NodeChildProcessSpawner from "@effect/platform-node-shared/NodeChildProcessSpawner";
 import * as NodeFileSystem from "@effect/platform-node-shared/NodeFileSystem";
 import * as NodePath from "@effect/platform-node-shared/NodePath";
-import { Cause, Context, Effect, Layer, Logger, ManagedRuntime, Predicate, Schema } from "effect";
+import { Cause, Context, Effect, Exit, Layer, Logger, ManagedRuntime, Predicate, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import * as vscode from "vscode";
 import { AcpTrace } from "./acpTrace";
@@ -85,18 +85,25 @@ export function runIn<E>(
   effect: Effect.Effect<void, E, AppServices>,
   onError: (message: string) => void,
 ): Promise<void> {
-  return runtime.runPromise(
-    effect.pipe(
-      Effect.catchCause((cause) => {
-        if (Cause.hasInterruptsOnly(cause)) {
-          return Effect.void;
-        }
-        const message = messageOf(Cause.squash(cause));
-        // Defects are bugs: keep the stack trace in the log.
-        return Effect.logError(Cause.hasDies(cause) ? Cause.pretty(cause) : message).pipe(
-          Effect.andThen(Effect.sync(() => onError(message))),
-        );
-      }),
-    ),
-  );
+  return runtime
+    .runPromiseExit(
+      effect.pipe(
+        Effect.catchCause((cause) => {
+          if (Cause.hasInterruptsOnly(cause)) {
+            return Effect.void;
+          }
+          const message = messageOf(Cause.squash(cause));
+          // Defects are bugs: keep the stack trace in the log.
+          return Effect.logError(Cause.hasDies(cause) ? Cause.pretty(cause) : message).pipe(
+            Effect.andThen(Effect.sync(() => onError(message))),
+          );
+        }),
+      ),
+    )
+    .then((exit) => {
+      // Outside the effect: disposing the runtime interrupts its fibers, and nothing runs on it afterwards.
+      if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) {
+        onError(messageOf(Cause.squash(exit.cause)));
+      }
+    });
 }

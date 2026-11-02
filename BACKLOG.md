@@ -13,7 +13,7 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 ### High
 
 - [x] **B1. Inline `file://` code with a stray `%` crashes rendering.** `` `file:///tmp/100%.txt` `` makes `decodeURIComponent` throw `URIError` during render (reproduced with `renderToString`). The webview has no error boundary, so the whole chat probably goes blank. Catch the error, and add an error boundary. `src/ui/markdown.tsx:61`
-- [ ] **B2. A message is lost when its session can't be created.** The composer clears right after posting, and the turn returns without a session (login needed, no agent, agent failed to start). Put the message back in the composer or keep it queued. `src/ui/chat/composer.tsx:245`, `src/chat/turns.ts:260`
+- [x] **B2. A message is lost when its session can't be created.** The composer clears right after posting, and the turn returns without a session (login needed, no agent, agent failed to start). Put the message back in the composer or keep it queued. `src/ui/chat/composer.tsx:245`, `src/chat/turns.ts:260`
 - [ ] **B3. Terminal login and agent restart wipe conversations.** `restart` resets the conversation, `reopen` and the queue of every tab on the agent, which contradicts "Auth errors keep `reopen`". Restarting after an agent update does the same. Keep `reopen` when the agent can reopen sessions. `src/chat/tabAgents.ts:260`, `src/chat/tabAgents.ts:311`, `src/chat/sessions.ts:112`
 
 ### Medium

@@ -196,7 +196,10 @@ export interface QueuedInfo {
   attachments: string[];
 }
 
-/** The composer content to put back ("loadComposer"): a queued message, or a sent one to edit (with `rewind`). */
+/**
+ * The composer content to put back ("loadComposer"): a queued message, one whose turn could not start, or a sent one
+ * to edit (with `rewind`).
+ */
 export interface LoadComposer {
   parts: PromptPart[];
   /** The turn whose user message is being edited. */

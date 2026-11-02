@@ -66,8 +66,9 @@ export function useComposerDrafts({
     inline.current.set(tab, new Map(content.inline));
     update(tab, (s) => ({ ...s, attachments: content.attachments }));
     if (tab !== shownDraft.current) {
-      // Shown, and saved, when the tab is next selected.
+      // Shown when the tab is next selected; saved now, as the window may reload before that.
       drafts.current.set(tab, content.text);
+      saveContent(tab, content);
       return;
     }
     resetText(editor.view, content.text, tokenInfos(content.inline));
@@ -76,8 +77,8 @@ export function useComposerDrafts({
   }
 
   /**
-   * Puts a message back in the composer of `tab`: a queued one after what is there, or a sent one (with `rewind`, its
-   * turn) in place of it until the edit is sent or cancelled.
+   * Puts a message back in the composer of `tab`: a queued or unsent one after what is there, or a sent one (with
+   * `rewind`, its turn) in place of it until the edit is sent or cancelled.
    */
   function load(tab: number, parts: ReadonlyArray<PromptPart>, rewind?: number): void {
     const loaded = contentOf(parts);
@@ -111,10 +112,14 @@ export function useComposerDrafts({
   function saveDraft(text: string): void {
     const tab = activeRef.current;
     if (tab === undefined) return;
+    saveContent(tab, { text, inline: inlineOf(tab), attachments: statesRef.current[tab]?.attachments ?? [] });
+  }
+
+  function saveContent(tab: number, { text, inline, attachments }: Content): void {
     const draft: Draft = {
       text,
-      inline: [...inlineOf(tab)].filter(([token]) => text.includes(token)).map(([token, attachment]) => ({ token, attachment })),
-      attachments: statesRef.current[tab]?.attachments ?? [],
+      inline: [...inline].filter(([token]) => text.includes(token)).map(([token, attachment]) => ({ token, attachment })),
+      attachments,
     };
     sender.current.save(tab, draft);
   }

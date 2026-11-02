@@ -78,7 +78,7 @@ const openChat = Effect.acquireRelease(
     } as unknown as vscode.WebviewView;
     const provider = new ChatViewProvider(context, runtime, manager, updates);
     provider.resolveWebviewView(view);
-    return { root, runtime, provider, posted, send: (message: FromWebview) => receive(message) };
+    return { root, runtime, provider, posted, context, send: (message: FromWebview) => receive(message) };
   }),
   ({ root, runtime, provider }) =>
     Effect.promise(async () => {
@@ -121,6 +121,49 @@ const startChat = Effect.gen(function* () {
 beforeEach(() => __test.reset());
 
 describe("ChatViewProvider", () => {
+  describe("saving tabs", () => {
+    const savedText = (context: vscode.ExtensionContext) => JSON.stringify(context.workspaceState.get("codeAcp.tabs") ?? null);
+
+    it.live("writes a draft right away, as a window reload drops what isn't written yet", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { context, send, tab } = yield* startChat;
+          const start = Date.now();
+          send({ type: "draftText", tab, text: "unsent words" });
+          yield* until(() => savedText(context).includes("unsent words"), "the draft to be written");
+          assert.isBelow(Date.now() - start, 400);
+        }),
+      ),
+    );
+
+    it.live("writes a change soon after the last write", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { context, send, tab } = yield* startChat;
+          const start = Date.now();
+          send({ type: "renameTab", tab, title: "renamed" });
+          yield* until(() => savedText(context).includes("renamed"), "the name to be written");
+          assert.isBelow(Date.now() - start, 400);
+        }),
+      ),
+    );
+
+    it.live("keeps writing while changes keep coming", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { context, send, tab } = yield* startChat;
+          let written = false;
+          for (let n = 0; n < 40 && !written; n++) {
+            send({ type: "renameTab", tab, title: `name ${n}` });
+            yield* Effect.sleep("20 millis");
+            written = savedText(context).includes("name ");
+          }
+          assert.isTrue(written);
+        }),
+      ),
+    );
+  });
+
   it.live("starts a session when the webview is ready", () =>
     Effect.scoped(
       Effect.gen(function* () {

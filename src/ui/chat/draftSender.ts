@@ -1,5 +1,8 @@
 import type { Draft } from "../../chat/protocol";
 
+/** Short: the window can reload at any moment, and the webview gets no chance to send what is still waiting here. */
+const DRAFT_DELAY_MS = 100;
+
 export type DraftMessage = { type: "draft"; tab: number; draft: Draft } | { type: "draftText"; tab: number; text: string };
 
 /** Sends drafts to the extension, which keeps them across reloads: the latest per pause in typing, one tab at a time. */
@@ -10,7 +13,7 @@ export class DraftSender {
 
   constructor(
     private readonly send: (message: DraftMessage) => void,
-    private readonly delayMs = 300,
+    private readonly delayMs = DRAFT_DELAY_MS,
   ) {}
 
   save(tab: number, draft: Draft): void {

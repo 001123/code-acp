@@ -1,7 +1,7 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { Effect, Exit, Option, Predicate } from "effect";
 import * as vscode from "vscode";
-import type { AgentRequestError, AgentStartError, AuthRequiredError } from "../acpClient";
+import type { AcpAgent, AgentRequestError, AgentStartError, AuthRequiredError } from "../acpClient";
 import type { AcpTrace } from "../acpTrace";
 import type { ShadowGit } from "../checkpoints";
 import { changesSinceTurn } from "../fileChanges";
@@ -39,6 +39,14 @@ export interface TurnsHost extends ChatUi {
   finished(tab: Tab): void;
   /** The tab's running turn is over: it is idle again. */
   turnEnded(tab: Tab): void;
+}
+
+/** What a turn needs to run. */
+interface PreparedTurn {
+  readonly sessionId: string;
+  readonly agent: AcpAgent;
+  readonly prompt: Array<acp.ContentBlock>;
+  readonly sent: ReadonlyArray<SentAttachment>;
 }
 
 /** The turns of chat tabs: sending messages, queueing them, taking them back. */
@@ -255,14 +263,27 @@ export class TabTurns {
     this.host.postTab(tab, { type: "rewind", turn });
   }
 
-  /** Runs a turn; its stop reason, or undefined when it could not start. */
-  private readonly sendTurn = Effect.fn("TabTurns.sendTurn")(function* (
+  /** Runs a turn; its stop reason, or undefined without one. A message that gets no turn goes back to the composer. */
+  private readonly sendTurn = Effect.fn("TabTurns.sendTurn")(function* (this: TabTurns, tab: Tab, message: OutgoingMessage) {
+    const prepared = yield* this.prepareTurn(tab, message).pipe(
+      // The chat doesn't show the message yet, so it would be lost.
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          if (!Exit.isSuccess(exit) || !exit.value) {
+            this.loadComposer(tab, { parts: [...message.parts] });
+          }
+        }),
+      ),
+    );
+    return prepared ? yield* this.runTurn(tab, message, prepared) : undefined;
+  });
+
+  /** The session and prompt of a turn; undefined when there is nothing to run it on, or to send. */
+  private readonly prepareTurn = Effect.fn("TabTurns.prepareTurn")(function* (
     this: TabTurns,
     tab: Tab,
-    message: OutgoingMessage,
+    { parts }: OutgoingMessage,
   ) {
-    const { parts } = message;
-    const text = messageText(parts);
     const sessionId = yield* this.host.ensureSession(tab);
     const agent = tab.running?.agent;
     if (!sessionId || !agent) {
@@ -297,10 +318,17 @@ export class TabTurns {
         prompt.push(block);
       }
     }
-    if (prompt.length === 0) {
-      return;
-    }
+    return prompt.length > 0 ? { sessionId, agent, prompt, sent } : undefined;
+  });
 
+  /** Runs a turn; its stop reason, or undefined when the agent wants a login first. */
+  private readonly runTurn = Effect.fn("TabTurns.runTurn")(function* (
+    this: TabTurns,
+    tab: Tab,
+    message: OutgoingMessage,
+    { sessionId, agent, prompt, sent }: PreparedTurn,
+  ) {
+    const text = messageText(message.parts);
     tab.used = true;
     tab.createdAt ??= Date.now();
     if (!tab.title) {

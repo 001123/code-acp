@@ -8,7 +8,7 @@ const draft = (text: string, attachments: Attachment[] = []): Draft => ({ text, 
 
 const sender = () => {
   const sent: DraftMessage[] = [];
-  return { sent, drafts: new DraftSender((message) => sent.push(message)) };
+  return { sent, drafts: new DraftSender((message) => sent.push(message), 300) };
 };
 
 beforeEach(() => void vi.useFakeTimers());

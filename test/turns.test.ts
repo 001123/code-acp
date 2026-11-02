@@ -4,12 +4,12 @@ import { Deferred, Effect, Scope } from "effect";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthRequiredError, type AcpAgent } from "../src/acpClient";
+import { AgentStartError, AuthRequiredError, type AcpAgent } from "../src/acpClient";
 import { ChangeReview } from "../src/chat/changes";
 import type { ChatUi } from "../src/chat/host";
 import type { TurnMessage } from "../src/chat/protocol";
 import { TabList, type Tab } from "../src/chat/tabs";
-import { TabTurns } from "../src/chat/turns";
+import { TabTurns, type TurnsHost } from "../src/chat/turns";
 import type { TabUsage } from "../src/chat/usage";
 import type { TabWorktrees } from "../src/chat/worktrees";
 import { __test, Uri, window } from "./stubs/vscode";
@@ -28,7 +28,7 @@ const until = (ready: () => boolean) =>
   });
 
 /** The turns of one tab with a session on an agent that answers each prompt when told to. */
-const makeTurns = Effect.fnUntraced(function* () {
+const makeTurns = Effect.fnUntraced(function* (ensureSession: TurnsHost["ensureSession"] = (each) => Effect.succeed(each.sessionId)) {
   const posted: Array<Record<string, unknown>> = [];
   const statuses: string[] = [];
   const finished: Tab[] = [];
@@ -64,7 +64,7 @@ const makeTurns = Effect.fnUntraced(function* () {
       changes: new ChangeReview({ postTab: ui.postTab, saveTabs: ui.saveTabs, run: () => {}, openFile: () => Effect.void }),
       usage: { recordTurn: () => Effect.void, totals: () => Effect.succeed({ turns: 7 }) } as unknown as TabUsage,
       tabWorktrees: { localize: (_tab: Tab, attachment: unknown) => Effect.succeed(attachment) } as unknown as TabWorktrees,
-      ensureSession: (each) => Effect.succeed(each.sessionId),
+      ensureSession,
       cancelTab: () =>
         Effect.sync(() => {
           cancelled++;
@@ -347,6 +347,101 @@ describe("TabTurns", () => {
       assert.deepStrictEqual(finished, []);
     }),
   );
+
+  describe("a message whose turn can't start", () => {
+    it.live("goes back to the composer when the user has to act first", () =>
+      Effect.gen(function* () {
+        const { say, posted, prompts, tab, finished } = yield* makeTurns();
+        tab.sessionId = undefined;
+        say("hello");
+        yield* until(() => ofType(posted, "loadComposer").length === 1);
+        assert.deepStrictEqual(ofType(posted, "loadComposer"), [{ type: "loadComposer", parts: ["hello"] }]);
+        assert.deepStrictEqual(ofType(posted, "userMessage"), []);
+        assert.strictEqual(prompts.length, 0);
+        assert.isFalse(tab.sending);
+        assert.isFalse(tab.used);
+        assert.deepStrictEqual(finished, []);
+      }),
+    );
+
+    it.live("goes back to the composer when the agent fails to start", () =>
+      Effect.gen(function* () {
+        const { say, posted, tab } = yield* makeTurns(() => Effect.fail(new AgentStartError({ message: "no" })));
+        say("hello");
+        yield* until(() => ofType(posted, "loadComposer").length === 1);
+        assert.deepStrictEqual(ofType(posted, "loadComposer"), [{ type: "loadComposer", parts: ["hello"] }]);
+        assert.isFalse(tab.sending);
+      }),
+    );
+
+    it.live("keeps its attachments", () =>
+      Effect.gen(function* () {
+        const { send, posted, tab } = yield* makeTurns();
+        tab.sessionId = undefined;
+        const attachment = { kind: "uri" as const, uri: "file:///w/a.ts", name: "a.ts", token: "@a.ts" };
+        send({ type: "send", tab: tab.id, parts: ["see ", attachment] });
+        yield* until(() => ofType(posted, "loadComposer").length === 1);
+        assert.deepStrictEqual(ofType(posted, "loadComposer")[0]!.parts, ["see ", attachment]);
+      }),
+    );
+
+    it.live("goes back when its only attachment can't be read", () =>
+      Effect.gen(function* () {
+        const { send, posted, prompts, tab } = yield* makeTurns();
+        const missing = { kind: "uri" as const, uri: "file:///nonexistent/gone.ts", name: "gone.ts" };
+        send({ type: "send", tab: tab.id, parts: [missing] });
+        yield* until(() => ofType(posted, "loadComposer").length === 1);
+        assert.deepStrictEqual(ofType(posted, "loadComposer")[0]!.parts, [missing]);
+        assert.strictEqual(ofType(posted, "error").length, 1);
+        assert.strictEqual(prompts.length, 0);
+      }),
+    );
+
+    it.live("goes back after an edit took the original away", () =>
+      Effect.gen(function* () {
+        const { say, prompts, tab, answer, posted } = yield* makeTurns();
+        say("one");
+        yield* until(() => prompts.length === 1);
+        yield* answer(0);
+        const [turn] = [...tab.sent.keys()];
+        tab.sessionId = undefined;
+        say("edited", { rewind: turn! });
+        yield* until(() => ofType(posted, "loadComposer").length === 1);
+        assert.deepStrictEqual(ofType(posted, "rewind"), [{ type: "rewind", turn }]);
+        // The original is gone, so this is a new message and not an edit of it.
+        assert.deepStrictEqual(ofType(posted, "loadComposer"), [{ type: "loadComposer", parts: ["edited"] }]);
+      }),
+    );
+
+    it.live("leaves the queue waiting", () =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<string | undefined>();
+        const { say, posted, prompts, tab } = yield* makeTurns(() => Deferred.await(started));
+        say("first");
+        yield* until(() => tab.sending);
+        say("second");
+        yield* until(() => tab.queue.length === 1);
+        yield* Deferred.succeed(started, undefined);
+        yield* until(() => ofType(posted, "loadComposer").length === 1);
+        assert.deepStrictEqual(ofType(posted, "loadComposer"), [{ type: "loadComposer", parts: ["first"] }]);
+        assert.strictEqual(tab.queue.length, 1);
+        assert.strictEqual(prompts.length, 0);
+      }),
+    );
+
+    it.live("does not go back once the turn started and the agent asks for a login", () =>
+      Effect.gen(function* () {
+        const { say, prompts, posted, ended } = yield* makeTurns();
+        say("one");
+        yield* until(() => prompts.length === 1);
+        yield* Deferred.fail(prompts[0]!.reply, new AuthRequiredError({ message: "login" }));
+        yield* until(() => ended.length === 1);
+        yield* Effect.sleep("5 millis");
+        assert.deepStrictEqual(ofType(posted, "loadComposer"), []);
+        assert.strictEqual(ofType(posted, "userMessage").length, 1);
+      }),
+    );
+  });
 
   it.live("leaves a newer turn alone when a cancelled one ends late", () =>
     Effect.gen(function* () {
