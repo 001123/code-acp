@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import * as vscode from "vscode";
 import type { AgentCommand } from "./acpClient";
 import { t } from "./i18n";
-import { binaryTarget, currentPlatform, type BinaryTarget, type PackageDistribution, type RegistryAgent } from "./registry";
+import { binaryTarget, currentPlatform, isPathSegment, type BinaryTarget, type PackageDistribution, type RegistryAgent } from "./registry";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
 import { CustomAgentEntry, readSettings } from "./settings";
 
@@ -137,6 +137,15 @@ export class AgentManager extends Context.Service<AgentManager, {
 
       const fail = (message: string, cause?: unknown) => new InstallError({ message, cause });
       const removeDir = (dir: string) => fs.remove(dir, { recursive: true, force: true });
+      /** Removes an agent's directory; a stored id or version that is not a plain name never reaches the delete. */
+      const removeAgentDir = (...segments: ReadonlyArray<string>) =>
+        segments.every((segment) => isPathSegment(segment))
+          ? removeDir(path.join(root, ...segments))
+          : Effect.logWarning(`[install] not removing unsafe path: ${segments.join("/")}`);
+      const isInside = (dir: string, target: string) => {
+        const relative = path.relative(dir, target);
+        return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+      };
       const update = (key: string, value: unknown) =>
         thenable(() => context.globalState.update(key, value)).pipe(Effect.mapError((err) => fail(err.message, err)));
 
@@ -217,7 +226,10 @@ export class AgentManager extends Context.Service<AgentManager, {
         const data = new Uint8Array(
           yield* res.arrayBuffer.pipe(Effect.mapError((err) => fail(t("install.downloadFailed", url, err.message), err))),
         );
-        if (target.sha256) {
+        if (target.sha256 === undefined) {
+          yield* Effect.logWarning(`[install] no SHA-256 checksum for ${url}`);
+          void vscode.window.showWarningMessage(t("install.noChecksum", fileName));
+        } else {
           const digest = createHash("sha256").update(data).digest("hex");
           if (digest.toLowerCase() !== target.sha256.toLowerCase()) {
             return yield* fail(t("install.checksum", url));
@@ -256,12 +268,19 @@ export class AgentManager extends Context.Service<AgentManager, {
         if (!kind) {
           return yield* fail(t("install.unsupported", agent.name, currentPlatform() ?? process.platform));
         }
+        if (!isPathSegment(agent.id) || !isPathSegment(agent.version)) {
+          return yield* fail(t("install.unsafePath", `${agent.id}/${agent.version}`));
+        }
         const dir = path.join(root, agent.id, agent.version);
+        const binary = binaryTarget(agent);
+        // Before removeDir, so a bad entry does not cost the copy already installed.
+        if (binary && !isInside(dir, path.resolve(dir, binary.cmd))) {
+          return yield* fail(t("install.unsafePath", binary.cmd));
+        }
         yield* removeDir(dir);
         yield* fs.makeDirectory(dir, { recursive: true });
 
         const launch = yield* Effect.gen(function* () {
-          const binary = binaryTarget(agent);
           const { npx, uvx } = agent.distribution;
           if (kind === "binary" && binary) {
             return yield* installBinary(binary, dir, report);
@@ -296,14 +315,14 @@ export class AgentManager extends Context.Service<AgentManager, {
           }),
         );
         if (previous && previous.version !== agent.version) {
-          yield* removeDir(path.join(root, agent.id, previous.version));
+          yield* removeAgentDir(agent.id, previous.version);
         }
         yield* notify;
         return installed;
       }, Effect.mapError((err) => (err instanceof InstallError ? err : fail(messageOf(err), err))));
 
       const uninstall = Effect.fn("AgentManager.uninstall")(function* (id: string) {
-        yield* removeDir(path.join(root, id)).pipe(Effect.mapError((err) => fail(err.message, err)));
+        yield* removeAgentDir(id).pipe(Effect.mapError((err) => fail(err.message, err)));
         yield* Semaphore.withPermits(stateLock, 1)(
           Effect.gen(function* () {
             const { [id]: _removed, ...rest } = yield* state;

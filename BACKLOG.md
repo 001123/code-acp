@@ -18,8 +18,8 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 
 ### Medium
 
-- [ ] **B4. Workspace settings can change what gets executed.** `customAgents`, `env`, `nodePath`, `ccusagePath` and `mcpServers` declare no `scope`, so a trusted repo's `.vscode/settings.json` can set them (e.g. `NODE_OPTIONS`). Use `machine` scope; ask for confirmation if workspace MCP servers stay allowed. `package.json`
-- [ ] **B5. Registry values reach file paths unchecked.** `agent.id`, `version` and `cmd` aren't checked for `..`, and `removeDir(dir)` deletes recursively from them. `sha256` is also optional. `src/registry.ts`, `src/agentManager.ts:220`, `src/agentManager.ts:259`
+- [x] **B4. Workspace settings can change what gets executed.** `customAgents`, `env`, `nodePath`, `ccusagePath` and `mcpServers` declare no `scope`, so a trusted repo's `.vscode/settings.json` can set them (e.g. `NODE_OPTIONS`). Use `machine` scope; ask for confirmation if workspace MCP servers stay allowed. `package.json`
+- [x] **B5. Registry values reach file paths unchecked.** `agent.id`, `version` and `cmd` aren't checked for `..`, and `removeDir(dir)` deletes recursively from them. `sha256` is also optional (stays optional, with a warning: 37 of 116 registry targets have none). `src/registry.ts`, `src/agentManager.ts:220`, `src/agentManager.ts:259`
 
 ### Low
 

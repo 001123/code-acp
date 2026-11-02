@@ -229,7 +229,6 @@ export const window = {
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   state: { focused: true },
   onDidChangeWindowState: () => noDisposable,
-  onDidChangeActiveTextEditor: () => noDisposable,
   onDidStartTerminalShellExecution: () => noDisposable,
   onDidEndTerminalShellExecution: () => noDisposable,
   onDidCloseTerminal: (listener: (terminal: unknown) => void) => {

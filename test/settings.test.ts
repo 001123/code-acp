@@ -1,5 +1,6 @@
 import { assert, describe, it, beforeEach } from "@effect/vitest";
 import { Schema } from "effect";
+import { readFileSync } from "node:fs";
 import { __test } from "./stubs/vscode";
 import { CustomAgentEntry, DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, McpServerEntry, readSettings, Settings } from "../src/settings";
 
@@ -102,4 +103,16 @@ describe("entry schemas", () => {
   it("Settings rejects a wrong language", () => {
     assert.throws(() => Schema.decodeUnknownSync(Settings)({}));
   });
+});
+
+describe("settings that decide what gets executed", () => {
+  const properties: Record<string, { readonly scope?: string }> = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ).contributes.configuration.properties;
+
+  for (const key of ["customAgents", "env", "nodePath", "ccusagePath", "mcpServers"]) {
+    it(`codeAcp.${key} cannot be set by a workspace`, () => {
+      assert.strictEqual(properties[`codeAcp.${key}`]?.scope, "machine");
+    });
+  }
 });

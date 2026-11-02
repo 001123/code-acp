@@ -12,7 +12,7 @@ import { TabList, type Tab } from "../src/chat/tabs";
 import { TabTurns, type TurnsHost } from "../src/chat/turns";
 import type { TabUsage } from "../src/chat/usage";
 import type { TabWorktrees } from "../src/chat/worktrees";
-import { __test, Uri, window } from "./stubs/vscode";
+import { __test } from "./stubs/vscode";
 
 type Reply = Deferred.Deferred<acp.PromptResponse, AuthRequiredError>;
 
@@ -267,32 +267,19 @@ describe("TabTurns", () => {
     }),
   );
 
-  /** Opens `path` with `selection` selected, as lines counted from 0. */
-  const openEditor = (path: string, selection?: { from: number; to: number }) => {
-    const empty = { isEmpty: true, start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
-    window.activeTextEditor = {
-      document: { uri: Uri.file(path), languageId: "ts", getText: () => "selected" },
-      selections: [
-        selection ? { isEmpty: false, start: { line: selection.from, character: 0 }, end: { line: selection.to, character: 1 } } : empty,
-      ],
-    } as unknown as typeof window.activeTextEditor;
-  };
-
-  it.live("adds the open file and its selected lines when the message asks for them", () =>
+  it.live("shows sent attachments with where they open", () =>
     Effect.gen(function* () {
-      const { send, tab, posted, prompts } = yield* makeTurns();
+      const { send, tab, posted } = yield* makeTurns();
       const file = path.join(yield* Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), "turns-"))), "open.ts");
       yield* Effect.promise(() => fs.writeFile(file, "text"));
-      openEditor(file, { from: 1, to: 2 });
-      send({ type: "send", tab: tab.id, parts: ["look"], includeActiveFile: true });
+      const parts = [
+        "look ",
+        { kind: "uri" as const, uri: `file://${file}`, name: "open.ts", token: "@open.ts" },
+        " ",
+        { kind: "snippet" as const, uri: `file://${file}`, name: "open.ts:2-3", languageId: "ts", startLine: 2, endLine: 3, text: "selected", token: "@open.ts:2-3" },
+      ];
+      send({ type: "send", tab: tab.id, parts });
       yield* until(() => ofType(posted, "userMessage").length === 1);
-      assert.deepStrictEqual([...tab.sent.values()][0]!.parts, [
-        "look",
-        " ",
-        { kind: "uri", uri: `file://${file}`, name: "open.ts", token: "@open.ts" },
-        " ",
-        { kind: "snippet", uri: `file://${file}`, name: "open.ts:2-3", languageId: "ts", startLine: 2, endLine: 3, text: "selected", token: "@open.ts:2-3" },
-      ]);
       const shown = ofType(posted, "userMessage")[0]!;
       assert.strictEqual(shown.text, "look @open.ts @open.ts:2-3");
       assert.deepStrictEqual(
@@ -302,55 +289,6 @@ describe("TabTurns", () => {
           ["open.ts:2-3", "@open.ts:2-3", file, 2],
         ],
       );
-      assert.deepStrictEqual(ofType(posted, "error"), []);
-      assert.strictEqual(prompts.length, 1);
-      assert.include(prompts[0]!.texts.at(-1)!, "selected");
-    }),
-  );
-
-  it.live("keeps the file that was open when a queued message was sent", () =>
-    Effect.gen(function* () {
-      const { say, send, tab, prompts } = yield* makeTurns();
-      say("one");
-      yield* until(() => prompts.length === 1);
-      openEditor("/w/then.ts");
-      send({ type: "send", tab: tab.id, parts: ["two"], includeActiveFile: true });
-      yield* until(() => tab.queue.length === 1);
-      openEditor("/w/now.ts");
-      assert.deepStrictEqual(tab.queue[0]!.parts, ["two", " ", { kind: "uri", uri: "file:///w/then.ts", name: "then.ts", token: "@then.ts" }]);
-    }),
-  );
-
-  it.live("gives the open file a token of its own, spaced from the text", () =>
-    Effect.gen(function* () {
-      const { say, send, tab, prompts } = yield* makeTurns();
-      say("one");
-      yield* until(() => prompts.length === 1);
-      openEditor("/w/b/open.ts");
-      const other = { kind: "uri" as const, uri: "file:///w/a/open.ts", name: "open.ts", token: "@open.ts" };
-      send({ type: "send", tab: tab.id, parts: ["see ", other, "\n"], includeActiveFile: true });
-      yield* until(() => tab.queue.length === 1);
-      assert.deepStrictEqual(tab.queue[0]!.parts, [
-        "see ",
-        other,
-        "\n",
-        { kind: "uri", uri: "file:///w/b/open.ts", name: "open.ts", token: "@open.ts (2)" },
-      ]);
-    }),
-  );
-
-  it.live("does not add a file the message already holds, or one that is not asked for", () =>
-    Effect.gen(function* () {
-      const { say, send, tab, prompts } = yield* makeTurns();
-      say("one");
-      yield* until(() => prompts.length === 1);
-      openEditor("/w/open.ts");
-      const held = { kind: "uri" as const, uri: "file:///w/open.ts", name: "open.ts", token: "@open.ts" };
-      send({ type: "send", tab: tab.id, parts: ["two ", held], includeActiveFile: true });
-      say("three");
-      yield* until(() => tab.queue.length === 2);
-      assert.deepStrictEqual(tab.queue[0]!.parts, ["two ", held]);
-      assert.deepStrictEqual(tab.queue[1]!.parts, ["three"]);
     }),
   );
 

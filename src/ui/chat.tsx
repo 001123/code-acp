@@ -39,7 +39,6 @@ function App() {
   const [states, dispatchTabs] = useReducer(tabStates, {});
   const [agents, setAgents] = useState<AgentChoices>({ agents: [] });
   const [folders, setFolders] = useState<WorkspaceFolderInfo[]>([]);
-  const [activeFile, setActiveFile] = useState<string>();
   const [remote, setRemote] = useState(false);
   const [history, setHistory] = useState<History>();
   /** The tab whose name is being edited in the strip. */
@@ -117,7 +116,6 @@ function App() {
     busy: !!status.busy,
     agents,
     folders,
-    activeFile,
     remote,
     update,
     error,
@@ -247,8 +245,6 @@ function App() {
         return setAgents({ agents: msg.agents, activeId: msg.activeId });
       case "folders":
         return setFolders(msg.folders);
-      case "activeFile":
-        return setActiveFile(msg.name);
       case "environment":
         return setRemote(msg.remote);
       case "addAttachments":

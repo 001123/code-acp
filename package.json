@@ -492,6 +492,7 @@
           "description": "%config.language%"
         },
         "codeAcp.customAgents": {
+          "scope": "machine",
           "type": "object",
           "additionalProperties": {
             "type": "object",
@@ -520,6 +521,7 @@
           "description": "%config.customAgents%"
         },
         "codeAcp.env": {
+          "scope": "machine",
           "type": "object",
           "additionalProperties": {
             "type": "string"
@@ -528,11 +530,13 @@
           "description": "%config.env%"
         },
         "codeAcp.nodePath": {
+          "scope": "machine",
           "type": "string",
           "default": "node",
           "description": "%config.nodePath%"
         },
         "codeAcp.ccusagePath": {
+          "scope": "machine",
           "type": "string",
           "default": "",
           "description": "%config.ccusagePath%"
@@ -614,6 +618,7 @@
           "description": "%config.commitMessage.instructions%"
         },
         "codeAcp.mcpServers": {
+          "scope": "machine",
           "type": "object",
           "default": {},
           "markdownDescription": "%config.mcpServers%",

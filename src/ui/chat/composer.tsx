@@ -1,10 +1,9 @@
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { useRef, type MutableRefObject, type ReactNode } from "react";
 import type { Attachment, PromptPart, QueuedInfo, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n, type Translate } from "../l10n";
 import arrowUpIcon from "@tabler/icons/outline/arrow-up.svg";
-import paperclipIcon from "@tabler/icons/outline/paperclip.svg";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
 import { AgentPanel, type AgentChoices } from "./agentPanel";
 import { imageSrc } from "./attachments";
@@ -41,8 +40,6 @@ export interface ComposerOptions {
   agents: AgentChoices;
   /** The workspace folders a tab can run in. */
   folders: ReadonlyArray<WorkspaceFolderInfo>;
-  /** The file "include open file" sends: the active editor's, workspace-relative. */
-  activeFile: string | undefined;
   /** The extension runs on another machine (Remote SSH, WSL, containers), which can't read paths on this one. */
   remote: boolean;
   update: (tab: number | undefined, f: (s: TabState) => TabState) => void;
@@ -59,10 +56,9 @@ export interface ComposerOptions {
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, activeFile, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig } =
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig } =
     options;
   const { t } = useL10n();
-  const [includeFile, setIncludeFile] = useState(false);
   /** Handlers of the latest render, for the editor's callbacks, which are registered once. */
   const handlers = useRef<{ update(): void; select(): void; blur(): void; keyDown(e: KeyboardEvent): boolean; paste(e: ClipboardEvent): boolean }>(undefined);
   const placeholder = useRef(t("chat.placeholder"));
@@ -241,7 +237,7 @@ export function useComposer(options: ComposerOptions) {
     const tokens = [...drafts.inlineOf(active)].map(([token, a]) => ({ ...a, token }));
     const parts: PromptPart[] = [...splitTokens(text, tokens), ...attachments];
     if (parts.every((p) => typeof p === "string" && !p.trim())) return;
-    post({ type: "send", tab: active, parts, includeActiveFile: includeFile || undefined, now: now || undefined, rewind: editing });
+    post({ type: "send", tab: active, parts, now: now || undefined, rewind: editing });
     if (editing !== undefined) {
       drafts.endEdit(active);
       return;
@@ -298,11 +294,6 @@ export function useComposer(options: ComposerOptions) {
         </AgentPanel>
         {quickConfig}
         <FolderSelect tab={tabs.find((x) => x.id === active)} folders={folders} />
-        <label title={activeFile ? t("chat.includeFileNamed", activeFile) : t("chat.includeFile")}>
-          <input type="checkbox" id="include-file" checked={includeFile} onChange={(e) => setIncludeFile(e.target.checked)} />
-          <Icon svg={paperclipIcon} />
-          <span className="label-text">{activeFile ? activeFile.split(/[\\/]/).pop() : t("chat.includeFile")}</span>
-        </label>
         <span className="spacer" />
         {settings}
         <button

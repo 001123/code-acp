@@ -8,6 +8,9 @@ export const REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/lat
 const StringArray = Schema.Array(Schema.String);
 const Env = Schema.Record(Schema.String, Schema.String);
 
+/** A plain directory name. Checked at install rather than in RegistryAgent, so one bad entry cannot hide the whole registry. */
+export const isPathSegment = Schema.is(Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._+-]*$/)));
+
 export const PackageDistribution = Schema.Struct({
   package: Schema.String,
   args: Schema.optional(StringArray),

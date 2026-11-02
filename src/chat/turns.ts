@@ -9,7 +9,7 @@ import { t } from "../i18n";
 import type { ExtensionCtx, Output } from "../runtime";
 import { readSettings } from "../settings";
 import type { Worktrees } from "../worktrees";
-import { attachmentBlock, attachmentLocation, withActiveFile } from "./attachments";
+import { attachmentBlock, attachmentLocation } from "./attachments";
 import type { ChangeReview } from "./changes";
 import type { ChatUi } from "./host";
 import type { LoadComposer, QueuedInfo, SentAttachment, TurnMessage } from "./protocol";
@@ -69,8 +69,7 @@ export class TabTurns {
   readonly onMessage = Effect.fn("TabTurns.onMessage")(function* (this: TabTurns, tab: Tab, msg: TurnMessage) {
     switch (msg.type) {
       case "send": {
-        // The file open now, not when a queued message finally goes.
-        const message: OutgoingMessage = { parts: msg.includeActiveFile ? withActiveFile(msg.parts) : msg.parts };
+        const message: OutgoingMessage = { parts: msg.parts };
         if (msg.rewind !== undefined) {
           yield* this.resend(tab, msg.rewind, message, true);
         } else if (msg.now) {
