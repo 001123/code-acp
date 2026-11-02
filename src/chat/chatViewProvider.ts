@@ -126,8 +126,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return true;
   });
   private readonly focus = thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+  /**
+   * Shows the chat with the caret in the composer. The message follows the focus command because
+   * that command moves focus to the webview's outer frame, away from a composer focused before it.
+   */
+  private readonly focusComposer = this.focus.pipe(Effect.andThen(Effect.sync(() => this.post({ type: "focusComposer" }))));
   /** What VS Code's commands add to the composer. */
-  readonly composer = new ComposerCommands(this.attachments, this.focus);
+  readonly composer = new ComposerCommands(this.attachments, this.focusComposer);
   private readonly viewMessages = new ViewMessages({
     post: (message) => this.post(message),
     attachments: this.attachments,

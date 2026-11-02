@@ -254,6 +254,6 @@ export const window = {
   createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
 };
 
-export const commands = { executeCommand: async () => undefined };
+export const commands: { executeCommand: (...args: unknown[]) => Promise<unknown> } = { executeCommand: async () => undefined };
 
 export const FileType = { File: 1, Directory: 2 } as const;

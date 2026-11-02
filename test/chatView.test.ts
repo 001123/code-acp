@@ -11,7 +11,7 @@ import { ChatViewProvider } from "../src/chat/chatViewProvider";
 import type { FromWebview, TabInfo } from "../src/chat/protocol";
 import { makeRuntime } from "../src/runtime";
 import { makeOutput } from "./helpers";
-import { __test, EventEmitter, Uri, workspace } from "./stubs/vscode";
+import { __test, commands, EventEmitter, Uri, workspace } from "./stubs/vscode";
 
 const MOCK_AGENT = fileURLToPath(new URL("./fixtures/mock-agent.mjs", import.meta.url));
 
@@ -307,6 +307,24 @@ describe("ChatViewProvider", () => {
         yield* until(() => ofType("files").length === 1, "the search result");
         assert.strictEqual(ofType("files")[0]!.id, 7);
         assert.deepStrictEqual(ofType("error"), []);
+      }),
+    ),
+  );
+
+  it.live("focuses the composer only after the focus command has moved focus to the view", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { posted, provider, runtime } = yield* startChat;
+        const original = commands.executeCommand;
+        const focused: number[] = [];
+        commands.executeCommand = async () => {
+          focused.push(posted.filter((m) => m.type === "focusComposer").length);
+          return undefined;
+        };
+        yield* Effect.addFinalizer(() => Effect.sync(() => (commands.executeCommand = original)));
+        yield* Effect.promise(() => runtime.runPromise(provider.composer.attach([Uri.file("/w/a.ts") as unknown as vscode.Uri])));
+        assert.deepStrictEqual(focused, [0]);
+        assert.strictEqual(posted.at(-1)!.type, "focusComposer");
       }),
     ),
   );
