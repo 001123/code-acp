@@ -29,7 +29,6 @@
   height: 22px;
   font-size: 0.88em;
 }
-/* Shrink before the buttons of the row when the view is narrow. */
 .quick-config {
   flex-shrink: 1;
   min-width: 0;

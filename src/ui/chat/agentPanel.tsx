@@ -21,10 +21,20 @@ function AgentIcon({ icon }: { icon: string | undefined }) {
 }
 
 /**
- * The agent button: hover opens a panel that picks the tab's agent (the last entry opens the agent manager), installs
- * its update, and holds the session's config options (`children`).
+ * The agent button and the session's `summary` beside it: hovering either opens a panel that picks the tab's agent (the
+ * last entry opens the agent manager), installs its update, and holds the session's config options (`children`).
  */
-export function AgentPanel({ tab, choices, children }: { tab: TabInfo | undefined; choices: AgentChoices; children?: ReactNode }) {
+export function AgentPanel({
+  tab,
+  choices,
+  summary,
+  children,
+}: {
+  tab: TabInfo | undefined;
+  choices: AgentChoices;
+  summary?: ReactNode;
+  children?: ReactNode;
+}) {
   const { t } = useL10n();
   const menu = useHoverMenu();
   const subMenus = useSubMenus(menu.open);
@@ -48,6 +58,7 @@ export function AgentPanel({ tab, choices, children }: { tab: TabInfo | undefine
       >
         <AgentIcon icon={current?.icon} />
       </button>
+      {summary}
       {menu.open && (
         <div id="agent-panel" className="popup-menu" role="dialog" aria-label={t("chat.agentSettings")}>
           <SubMenuContext.Provider value={subMenus}>

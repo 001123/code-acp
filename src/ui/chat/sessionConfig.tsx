@@ -85,7 +85,7 @@ export function ConfigSelect({
   );
 }
 
-/** Beside the agent button: the session's model and effort as text; the agent panel changes them. */
+/** Beside the agent button: the session's model and effort as text; hovering it opens the agent panel, which changes them. */
 export function QuickConfig({ options }: { options: ReadonlyArray<acp.SessionConfigOption> }) {
   const selects = options.filter((o): o is SelectOption => o.type === "select");
   const quick = (["model", "effort"] as const).flatMap((kind) => selects.find((o) => configKind(o) === kind) ?? []);

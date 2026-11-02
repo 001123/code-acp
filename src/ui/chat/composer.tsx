@@ -289,10 +289,9 @@ export function useComposer(options: ComposerOptions) {
         <EditorContent editor={editor} />
       </div>
       <div id="actions">
-        <AgentPanel tab={tabs.find((x) => x.id === active)} choices={agents}>
+        <AgentPanel tab={tabs.find((x) => x.id === active)} choices={agents} summary={quickConfig}>
           {agentConfig}
         </AgentPanel>
-        {quickConfig}
         <FolderSelect tab={tabs.find((x) => x.id === active)} folders={folders} />
         <span className="spacer" />
         {settings}

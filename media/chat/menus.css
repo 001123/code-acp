@@ -3,6 +3,15 @@
   position: relative;
   display: inline-flex;
 }
+/* Holds the model and effort text too: shrinks with it before the buttons of the row when the view is narrow. */
+#agent {
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+#agent > .icon-btn {
+  flex: none;
+}
 /* A registry icon is a monochrome SVG: paint it with the text color. */
 .agent-icon {
   flex: none;
