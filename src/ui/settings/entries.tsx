@@ -8,7 +8,7 @@ import pencilIcon from "@tabler/icons/outline/pencil.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import serverIcon from "@tabler/icons/outline/server.svg";
 import worldIcon from "@tabler/icons/outline/world.svg";
-import { Field, Overridden } from "./fields";
+import { Field, Overridden, UserOnly } from "./fields";
 import { formatPairs, parsePairs } from "./pairs";
 import { set } from "./post";
 
@@ -188,7 +188,7 @@ function EntryEditor(props: {
 }
 
 /** The entries of codeAcp.mcpServers or, with `agents`, of codeAcp.customAgents. */
-export function EntryList(props: { agents?: boolean; value: unknown; overridden: boolean }) {
+export function EntryList(props: { agents?: boolean; value: unknown; overridden: boolean; locked: boolean }) {
   const { t } = useL10n();
   const key = props.agents ? "customAgents" : "mcpServers";
   /** The entry being edited: its name, or "" for a new one. */
@@ -208,72 +208,74 @@ export function EntryList(props: { agents?: boolean; value: unknown; overridden:
 
   return (
     <>
-      {props.overridden && <Overridden />}
-      <div className="mcp-list">
-        {!servers.length && editing === undefined && (
-          <div className="note">{t(props.agents ? "settings.customEmpty" : "settings.mcpEmpty")}</div>
-        )}
-        {servers.map(([name, entry]) =>
-          editing === name ? (
+      {props.locked ? <UserOnly /> : props.overridden && <Overridden />}
+      <fieldset className="plain" disabled={props.locked}>
+        <div className="mcp-list">
+          {!servers.length && editing === undefined && (
+            <div className="note">{t(props.agents ? "settings.customEmpty" : "settings.mcpEmpty")}</div>
+          )}
+          {servers.map(([name, entry]) =>
+            editing === name ? (
+              <EntryEditor
+                key={name}
+                agents={props.agents}
+                initial={toDraft(name, entry)}
+                taken={names.filter((n) => n !== name)}
+                onSave={(newName, newEntry) => save(name, newName, newEntry)}
+                onCancel={() => setEditing(undefined)}
+              />
+            ) : (
+              <div key={name} className="mcp-row">
+                <span className="mcp-icon">
+                  <Icon svg={props.agents ? terminalIcon : "url" in entry ? worldIcon : serverIcon} />
+                </span>
+                <div className="mcp-info">
+                  <div>
+                    <strong>{name}</strong>{" "}
+                    {!props.agents && (
+                      <span className="badge">{"url" in entry ? entry.type.toUpperCase() : "stdio"}</span>
+                    )}
+                  </div>
+                  <code>{"url" in entry ? entry.url : [entry.command, ...(entry.args ?? [])].join(" ")}</code>
+                </div>
+                <button
+                  className="icon-btn"
+                  title={t("settings.mcpEdit")}
+                  aria-label={t("settings.mcpEdit")}
+                  disabled={editing !== undefined}
+                  onClick={() => setEditing(name)}
+                >
+                  <Icon svg={pencilIcon} />
+                </button>
+                <button
+                  className="icon-btn danger"
+                  title={t("settings.mcpRemove")}
+                  aria-label={t("settings.mcpRemove")}
+                  disabled={editing !== undefined}
+                  onClick={() => remove(name)}
+                >
+                  <Icon svg={trashIcon} />
+                </button>
+              </div>
+            ),
+          )}
+          {editing === "" && (
             <EntryEditor
-              key={name}
               agents={props.agents}
-              initial={toDraft(name, entry)}
-              taken={names.filter((n) => n !== name)}
-              onSave={(newName, newEntry) => save(name, newName, newEntry)}
+              initial={EMPTY_DRAFT}
+              taken={names}
+              onSave={(name, entry) => save("", name, entry)}
               onCancel={() => setEditing(undefined)}
             />
-          ) : (
-            <div key={name} className="mcp-row">
-              <span className="mcp-icon">
-                <Icon svg={props.agents ? terminalIcon : "url" in entry ? worldIcon : serverIcon} />
-              </span>
-              <div className="mcp-info">
-                <div>
-                  <strong>{name}</strong>{" "}
-                  {!props.agents && (
-                    <span className="badge">{"url" in entry ? entry.type.toUpperCase() : "stdio"}</span>
-                  )}
-                </div>
-                <code>{"url" in entry ? entry.url : [entry.command, ...(entry.args ?? [])].join(" ")}</code>
-              </div>
-              <button
-                className="icon-btn"
-                title={t("settings.mcpEdit")}
-                aria-label={t("settings.mcpEdit")}
-                disabled={editing !== undefined}
-                onClick={() => setEditing(name)}
-              >
-                <Icon svg={pencilIcon} />
-              </button>
-              <button
-                className="icon-btn danger"
-                title={t("settings.mcpRemove")}
-                aria-label={t("settings.mcpRemove")}
-                disabled={editing !== undefined}
-                onClick={() => remove(name)}
-              >
-                <Icon svg={trashIcon} />
-              </button>
-            </div>
-          ),
+          )}
+        </div>
+        {editing === undefined && (
+          <button className="with-icon" onClick={() => setEditing("")}>
+            <Icon svg={plusIcon} />
+            {t(props.agents ? "settings.customAdd" : "settings.mcpAdd")}
+          </button>
         )}
-        {editing === "" && (
-          <EntryEditor
-            agents={props.agents}
-            initial={EMPTY_DRAFT}
-            taken={names}
-            onSave={(name, entry) => save("", name, entry)}
-            onCancel={() => setEditing(undefined)}
-          />
-        )}
-      </div>
-      {editing === undefined && (
-        <button className="with-icon" onClick={() => setEditing("")}>
-          <Icon svg={plusIcon} />
-          {t(props.agents ? "settings.customAdd" : "settings.mcpAdd")}
-        </button>
-      )}
+      </fieldset>
       <div className="note muted">{t("settings.mcpSecretNote")}</div>
     </>
   );

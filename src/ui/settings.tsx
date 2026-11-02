@@ -5,6 +5,7 @@ import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
 import { EntryList, serversOf } from "./settings/entries";
+import { ScopeContext, Segmented } from "./settings/fields";
 import { AgentTab, CommitTab, GeneralTab, LinksTab, NotificationsTab, WorktreeTab } from "./settings/panels";
 import { post } from "./settings/post";
 import { optionsKey, type LoadedOptions, type State } from "./settings/state";
@@ -31,7 +32,7 @@ function save(patch: Saved): void {
 
 function App() {
   const { t } = useL10n();
-  const [state, setState] = useState<State>({ values: {}, overridden: [], agents: [] });
+  const [state, setState] = useState<State>({ values: {}, overridden: [], scope: "user", hasWorkspace: false, locked: [], agents: [] });
   const [loaded, setLoaded] = useState<LoadedOptions>({});
   const [tab, setTab] = useState(savedTab);
   const [usage, setUsage] = useState<UsageView>();
@@ -66,11 +67,25 @@ function App() {
     return null;
   };
   const current = TABS.find((x) => x.id === tab)!;
+  // Usage is no setting.
+  const scoped = current.keys.length > 0;
 
   return (
-    <>
+    <ScopeContext.Provider value={state.scope}>
       <header>
         <h1>{t("settings.title")}</h1>
+        {state.hasWorkspace && scoped && (
+          <Segmented
+            id="scope"
+            label={t("settings.scope")}
+            value={state.scope}
+            options={[
+              { value: "user", label: t("settings.scopeUser"), title: t("settings.scopeUserDesc") },
+              { value: "workspace", label: t("settings.scopeWorkspace"), title: t("settings.scopeWorkspaceDesc") },
+            ]}
+            onChange={(scope) => post({ type: "scope", scope: scope === "workspace" ? "workspace" : "user" })}
+          />
+        )}
         <button className="secondary with-icon" onClick={() => post({ type: "openNative" })}>
           <Icon svg={externalIcon} />
           {t("settings.openNative")}
@@ -84,6 +99,7 @@ function App() {
           <div className="panel-head">
             <h2>{t(current.label)}</h2>
             <div className="desc">{t(current.desc)}</div>
+            {state.scope === "workspace" && scoped && <div className="note muted">{t("settings.scopeWorkspaceNote")}</div>}
           </div>
 
           {tab === "general" && <GeneralTab state={state} />}
@@ -96,9 +112,9 @@ function App() {
 
           {tab === "commit" && <CommitTab state={state} loaded={loaded} load={load} />}
 
-          {tab === "mcp" && <EntryList value={v.mcpServers} overridden={overridden("mcpServers")} />}
+          {tab === "mcp" && <EntryList value={v.mcpServers} overridden={overridden("mcpServers")} locked={state.locked.includes("mcpServers")} />}
 
-          {tab === "custom" && <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} />}
+          {tab === "custom" && <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} locked={state.locked.includes("customAgents")} />}
 
           {tab === "links" && <LinksTab state={state} />}
 
@@ -115,7 +131,7 @@ function App() {
             />}
         </main>
       </div>
-    </>
+    </ScopeContext.Provider>
   );
 }
 

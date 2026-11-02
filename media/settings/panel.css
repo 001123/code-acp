@@ -29,7 +29,16 @@ h2 {
   font-weight: 600;
 }
 .field-control {
-  margin-top: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+fieldset.plain {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
 }
 .field.inline {
   display: grid;
@@ -39,6 +48,11 @@ h2 {
 }
 .field.inline .field-control {
   margin-top: 0;
+}
+fieldset:disabled input:not([type="checkbox"]),
+fieldset:disabled textarea,
+fieldset:disabled select {
+  opacity: 0.6;
 }
 .field.inline .note {
   grid-column: 1 / -1;

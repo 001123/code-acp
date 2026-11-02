@@ -20,12 +20,14 @@ First public version; nothing has been released yet.
 - **Explain**, **Refactor**, **Write Tests** and **Fix with Code ACP** actions.
 - Review the agent's changes with Keep and Undo, restore checkpoints, and follow the agent in the editor.
 - Run a tab in its own git worktree and apply its changes to your checkout.
+- Copy ignored files and run a setup command when a worktree is created. A project can have its own command, which runs only after you allow it.
+- Switch the Settings page between user and workspace settings.
 - Commit message generation, then commit and push, from the Source Control view.
 - Token and cost tracking, ccusage reports, status bar activity, background notifications and tracing.
 - English and Vietnamese interfaces.
 
 ### Security
 
-- Settings that decide what runs (custom agents, MCP servers, environment variables, Node and ccusage paths) apply only at machine scope, so a workspace cannot set them.
+- Settings that decide what runs (custom agents, MCP servers, environment variables, Node and ccusage paths) apply only at machine scope, so a workspace cannot set them. A project's worktree setup command asks first, and asks again when the command or a file it names changes.
 - Links from agents open only after asking, over https, or over http to localhost, 127.0.0.1 and hosts you list in Settings; a workspace cannot add to that list.
 - Registry entries with unsafe paths are refused at install.

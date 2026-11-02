@@ -110,6 +110,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.runtime.runPromise(this.changes.lenses(this.tabs.active, document).pipe(Effect.orElseSucceed(() => []))),
   };
   private readonly tabWorktrees: TabWorktrees = new TabWorktrees({
+    globalState: () => this.context.globalState,
     tabs: () => this.tabs,
     postTab: (tab, message) => this.postTab(tab, message),
     postTabs: () => this.postTabs(),

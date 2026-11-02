@@ -55,6 +55,12 @@ export const Settings = Schema.Struct({
   rememberSessionOptions: Schema.Boolean,
   /** Run each new chat tab in a git worktree of its own, on a new branch. */
   worktreeForNewTabs: Schema.Boolean,
+  /** Ignored files to copy from the base checkout into a new worktree, as gitignore patterns. */
+  worktreeCopyFiles: Schema.Array(Schema.String),
+  /** Shell command to run at the top of a new worktree; user settings only, as a repository must not choose it. */
+  worktreeSetupCommand: Schema.String,
+  /** A project's own setup command; read by `projectSetupCommand`, and only run once the user allows it. */
+  worktreeProjectSetupCommand: Schema.String,
   /** Installed agent id for commit messages; empty means the default agent. */
   "commitMessage.agent": Schema.String,
   /** Model value (or name) to pick in the commit session; empty keeps the agent's default. */
@@ -87,6 +93,9 @@ export const SETTING_KEYS = [
   "notifyFinished",
   "rememberSessionOptions",
   "worktreeForNewTabs",
+  "worktreeCopyFiles",
+  "worktreeSetupCommand",
+  "worktreeProjectSetupCommand",
   "commitMessage.agent",
   "commitMessage.model",
   "commitMessage.instructions",
@@ -115,6 +124,9 @@ const DEFAULTS: Settings = {
   notifyFinished: true,
   rememberSessionOptions: true,
   worktreeForNewTabs: false,
+  worktreeCopyFiles: [],
+  worktreeSetupCommand: "",
+  worktreeProjectSetupCommand: "",
   "commitMessage.agent": "",
   "commitMessage.model": "",
   "commitMessage.instructions": DEFAULT_COMMIT_INSTRUCTIONS,
@@ -152,6 +164,9 @@ export function readSettings(): Settings {
     notifyFinished: read("notifyFinished"),
     rememberSessionOptions: read("rememberSessionOptions"),
     worktreeForNewTabs: read("worktreeForNewTabs"),
+    worktreeCopyFiles: read("worktreeCopyFiles"),
+    worktreeSetupCommand: read("worktreeSetupCommand"),
+    worktreeProjectSetupCommand: read("worktreeProjectSetupCommand"),
     "commitMessage.agent": read("commitMessage.agent"),
     "commitMessage.model": read("commitMessage.model"),
     "commitMessage.instructions": read("commitMessage.instructions"),
@@ -160,6 +175,34 @@ export function readSettings(): Settings {
     mcpServers: read("mcpServers"),
     allowedHttpHosts: read("allowedHttpHosts"),
   };
+}
+
+/** Where the Settings page reads and writes: the user's settings, or those of the open workspace. */
+export type SettingsScope = "user" | "workspace";
+
+/** Settings with `"scope": "machine"` in package.json: they decide what runs, so a workspace can't set them. */
+export const USER_ONLY_SETTINGS: ReadonlyArray<SettingKey> = [
+  "customAgents",
+  "env",
+  "nodePath",
+  "ccusagePath",
+  "worktreeSetupCommand",
+  "mcpServers",
+  "allowedHttpHosts",
+];
+
+/** Settings that mean something only for a project. */
+export const WORKSPACE_ONLY_SETTINGS: ReadonlyArray<SettingKey> = ["worktreeProjectSetupCommand"];
+
+/** The settings that can't be changed in `scope`. */
+export const lockedSettings = (scope: SettingsScope): ReadonlyArray<SettingKey> =>
+  scope === "user" ? WORKSPACE_ONLY_SETTINGS : USER_ONLY_SETTINGS;
+
+/** The setup command the project of `folder` asks for, from its folder or workspace settings; a user value doesn't count. */
+export function projectSetupCommand(folder: string): string {
+  const info = vscode.workspace.getConfiguration("codeAcp", vscode.Uri.file(folder)).inspect("worktreeProjectSetupCommand");
+  const command = Schema.decodeUnknownOption(Schema.String)(info?.workspaceFolderValue ?? info?.workspaceValue);
+  return Option.getOrElse(command, () => "").trim();
 }
 
 /** Whether `value` is a valid value for setting `key` (for values coming from a webview). */

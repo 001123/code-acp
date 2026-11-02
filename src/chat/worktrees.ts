@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Effect, Option, Schema } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { AgentRequestError, AgentStartError } from "../acpClient";
@@ -7,10 +7,14 @@ import { ShadowGit } from "../checkpoints";
 import { t, type MessageKey } from "../i18n";
 import { thenable, type ExtensionCtx, type Output, type VscodeError } from "../runtime";
 import { folderOf } from "../workspace";
-import { intoWorktree, isManaged, Worktrees, type PlacedWorktree, type TabWorktree, type WorktreeError } from "../worktrees";
+import { intoWorktree, isManaged, Worktrees, type PlacedWorktree, type ProjectCommand, type TabWorktree, type WorktreeError } from "../worktrees";
 import { confirm } from "./changes";
 import type { Attachment } from "./protocol";
 import type { Tab, TabList } from "./tabs";
+
+/** Where the fingerprints of the project setup commands the user allowed are kept. */
+const APPROVED_COMMANDS_KEY = "codeAcp.approvedWorktreeCommands";
+const decodeApproved = Schema.decodeUnknownOption(Schema.Array(Schema.String));
 
 /** What the tab's worktree becomes when the tab leaves it. */
 type Fate = "keep" | "delete" | "cancel";
@@ -24,6 +28,7 @@ type Target = { readonly kind: "local" | "new" } | { readonly kind: "existing"; 
 
 /** What the worktrees of tabs need from the chat view. */
 export interface WorktreesHost {
+  globalState(): vscode.Memento;
   tabs(): TabList;
   postTab(tab: Tab, message: Record<string, unknown>): void;
   postTabs(): void;
@@ -146,6 +151,7 @@ export class TabWorktrees {
     }
     const worktrees = yield* Worktrees;
     let next: PlacedWorktree | undefined;
+    let setupError: string | undefined;
     if (target.kind === "new") {
       this.host.status(tab, "worktree.creating");
       next = Option.getOrUndefined(
@@ -154,6 +160,9 @@ export class TabWorktrees {
           Effect.tapError(() => Effect.sync(() => this.host.status(tab, "chat.ready"))),
         ),
       );
+      if (next) {
+        setupError = yield* this.setUp(tab, next.worktree);
+      }
     } else if (target.kind === "existing") {
       next = target.placed;
     }
@@ -164,6 +173,8 @@ export class TabWorktrees {
     if (next) {
       this.announce(tab, next.worktree);
     }
+    // Only now: starting over clears the transcript.
+    this.reportSetup(tab, setupError);
     if (left && release === "delete") {
       yield* this.discard(left, leftCwd);
     }
@@ -171,6 +182,47 @@ export class TabWorktrees {
 
   private announce(tab: Tab, worktree: TabWorktree): void {
     this.host.postTab(tab, { type: "notice", key: "worktree.started", args: [nameOf(worktree)] });
+  }
+
+  /** Readies a new worktree, before the agent starts there; returns what went wrong, which doesn't stop the tab. */
+  private readonly setUp = Effect.fn("TabWorktrees.setUp")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+    this.host.status(tab, "worktree.settingUp");
+    return yield* (yield* Worktrees).setup(worktree, (request) => this.approve(worktree, request)).pipe(
+      Effect.as(undefined),
+      Effect.catch((err) => Effect.succeed(err.message)),
+    );
+  });
+
+  /** Whether a project's setup command may run: asks the first time, and again once its fingerprint changes. */
+  private readonly approve = Effect.fn("TabWorktrees.approve")(
+    function* (this: TabWorktrees, worktree: TabWorktree, request: ProjectCommand) {
+      const globalState = this.host.globalState();
+      const approved = () => Option.getOrElse(decodeApproved(globalState.get(APPROVED_COMMANDS_KEY)), (): ReadonlyArray<string> => []);
+      if (approved().includes(request.fingerprint)) {
+        return true;
+      }
+      const allow = t("worktree.projectCommandAllow");
+      const picked = yield* thenable(() =>
+        vscode.window.showWarningMessage(
+          t("worktree.projectCommandConfirm", path.basename(worktree.base)),
+          { modal: true, detail: t("worktree.projectCommandDetail", request.command) },
+          allow,
+        ),
+      );
+      if (picked !== allow) {
+        return false;
+      }
+      yield* thenable(() => globalState.update(APPROVED_COMMANDS_KEY, [...approved(), request.fingerprint]));
+      return true;
+    },
+    // Not running it is the safe answer when the question or its answer fails.
+    Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(false))),
+  );
+
+  private reportSetup(tab: Tab, error: string | undefined): void {
+    if (error !== undefined && this.host.tabs().has(tab)) {
+      this.host.postTab(tab, { type: "error", text: error });
+    }
   }
 
   /** Runs a tab that asked for it in a new worktree; it stays where it is when its folder isn't in git, or that fails. */
@@ -201,13 +253,23 @@ export class TabWorktrees {
       tab.cwd = created.value.cwd;
       this.host.postTabs();
       this.announce(tab, created.value.worktree);
+      this.reportSetup(tab, yield* this.setUp(tab, created.value.worktree));
     }
   });
 
   /** Before the tab's session starts: brings its worktree back if it went missing, else returns the tab to its base folder. */
   readonly ensure = Effect.fn("TabWorktrees.ensure")(function* (this: TabWorktrees, tab: Tab) {
     const { worktree } = tab;
-    if (!worktree || (yield* (yield* Worktrees).restore(worktree))) {
+    if (!worktree) {
+      return;
+    }
+    const worktrees = yield* Worktrees;
+    const missing = !(yield* worktrees.exists(worktree.root));
+    if (yield* worktrees.restore(worktree)) {
+      if (missing) {
+        // Git brought back only what it tracks.
+        this.reportSetup(tab, yield* this.setUp(tab, worktree));
+      }
       return;
     }
     tab.worktree = undefined;

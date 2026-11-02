@@ -41,7 +41,7 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 
 ### Next
 
-- [ ] **F1. Worktree setup.** Run a script or copy `.env` and `node_modules` when a worktree is created; ignored files are missing from new worktrees today.
+- [x] **F1. Worktree setup.** Copy ignored files such as `.env` and `node_modules` and run a setup command when a worktree is created.
 - [ ] **F2. Permission auto-approval rules.** For example, allow file reads, or allow everything in worktree tabs. Every request needs a manual answer today.
 - [ ] **F3. Checks after each turn.** Run a command such as `npm run check` when the agent finishes and send failures back, with a limit on rounds.
 - [ ] **F4. Comments on diffs.** Comment on hunks and send them to the agent as one batch, on top of the keep/undo review.

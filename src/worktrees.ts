@@ -1,16 +1,23 @@
-import { Context, Effect, FileSystem, Layer, Option, Schema, Stream } from "effect";
+import { Context, Duration, Effect, FileSystem, Layer, Option, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { createHash, randomBytes } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
+import { cp } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { t } from "./i18n";
 import { messageOf } from "./runtime";
+import { projectSetupCommand, readSettings } from "./settings";
 
 /** Branches of the worktrees the extension creates. */
 const BRANCH_PREFIX = "code-acp/";
 
 /** Where the extension's worktrees live, outside the repository so that they never show up in it. */
 const MANAGED_DIR = path.join(".code-acp", "worktrees");
+/** How long a worktree's setup command may run; a dev server would otherwise keep the tab waiting for good. */
+const SETUP_TIMEOUT_MINUTES = 10;
+/** How much of a failed setup command's output its error shows, from the end. */
+const SETUP_OUTPUT_TAIL = 2000;
 
 /** The git worktree a tab runs in. */
 export const TabWorktree = Schema.Struct({
@@ -22,6 +29,16 @@ export const TabWorktree = Schema.Struct({
   base: Schema.String,
 });
 export type TabWorktree = typeof TabWorktree.Type;
+
+/** The setup command a project asks for; it only runs once the user allows it. */
+export interface ProjectCommand {
+  readonly command: string;
+  /** What the user allows: changes with the command, its repository and the files it names. */
+  readonly fingerprint: string;
+}
+
+/** Whether the user allows a project's setup command. */
+export type ApproveCommand = (request: ProjectCommand) => Effect.Effect<boolean>;
 
 /** A worktree, and the folder in it that matches its base folder: a session's cwd. */
 export interface PlacedWorktree {
@@ -71,6 +88,14 @@ export function parseWorktreeList(output: string): ReadonlyArray<{ readonly root
   });
 }
 
+/** The entries of a `git ls-files --directory` listing without those inside a directory it lists too, and without its slashes. */
+export function outermostEntries(entries: ReadonlyArray<string>): ReadonlyArray<string> {
+  const directories = entries.filter((entry) => entry.endsWith("/"));
+  return entries
+    .filter((entry) => !directories.some((directory) => entry !== directory && entry.startsWith(directory)))
+    .map((entry) => entry.replace(/\/$/, ""));
+}
+
 /** The git worktrees chat tabs run in. Listings come from git, so worktrees made outside the extension show up too. */
 export class Worktrees extends Context.Service<Worktrees, {
   /** Whether `folder` is in a git work tree. */
@@ -79,6 +104,12 @@ export class Worktrees extends Context.Service<Worktrees, {
   branchOf(folder: string): Effect.Effect<string | undefined>;
   /** A new worktree on a new branch from the HEAD of `folder`; none when `folder` isn't in a git work tree. */
   create(folder: string): Effect.Effect<Option.Option<PlacedWorktree>, WorktreeError>;
+  /**
+   * Readies a new worktree as the settings say: copies ignored files from its base checkout, then runs a setup
+   * command at its top: the project's if `approve` allows it (without `approve` it doesn't run), else the user's.
+   * One failure doesn't stop the rest; it fails in the end with all of them.
+   */
+  setup(worktree: TabWorktree, approve?: ApproveCommand): Effect.Effect<void, WorktreeError>;
   /** The other worktrees of the repository of `folder`, which becomes their base. */
   list(folder: string): Effect.Effect<ReadonlyArray<PlacedWorktree>, WorktreeError>;
   /** The worktree of one of `folders`' repositories holding `cwd`. */
@@ -105,8 +136,9 @@ export class Worktrees extends Context.Service<Worktrees, {
 
       /** Runs git in `cwd`, whatever its exit code. */
       const exec = Effect.fn("Worktrees.exec")(
-        function* (cwd: string, args: ReadonlyArray<string>, env?: Record<string, string>) {
-          const handle = yield* spawner.spawn(ChildProcess.make("git", args, { cwd, env, extendEnv: true }));
+        function* (cwd: string, args: ReadonlyArray<string>, env?: Record<string, string>, input?: string) {
+          const stdin = input === undefined ? undefined : Stream.make(new TextEncoder().encode(input));
+          const handle = yield* spawner.spawn(ChildProcess.make("git", args, { cwd, env, extendEnv: true, stdin }));
           const [out, err, code] = yield* Effect.all(
             [Stream.mkString(Stream.decodeText(handle.stdout)), Stream.mkString(Stream.decodeText(handle.stderr)), handle.exitCode],
             { concurrency: "unbounded" },
@@ -163,6 +195,102 @@ export class Worktrees extends Context.Service<Worktrees, {
         // A folder with nothing committed in it isn't in the new worktree.
         yield* fs.makeDirectory(cwd, { recursive: true }).pipe(Effect.mapError((err) => failed("worktree", err.message)));
         return Option.some<PlacedWorktree>({ worktree: { root, branch, base: folder }, cwd });
+      });
+
+      /** Copies the ignored files of the base checkout that `patterns` name; returns what went wrong. */
+      const copyIgnored = Effect.fnUntraced(function* (worktree: TabWorktree, patterns: ReadonlyArray<string>) {
+        const repo = yield* repoOf(worktree.base);
+        if (Option.isNone(repo)) {
+          return [];
+        }
+        const { top } = repo.value;
+        const named = yield* git(top, ["ls-files", "-z", "--others", "--ignored", "--directory", ...patterns.map((pattern) => `--exclude=${pattern}`)]);
+        // By the worktree's own rules: a file it doesn't ignore would be staged when its changes are applied.
+        const { out, err, code } = yield* exec(worktree.root, ["check-ignore", "-z", "--stdin"], undefined, named);
+        if (code > 1) {
+          return yield* failed("check-ignore", err || code);
+        }
+        const failures = yield* Effect.forEach(outermostEntries(out.split("\0").filter(Boolean)), (entry) =>
+          Effect.tryPromise(() =>
+            cp(path.join(top, entry), path.join(worktree.root, entry), {
+              recursive: true,
+              force: false,
+              // Relative links, as in node_modules, keep pointing inside the copy.
+              verbatimSymlinks: true,
+              // A clone where the filesystem has them, so that a large node_modules takes no space.
+              mode: fsConstants.COPYFILE_FICLONE,
+            }),
+          ).pipe(
+            Effect.as(undefined),
+            Effect.catch((err) => Effect.succeed(t("worktree.copyFailed", entry, messageOf(err)))),
+          ),
+        );
+        return failures.filter((failure) => failure !== undefined);
+      });
+
+      /** Runs the setup command at the top of the worktree; its output only matters when it fails. */
+      const runSetupCommand = Effect.fn("Worktrees.runSetupCommand")(
+        function* (root: string, command: string) {
+          const handle = yield* spawner.spawn(
+            ChildProcess.make(command, [], { cwd: root, shell: true, stdin: "ignore", forceKillAfter: "5 seconds" }),
+          );
+          let tail = "";
+          // Not waited for: a process the command leaves behind may hold on to the output.
+          yield* handle.all.pipe(
+            Stream.decodeText,
+            Stream.runForEach((text) => Effect.sync(() => (tail = (tail + text).slice(-SETUP_OUTPUT_TAIL)))),
+            Effect.forkScoped,
+          );
+          const code = yield* handle.exitCode;
+          if (code !== 0) {
+            return yield* new WorktreeError({ message: t("worktree.setupFailed", code, tail.trim()) });
+          }
+        },
+        Effect.scoped,
+        Effect.catchTag("PlatformError", (err) => Effect.fail(new WorktreeError({ message: t("worktree.setupFailed", "-", err.message) }))),
+        Effect.timeoutOrElse({
+          duration: Duration.minutes(SETUP_TIMEOUT_MINUTES),
+          orElse: () => Effect.fail(new WorktreeError({ message: t("worktree.setupTimedOut", SETUP_TIMEOUT_MINUTES) })),
+        }),
+      );
+
+      /**
+       * Identifies a project's command in its repository. Files it names count, as a pull can change what a script
+       * does without changing the command; what it runs by other means, such as npm's scripts, doesn't.
+       */
+      const fingerprintOf = Effect.fnUntraced(function* (worktree: TabWorktree, command: string) {
+        const repo = yield* repoOf(worktree.base);
+        const top = Option.match(repo, { onNone: () => worktree.base, onSome: ({ top }) => top });
+        const hash = createHash("sha256").update(JSON.stringify([top, command]));
+        for (const word of new Set(command.split(/[\s;&|()<>"'=]+/).filter(Boolean))) {
+          const file = intoWorktree(path.resolve(worktree.root, word), worktree.root, worktree.root);
+          // Most words are no file, or a folder.
+          const content = file === undefined ? Option.none() : yield* fs.readFile(file).pipe(Effect.option);
+          if (Option.isSome(content)) {
+            hash.update(JSON.stringify(word)).update(content.value);
+          }
+        }
+        return hash.digest("hex");
+      });
+
+      const setup = Effect.fn("Worktrees.setup")(function* (worktree: TabWorktree, approve?: ApproveCommand) {
+        const { worktreeCopyFiles: patterns, worktreeSetupCommand: userCommand } = readSettings();
+        const failures = patterns.length === 0
+          ? []
+          : [...yield* copyIgnored(worktree, patterns).pipe(Effect.catch((err) => Effect.succeed([err.message])))];
+        // After the copy: a script the project's command names may be among the copied files.
+        const project = projectSetupCommand(worktree.base);
+        const allowed = project !== "" && approve !== undefined
+          && (yield* approve({ command: project, fingerprint: yield* fingerprintOf(worktree, project) }));
+        const command = allowed ? project : userCommand;
+        if (command !== "") {
+          yield* runSetupCommand(worktree.root, command).pipe(
+            Effect.catch((err) => Effect.sync(() => failures.push(err.message))),
+          );
+        }
+        if (failures.length > 0) {
+          return yield* new WorktreeError({ message: failures.join("\n") });
+        }
       });
 
       const list = Effect.fn("Worktrees.list")(function* (folder: string) {
@@ -265,6 +393,7 @@ export class Worktrees extends Context.Service<Worktrees, {
         isRepo: (folder) => repoOf(folder).pipe(Effect.map(Option.isSome)),
         branchOf,
         create,
+        setup,
         list,
         locate,
         exists,

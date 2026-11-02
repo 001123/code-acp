@@ -7,15 +7,17 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterAll, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll } from "vitest";
 import * as vscode from "vscode";
 import { TabList } from "../src/chat/tabs";
 import { TabWorktrees } from "../src/chat/worktrees";
 import { ShadowGit } from "../src/checkpoints";
 import { ExtensionCtx } from "../src/runtime";
-import { intoWorktree, isManaged, parseWorktreeList, Worktrees } from "../src/worktrees";
+import { intoWorktree, isManaged, outermostEntries, parseWorktreeList, Worktrees, type ProjectCommand } from "../src/worktrees";
 import { makeExtensionCtx } from "./helpers";
+import { __test, Uri, workspace } from "./stubs/vscode";
 
+const PROJECT_COMMAND = "codeAcp.worktreeProjectSetupCommand";
 const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "code-acp-worktrees-")));
 const realHome = process.env.HOME;
 
@@ -48,6 +50,11 @@ beforeAll(() => {
   process.env.HOME = path.join(scratch, "home");
   fs.mkdirSync(process.env.HOME);
 });
+afterEach(() => {
+  __test.setSetting("codeAcp.worktreeCopyFiles", []);
+  __test.setSetting("codeAcp.worktreeSetupCommand", "");
+  __test.setWorkspaceSetting(PROJECT_COMMAND, undefined);
+});
 afterAll(() => {
   process.env.HOME = realHome;
   fs.rmSync(scratch, { recursive: true, force: true });
@@ -63,6 +70,15 @@ describe("worktree helpers", () => {
       "",
     ].join("\n");
     assert.deepStrictEqual(parseWorktreeList(output), [{ root: "/r", branch: "main" }, { root: "/d" }]);
+  });
+
+  it("keeps the outermost entries of a listing, without their slashes", () => {
+    assert.deepStrictEqual(outermostEntries([".env", "ignored/deep/", "ignored/deep/.env", "ignored/deeper", "node_modules/"]), [
+      ".env",
+      "ignored/deep",
+      "ignored/deeper",
+      "node_modules",
+    ]);
   });
 
   it("maps a file of the base folder into the worktree", () => {
@@ -249,6 +265,157 @@ describe("Worktrees", () => {
     }).pipe(Effect.provide(layer)),
   );
 
+  it.effect("copies only the ignored files the patterns name, and leaves the worktree clean", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      fs.appendFileSync(path.join(repo, ".gitignore"), ".env\nnode_modules/\n");
+      git(repo, "add", "--all");
+      git(repo, "commit", "--quiet", "-m", "ignore");
+      fs.writeFileSync(path.join(repo, ".env"), "SECRET=1\n");
+      fs.mkdirSync(path.join(repo, "sub", "node_modules", "pkg"), { recursive: true });
+      fs.writeFileSync(path.join(repo, "sub", "node_modules", "pkg", "index.js"), "x\n");
+      fs.symlinkSync("pkg/index.js", path.join(repo, "sub", "node_modules", "link.js"));
+      fs.mkdirSync(path.join(repo, "ignored"));
+      fs.writeFileSync(path.join(repo, "ignored", "unnamed.txt"), "x\n");
+      fs.writeFileSync(path.join(repo, "untracked.txt"), "x\n");
+      __test.setSetting("codeAcp.worktreeCopyFiles", [".env", "node_modules", "untracked.txt", "../outside"]);
+      const { worktree } = yield* created(repo);
+      const worktrees = yield* Worktrees;
+      yield* worktrees.setup(worktree);
+      assert.strictEqual(fs.readFileSync(path.join(worktree.root, ".env"), "utf8"), "SECRET=1\n");
+      assert.isTrue(fs.existsSync(path.join(worktree.root, "sub", "node_modules", "pkg", "index.js")));
+      assert.strictEqual(fs.readlinkSync(path.join(worktree.root, "sub", "node_modules", "link.js")), "pkg/index.js");
+      assert.isFalse(fs.existsSync(path.join(worktree.root, "ignored")));
+      assert.isFalse(fs.existsSync(path.join(worktree.root, "untracked.txt")));
+      assert.deepStrictEqual(yield* worktrees.status(worktree), { changed: 0, commits: 0 });
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("goes by the worktree's ignore rules, not an uncommitted change to the base's", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      fs.appendFileSync(path.join(repo, ".gitignore"), "local.txt\n");
+      fs.writeFileSync(path.join(repo, "local.txt"), "x\n");
+      __test.setSetting("codeAcp.worktreeCopyFiles", ["local.txt"]);
+      const { worktree } = yield* created(repo);
+      yield* (yield* Worktrees).setup(worktree);
+      assert.isFalse(fs.existsSync(path.join(worktree.root, "local.txt")));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("runs the setup command in a shell at the top of the worktree, even from a subfolder", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      __test.setSetting("codeAcp.worktreeSetupCommand", "pwd > where.txt && echo done >> where.txt");
+      const { worktree } = yield* created(path.join(repo, "sub"));
+      yield* (yield* Worktrees).setup(worktree);
+      assert.strictEqual(fs.readFileSync(path.join(worktree.root, "where.txt"), "utf8"), `${worktree.root}\ndone\n`);
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("reports a failed command with its output, after copying what it could", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      fs.mkdirSync(path.join(repo, "ignored"));
+      fs.writeFileSync(path.join(repo, "ignored", "f.txt"), "x\n");
+      __test.setSetting("codeAcp.worktreeCopyFiles", ["ignored"]);
+      __test.setSetting("codeAcp.worktreeSetupCommand", "echo oh no >&2; exit 3");
+      const { worktree } = yield* created(repo);
+      const err = yield* (yield* Worktrees).setup(worktree).pipe(Effect.flip);
+      assert.include(err.message, "3");
+      assert.include(err.message, "oh no");
+      assert.isTrue(fs.existsSync(path.join(worktree.root, "ignored", "f.txt")));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.live("doesn't wait for a process the setup command leaves behind", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      __test.setSetting("codeAcp.worktreeSetupCommand", "sleep 30 & echo started");
+      const { worktree } = yield* created(repo);
+      const result = yield* (yield* Worktrees).setup(worktree).pipe(Effect.timeoutOption("10 seconds"));
+      assert.isTrue(Option.isSome(result));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.live("stops the setup command when interrupted", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      __test.setSetting("codeAcp.worktreeSetupCommand", "sleep 30; touch finished.txt");
+      const { worktree } = yield* created(repo);
+      const result = yield* (yield* Worktrees).setup(worktree).pipe(Effect.timeoutOption("500 millis"), Effect.timeoutOption("10 seconds"));
+      assert.deepStrictEqual(result, Option.some(Option.none()));
+      assert.isFalse(fs.existsSync(path.join(worktree.root, "finished.txt")));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("runs a project's command instead of the user's, only when allowed", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      __test.setSetting("codeAcp.worktreeSetupCommand", "touch user.txt");
+      __test.setWorkspaceSetting(PROJECT_COMMAND, "touch project.txt");
+      const worktrees = yield* Worktrees;
+      const ran = (worktree: { root: string }) => ["user.txt", "project.txt"].filter((file) => fs.existsSync(path.join(worktree.root, file)));
+
+      const allowed = (yield* created(repo)).worktree;
+      const asked: ProjectCommand[] = [];
+      yield* worktrees.setup(allowed, (request) => Effect.sync(() => (asked.push(request), true)));
+      assert.deepStrictEqual(ran(allowed), ["project.txt"]);
+      assert.strictEqual(asked[0]?.command, "touch project.txt");
+
+      const declined = (yield* created(repo)).worktree;
+      yield* worktrees.setup(declined, () => Effect.succeed(false));
+      assert.deepStrictEqual(ran(declined), ["user.txt"]);
+
+      const nobodyAsked = (yield* created(repo)).worktree;
+      yield* worktrees.setup(nobodyAsked);
+      assert.deepStrictEqual(ran(nobodyAsked), ["user.txt"]);
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("doesn't ask about a project's command when there is none", () =>
+    Effect.gen(function* () {
+      const { worktree } = yield* created(makeRepo());
+      yield* (yield* Worktrees).setup(worktree, () => Effect.die("asked"));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("identifies a project's command by the command, its repository and the files it names", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      fs.appendFileSync(path.join(repo, ".gitignore"), "local.sh\n");
+      fs.writeFileSync(path.join(repo, "setup.sh"), "echo one\n");
+      git(repo, "add", "--all");
+      git(repo, "commit", "--quiet", "-m", "script");
+      const worktrees = yield* Worktrees;
+      const fingerprint = (command: string, folder = repo) =>
+        Effect.gen(function* () {
+          __test.setWorkspaceSetting(PROJECT_COMMAND, command);
+          const { worktree } = yield* created(folder);
+          let seen = "";
+          yield* worktrees.setup(worktree, (request) => Effect.sync(() => ((seen = request.fingerprint), false)));
+          return seen;
+        });
+
+      const script = "sh ./setup.sh && echo done";
+      const first = yield* fingerprint(script);
+      assert.strictEqual(yield* fingerprint(script), first);
+      assert.notStrictEqual(yield* fingerprint(`${script} again`), first);
+      assert.notStrictEqual(yield* fingerprint(script, makeRepo()), first);
+
+      fs.writeFileSync(path.join(repo, "setup.sh"), "echo two\n");
+      git(repo, "commit", "--quiet", "--all", "-m", "change");
+      assert.notStrictEqual(yield* fingerprint(script), first);
+
+      // A script that reaches the worktree by being copied counts too.
+      __test.setSetting("codeAcp.worktreeCopyFiles", ["local.sh"]);
+      fs.writeFileSync(path.join(repo, "local.sh"), "echo one\n");
+      const copied = yield* fingerprint("sh local.sh");
+      fs.writeFileSync(path.join(repo, "local.sh"), "echo two\n");
+      assert.notStrictEqual(yield* fingerprint("sh local.sh"), copied);
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("finds the worktree holding a session's folder", () =>
     Effect.gen(function* () {
       const repo = makeRepo();
@@ -282,20 +449,28 @@ describe("TabWorktrees", () => {
   /** The controller with two tabs on `tabs`; answers `reply` to whatever it asks, and records the questions. */
   const makeController = (reply?: string) => {
     const asked: string[] = [];
+    const posted: Array<Record<string, unknown>> = [];
     vscode.window.showWarningMessage = (async (message: string) => {
       asked.push(message);
       return reply;
     }) as never;
     const tabs = new TabList(undefined, () => "/w");
+    const stored = new Map<string, unknown>();
+    const globalState = {
+      keys: () => [...stored.keys()],
+      get: (key: string) => stored.get(key),
+      update: async (key: string, value: unknown) => void stored.set(key, value),
+    } as vscode.Memento;
     const controller = new TabWorktrees({
+      globalState: () => globalState,
       tabs: () => tabs,
-      postTab: () => {},
+      postTab: (_tab, message) => void posted.push(message),
       postTabs: () => {},
       status: () => {},
       confirmStartOver: () => Effect.succeed(true),
       startOver: () => Effect.void,
     });
-    return { asked, tabs, controller, tab: tabs.active };
+    return { asked, posted, tabs, controller, tab: tabs.active };
   };
 
   it.effect("deletes a worktree with nothing to lose without asking", () =>
@@ -342,6 +517,90 @@ describe("TabWorktrees", () => {
       alone.tab.worktree = { root: own, base: repo };
       assert.strictEqual(yield* alone.controller.askRelease(alone.tab), "keep");
       assert.deepStrictEqual([...asked, ...alone.asked], []);
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("sets up the new worktree of a tab before its session, and a failure leaves the tab in it", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      workspace.workspaceFolders = [{ name: "repo", uri: Uri.file(repo) }];
+      __test.setSetting("codeAcp.worktreeSetupCommand", "touch ready.txt; exit 1");
+      const { controller, posted, tab } = makeController();
+      tab.cwd = repo;
+      tab.wantsWorktree = true;
+      yield* controller.prepare(tab);
+      workspace.workspaceFolders = undefined;
+      assert.isDefined(tab.worktree);
+      assert.isTrue(fs.existsSync(path.join(tab.worktree!.root, "ready.txt")));
+      assert.isTrue(posted.some((message) => message.type === "error"));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("sets up a worktree that came back, but not one that is still there", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      __test.setSetting("codeAcp.worktreeSetupCommand", "touch ready.txt");
+      const { worktree, cwd } = yield* created(repo);
+      const { controller, tab } = makeController();
+      tab.worktree = worktree;
+      tab.cwd = cwd;
+      const ready = path.join(worktree.root, "ready.txt");
+      yield* controller.ensure(tab);
+      assert.isFalse(fs.existsSync(ready));
+      fs.rmSync(worktree.root, { recursive: true });
+      yield* controller.ensure(tab);
+      assert.isTrue(fs.existsSync(ready));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("asks before running a project's command, and again only when it changes", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      fs.writeFileSync(path.join(repo, "setup.sh"), "touch ran.txt\n");
+      git(repo, "add", "--all");
+      git(repo, "commit", "--quiet", "-m", "script");
+      __test.setWorkspaceSetting(PROJECT_COMMAND, "sh setup.sh");
+      const { asked, controller, tab } = makeController("Allow and Run");
+      /** Prepares a new worktree for the tab, and returns whether the command ran in it. */
+      const prepare = Effect.gen(function* () {
+        workspace.workspaceFolders = [{ name: "repo", uri: Uri.file(repo) }];
+        tab.worktree = undefined;
+        tab.cwd = repo;
+        tab.wantsWorktree = true;
+        yield* controller.prepare(tab);
+        workspace.workspaceFolders = undefined;
+        return fs.existsSync(path.join(tab.worktree!.root, "ran.txt"));
+      });
+
+      assert.isTrue(yield* prepare);
+      assert.lengthOf(asked, 1);
+      assert.include(asked[0]!, "repo-");
+
+      assert.isTrue(yield* prepare);
+      assert.lengthOf(asked, 1);
+
+      fs.writeFileSync(path.join(repo, "setup.sh"), "touch ran.txt; echo changed\n");
+      git(repo, "commit", "--quiet", "--all", "-m", "change");
+      assert.isTrue(yield* prepare);
+      assert.lengthOf(asked, 2);
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("runs nothing of the project's when the question is dismissed, and asks again next time", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      __test.setWorkspaceSetting(PROJECT_COMMAND, "touch ran.txt");
+      const { asked, controller, tab } = makeController(undefined);
+      for (const times of [1, 2]) {
+        workspace.workspaceFolders = [{ name: "repo", uri: Uri.file(repo) }];
+        tab.worktree = undefined;
+        tab.cwd = repo;
+        tab.wantsWorktree = true;
+        yield* controller.prepare(tab);
+        workspace.workspaceFolders = undefined;
+        assert.isFalse(fs.existsSync(path.join(tab.worktree!.root, "ran.txt")));
+        assert.lengthOf(asked, times);
+      }
     }).pipe(Effect.provide(layer)),
   );
 

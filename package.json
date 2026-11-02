@@ -596,6 +596,26 @@
           "default": false,
           "description": "%config.worktreeForNewTabs%"
         },
+        "codeAcp.worktreeCopyFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "%config.worktreeCopyFiles%"
+        },
+        "codeAcp.worktreeSetupCommand": {
+          "scope": "machine",
+          "type": "string",
+          "default": "",
+          "description": "%config.worktreeSetupCommand%"
+        },
+        "codeAcp.worktreeProjectSetupCommand": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "description": "%config.worktreeProjectSetupCommand%"
+        },
         "codeAcp.commitMessage.agent": {
           "type": "string",
           "default": "",

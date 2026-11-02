@@ -3,7 +3,18 @@ import { Schema } from "effect";
 import { readFileSync } from "node:fs";
 import { __test } from "./stubs/vscode";
 import { parseHosts } from "../src/ui/settings/hosts";
-import { CustomAgentEntry, DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, McpServerEntry, readSettings, Settings } from "../src/settings";
+import {
+  CustomAgentEntry,
+  DEFAULT_COMMIT_INSTRUCTIONS,
+  isValidSetting,
+  lockedSettings,
+  McpServerEntry,
+  projectSetupCommand,
+  readSettings,
+  Settings,
+  USER_ONLY_SETTINGS,
+} from "../src/settings";
+import { scopedSetting, valueToStore } from "../src/settingsPanel";
 
 beforeEach(() => __test.reset());
 
@@ -22,6 +33,9 @@ describe("readSettings", () => {
     assert.isTrue(s.notifyFinished);
     assert.isTrue(s.rememberSessionOptions);
     assert.isFalse(s.worktreeForNewTabs);
+    assert.deepStrictEqual(s.worktreeCopyFiles, []);
+    assert.strictEqual(s.worktreeSetupCommand, "");
+    assert.strictEqual(s.worktreeProjectSetupCommand, "");
     assert.deepStrictEqual(s.allowedHttpHosts, []);
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
   });
@@ -130,9 +144,89 @@ describe("settings that decide what gets executed", () => {
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   ).contributes.configuration.properties;
 
-  for (const key of ["customAgents", "env", "nodePath", "ccusagePath", "mcpServers"]) {
+  for (const key of ["customAgents", "env", "nodePath", "ccusagePath", "mcpServers", "worktreeSetupCommand"]) {
     it(`codeAcp.${key} cannot be set by a workspace`, () => {
       assert.strictEqual(properties[`codeAcp.${key}`]?.scope, "machine");
     });
   }
+
+  it("the Settings page locks exactly the settings a workspace can't set", () => {
+    const machine = Object.entries(properties)
+      .filter(([, property]) => property.scope === "machine")
+      .map(([key]) => key.replace("codeAcp.", ""));
+    assert.sameMembers([...USER_ONLY_SETTINGS], machine);
+    assert.sameMembers([...lockedSettings("workspace")], machine);
+  });
+
+  it("a project's setup command can differ per folder of a workspace", () => {
+    assert.strictEqual(properties["codeAcp.worktreeProjectSetupCommand"]?.scope, "resource");
+  });
+});
+
+describe("projectSetupCommand", () => {
+  const KEY = "codeAcp.worktreeProjectSetupCommand";
+
+  it("comes from the folder's settings, then the workspace's, and never the user's", () => {
+    __test.setSetting(KEY, "user");
+    assert.strictEqual(projectSetupCommand("/repo"), "");
+    __test.setWorkspaceSetting(KEY, " workspace ");
+    assert.strictEqual(projectSetupCommand("/repo"), "workspace");
+    __test.setFolderSetting("/repo", KEY, "folder");
+    assert.strictEqual(projectSetupCommand("/repo"), "folder");
+    assert.strictEqual(projectSetupCommand("/other"), "workspace");
+  });
+
+  it("ignores a value that is no text", () => {
+    __test.setWorkspaceSetting(KEY, ["npm", "install"]);
+    assert.strictEqual(projectSetupCommand("/repo"), "");
+  });
+});
+
+describe("settings scopes", () => {
+  it("shows the user's value and warns of a workspace one, in user scope", () => {
+    assert.deepStrictEqual(scopedSetting("user", "autoScroll", { defaultValue: true }), { value: true, overridden: false });
+    assert.deepStrictEqual(scopedSetting("user", "autoScroll", { defaultValue: true, globalValue: false, workspaceValue: true }), {
+      value: false,
+      overridden: true,
+    });
+  });
+
+  it("shows the workspace's value, else what it inherits, in workspace scope", () => {
+    assert.deepStrictEqual(scopedSetting("workspace", "autoScroll", { defaultValue: true, globalValue: false }), { value: false, overridden: false });
+    assert.deepStrictEqual(scopedSetting("workspace", "autoScroll", { defaultValue: true, globalValue: false, workspaceValue: true }), {
+      value: true,
+      overridden: true,
+    });
+  });
+
+  it("ignores a workspace value of a setting that can't have one", () => {
+    assert.deepStrictEqual(scopedSetting("workspace", "nodePath", { globalValue: "/mine", workspaceValue: "/theirs" }), {
+      value: "/mine",
+      overridden: false,
+    });
+  });
+
+  it("doesn't let a user value stand in for a project's setup command", () => {
+    assert.deepStrictEqual(scopedSetting("workspace", "worktreeProjectSetupCommand", { defaultValue: "", globalValue: "x" }), {
+      value: "",
+      overridden: false,
+    });
+    assert.strictEqual(valueToStore("workspace", "worktreeProjectSetupCommand", "x", { defaultValue: "", globalValue: "x" }), "x");
+  });
+
+  it("doesn't warn in user scope of a project's setup command, which overrides nothing there", () => {
+    assert.isFalse(scopedSetting("user", "worktreeProjectSetupCommand", { defaultValue: "", workspaceValue: "x" }).overridden);
+  });
+
+  it("removes a user value equal to the default", () => {
+    assert.isUndefined(valueToStore("user", "autoScroll", true, { defaultValue: true }));
+    assert.strictEqual(valueToStore("user", "autoScroll", false, { defaultValue: true }), false);
+  });
+
+  it("stores in a workspace what differs from what it inherits, even the default", () => {
+    assert.strictEqual(valueToStore("workspace", "autoScroll", true, { defaultValue: true, globalValue: false }), true);
+    assert.isUndefined(valueToStore("workspace", "autoScroll", false, { defaultValue: true, globalValue: false, workspaceValue: true }));
+    assert.deepStrictEqual(valueToStore("workspace", "worktreeCopyFiles", [], { defaultValue: [], globalValue: [".env"] }), []);
+    assert.isUndefined(valueToStore("workspace", "worktreeCopyFiles", [".env"], { defaultValue: [], globalValue: [".env"] }));
+  });
 });

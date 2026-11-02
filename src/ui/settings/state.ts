@@ -1,10 +1,14 @@
 import type { AgentChoice } from "../../agentManager";
-import type { SettingKey } from "../../settings";
+import type { SettingKey, SettingsScope } from "../../settings";
 import type { AgentOptions } from "../../sessionOptions";
 
 export interface State {
   values: Partial<Record<SettingKey, unknown>>;
   overridden: SettingKey[];
+  /** Which settings `values` are, and those that can't be changed there. */
+  scope: SettingsScope;
+  hasWorkspace: boolean;
+  locked: ReadonlyArray<SettingKey>;
   agents: AgentChoice[];
   activeId?: string;
 }

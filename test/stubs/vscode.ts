@@ -3,6 +3,9 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
 const settings = new Map<string, unknown>();
+const workspaceSettings = new Map<string, unknown>();
+/** By folder path, then full key. */
+const folderSettings = new Map<string, Map<string, unknown>>();
 const listeners = new Set<(e: { affectsConfiguration(section: string): boolean }) => void>();
 const closeListeners = new Set<(terminal: unknown) => void>();
 
@@ -14,6 +17,14 @@ export const __test = {
     for (const listener of listeners) {
       listener({ affectsConfiguration: (section) => key === section || key.startsWith(`${section}.`) });
     }
+  },
+  /** Sets a full key like `codeAcp.language` in the workspace's settings; undefined removes it. */
+  setWorkspaceSetting(key: string, value: unknown) {
+    workspaceSettings.set(key, value);
+  },
+  /** Sets a full key in the settings of the workspace folder at `folder`. */
+  setFolderSetting(folder: string, key: string, value: unknown) {
+    folderSettings.set(folder, new Map([[key, value]]));
   },
   /** The lines of each output channel created, by name. */
   outputChannels: new Map<string, string[]>(),
@@ -33,6 +44,8 @@ export const __test = {
   },
   reset() {
     settings.clear();
+    workspaceSettings.clear();
+    folderSettings.clear();
     __test.outputChannels.clear();
     __test.openedDocuments.length = 0;
     __test.terminals.length = 0;
@@ -182,9 +195,17 @@ const toError = (e: unknown, p: string) =>
 export const workspace = {
   workspaceFolders: undefined as ReadonlyArray<{ name?: string; uri: Uri }> | undefined,
   textDocuments: [] as Array<{ uri: Uri; isClosed: boolean; lineCount: number; save(): Promise<boolean>; getText?(): string }>,
-  getConfiguration(section?: string) {
+  getConfiguration(section?: string, scope?: Uri) {
     const full = (key: string) => (section ? `${section}.${key}` : key);
     return {
+      inspect(key: string) {
+        const k = full(key);
+        return {
+          globalValue: settings.get(k),
+          workspaceValue: workspaceSettings.get(k),
+          workspaceFolderValue: scope && folderSettings.get(scope.fsPath)?.get(k),
+        };
+      },
       get<T>(key: string, fallback?: T): T | undefined {
         const k = full(key);
         return (settings.has(k) ? settings.get(k) : fallback) as T | undefined;

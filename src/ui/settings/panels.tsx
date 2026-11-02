@@ -9,6 +9,7 @@ import { post, set } from "./post";
 import { stringOf, type LoadedOptions, type State } from "./state";
 
 const isOverridden = (state: State) => (key: SettingKey) => state.overridden.includes(key);
+const isLocked = (state: State) => (key: SettingKey) => state.locked.includes(key);
 
 export function GeneralTab({ state }: { state: State }) {
   const { t } = useL10n();
@@ -127,6 +128,55 @@ export function WorktreeTab({ state }: { state: State }) {
       >
         <Toggle id="worktreeForNewTabs" checked={v.worktreeForNewTabs === true} onChange={(checked) => set("worktreeForNewTabs", checked)} />
       </Field>
+      <Field
+        id="worktreeCopyFiles"
+        label="settings.worktreeCopyFiles"
+        desc="settings.worktreeCopyFilesDesc"
+        overridden={overridden("worktreeCopyFiles")}
+      >
+        <Text
+          id="worktreeCopyFiles"
+          rows={4}
+          placeholder={".env\nnode_modules"}
+          value={((v.worktreeCopyFiles as ReadonlyArray<string> | undefined) ?? []).join("\n")}
+          onCommit={(text) =>
+            set(
+              "worktreeCopyFiles",
+              text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+            )
+          }
+        />
+      </Field>
+      {state.scope === "workspace" ? (
+        <Field
+          key="project"
+          id="worktreeProjectSetupCommand"
+          label="settings.worktreeProjectSetupCommand"
+          desc="settings.worktreeProjectSetupCommandDesc"
+        >
+          <Text
+            id="worktreeProjectSetupCommand"
+            placeholder="npm install"
+            value={stringOf(state, "worktreeProjectSetupCommand")}
+            onCommit={(text) => set("worktreeProjectSetupCommand", text.trim())}
+          />
+        </Field>
+      ) : (
+        <Field
+          key="user"
+          id="worktreeSetupCommand"
+          label="settings.worktreeSetupCommand"
+          desc="settings.worktreeSetupCommandDesc"
+          overridden={overridden("worktreeSetupCommand")}
+        >
+          <Text
+            id="worktreeSetupCommand"
+            placeholder="npm install"
+            value={stringOf(state, "worktreeSetupCommand")}
+            onCommit={(text) => set("worktreeSetupCommand", text.trim())}
+          />
+        </Field>
+      )}
     </section>
   );
 }
@@ -136,6 +186,7 @@ export function AgentTab({ state }: { state: State }) {
   const [envError, setEnvError] = useState<string>();
   const v = state.values;
   const overridden = isOverridden(state);
+  const locked = isLocked(state);
   const env = formatPairs(v.env as Record<string, string> | undefined);
   return (
     <section className="card">
@@ -177,6 +228,7 @@ export function AgentTab({ state }: { state: State }) {
         label="settings.nodePath"
         desc="settings.nodePathDesc"
         overridden={overridden("nodePath")}
+        locked={locked("nodePath")}
       >
         <Text
           id="nodePath"
@@ -190,6 +242,7 @@ export function AgentTab({ state }: { state: State }) {
         label="settings.ccusagePath"
         desc="settings.ccusagePathDesc"
         overridden={overridden("ccusagePath")}
+        locked={locked("ccusagePath")}
       >
         <Text
           id="ccusagePath"
@@ -203,6 +256,7 @@ export function AgentTab({ state }: { state: State }) {
         label="settings.env"
         desc="settings.envDesc"
         overridden={overridden("env")}
+        locked={locked("env")}
         error={envError}
       >
         <Text
@@ -237,6 +291,7 @@ export function LinksTab({ state }: { state: State }) {
         label="settings.allowedHttpHosts"
         desc="settings.allowedHttpHostsDesc"
         overridden={isOverridden(state)("allowedHttpHosts")}
+        locked={isLocked(state)("allowedHttpHosts")}
         error={error}
       >
         <Text

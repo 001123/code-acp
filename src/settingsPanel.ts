@@ -8,13 +8,15 @@ import { onDidChangeLocale, t, webviewL10n } from "./i18n";
 import { ManagerPanel } from "./managerPanel";
 import { runIn, thenable, type AppRuntime, type AppServices } from "./runtime";
 import { LOWEST_EFFORT } from "./sessionOptions";
-import { DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, SETTING_KEYS, type SettingKey } from "./settings";
+import { DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, lockedSettings, SETTING_KEYS, WORKSPACE_ONLY_SETTINGS, type SettingKey, type SettingsScope } from "./settings";
 import { UsageLedger, type SessionQuery, type UsageSummary } from "./usageLedger";
 import { webviewHtml, webviewRoots } from "./webview";
 
 export type FromWebview =
   | { type: "ready" }
   | { type: "set"; key: SettingKey; value: unknown }
+  /** Which settings the page reads and writes from now on. */
+  | { type: "scope"; scope: SettingsScope }
   | { type: "use"; id: string }
   | { type: "manageAgents" }
   | { type: "openNative" }
@@ -63,7 +65,42 @@ function isDefault(key: SettingKey, value: unknown): boolean {
   return value === "";
 }
 
-/** Webview page for the extension's settings (user scope), with a link to the native Settings UI. */
+/** What a setting is worth in a workspace that doesn't set it. */
+function inherited(key: SettingKey, info: SettingInspection | undefined): unknown {
+  return WORKSPACE_ONLY_SETTINGS.includes(key) ? info?.defaultValue : (info?.globalValue ?? info?.defaultValue);
+}
+
+/** The levels of a setting, as `inspect` reports them. */
+export interface SettingInspection {
+  readonly defaultValue?: unknown;
+  readonly globalValue?: unknown;
+  readonly workspaceValue?: unknown;
+  readonly workspaceFolderValue?: unknown;
+}
+
+/** The value to store for `key` in `scope`; undefined removes it. */
+export function valueToStore(scope: SettingsScope, key: SettingKey, value: unknown, info: SettingInspection | undefined): unknown {
+  if (scope === "user") {
+    return isDefault(key, value) ? undefined : value;
+  }
+  // Removed rather than stored, so that the workspace keeps following the user's later changes.
+  return JSON.stringify(value) === JSON.stringify(inherited(key, info)) ? undefined : value;
+}
+
+/** What the page shows for `key` in `scope`, and whether a workspace value is worth pointing out. */
+export function scopedSetting(scope: SettingsScope, key: SettingKey, info: SettingInspection | undefined): { value: unknown; overridden: boolean } {
+  const locked = lockedSettings(scope).includes(key);
+  if (scope === "workspace") {
+    const set = !locked && info?.workspaceValue !== undefined;
+    return { value: set ? info?.workspaceValue : inherited(key, info), overridden: set };
+  }
+  return {
+    value: info?.globalValue ?? info?.defaultValue,
+    overridden: !locked && (info?.workspaceValue !== undefined || info?.workspaceFolderValue !== undefined),
+  };
+}
+
+/** Webview page for the extension's settings, of the user or the open workspace, with a link to the native Settings UI. */
 export class SettingsPanel {
   private static current?: SettingsPanel;
 
@@ -71,6 +108,7 @@ export class SettingsPanel {
   /** The tab to show once the page is ready. */
   private pendingTab?: string;
   private usageQuery: SessionQuery = { text: "", limit: USAGE_PAGE };
+  private pickedScope: SettingsScope = "user";
 
   /** Opens the page, on `tab` when given (e.g. "usage"). */
   static show(context: vscode.ExtensionContext, runtime: AppRuntime, manager: AgentManager["Service"], tab?: string): void {
@@ -116,6 +154,14 @@ export class SettingsPanel {
     );
   }
 
+  private get hasWorkspace(): boolean {
+    return (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
+  }
+
+  private get scope(): SettingsScope {
+    return this.hasWorkspace ? this.pickedScope : "user";
+  }
+
   private run<E>(effect: Effect.Effect<void, E, AppServices>): void {
     void runIn(this.runtime, effect, (message) => void vscode.window.showErrorMessage(`Code ACP: ${message}`));
   }
@@ -153,14 +199,20 @@ export class SettingsPanel {
         }
         break;
       }
-      case "set":
-        if (SETTING_KEYS.includes(msg.key) && isValidSetting(msg.key, msg.value)) {
-          const value = isDefault(msg.key, msg.value) ? undefined : msg.value;
-          yield* thenable(() =>
-            vscode.workspace.getConfiguration("codeAcp").update(msg.key, value, vscode.ConfigurationTarget.Global),
-          );
+      case "scope":
+        this.pickedScope = msg.scope === "workspace" ? "workspace" : "user";
+        yield* this.render;
+        break;
+      case "set": {
+        const scope = this.scope;
+        if (SETTING_KEYS.includes(msg.key) && !lockedSettings(scope).includes(msg.key) && isValidSetting(msg.key, msg.value)) {
+          const config = vscode.workspace.getConfiguration("codeAcp");
+          const value = valueToStore(scope, msg.key, msg.value, config.inspect(msg.key));
+          const target = scope === "workspace" ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+          yield* thenable(() => config.update(msg.key, value, target));
         }
         break;
+      }
       case "use":
         if (yield* this.manager.has(msg.id)) {
           yield* this.manager.setActive(msg.id);
@@ -190,10 +242,11 @@ export class SettingsPanel {
       const config = vscode.workspace.getConfiguration("codeAcp");
       const values: Record<string, unknown> = {};
       const overridden: SettingKey[] = [];
+      const scope = this.scope;
       for (const key of SETTING_KEYS) {
-        const info = config.inspect(key);
-        values[key] = info?.globalValue ?? info?.defaultValue;
-        if (info?.workspaceValue !== undefined || info?.workspaceFolderValue !== undefined) {
+        const setting = scopedSetting(scope, key, config.inspect(key));
+        values[key] = setting.value;
+        if (setting.overridden) {
           overridden.push(key);
         }
       }
@@ -201,6 +254,9 @@ export class SettingsPanel {
         type: "state",
         values,
         overridden,
+        scope,
+        hasWorkspace: this.hasWorkspace,
+        locked: lockedSettings(scope),
         agents: yield* this.manager.agents,
         activeId: yield* this.manager.activeId,
       });
