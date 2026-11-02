@@ -2,12 +2,19 @@ import { Effect } from "effect";
 import * as vscode from "vscode";
 import type { AgentManager } from "../agentManager";
 import { t } from "../i18n";
+import type { AppServices } from "../runtime";
 import { choicesOf, modelOption, thoughtOption } from "../sessionOptions";
 import { readSettings } from "../settings";
+import { UsageLedger } from "../usageLedger";
+import { UsageStatusBar } from "../usageStatusBar";
 import { shouldNotify, type Attention, type AttentionReason } from "./attention";
 import type { Permissions } from "./permissions";
 import { ChatStatusBar } from "./statusBar";
 import type { Tab, TabList } from "./tabs";
+import type { TabUsage } from "./usage";
+
+/** Catches what the ledger doesn't announce: other windows' records and a new day. */
+const USAGE_REFRESH_MS = 60 * 1000;
 
 /** What the indicators need from the chat view. */
 export interface IndicatorsHost {
@@ -15,14 +22,17 @@ export interface IndicatorsHost {
   readonly tabs: TabList;
   readonly permissions: Permissions<Tab>;
   readonly attention: Attention<Tab>;
+  readonly usage: TabUsage;
   /** Run by the status bar item. */
   readonly showAttentionCommand: string;
+  /** Run by the usage status bar item. */
+  readonly showUsageCommand: string;
   view(): vscode.WebviewView | undefined;
   agentIdOf(tab: Tab): Effect.Effect<string | undefined>;
   /** Shows the chat with `tab` active. */
   reveal(tab: Tab): void;
   /** Runs an effect from a callback, showing failures in the active tab. */
-  run(effect: Effect.Effect<void>): void;
+  run(effect: Effect.Effect<void, never, AppServices>): void;
 }
 
 /** Where the chat shows what its tabs are doing outside the chat view: the status bar, the view's title and badge, and notifications. */
@@ -32,9 +42,23 @@ export class ChatIndicators implements vscode.Disposable {
   private statusBarDue = false;
   /** Counts status bar updates, so one that took longer doesn't overwrite a newer one. */
   private statusBarRun = 0;
+  private readonly usageStatusBar: UsageStatusBar;
+  /** Counts usage updates, for the same reason. */
+  private usageRun = 0;
+  private readonly usageTimer: ReturnType<typeof setInterval>;
+  private ledgerChanges: vscode.Disposable | undefined;
 
   constructor(private readonly host: IndicatorsHost) {
     this.statusBar = new ChatStatusBar(host.showAttentionCommand);
+    this.usageStatusBar = new UsageStatusBar(host.showUsageCommand);
+    this.usageTimer = setInterval(() => this.update(), USAGE_REFRESH_MS);
+    host.run(
+      UsageLedger.use((ledger) =>
+        Effect.sync(() => {
+          this.ledgerChanges = ledger.onDidChange(() => this.update());
+        }),
+      ),
+    );
   }
 
   /** Shows the active tab's agent in the view title, its agent and model in the status bar, and what the tabs are doing. */
@@ -46,6 +70,7 @@ export class ChatIndicators implements vscode.Disposable {
     queueMicrotask(() => {
       this.statusBarDue = false;
       this.host.run(this.showStatusBar);
+      this.host.run(this.showUsage);
     });
   }
 
@@ -76,6 +101,18 @@ export class ChatIndicators implements vscode.Disposable {
     });
   }
 
+  /** Shows what the active tab's session used; read apart from the status above, which shouldn't wait for the ledger. */
+  private get showUsage(): Effect.Effect<void, never, AppServices> {
+    return Effect.gen({ self: this }, function* () {
+      const run = ++this.usageRun;
+      const totals = yield* this.host.usage.totals(this.host.tabs.active);
+      const today = yield* (yield* UsageLedger).today;
+      if (run === this.usageRun) {
+        this.usageStatusBar.show(totals, today);
+      }
+    });
+  }
+
   showBadge(): void {
     this.update();
     const view = this.host.view();
@@ -101,6 +138,9 @@ export class ChatIndicators implements vscode.Disposable {
   }
 
   dispose(): void {
+    clearInterval(this.usageTimer);
+    this.ledgerChanges?.dispose();
     this.statusBar.dispose();
+    this.usageStatusBar.dispose();
   }
 }

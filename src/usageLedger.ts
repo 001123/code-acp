@@ -280,6 +280,8 @@ export class UsageLedger extends Context.Service<UsageLedger, {
   recordTurn(ref: SessionRef, usage: unknown): Effect.Effect<void>;
   recordCost(ref: SessionRef, cost: Cost, previous?: Cost): Effect.Effect<void>;
   session(agentId: string, sessionId: string): Effect.Effect<Totals | undefined>;
+  /** What was recorded on the current local day. */
+  readonly today: Effect.Effect<Totals>;
   summary(query: SessionQuery, searchText?: (session: SessionEntry) => string): Effect.Effect<UsageSummary>;
   readonly clear: Effect.Effect<void>;
 }>()("code-acp/UsageLedger") {
@@ -421,6 +423,11 @@ export class UsageLedger extends Context.Service<UsageLedger, {
           return entry && { turns: entry.turns, tokens: entry.tokens, cost: entry.cost };
         });
 
+      const today = Effect.gen(function* () {
+        const day = yield* localDay(0);
+        return (yield* readMonth(monthOf(day))).days[day] ?? NO_TOTALS;
+      });
+
       const summary = (query: SessionQuery, searchText?: (session: SessionEntry) => string) =>
         Effect.gen(function* () {
           return summarize(yield* readAll, yield* localDay(0), yield* localDay(6), yield* localDay(29), query, searchText);
@@ -434,7 +441,7 @@ export class UsageLedger extends Context.Service<UsageLedger, {
         }).pipe(logFailure),
       );
 
-      return UsageLedger.of({ onDidChange: changed.event, recordTurn, recordCost, session, summary, clear });
+      return UsageLedger.of({ onDidChange: changed.event, recordTurn, recordCost, session, today, summary, clear });
     }),
   );
 }

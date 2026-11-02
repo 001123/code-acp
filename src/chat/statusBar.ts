@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { t } from "../i18n";
 
-/** What the status bar item shows: the active tab's model and effort, and what the tabs are doing; the agent is in the tooltip. */
+/** What the status bar item shows: an icon for what the tabs are doing; the active tab's agent, model and effort are in the tooltip. */
 export interface ChatStatus {
   /** Name of the active tab's agent; undefined when there is none. */
   readonly agent?: string;
@@ -27,7 +27,6 @@ export interface StatusBarView {
 export function statusBarView(status: ChatStatus): StatusBarView {
   const { agent, model, effort, waiting, finished, running } = status;
   const icon = waiting ? "$(bell-dot)" : running ? "$(loading~spin)" : finished ? "$(bell)" : "$(comment-discussion)";
-  const label = [model, effort].filter((part) => part !== undefined).join(" · ");
   const lines = [
     t("statusBar.agent", agent ?? t("statusBar.noAgent")),
     ...(model ? [t("statusBar.model", model)] : []),
@@ -39,7 +38,7 @@ export function statusBarView(status: ChatStatus): StatusBarView {
     "",
     t(waiting || finished ? "statusBar.showAttention" : "statusBar.showChat"),
   ];
-  return { text: label ? `${icon} ${label}` : icon, tooltip: lines.join("\n"), warning: waiting > 0 };
+  return { text: icon, tooltip: lines.join("\n"), warning: waiting > 0 };
 }
 
 /** The chat's status bar item; clicking it runs `command`, which brings up the tab that needs the user. */

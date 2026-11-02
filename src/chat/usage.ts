@@ -32,10 +32,15 @@ export class TabUsage {
     return agentId && sessionId ? { agentId, sessionId, cwd: tab.worktree?.base ?? tab.cwd, title: tab.name ?? tab.title } : undefined;
   }
 
-  /** The tokens and cost recorded for the tab's session, shown with its context usage. */
-  private readonly postTotals = Effect.fn("TabUsage.postTotals")(function* (this: TabUsage, tab: Tab) {
+  /** The tokens, turns and cost recorded for the tab's session (or the one it will reopen). */
+  readonly totals = Effect.fn("TabUsage.totals")(function* (this: TabUsage, tab: Tab) {
     const ref = this.sessionRef(tab, tab.sessionId ?? tab.reopen?.sessionId);
-    const totals = ref ? yield* (yield* UsageLedger).session(ref.agentId, ref.sessionId) : undefined;
+    return ref ? yield* (yield* UsageLedger).session(ref.agentId, ref.sessionId) : undefined;
+  });
+
+  /** Shows the session's totals with its context usage. */
+  private readonly postTotals = Effect.fn("TabUsage.postTotals")(function* (this: TabUsage, tab: Tab) {
+    const totals = yield* this.totals(tab);
     this.host.postTab(tab, { type: "sessionTotals", totals: totals ?? null });
   });
 

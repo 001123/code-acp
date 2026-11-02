@@ -40,7 +40,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 
 - Generate commit messages from the Source Control view with your choice of agent, model, effort and instructions, then commit and push.
 - Track tokens and cost by day, conversation and agent, or read the logs agents keep on your machine through [ccusage](https://github.com/ryoppippi/ccusage).
-- See context window use and session cost in the chat, and model, effort and activity in the status bar.
+- See context window use and session cost in the chat, and activity and the tab's tokens and turns in the status bar.
 - Get notified when a conversation in the background finishes or needs you.
 
 ### Language
