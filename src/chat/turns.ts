@@ -356,13 +356,25 @@ export class TabTurns {
       Effect.tap((res) => Effect.sync(() => this.host.postTab(tab, { type: "turnEnd", stopReason: res.stopReason }))),
       Effect.tap((res) => (readSettings().tracing ? this.postTrace(tab, sessionId, turn, res, stats, costBefore) : Effect.void)),
       Effect.map((res) => res.stopReason),
-      Effect.catchTag("AuthRequiredError", () =>
-        Effect.sync(() => {
-          tab.sessionId = undefined;
-          this.host.status(tab, "chat.needsLogin", { needsLogin: true });
-          return undefined;
-        }),
-      ),
+      Effect.catchTags({
+        AuthRequiredError: () =>
+          Effect.sync(() => {
+            // Reopened after logging in: the agent still has the conversation.
+            tab.reopen = { sessionId, cwd: tab.cwd, agentId: tab.running?.agentId };
+            tab.sessionId = undefined;
+            this.host.status(tab, "chat.needsLogin", { needsLogin: true });
+            return undefined;
+          }),
+        // Cut off by a restart or a start over, so its failure is no news. A session that is back already has left the
+        // queue waiting for this turn to end.
+        AgentRequestError: (err) =>
+          tab.turn === turn
+            ? Effect.fail(err)
+            : Effect.sync(() => {
+                tab.steer = tab.sessionId !== undefined;
+                return undefined;
+              }),
+      }),
       Effect.ensuring(
         Effect.sync(() => {
           if (tab.turnStats === stats) {

@@ -288,14 +288,18 @@ describe("TabTurns", () => {
       yield* until(() => ofType(posted, "userMessage").length === 1);
       assert.deepStrictEqual([...tab.sent.values()][0]!.parts, [
         "look",
-        { kind: "uri", uri: `file://${file}`, name: "open.ts" },
-        { kind: "snippet", uri: `file://${file}`, name: "open.ts:2-3", languageId: "ts", startLine: 2, endLine: 3, text: "selected" },
+        " ",
+        { kind: "uri", uri: `file://${file}`, name: "open.ts", token: "@open.ts" },
+        " ",
+        { kind: "snippet", uri: `file://${file}`, name: "open.ts:2-3", languageId: "ts", startLine: 2, endLine: 3, text: "selected", token: "@open.ts:2-3" },
       ]);
+      const shown = ofType(posted, "userMessage")[0]!;
+      assert.strictEqual(shown.text, "look @open.ts @open.ts:2-3");
       assert.deepStrictEqual(
-        (ofType(posted, "userMessage")[0]!.attachments as Array<{ name: string; path?: string; line?: number }>).map((a) => [a.name, a.path, a.line]),
+        (shown.attachments as Array<{ name: string; token?: string; path?: string; line?: number }>).map((a) => [a.name, a.token, a.path, a.line]),
         [
-          ["open.ts", file, undefined],
-          ["open.ts:2-3", file, 2],
+          ["open.ts", "@open.ts", file, undefined],
+          ["open.ts:2-3", "@open.ts:2-3", file, 2],
         ],
       );
       assert.deepStrictEqual(ofType(posted, "error"), []);
@@ -313,7 +317,25 @@ describe("TabTurns", () => {
       send({ type: "send", tab: tab.id, parts: ["two"], includeActiveFile: true });
       yield* until(() => tab.queue.length === 1);
       openEditor("/w/now.ts");
-      assert.deepStrictEqual(tab.queue[0]!.parts, ["two", { kind: "uri", uri: "file:///w/then.ts", name: "then.ts" }]);
+      assert.deepStrictEqual(tab.queue[0]!.parts, ["two", " ", { kind: "uri", uri: "file:///w/then.ts", name: "then.ts", token: "@then.ts" }]);
+    }),
+  );
+
+  it.live("gives the open file a token of its own, spaced from the text", () =>
+    Effect.gen(function* () {
+      const { say, send, tab, prompts } = yield* makeTurns();
+      say("one");
+      yield* until(() => prompts.length === 1);
+      openEditor("/w/b/open.ts");
+      const other = { kind: "uri" as const, uri: "file:///w/a/open.ts", name: "open.ts", token: "@open.ts" };
+      send({ type: "send", tab: tab.id, parts: ["see ", other, "\n"], includeActiveFile: true });
+      yield* until(() => tab.queue.length === 1);
+      assert.deepStrictEqual(tab.queue[0]!.parts, [
+        "see ",
+        other,
+        "\n",
+        { kind: "uri", uri: "file:///w/b/open.ts", name: "open.ts", token: "@open.ts (2)" },
+      ]);
     }),
   );
 

@@ -24,11 +24,15 @@ const memento = (values = new Map<string, unknown>()) =>
     keys: () => [...values.keys()],
   }) as unknown as vscode.Memento;
 
+/** Set per test: what the mock agent can do, and whether it is still installed. */
+let agentEnv: Record<string, string> = {};
+let installed = true;
+
 const manager = {
   onDidChange: new EventEmitter<void>().event,
   agents: Effect.succeed([{ id: "mock", name: "Mock" }]),
-  has: (id: string) => Effect.succeed(id === "mock"),
-  command: () => Effect.succeed({ command: process.execPath, args: [MOCK_AGENT], env: { ...process.env, MOCK_FORK: "1" } }),
+  has: (id: string) => Effect.sync(() => installed && id === "mock"),
+  command: () => Effect.sync(() => ({ command: process.execPath, args: [MOCK_AGENT], env: { ...process.env, MOCK_FORK: "1", ...agentEnv } })),
   activeId: Effect.succeed("mock"),
   setActive: () => Effect.void,
 } as unknown as AgentManager["Service"];
@@ -118,7 +122,11 @@ const startChat = Effect.gen(function* () {
   return { ...chat, ofType, tabsNow, say, replyOf, idle, tab: tabsNow().active };
 });
 
-beforeEach(() => __test.reset());
+beforeEach(() => {
+  __test.reset();
+  agentEnv = {};
+  installed = true;
+});
 
 describe("ChatViewProvider", () => {
   describe("saving tabs", () => {
@@ -369,6 +377,115 @@ describe("ChatViewProvider", () => {
       }),
     ),
   );
+
+  describe("restarting an agent that can reopen sessions", () => {
+    const restartIn = (chat: { runtime: { runPromise: (effect: any) => Promise<unknown> }; provider: ChatViewProvider }, agentId?: string) =>
+      Effect.promise(() => chat.runtime.runPromise(chat.provider.restart(agentId)));
+
+    it.live("keeps the conversation of the active tab, and of the others until selected", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          agentEnv = { MOCK_LOAD: "1" };
+          const chat = yield* startChat;
+          const { idle, ofType, replyOf, say, send, tab, tabsNow } = chat;
+          say(tab, "pid");
+          yield* until(() => ofType("turnEnd", tab).length === 1, "the first turn");
+          yield* idle(tab);
+          const pid = replyOf(tab);
+          send({ type: "newTab" });
+          yield* until(() => tabsNow().tabs.length === 2, "the second tab");
+          const other = tabsNow().active;
+          yield* until(() => ofType("session", other).length === 1, "its session");
+          say(other, "updates");
+          yield* until(() => ofType("turnEnd", other).length === 1, "its turn");
+          yield* idle(other);
+
+          yield* restartIn(chat);
+          yield* until(() => ofType("session", other).length === 2, "the active tab's session again");
+          assert.include(replyOf(other), "replayed s2");
+          assert.strictEqual(ofType("reset", other).length, 1);
+          assert.strictEqual(tabsNow().tabs.find((each) => each.id === other)!.title, "updates");
+
+          // The other tab waits, its transcript untouched.
+          assert.strictEqual(ofType("reset", tab).length, 0);
+          assert.strictEqual(ofType("status", tab).at(-1)!.stopped, true);
+          send({ type: "selectTab", tab });
+          yield* until(() => ofType("session", tab).length === 2, "the other tab's session again");
+          assert.include(replyOf(tab), "replayed s1");
+          assert.strictEqual(tabsNow().tabs.find((each) => each.id === tab)!.title, "pid");
+
+          say(tab, "pid");
+          yield* until(() => ofType("turnEnd", tab).length === 2, "a turn after restarting");
+          yield* idle(tab);
+          assert.notInclude(replyOf(tab).slice(pid.length + "replayed s1".length), pid);
+          assert.deepStrictEqual(ofType("error"), []);
+        }),
+      ),
+    );
+
+    it.live("keeps a running turn's queue and sends it once the session is back", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          agentEnv = { MOCK_LOAD: "1" };
+          const chat = yield* startChat;
+          const { idle, ofType, replyOf, say, tab } = chat;
+          say(tab, "permission");
+          yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+          say(tab, "updates");
+          yield* until(() => ofType("queue", tab).at(-1)?.items.length === 1, "the queued message");
+          yield* restartIn(chat);
+          yield* until(() => ofType("turnEnd", tab).length === 1, "the queued turn");
+          yield* idle(tab);
+          assert.strictEqual(ofType("userMessage", tab).at(-1)!.text, "updates");
+          assert.include(replyOf(tab), "replayed s1");
+          assert.include(replyOf(tab), "hello world");
+          assert.deepStrictEqual(ofType("queue", tab).at(-1)?.items, []);
+          assert.deepStrictEqual(ofType("error", tab), []);
+        }),
+      ),
+    );
+
+    it.live("starts over when the agent was removed", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          agentEnv = { MOCK_LOAD: "1" };
+          const chat = yield* startChat;
+          const { idle, ofType, replyOf, say, tab, tabsNow } = chat;
+          say(tab, "updates");
+          yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+          yield* idle(tab);
+          installed = false;
+          yield* restartIn(chat, "mock");
+          yield* until(() => ofType("session", tab).length === 2, "the new session");
+          assert.strictEqual(ofType("reset", tab).length, 1);
+          assert.notInclude(replyOf(tab), "replayed");
+          assert.isUndefined(tabsNow().tabs[0]!.title);
+        }),
+      ),
+    );
+
+    it.live("reopens the conversation after a terminal login", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          agentEnv = { MOCK_LOAD: "1", MOCK_TERMINAL_AUTH: "1" };
+          const { idle, ofType, provider, replyOf, runtime, say, tab, tabsNow } = yield* startChat;
+          say(tab, "updates");
+          yield* until(() => ofType("turnEnd", tab).length === 1, "the first turn");
+          yield* idle(tab);
+          say(tab, "expired");
+          yield* until(() => ofType("status", tab).at(-1)?.needsLogin === true, "the login request");
+          const login = runtime.runPromise(provider.login());
+          yield* until(() => __test.terminals.length === 1, "the login terminal");
+          __test.closeTerminal(__test.terminals[0]);
+          yield* Effect.promise(() => login);
+          yield* until(() => ofType("session", tab).length === 2, "the session again");
+          assert.include(replyOf(tab), "replayed s1");
+          assert.strictEqual(tabsNow().tabs[0]!.title, "updates");
+          assert.deepStrictEqual(ofType("error"), []);
+        }),
+      ),
+    );
+  });
 
   it.live("shows the tab waiting for a permission", () =>
     Effect.scoped(

@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { assert, beforeEach, describe, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { AgentRequestError, AuthRequiredError, type AcpAgent } from "../src/acpClient";
 import { AgentPool } from "../src/chat/agents";
 import { ChangeReview } from "../src/chat/changes";
@@ -197,6 +197,65 @@ describe("TabSessions", () => {
       assert.strictEqual(tab.queue.length, 0);
     }),
   );
+
+  describe("a turn whose agent went away", () => {
+    /** A running turn with a message queued behind it; the first prompt fails when told to. */
+    const runningTurn = Effect.gen(function* () {
+      const fail = yield* Deferred.make<void>();
+      const prompts: string[] = [];
+      const made = yield* makeSessions({
+        prompt: (sessionId) => {
+          prompts.push(sessionId);
+          return prompts.length === 1 ? Deferred.await(fail).pipe(Effect.andThen(Effect.fail(requestError))) : Effect.succeed({ stopReason: "end_turn" as const });
+        },
+      });
+      const { tab, running, turns, run } = made;
+      tab.sessionId = "s";
+      tab.running = running;
+      const turn = yield* run(turns.send(tab, { parts: ["one"] })).pipe(Effect.forkChild);
+      yield* until(() => prompts.length === 1);
+      yield* run(turns.send(tab, { parts: ["two"] }));
+      return { ...made, fail, prompts, turn };
+    });
+
+    it.live("says nothing when a restart cut it off, and sends the queue to a session already back", () =>
+      Effect.gen(function* () {
+        const { tab, fail, prompts, turn } = yield* runningTurn;
+        tab.turn = undefined;
+        tab.busy = false;
+        tab.sessionId = "back";
+        yield* Deferred.succeed(fail, undefined);
+        assert.isTrue(Exit.isSuccess(yield* Fiber.await(turn)));
+        yield* until(() => prompts.length === 2);
+        assert.deepStrictEqual(prompts, ["s", "back"]);
+        assert.strictEqual(tab.queue.length, 0);
+      }),
+    );
+
+    it.live("leaves the queue to the session that is still coming back", () =>
+      Effect.gen(function* () {
+        const { tab, fail, prompts, turn } = yield* runningTurn;
+        tab.turn = undefined;
+        tab.busy = false;
+        tab.sessionId = undefined;
+        yield* Deferred.succeed(fail, undefined);
+        assert.isTrue(Exit.isSuccess(yield* Fiber.await(turn)));
+        assert.deepStrictEqual(prompts, ["s"]);
+        assert.strictEqual(tab.queue.length, 1);
+        assert.isFalse(tab.steer);
+      }),
+    );
+
+    it.live("reports the failure when the agent died on its own", () =>
+      Effect.gen(function* () {
+        const { tab, fail, prompts, turn } = yield* runningTurn;
+        yield* Deferred.succeed(fail, undefined);
+        assert.isTrue(Exit.isFailure(yield* Fiber.await(turn)));
+        assert.deepStrictEqual(prompts, ["s"]);
+        assert.strictEqual(tab.queue.length, 1);
+      }),
+    );
+  });
 
   it.effect("starts over: frees the old session and applies the change", () =>
     Effect.gen(function* () {

@@ -16,7 +16,7 @@ export interface RunningAgent {
   readonly agentId: string;
 }
 
-/** A session to reopen when its tab is first used: saved before a reload, or lost when the agent exited. */
+/** A session to reopen when its tab is next used: saved before a reload, or lost when the agent stopped or wanted a login. */
 export interface Reopen {
   readonly sessionId: string;
   readonly cwd: string;
@@ -124,6 +124,18 @@ export interface Tab extends DraftHolder {
   replaying?: { turn?: number; blocks: acp.ContentBlock[]; turns: number[] };
   /** Pending `postChanges`. */
   changesTimer?: ReturnType<typeof setTimeout>;
+}
+
+/** Takes the tab off its process, which is gone or going; a session in use is kept to reopen, and the queue waits for it. */
+export function detachSession(tab: Tab): void {
+  if (tab.running && tab.sessionId && tab.used) {
+    tab.reopen = { sessionId: tab.sessionId, cwd: tab.cwd, agentId: tab.running.agentId };
+  }
+  tab.sessionId = undefined;
+  tab.running = undefined;
+  tab.configOptions = undefined;
+  tab.busy = false;
+  tab.steer = false;
 }
 
 /** Forgets the tab's conversation: it starts over in a fresh session when next used. */

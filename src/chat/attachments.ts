@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import { t } from "../i18n";
 import { thenable, type VscodeError } from "../runtime";
 import type { Attachment, PromptPart, SentAttachment } from "./protocol";
+import { messageText } from "./tabs";
 
 const IMAGE_MIME: Record<string, string> = {
   ".png": "image/png",
@@ -117,7 +118,10 @@ export function activeFileName(): string | undefined {
   return uri?.scheme === "file" ? vscode.workspace.asRelativePath(uri) : undefined;
 }
 
-/** `parts` with the active editor's file and selected lines at the end, unless they already hold them. */
+/**
+ * `parts` with the active editor's file and selected lines at the end as tokens, the way a replayed message shows
+ * them, unless they already hold them.
+ */
 export function withActiveFile(parts: ReadonlyArray<PromptPart>): ReadonlyArray<PromptPart> {
   const editor = vscode.window.activeTextEditor;
   if (!editor || activeFileName() === undefined) {
@@ -125,7 +129,15 @@ export function withActiveFile(parts: ReadonlyArray<PromptPart>): ReadonlyArray<
   }
   const active = [...uriAttachments([editor.document.uri]), ...selectionAttachments(editor)];
   const held = (a: Attachment) => parts.some((p) => typeof p !== "string" && p.kind === a.kind && "uri" in p && "uri" in a && p.uri === a.uri && p.name === a.name);
-  return [...parts, ...active.filter((a) => !held(a))];
+  const out = [...parts];
+  for (const attachment of active.filter((a) => !held(a))) {
+    const text = messageText(out);
+    let token = `@${attachment.name}`;
+    for (let n = 2; text.includes(token); n++) token = `@${attachment.name} (${n})`;
+    if (text && !/\s$/.test(text)) out.push(" ");
+    out.push({ ...attachment, token });
+  }
+  return out;
 }
 
 /** Where a sent attachment opens on a click: its local file, at the first selected line. */

@@ -11,9 +11,10 @@ import type { ChangeReview } from "./changes";
 import type { Follower } from "./follow";
 import type { ChatUi } from "./host";
 import { CANCELLED, ELICITATION_CANCELLED, type Permissions } from "./permissions";
+import { canReopen } from "./history";
 import { replayedParts } from "./replay";
 import { NoAgentError, type TabSessions } from "./sessions";
-import { resetConversation, type RunningAgent, type Tab, type TabList } from "./tabs";
+import { detachSession, resetConversation, type RunningAgent, type Tab, type TabList } from "./tabs";
 import type { TabTurns } from "./turns";
 import type { TabUsage } from "./usage";
 
@@ -184,15 +185,8 @@ export class TabAgents {
         continue;
       }
       permissions.cancel(tab);
-      if (tab.sessionId && tab.used) {
-        tab.reopen = { sessionId: tab.sessionId, cwd: tab.cwd, agentId: running.agentId };
-      }
-      tab.sessionId = undefined;
-      tab.running = undefined;
-      tab.configOptions = undefined;
-      tab.busy = false;
       // The queue waits for the user rather than starting the agent again.
-      tab.steer = false;
+      detachSession(tab);
       this.host.status(tab, "chat.stopped", { stopped: true });
     }
     this.host.postTabs();
@@ -295,11 +289,11 @@ export class TabAgents {
   });
 
   /**
-   * Restarts the agent `agentId`, or every agent; their tabs start over, the active one right away and the others
-   * when selected.
+   * Restarts the agent `agentId`, or every agent. Their tabs get going again, the active one right away and the others
+   * when selected: they reopen their conversations when the agent is still there and can, else they start over.
    */
   readonly restart = Effect.fn("TabAgents.restart")(function* (this: TabAgents, agentId?: string) {
-    const { agents, tabs, permissions, changes, sessions } = this.host;
+    const { agents, tabs, permissions, changes, sessions, manager } = this.host;
     const stopped = agents.take(agentId);
     for (const tab of tabs.all) {
       const affected = tab.running
@@ -308,7 +302,18 @@ export class TabAgents {
       if (!affected) {
         continue;
       }
+      // Without a process to ask, reopening the session tells whether the agent can.
+      const process = tab.running ?? stopped.find((running) => running.agentId === tab.reopen?.agentId);
       permissions.cancel(tab);
+      // Its running turn is cut off, and no longer decides when the tab is idle.
+      tab.turn = undefined;
+      detachSession(tab);
+      const owner = tab.reopen?.agentId;
+      if (owner && (yield* manager.has(owner)) && (!process || canReopen(process.agent))) {
+        changes.post(tab);
+        this.host.status(tab, "chat.stopped", { stopped: true });
+        continue;
+      }
       resetConversation(tab);
       this.host.postTab(tab, { type: "reset" });
       changes.clear(tab);

@@ -4,6 +4,7 @@ import * as path from "node:path";
 
 const settings = new Map<string, unknown>();
 const listeners = new Set<(e: { affectsConfiguration(section: string): boolean }) => void>();
+const closeListeners = new Set<(terminal: unknown) => void>();
 
 /** Test hooks; not part of the real vscode API. */
 export const __test = {
@@ -16,9 +17,18 @@ export const __test = {
   },
   /** The lines of each output channel created, by name. */
   outputChannels: new Map<string, string[]>(),
+  /** The terminals created. */
+  terminals: [] as Array<{ options: unknown }>,
+  /** As if the user closed the terminal. */
+  closeTerminal(terminal: unknown) {
+    for (const listener of [...closeListeners]) {
+      listener(terminal);
+    }
+  },
   reset() {
     settings.clear();
     __test.outputChannels.clear();
+    __test.terminals.length = 0;
     env.language = "en";
     workspace.workspaceFolders = undefined;
     workspace.textDocuments = [];
@@ -222,7 +232,15 @@ export const window = {
   onDidChangeActiveTextEditor: () => noDisposable,
   onDidStartTerminalShellExecution: () => noDisposable,
   onDidEndTerminalShellExecution: () => noDisposable,
-  onDidCloseTerminal: () => noDisposable,
+  onDidCloseTerminal: (listener: (terminal: unknown) => void) => {
+    closeListeners.add(listener);
+    return { dispose: () => void closeListeners.delete(listener) };
+  },
+  createTerminal: (options: unknown) => {
+    const terminal = { options, show: () => {} };
+    __test.terminals.push(terminal);
+    return terminal;
+  },
   createTextEditorDecorationType: () => noDisposable,
   createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
 };

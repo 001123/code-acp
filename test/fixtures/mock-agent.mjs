@@ -8,6 +8,8 @@ if (process.env.MOCK_EXIT_EARLY === "1") {
   process.exit(3);
 }
 
+let sessions = 0;
+
 const stream = acp.ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin));
 
 acp
@@ -17,16 +19,24 @@ acp
     agentInfo: { name: "mock-agent", version: "9.9.9" },
     agentCapabilities: {
       mcpCapabilities: { http: process.env.MOCK_HTTP === "1", sse: false },
+      loadSession: process.env.MOCK_LOAD === "1",
       ...(process.env.MOCK_FORK === "1" ? { sessionCapabilities: { fork: {} } } : {}),
     },
-    authMethods: [{ id: "login", name: "Log in" }],
+    authMethods: [process.env.MOCK_TERMINAL_AUTH === "1" ? { id: "login", name: "Log in", type: "terminal", args: ["--login"] } : { id: "login", name: "Log in" }],
     _meta: { clientInfo: params.clientInfo, clientCapabilities: params.clientCapabilities, pid: process.pid },
   }))
   .onRequest(acp.methods.agent.session.new, ({ params }) => {
     if (process.env.MOCK_AUTH === "1") {
       throw acp.RequestError.authRequired();
     }
-    return { sessionId: "s1", _meta: { cwd: params.cwd, mcpServers: params.mcpServers } };
+    return { sessionId: `s${++sessions}`, _meta: { cwd: params.cwd, mcpServers: params.mcpServers } };
+  })
+  .onRequest(acp.methods.agent.session.load, async ({ params, client }) => {
+    await client.notify(acp.methods.client.session.update, {
+      sessionId: params.sessionId,
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: `replayed ${params.sessionId}` } },
+    });
+    return {};
   })
   .onRequest(acp.methods.agent.session.fork, ({ params }) => ({
     sessionId: `${params.sessionId}-fork`,
@@ -105,6 +115,8 @@ acp
         return { stopReason: "end_turn" };
       case "refuse":
         return { stopReason: "refusal" };
+      case "expired":
+        throw acp.RequestError.authRequired();
       case "pid":
         await say(String(process.pid));
         return { stopReason: "end_turn" };

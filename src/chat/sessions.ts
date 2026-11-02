@@ -114,6 +114,8 @@ export class TabSessions {
         Effect.catchTag("AgentRequestError", () =>
           Effect.sync(() => {
             this.host.postTab(tab, { type: "notice", key: "chat.reopenFailed" });
+            // The reset before loading took it off the screen.
+            this.host.turns.postQueue(tab);
             return false;
           }),
         ),
