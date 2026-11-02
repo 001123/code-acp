@@ -34,7 +34,7 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 - [ ] **M3. Plan a first release.** The version is still 0.0.1; `CHANGELOG.md` is in place.
 - [x] **M4. Upgrade `@agentclientprotocol/sdk`** from 2.1.0 to 2.4.0.
 - [ ] **M5. Add tests** for `completions`, `terminalContext` and `claudeSettings` (none yet), and direct ones for `agentTerminals`.
-- [ ] **M6. Split `src/ui/settings.tsx`** (1021 lines).
+- [x] **M6. Split `src/ui/settings.tsx`** into `src/ui/settings/`.
 - [x] **M7. Fix the "Multilingual" typo.** Already gone from `README.md`.
 
 ## Features
