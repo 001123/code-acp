@@ -5,7 +5,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { t } from "../i18n";
 import { thenable, type VscodeError } from "../runtime";
-import type { Attachment } from "./protocol";
+import type { Attachment, PromptPart } from "./protocol";
 
 const IMAGE_MIME: Record<string, string> = {
   ".png": "image/png",
@@ -109,6 +109,23 @@ export function selectionAttachments(editor: vscode.TextEditor): Attachment[] {
       },
     ];
   });
+}
+
+/** The workspace-relative name of the file "include open file" sends, if any. */
+export function activeFileName(): string | undefined {
+  const uri = vscode.window.activeTextEditor?.document.uri;
+  return uri?.scheme === "file" ? vscode.workspace.asRelativePath(uri) : undefined;
+}
+
+/** `parts` with the active editor's file and selected lines at the end, unless they already hold them. */
+export function withActiveFile(parts: ReadonlyArray<PromptPart>): ReadonlyArray<PromptPart> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || activeFileName() === undefined) {
+    return parts;
+  }
+  const active = [...uriAttachments([editor.document.uri]), ...selectionAttachments(editor)];
+  const held = (a: Attachment) => parts.some((p) => typeof p !== "string" && p.kind === a.kind && "uri" in p && "uri" in a && p.uri === a.uri && p.name === a.name);
+  return [...parts, ...active.filter((a) => !held(a))];
 }
 
 /**

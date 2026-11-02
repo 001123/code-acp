@@ -176,6 +176,10 @@ export const workspace = {
   },
   asRelativePath: (p: string) => p,
   fs: {
+    async stat(uri: Uri) {
+      const info = await fs.stat(uri.fsPath);
+      return { type: info.isDirectory() ? FileType.Directory : FileType.File, size: info.size };
+    },
     async createDirectory(uri: Uri) {
       await fs.mkdir(uri.fsPath, { recursive: true });
     },
@@ -207,6 +211,7 @@ export const window = {
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   state: { focused: true },
   onDidChangeWindowState: () => noDisposable,
+  onDidChangeActiveTextEditor: () => noDisposable,
   onDidStartTerminalShellExecution: () => noDisposable,
   onDidEndTerminalShellExecution: () => noDisposable,
   onDidCloseTerminal: () => noDisposable,
@@ -215,3 +220,5 @@ export const window = {
 };
 
 export const commands = { executeCommand: async () => undefined };
+
+export const FileType = { File: 1, Directory: 2 } as const;

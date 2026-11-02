@@ -40,6 +40,12 @@ function configIcon(option: acp.SessionConfigOption): string {
   return kind ? CONFIG_ICONS[kind] : adjustmentsIcon;
 }
 
+/** The name of the option's current value. */
+function currentName(option: SelectOption): string {
+  const flat = option.options.flatMap((o) => ("options" in o ? o.options : [o]));
+  return flat.find((o) => o.value === option.currentValue)?.name ?? option.currentValue;
+}
+
 /** One row of the agent panel: picks a value for a select config option. */
 export function ConfigSelect({
   tab,
@@ -56,8 +62,6 @@ export function ConfigSelect({
       ? [{ heading: o.name }, ...o.options.map((v) => ({ value: v.value, label: v.name, title: v.description ?? undefined }))]
       : [{ value: o.value, label: o.name, title: o.description ?? undefined }],
   );
-  const flat = option.options.flatMap((o) => ("options" in o ? o.options : [o]));
-  const currentName = flat.find((o) => o.value === option.currentValue)?.name ?? option.currentValue;
   return (
     <SubMenu
       id={`config:${option.id}`}
@@ -67,7 +71,7 @@ export function ConfigSelect({
         <>
           <Icon svg={configIcon(option)} />
           <span className="menu-label">{option.name}</span>
-          <span className="submenu-value">{currentName}</span>
+          <span className="submenu-value">{currentName(option)}</span>
         </>
       }
       entries={entries}
@@ -81,57 +85,15 @@ export function ConfigSelect({
   );
 }
 
-/** Beside the agent button: the session's model and effort, each a dropdown. */
-export function QuickConfig({
-  tab,
-  options,
-  onChange,
-}: {
-  tab: number;
-  options: ReadonlyArray<acp.SessionConfigOption>;
-  onChange: (configId: string, value: string) => void;
-}) {
+/** Beside the agent button: the session's model and effort as text; the agent panel changes them. */
+export function QuickConfig({ options }: { options: ReadonlyArray<acp.SessionConfigOption> }) {
   const selects = options.filter((o): o is SelectOption => o.type === "select");
   const quick = (["model", "effort"] as const).flatMap((kind) => selects.find((o) => configKind(o) === kind) ?? []);
-  return quick.map((option) => {
-    const known = option.options.flatMap((o) => ("options" in o ? o.options : [o])).some((o) => o.value === option.currentValue);
-    return (
-      <span key={option.id} className="config-item quick-config" title={option.description ?? option.name}>
-        <span className="config-name" aria-hidden="true">
-          <Icon svg={configIcon(option)} />
-        </span>
-        <select
-          aria-label={option.name}
-          value={option.currentValue}
-          onChange={(e) => {
-            onChange(option.id, e.target.value);
-            post({ type: "setConfig", tab, configId: option.id, value: e.target.value });
-          }}
-        >
-          {!known && (
-            <option value={option.currentValue} disabled>
-              {option.currentValue}
-            </option>
-          )}
-          {option.options.map((o) =>
-            "options" in o ? (
-              <optgroup key={o.group} label={o.name}>
-                {o.options.map((v) => (
-                  <option key={v.value} value={v.value}>
-                    {v.name}
-                  </option>
-                ))}
-              </optgroup>
-            ) : (
-              <option key={o.value} value={o.value}>
-                {o.name}
-              </option>
-            ),
-          )}
-        </select>
-      </span>
-    );
-  });
+  return quick.map((option) => (
+    <span key={option.id} className="quick-config" title={option.description ?? option.name}>
+      {currentName(option)}
+    </span>
+  ));
 }
 
 /** Stands in for the config options while the tab's new session starts. */

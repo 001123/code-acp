@@ -11,7 +11,7 @@ import { webviewHtml, webviewRoots } from "../webview";
 import { Worktrees } from "../worktrees";
 import { AgentPool, stopAll } from "./agents";
 import { Attention } from "./attention";
-import { AttachmentQueue, pruneTempFiles } from "./attachments";
+import { activeFileName, AttachmentQueue, pruneTempFiles } from "./attachments";
 import { ChangeReview, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
 import { ComposerCommands } from "./composerCommands";
 import { DraftStore } from "./drafts";
@@ -258,6 +258,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
+      vscode.window.onDidChangeActiveTextEditor(() => this.postActiveFile()),
       vscode.window.onDidChangeWindowState((state) => {
         this.attention.refresh();
         // A checkout made in another window or a terminal.
@@ -332,6 +333,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.post({ type: "folders", folders: workspaceFolders() });
   }
 
+  /** The file "include open file" would send, shown beside the checkbox. */
+  private postActiveFile(): void {
+    this.post({ type: "activeFile", name: activeFileName() });
+  }
+
   /** Reads what is checked out in the tab's folder; the agent or the user may have changed it at any time. */
   private readonly refreshBranch = Effect.fn("ChatView.refreshBranch")(function* (this: ChatViewProvider, tab: Tab) {
     const { cwd } = tab;
@@ -400,6 +406,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.drafts.load();
         this.post({ type: "environment", remote: vscode.env.remoteName !== undefined });
         this.postFolders();
+        this.postActiveFile();
         this.postTabs();
         yield* this.tabAgents.postAgent;
         this.post({ type: "followAgent", enabled: this.followAgent });
