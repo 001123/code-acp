@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import { AcpTrace } from "./acpTrace";
 import { AgentManager } from "./agentManager";
 import { AgentUpdates } from "./agentUpdates";
+import { AutoApprove } from "./chat/autoApprove";
 import { Ccusage } from "./ccusage";
 import { ShadowGit } from "./checkpoints";
 import { ClaudeSettings } from "./claudeSettings";
@@ -65,7 +66,7 @@ const appLayer = (context: vscode.ExtensionContext, channel: vscode.OutputChanne
     Logger.layer([outputLogger(channel)]),
     AcpTrace.layer,
   );
-  const services = Layer.mergeAll(AgentManager.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer, Problems.layer, TerminalContext.layer, ShadowGit.layer, Worktrees.layer, UsageLedger.layer, Ccusage.layer).pipe(Layer.provideMerge(base));
+  const services = Layer.mergeAll(AgentManager.layer, AutoApprove.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer, Problems.layer, TerminalContext.layer, ShadowGit.layer, Worktrees.layer, UsageLedger.layer, Ccusage.layer).pipe(Layer.provideMerge(base));
   return Layer.mergeAll(CommitMessage.layer, AgentUpdates.layer).pipe(Layer.provideMerge(services));
 };
 

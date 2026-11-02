@@ -1,12 +1,14 @@
 import { useState } from "react";
-import type { SettingKey } from "../../settings";
-import { useL10n } from "../l10n";
+import type { ApprovalRules, SettingKey } from "../../settings";
+import { Icon } from "../icon";
+import { useL10n, type MessageKey } from "../l10n";
 import { AgentModelFields } from "./agentModel";
-import { Field, Text, Toggle } from "./fields";
+import { Field, Segmented, Text, Toggle } from "./fields";
 import { parseHosts } from "./hosts";
 import { formatPairs, parsePairs } from "./pairs";
 import { post, set } from "./post";
 import { stringOf, type LoadedOptions, type State } from "./state";
+import warningIcon from "@tabler/icons/outline/alert-triangle.svg";
 
 const isOverridden = (state: State) => (key: SettingKey) => state.overridden.includes(key);
 const isLocked = (state: State) => (key: SettingKey) => state.locked.includes(key);
@@ -110,6 +112,61 @@ export function NotificationsTab({ state }: { state: State }) {
           onChange={(checked) => set("notifyFinished", checked)}
         />
       </Field>
+    </section>
+  );
+}
+
+const APPROVAL_RULES: ReadonlyArray<{ key: keyof ApprovalRules; label: MessageKey; desc: MessageKey }> = [
+  { key: "read", label: "settings.autoApproveRead", desc: "settings.autoApproveReadDesc" },
+  { key: "edit", label: "settings.autoApproveEdit", desc: "settings.autoApproveEditDesc" },
+  { key: "execute", label: "settings.autoApproveExecute", desc: "settings.autoApproveExecuteDesc" },
+  { key: "fetch", label: "settings.autoApproveFetch", desc: "settings.autoApproveFetchDesc" },
+  { key: "worktreeTabs", label: "settings.autoApproveWorktreeTabs", desc: "settings.autoApproveWorktreeTabsDesc" },
+];
+
+/** Follows the user's rule; only a workspace can say so. */
+const INHERIT = "inherit";
+
+export function PermissionsTab({ state }: { state: State }) {
+  const { t } = useL10n();
+  const user = (state.values.autoApprove ?? {}) as ApprovalRules;
+  const workspace = state.workspaceAutoApprove;
+  const inWorkspace = state.scope === "workspace";
+  const rules = { ...user, ...workspace };
+  const pick = (key: keyof ApprovalRules, value: string) => {
+    const { [key]: _, ...others } = inWorkspace ? workspace : user;
+    const removed = value === (inWorkspace ? INHERIT : "ask");
+    const next = removed ? others : { ...others, [key]: value };
+    if (inWorkspace) {
+      post({ type: "workspaceAutoApprove", rules: next });
+    } else {
+      set("autoApprove", next);
+    }
+  };
+  const options = [
+    ...(inWorkspace ? [{ value: INHERIT, label: t("settings.autoApproveInherit") }] : []),
+    { value: "ask", label: t("settings.autoApproveAsk") },
+    { value: "allow", label: t("settings.autoApproveAllow") },
+  ];
+  return (
+    <section className="card">
+      {inWorkspace && <div className="note muted">{t("settings.autoApproveWorkspaceNote")}</div>}
+      {APPROVAL_RULES.map(({ key, label, desc }) => (
+        <Field key={key} id={`autoApprove-${key}`} label={label} desc={desc} overridden={!inWorkspace && workspace[key] !== undefined}>
+          <Segmented
+            id={`autoApprove-${key}`}
+            value={(inWorkspace ? workspace[key] : user[key]) ?? (inWorkspace ? INHERIT : "ask")}
+            options={options}
+            onChange={(value) => pick(key, value)}
+          />
+        </Field>
+      ))}
+      {((rules.read === "allow" && rules.fetch === "allow") || rules.worktreeTabs === "allow") && (
+        <div className="note warning">
+          <Icon svg={warningIcon} />
+          {t("settings.autoApproveLeakWarning")}
+        </div>
+      )}
     </section>
   );
 }

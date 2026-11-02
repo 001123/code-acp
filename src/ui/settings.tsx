@@ -6,7 +6,7 @@ import { useL10n } from "./l10n";
 import { mount } from "./mount";
 import { EntryList, serversOf } from "./settings/entries";
 import { ScopeContext, Segmented } from "./settings/fields";
-import { AgentTab, CommitTab, GeneralTab, LinksTab, NotificationsTab, WorktreeTab } from "./settings/panels";
+import { AgentTab, CommitTab, GeneralTab, LinksTab, NotificationsTab, PermissionsTab, WorktreeTab } from "./settings/panels";
 import { post } from "./settings/post";
 import { optionsKey, type LoadedOptions, type State } from "./settings/state";
 import { TABS, Tabs, type Tab } from "./settings/tabs";
@@ -32,7 +32,7 @@ function save(patch: Saved): void {
 
 function App() {
   const { t } = useL10n();
-  const [state, setState] = useState<State>({ values: {}, overridden: [], scope: "user", hasWorkspace: false, locked: [], agents: [] });
+  const [state, setState] = useState<State>({ values: {}, overridden: [], workspaceAutoApprove: {}, scope: "user", hasWorkspace: false, locked: [], agents: [] });
   const [loaded, setLoaded] = useState<LoadedOptions>({});
   const [tab, setTab] = useState(savedTab);
   const [usage, setUsage] = useState<UsageView>();
@@ -105,6 +105,8 @@ function App() {
           {tab === "general" && <GeneralTab state={state} />}
 
           {tab === "notifications" && <NotificationsTab state={state} />}
+
+          {tab === "permissions" && <PermissionsTab state={state} />}
 
           {tab === "worktree" && <WorktreeTab state={state} />}
 

@@ -26,6 +26,21 @@ export const CustomAgentEntry = Schema.Struct({
 });
 export type CustomAgentEntry = typeof CustomAgentEntry.Type;
 
+const ApprovalRule = Schema.optional(Schema.Literals(["ask", "allow"]));
+
+/** Which permission requests are answered without asking; what is left out is asked about, or follows the user's rules in a workspace. */
+export const ApprovalRules = Schema.Struct({
+  /** Reads and searches inside the tab's folder. */
+  read: ApprovalRule,
+  /** Edits and moves inside the tab's folder, except in folders whose files can run something. */
+  edit: ApprovalRule,
+  execute: ApprovalRule,
+  fetch: ApprovalRule,
+  /** Everything that says what it does, in tabs with a worktree of their own. */
+  worktreeTabs: ApprovalRule,
+});
+export type ApprovalRules = typeof ApprovalRules.Type;
+
 const FastModeSetting = Schema.Literals(["default", "on", "off"]);
 
 /** Schemas of the codeAcp.* settings; keep in sync with `contributes.configuration` in package.json. */
@@ -74,6 +89,8 @@ export const Settings = Schema.Struct({
   mcpServers: Schema.Record(Schema.String, McpServerEntry),
   /** Hosts besides this machine that links from agents may reach over plain http. */
   allowedHttpHosts: Schema.Array(Schema.String),
+  /** The user's rules for answering permission requests without asking; a workspace's are kept by `AutoApprove`. */
+  autoApprove: ApprovalRules,
 });
 export type Settings = typeof Settings.Type;
 export type SettingKey = keyof Settings;
@@ -103,6 +120,7 @@ export const SETTING_KEYS = [
   "commitMessage.fastMode",
   "mcpServers",
   "allowedHttpHosts",
+  "autoApprove",
 ] as const satisfies ReadonlyArray<SettingKey>;
 
 /** Default of codeAcp.commitMessage.instructions; keep in sync with package.json. */
@@ -135,6 +153,7 @@ const DEFAULTS: Settings = {
   "commitMessage.fastMode": "default",
   mcpServers: {},
   allowedHttpHosts: [],
+  autoApprove: {},
 };
 
 const decodeSettings = Schema.decodeUnknownOption(Settings);
@@ -174,6 +193,7 @@ export function readSettings(): Settings {
     "commitMessage.fastMode": read("commitMessage.fastMode"),
     mcpServers: read("mcpServers"),
     allowedHttpHosts: read("allowedHttpHosts"),
+    autoApprove: read("autoApprove"),
   };
 }
 
@@ -189,6 +209,7 @@ export const USER_ONLY_SETTINGS: ReadonlyArray<SettingKey> = [
   "worktreeSetupCommand",
   "mcpServers",
   "allowedHttpHosts",
+  "autoApprove",
 ];
 
 /** Settings that mean something only for a project. */

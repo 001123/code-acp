@@ -4,6 +4,7 @@ import { Icon } from "../icon";
 import { useL10n, type MessageKey } from "../l10n";
 import settingsIcon from "@tabler/icons/outline/settings.svg";
 import bellIcon from "@tabler/icons/outline/bell.svg";
+import shieldIcon from "@tabler/icons/outline/shield-check.svg";
 import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
 import commitIcon from "@tabler/icons/outline/git-commit.svg";
@@ -12,11 +13,12 @@ import terminalIcon from "@tabler/icons/outline/terminal-2.svg";
 import chartIcon from "@tabler/icons/outline/chart-bar.svg";
 import linkIcon from "@tabler/icons/outline/link.svg";
 
-export type Tab = "general" | "notifications" | "worktree" | "agent" | "commit" | "mcp" | "custom" | "links" | "usage";
+export type Tab = "general" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "custom" | "links" | "usage";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
   { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions", "tracing"] },
   { id: "notifications", label: "settings.notificationsTab", desc: "settings.notificationsTabDesc", icon: bellIcon, keys: ["notifications", "notifyFinished"] },
+  { id: "permissions", label: "settings.permissions", desc: "settings.permissionsDesc", icon: shieldIcon, keys: ["autoApprove"] },
   { id: "worktree", label: "settings.worktree", desc: "settings.worktreeDesc", icon: branchIcon, keys: ["worktreeForNewTabs", "worktreeCopyFiles", "worktreeSetupCommand", "worktreeProjectSetupCommand"] },
   {
     id: "agent",

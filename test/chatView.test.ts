@@ -184,6 +184,58 @@ describe("ChatViewProvider", () => {
     ),
   );
 
+  describe("permission rules", () => {
+    it.live("answers what they allow without asking, naming it in the conversation", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          __test.setSetting("codeAcp.autoApprove", { execute: "allow" });
+          const { ofType, say, replyOf, idle, tab } = yield* startChat;
+          say(tab, "approvable execute");
+          yield* until(() => replyOf(tab).includes("selected"), "the agent's answer");
+          yield* idle(tab);
+          assert.include(replyOf(tab), `"optionId":"allow"`);
+          assert.strictEqual(ofType("permissionRequest", tab).length, 0);
+          const notices = ofType("notice", tab).filter((m) => m.key === "chat.autoApproved");
+          assert.deepStrictEqual(notices.map((m) => m.args), [["Do it"]]);
+        }),
+      ),
+    );
+
+    it.live("asks about what they don't, such as a read outside the tab's folder", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          __test.setSetting("codeAcp.autoApprove", { read: "allow" });
+          const { ofType, say, send, replyOf, idle, tab } = yield* startChat;
+          say(tab, `approvable read ${path.join(os.tmpdir(), "elsewhere.txt")}`);
+          yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+          send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "deny" });
+          yield* until(() => replyOf(tab).includes("selected"), "the agent's answer");
+          yield* idle(tab);
+          assert.include(replyOf(tab), `"optionId":"deny"`);
+        }),
+      ),
+    );
+
+    it.live("takes a workspace's rules from its state", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const { ofType, say, send, context, replyOf, idle, tab } = yield* startChat;
+          say(tab, "approvable execute");
+          yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+          send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "allow" });
+          yield* until(() => replyOf(tab).includes("selected"), "the agent's answer");
+          yield* idle(tab);
+
+          yield* Effect.promise(async () => context.workspaceState.update("codeAcp.autoApprove", { execute: "allow" }));
+          say(tab, "approvable execute");
+          yield* until(() => ofType("notice", tab).some((m) => m.key === "chat.autoApproved"), "the rule to answer");
+          yield* idle(tab);
+          assert.strictEqual(ofType("permissionRequest", tab).length, 1);
+        }),
+      ),
+    );
+  });
+
   it.live("with tracing on, shows a turn's numbers after it ends, with the wait for the user", () =>
     Effect.scoped(
       Effect.gen(function* () {

@@ -75,7 +75,7 @@ acp
   }))
   .onRequest(acp.methods.agent.session.prompt, async ({ params, client }) => {
     const text = params.prompt.map((b) => (b.type === "text" ? b.text : "")).join("");
-    const [scenario, arg] = text.split(" ");
+    const [scenario, arg, file] = text.split(" ");
     const say = (message) =>
       client.notify(acp.methods.client.session.update, {
         sessionId: params.sessionId,
@@ -91,6 +91,31 @@ acp
           sessionId: params.sessionId,
           toolCall: { toolCallId: "t1", title: "Run it" },
           options: [
+            { optionId: "allow", name: "Allow", kind: "allow_once" },
+            { optionId: "deny", name: "Deny", kind: "reject_once" },
+          ],
+        });
+        await say(JSON.stringify(res.outcome));
+        return { stopReason: "end_turn" };
+      }
+      case "approvable": {
+        // As real agents do: what the tool does comes in the tool call, and the request adds little to it.
+        await client.notify(acp.methods.client.session.update, {
+          sessionId: params.sessionId,
+          update: {
+            sessionUpdate: "tool_call",
+            toolCallId: "t2",
+            title: "Do it",
+            kind: arg,
+            status: "pending",
+            ...(file ? { locations: [{ path: file }] } : {}),
+          },
+        });
+        const res = await client.request(acp.methods.client.session.requestPermission, {
+          sessionId: params.sessionId,
+          toolCall: { toolCallId: "t2", title: "Run command" },
+          options: [
+            { optionId: "always", name: "Always", kind: "allow_always" },
             { optionId: "allow", name: "Allow", kind: "allow_once" },
             { optionId: "deny", name: "Deny", kind: "reject_once" },
           ],

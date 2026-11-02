@@ -1,20 +1,23 @@
-import { Effect, Predicate } from "effect";
+import { Effect, Option, Predicate, Schema } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { AgentManager } from "./agentManager";
 import { Ccusage, isCcusageSource } from "./ccusage";
+import { AutoApprove } from "./chat/autoApprove";
 import { CommitMessage } from "./commitMessage";
 import { onDidChangeLocale, t, webviewL10n } from "./i18n";
 import { ManagerPanel } from "./managerPanel";
 import { runIn, thenable, type AppRuntime, type AppServices } from "./runtime";
 import { LOWEST_EFFORT } from "./sessionOptions";
-import { DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, lockedSettings, SETTING_KEYS, WORKSPACE_ONLY_SETTINGS, type SettingKey, type SettingsScope } from "./settings";
+import { ApprovalRules, DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, lockedSettings, SETTING_KEYS, WORKSPACE_ONLY_SETTINGS, type SettingKey, type SettingsScope } from "./settings";
 import { UsageLedger, type SessionQuery, type UsageSummary } from "./usageLedger";
 import { webviewHtml, webviewRoots } from "./webview";
 
 export type FromWebview =
   | { type: "ready" }
   | { type: "set"; key: SettingKey; value: unknown }
+  /** The rules of this workspace for answering permission requests, which are no setting. */
+  | { type: "workspaceAutoApprove"; rules: unknown }
   /** Which settings the page reads and writes from now on. */
   | { type: "scope"; scope: SettingsScope }
   | { type: "use"; id: string }
@@ -213,6 +216,14 @@ export class SettingsPanel {
         }
         break;
       }
+      case "workspaceAutoApprove": {
+        const rules = Schema.decodeUnknownOption(ApprovalRules)(msg.rules);
+        if (Option.isSome(rules) && this.scope === "workspace") {
+          yield* AutoApprove.use((autoApprove) => autoApprove.setWorkspaceRules(rules.value));
+          yield* this.render;
+        }
+        break;
+      }
       case "use":
         if (yield* this.manager.has(msg.id)) {
           yield* this.manager.setActive(msg.id);
@@ -237,7 +248,7 @@ export class SettingsPanel {
     }
   });
 
-  private get render(): Effect.Effect<void> {
+  private get render(): Effect.Effect<void, never, AutoApprove> {
     return Effect.gen({ self: this }, function* () {
       const config = vscode.workspace.getConfiguration("codeAcp");
       const values: Record<string, unknown> = {};
@@ -250,10 +261,15 @@ export class SettingsPanel {
           overridden.push(key);
         }
       }
+      const workspaceAutoApprove = yield* AutoApprove.use((autoApprove) => autoApprove.workspaceRules);
+      if (Object.keys(workspaceAutoApprove).length > 0) {
+        overridden.push("autoApprove");
+      }
       void this.panel.webview.postMessage({
         type: "state",
         values,
         overridden,
+        workspaceAutoApprove,
         scope,
         hasWorkspace: this.hasWorkspace,
         locked: lockedSettings(scope),

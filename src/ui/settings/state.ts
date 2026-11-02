@@ -1,10 +1,11 @@
 import type { AgentChoice } from "../../agentManager";
-import type { SettingKey, SettingsScope } from "../../settings";
+import type { ApprovalRules, SettingKey, SettingsScope } from "../../settings";
 import type { AgentOptions } from "../../sessionOptions";
 
 export interface State {
   values: Partial<Record<SettingKey, unknown>>;
   overridden: SettingKey[];
+  workspaceAutoApprove: ApprovalRules;
   /** Which settings `values` are, and those that can't be changed there. */
   scope: SettingsScope;
   hasWorkspace: boolean;

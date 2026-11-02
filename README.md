@@ -15,6 +15,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 - Queue messages while the agent works, edit and resend earlier ones, retry, or fork a conversation into a new tab.
 - Write in a composer with live Markdown preview; drafts survive reloads. Use `/` for agent commands and `$` for skills.
 - Answer the agent's permission requests and form questions in the chat, and follow its plans, tools, subagents and terminals.
+- Let rules answer permission requests for you, for all projects or one workspace, or everything in worktree chats.
 - Pick the model, effort and fast mode per tab, and start from your last choices for each agent.
 
 ### Context

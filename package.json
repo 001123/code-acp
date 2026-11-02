@@ -656,6 +656,40 @@
           "default": [],
           "description": "%config.allowedHttpHosts%"
         },
+        "codeAcp.autoApprove": {
+          "scope": "machine",
+          "type": "object",
+          "default": {},
+          "additionalProperties": false,
+          "description": "%config.autoApprove%",
+          "properties": {
+            "read": {
+              "type": "string",
+              "enum": ["ask", "allow"],
+              "description": "%config.autoApprove.read%"
+            },
+            "edit": {
+              "type": "string",
+              "enum": ["ask", "allow"],
+              "description": "%config.autoApprove.edit%"
+            },
+            "execute": {
+              "type": "string",
+              "enum": ["ask", "allow"],
+              "description": "%config.autoApprove.execute%"
+            },
+            "fetch": {
+              "type": "string",
+              "enum": ["ask", "allow"],
+              "description": "%config.autoApprove.fetch%"
+            },
+            "worktreeTabs": {
+              "type": "string",
+              "enum": ["ask", "allow"],
+              "description": "%config.autoApprove.worktreeTabs%"
+            }
+          }
+        },
         "codeAcp.mcpServers": {
           "scope": "machine",
           "type": "object",

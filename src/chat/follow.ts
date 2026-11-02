@@ -19,6 +19,8 @@ export interface FollowedCall {
   locations: ReadonlyArray<acp.ToolCallLocation>;
   diffs: ReadonlyArray<FollowDiff>;
   status?: acp.ToolCallStatus | null;
+  kind?: acp.ToolKind | null;
+  title?: string | null;
 }
 
 /** Where to show the agent at work: 0-based lines, inclusive; `highlight` for lines it changes. */
@@ -32,7 +34,7 @@ export interface FollowTarget {
 /** Folds a `tool_call` or `tool_call_update` into what is known of the call. */
 export const mergeCall = (
   call: FollowedCall | undefined,
-  update: Pick<acp.ToolCallUpdate, "locations" | "content" | "status">,
+  update: Pick<acp.ToolCallUpdate, "locations" | "content" | "status" | "kind" | "title">,
 ): FollowedCall => {
   const diffs = update.content?.flatMap((c) =>
     c.type === "diff" ? [{ path: c.path, oldText: c.oldText ?? null, newText: c.newText }] : [],
@@ -41,6 +43,8 @@ export const mergeCall = (
     locations: update.locations ?? call?.locations ?? [],
     diffs: diffs ?? call?.diffs ?? [],
     status: update.status ?? call?.status,
+    kind: update.kind ?? call?.kind,
+    title: update.title ?? call?.title,
   };
 };
 
@@ -120,6 +124,11 @@ export class Follower implements vscode.Disposable {
     if (path !== undefined && call.status !== "failed") {
       this.show(tab, call, path);
     }
+  }
+
+  /** What is known of a pending tool call of `tab`. */
+  known(tab: Tab, toolCallId: string): FollowedCall | undefined {
+    return this.calls.get(`${tab.id}:${toolCallId}`);
   }
 
   /** The agent wrote `path` through the client: shown where its pending tool call changed it, else at the top. */

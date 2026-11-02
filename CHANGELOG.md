@@ -13,6 +13,7 @@ First public version; nothing has been released yet.
 - Queue, edit, resend and retry messages, and fork a conversation into a new tab.
 - A composer with live Markdown preview, drafts that survive reloads, and `/` agent commands and `$` skills.
 - Permission requests, form questions, links to open after asking, plans, tools, subagents, terminals and context compaction in the chat.
+- Rules that answer permission requests without asking, for all projects or one workspace, and for worktree chats.
 - Model, effort and fast mode per tab, remembered for each agent, and modes for agents that only offer those.
 - Compact a conversation from the context window panel, for agents that offer `/compact`.
 - Log out of an agent.

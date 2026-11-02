@@ -8,6 +8,7 @@ import { t } from "../i18n";
 import { thenable, type AppRuntime } from "../runtime";
 import { readSettings } from "../settings";
 import { stopAll, type AgentPool } from "./agents";
+import { AutoApprove } from "./autoApprove";
 import { confirm, type ChangeReview } from "./changes";
 import type { Follower } from "./follow";
 import type { ChatUi } from "./host";
@@ -102,7 +103,23 @@ export class TabAgents {
       requestPermission: (req, signal) => {
         const tab = tabFor(req.sessionId);
         // No tab: it was closed.
-        return tab ? this.host.permissions.request(tab, req, signal) : Effect.succeed(CANCELLED);
+        if (!tab) {
+          return Effect.succeed(CANCELLED);
+        }
+        const known = this.host.follower.known(tab, req.toolCall.toolCallId);
+        const approval = AutoApprove.use((rules) => rules.approval(req, { cwd: tab.cwd, inWorktree: tab.worktree !== undefined, known }));
+        return Effect.promise(() => this.host.runtime.runPromise(approval)).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => this.host.permissions.request(tab, req, signal),
+              onSome: ({ optionId, title }) =>
+                Effect.sync((): acp.RequestPermissionResponse => {
+                  this.host.postTab(tab, { type: "notice", key: "chat.autoApproved", args: [title ?? "tool"] });
+                  return { outcome: { outcome: "selected", optionId } };
+                }),
+            }),
+          ),
+        );
       },
       elicit: (req, signal) => {
         // A form needs a session to be about. A link can come without one, e.g. to sign in while a session starts.
