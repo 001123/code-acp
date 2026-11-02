@@ -74,6 +74,15 @@
     opacity: 0.3;
   }
 }
+.tab-worktree {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--vscode-descriptionForeground);
+}
+.tab-worktree svg {
+  width: 12px;
+  height: 12px;
+}
 .tab-close,
 .tab-pin {
   display: inline-flex;

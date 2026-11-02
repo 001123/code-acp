@@ -86,6 +86,15 @@
         "icon": "$(debug-stop)"
       },
       {
+        "command": "codeAcp.worktree",
+        "title": "%command.worktree%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "codeAcp.tabWorktree",
+        "title": "%command.tabWorktree%"
+      },
+      {
         "command": "codeAcp.login",
         "title": "%command.login%",
         "category": "%command.category%"
@@ -237,6 +246,11 @@
           "group": "1_agent@1"
         },
         {
+          "command": "codeAcp.worktree",
+          "when": "view == codeAcp.chat",
+          "group": "1_agent@4"
+        },
+        {
           "command": "codeAcp.login",
           "when": "view == codeAcp.chat",
           "group": "1_agent@2"
@@ -367,6 +381,10 @@
           "when": "false"
         },
         {
+          "command": "codeAcp.tabWorktree",
+          "when": "false"
+        },
+        {
           "command": "codeAcp.fixProblems",
           "when": "false"
         },
@@ -437,6 +455,11 @@
           "command": "codeAcp.forkTab",
           "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && tabCanFork",
           "group": "1_pin@2"
+        },
+        {
+          "command": "codeAcp.tabWorktree",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "group": "1_pin@4"
         }
       ]
     },
@@ -533,6 +556,11 @@
           "type": "boolean",
           "default": true,
           "description": "%config.rememberSessionOptions%"
+        },
+        "codeAcp.worktreeForNewTabs": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.worktreeForNewTabs%"
         },
         "codeAcp.commitMessage.agent": {
           "type": "string",
@@ -655,7 +683,7 @@
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
     "package": "node esbuild.mjs --production && vsce package --out release/",
-    "reinstall": "npm run package && code --install-extension release/code-acp-$npm_package_version.vsix --force",
+    "reinstall": "npm run package && for cli in code codium; do if command -v $cli >/dev/null; then $cli --install-extension release/code-acp-$npm_package_version.vsix --force; fi; done",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
   "devDependencies": {

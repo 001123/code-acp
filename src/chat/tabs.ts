@@ -3,6 +3,7 @@ import { Option, Schema, Scope, Semaphore } from "effect";
 import { canFork, type AcpAgent } from "../acpClient";
 import { ChangeSet, SavedChanges } from "../fileChanges";
 import type { MessageKey } from "../i18n";
+import { TabWorktree } from "../worktrees";
 import { SavedDraft, type DraftHolder } from "./drafts";
 import type { PromptPart, TabInfo } from "./protocol";
 
@@ -60,6 +61,7 @@ export const SavedTabs = Schema.Struct({
       name: Schema.optional(Schema.String),
       draft: Schema.optional(SavedDraft),
       changes: Schema.optional(SavedChanges),
+      worktree: Schema.optional(TabWorktree),
     }),
   ),
 });
@@ -80,6 +82,12 @@ export interface Tab extends DraftHolder {
   configOptions?: ReadonlyArray<acp.SessionConfigOption>;
   /** The folder the tab's session runs in: picked for the tab, or the one of the session it opened. */
   cwd: string;
+  /** The git worktree `cwd` is in, when the tab has one of its own. */
+  worktree?: TabWorktree;
+  /** What is checked out in `cwd`, as last read. */
+  branch?: string;
+  /** Its session starts in a new worktree (codeAcp.worktreeForNewTabs). */
+  wantsWorktree?: boolean;
   /** The agent picked for the tab, installed or custom. */
   agentId?: string;
   reopen?: Reopen;
@@ -152,6 +160,7 @@ export class TabList {
       tab.savedDraft = entry.draft;
       tab.agentId = entry.agentId;
       tab.changes = ChangeSet.fromSaved(entry.changes);
+      tab.worktree = entry.worktree;
       if (entry.sessionId) {
         tab.title = entry.title;
         tab.createdAt = entry.createdAt;
@@ -271,6 +280,8 @@ export class TabList {
       pinned: tab.pinned,
       agentId: tab.agentId,
       cwd: tab.cwd,
+      worktree: tab.worktree,
+      branch: tab.branch,
       canFork: !!tab.sessionId && !!tab.running && canFork(tab.running.agent),
       draft: tab.draft,
     }));
@@ -281,19 +292,19 @@ export class TabList {
     return {
       active: this.tabs.indexOf(this.active),
       tabs: this.tabs.map((tab) => {
-        const { pinned, name, savedDraft: draft, title, createdAt } = tab;
+        const { pinned, name, savedDraft: draft, title, createdAt, worktree } = tab;
         const changes = tab.changes.saved;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree };
         }
-        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes };
+        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree };
       }),
     };
   }

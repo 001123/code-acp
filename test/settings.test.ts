@@ -17,6 +17,7 @@ describe("readSettings", () => {
     assert.isTrue(s.showChanges);
     assert.isTrue(s.notifications);
     assert.isTrue(s.rememberSessionOptions);
+    assert.isFalse(s.worktreeForNewTabs);
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
   });
 

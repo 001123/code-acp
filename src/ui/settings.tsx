@@ -594,7 +594,7 @@ function AgentModelFields(props: {
 type Tab = "general" | "agent" | "commit" | "mcp" | "custom" | "usage";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "notifications", "rememberSessionOptions"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "notifications", "rememberSessionOptions", "worktreeForNewTabs"] },
   {
     id: "agent",
     label: "settings.agent",
@@ -837,6 +837,15 @@ function App() {
                   checked={v.rememberSessionOptions !== false}
                   onChange={(checked) => set("rememberSessionOptions", checked)}
                 />
+              </Field>
+              <Field
+                id="worktreeForNewTabs"
+                label="settings.worktreeForNewTabs"
+                desc="settings.worktreeForNewTabsDesc"
+                overridden={overridden("worktreeForNewTabs")}
+                inline
+              >
+                <Toggle id="worktreeForNewTabs" checked={v.worktreeForNewTabs === true} onChange={(checked) => set("worktreeForNewTabs", checked)} />
               </Field>
             </section>
           )}

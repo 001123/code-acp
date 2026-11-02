@@ -5,6 +5,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 ## Features
 
 - Chat in tabs with history, queued messages, edits and conversation forks.
+- Run each tab in a git worktree of its own, then apply its changes to your checkout.
 - Attach files, images, editor selections and terminal output (`@` in the composer).
 - Review the agent's changes file by file or change by change, restore checkpoints, follow subagents and terminals.
 - Install, update and switch agents from the **ACP Agents** page, or add your own.

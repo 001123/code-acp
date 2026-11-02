@@ -7,6 +7,7 @@ import type { AgentManager } from "../agentManager";
 import type { AgentUpdate, AgentUpdates } from "../agentUpdates";
 import { ClaudeSettings } from "../claudeSettings";
 import { Completions } from "../completions";
+import type { ShadowGit } from "../checkpoints";
 import { ChangeSet } from "../fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
 import { Problems, type ProblemScope } from "../problems";
@@ -16,6 +17,7 @@ import { readSettings } from "../settings";
 import { TerminalContext } from "../terminalContext";
 import { UsageLedger, type SessionRef } from "../usageLedger";
 import { webviewHtml, webviewRoots } from "../webview";
+import { Worktrees } from "../worktrees";
 import { AgentPool, stopAll } from "./agents";
 import { Attention, type AttentionReason } from "./attention";
 import { attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
@@ -38,6 +40,7 @@ import {
   type Tab,
 } from "./tabs";
 import { replayedParts } from "./replay";
+import { TabWorktrees } from "./worktrees";
 import { cwdForNewTab, defaultCwd, excludeGlob, folderOf, gitIgnored, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
 
 /** `_meta` key on Claude agents' `usage_update` naming the model the usage belongs to. */
@@ -113,6 +116,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     provideCodeLenses: (document) =>
       this.runtime.runPromise(this.changes.lenses(this.tabs.active, document).pipe(Effect.orElseSucceed(() => []))),
   };
+  private readonly tabWorktrees: TabWorktrees = new TabWorktrees({
+    tabs: () => this.tabs,
+    postTab: (tab, message) => this.postTab(tab, message),
+    postTabs: () => this.postTabs(),
+    status: (tab, key) => this.status(tab, key),
+    confirmStartOver: (tab) => this.confirmStartOver(tab),
+    startOver: (tab, change) => this.startOver(tab, change),
+  });
   private readonly history = new HistoryRequests();
   /** Attachments added before the webview was ready are delivered on "ready". */
   private readonly attachments = new AttachmentQueue((attachments, prompt) => {
@@ -147,7 +158,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     private readonly manager: AgentManager["Service"],
     private readonly updates: AgentUpdates["Service"],
   ) {
-    this.tabs = new TabList(context.workspaceState.get(TABS_KEY), defaultCwd);
+    const saved = context.workspaceState.get(TABS_KEY);
+    this.tabs = new TabList(saved, defaultCwd);
+    if (saved === undefined) {
+      this.tabs.active.wantsWorktree = readSettings().worktreeForNewTabs;
+    }
     this.nextTurn = this.tabs.lastTurn + 1;
     this.lastOptions = new LastOptions(context.globalState);
     // Raw bytes of draft attachments, which are too big for workspaceState.
@@ -187,7 +202,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
-      vscode.window.onDidChangeWindowState(() => this.attention.refresh()),
+      vscode.window.onDidChangeWindowState((state) => {
+        this.attention.refresh();
+        // A checkout made in another window or a terminal.
+        if (state.focused) {
+          this.run(this.refreshBranch(this.tabs.active));
+        }
+      }),
       // Edits the user saves change the counts.
       vscode.workspace.onDidSaveTextDocument((doc) => {
         for (const tab of this.tabs.all) {
@@ -329,6 +350,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   private postTabs(): void {
     this.post({ type: "tabs", tabs: this.tabs.info, active: this.tabs.active.id });
+    // Answers with another post only when the branch changed.
+    this.run(this.refreshBranch(this.tabs.active));
     this.attention.refresh();
     this.updateStatusBar();
     this.saveTabs();
@@ -337,6 +360,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private postFolders(): void {
     this.post({ type: "folders", folders: workspaceFolders() });
   }
+
+  /** Reads what is checked out in the tab's folder; the agent or the user may have changed it at any time. */
+  private readonly refreshBranch = Effect.fn("ChatView.refreshBranch")(function* (this: ChatViewProvider, tab: Tab) {
+    const { cwd } = tab;
+    const branch = yield* (yield* Worktrees).branchOf(cwd);
+    // The tab may have moved on while git ran.
+    if (tab.cwd === cwd && tab.branch !== branch) {
+      tab.branch = branch;
+      this.postTabs();
+    }
+  });
 
   /** The composer's agent picker: installed and custom agents, their pending updates, and the default for new tabs. */
   private get postAgent(): Effect.Effect<void> {
@@ -404,7 +438,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /** The ledger entry of a tab's session; undefined until it has one and knows its agent. */
   private sessionRef(tab: Tab, sessionId: string | undefined = tab.sessionId): SessionRef | undefined {
     const agentId = tab.running?.agentId ?? tab.reopen?.agentId ?? tab.agentId;
-    return agentId && sessionId ? { agentId, sessionId, cwd: tab.cwd, title: tab.name ?? tab.title } : undefined;
+    // A worktree's usage counts for the folder it came from.
+    return agentId && sessionId ? { agentId, sessionId, cwd: tab.worktree?.base ?? tab.cwd, title: tab.name ?? tab.title } : undefined;
   }
 
   /** The tokens and cost recorded for the tab's session, shown with its context usage. */
@@ -546,6 +581,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "setCwd":
         if (tab) {
           yield* this.setTabCwd(tab, msg.cwd);
+        }
+        break;
+      case "pickWorktree":
+        if (tab) {
+          yield* this.tabWorktrees.pick(tab);
         }
         break;
       case "manageAgents":
@@ -924,6 +964,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           return tab.sessionId;
         }
         const running = yield* this.getAgent(tab);
+        yield* this.tabWorktrees.ensure(tab);
+        yield* this.tabWorktrees.prepare(tab);
         if (tab.reopen) {
           const reopened = yield* this.reopenSession(tab, running, tab.reopen);
           if (reopened) {
@@ -931,7 +973,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           }
         }
         // A folder removed from the workspace, or the folder of a past session outside it: start in the workspace.
-        if (folderOf(tab.cwd) === undefined) {
+        if (!tab.worktree && folderOf(tab.cwd) === undefined) {
           tab.cwd = defaultCwd();
           this.postTabs();
         }
@@ -1051,7 +1093,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   });
 
   /** The tab's session, created when missing; undefined when the user has to act first. */
-  private ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx> {
+  private ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | Worktrees | ShadowGit> {
     return this.createSession(tab).pipe(
       Effect.catchTags({
         NoAgentError: () => Effect.sync(() => void this.status(tab, "chat.noAgent", { needsAgent: true })),
@@ -1129,9 +1171,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /** Moves `tab` to another workspace folder, starting over in a fresh session there. */
   private readonly setTabCwd = Effect.fn("ChatView.setTabCwd")(function* (this: ChatViewProvider, tab: Tab, cwd: string) {
-    if (tab.cwd !== cwd && isWorkspaceFolder(cwd) && (yield* this.confirmStartOver(tab))) {
-      yield* this.startOver(tab, (tab) => (tab.cwd = cwd));
+    if ((tab.worktree?.base ?? tab.cwd) === cwd || !isWorkspaceFolder(cwd) || !(yield* this.confirmStartOver(tab))) {
+      return;
     }
+    const left = tab.worktree;
+    const leftCwd = tab.cwd;
+    const fate = yield* this.tabWorktrees.askRelease(tab);
+    if (fate === "cancel") {
+      this.postTabs();
+      return;
+    }
+    yield* this.startOver(tab, (tab) => {
+      tab.cwd = cwd;
+      tab.worktree = undefined;
+      // A tab that had a worktree of its own, or would have had one, gets one in the new folder.
+      tab.wantsWorktree = left !== undefined || readSettings().worktreeForNewTabs;
+    });
+    if (left && fate === "delete") {
+      yield* this.tabWorktrees.discard(left, leftCwd);
+    }
+  });
+
+  /** Offers the worktrees the active tab can run in (command palette, view menu). */
+  readonly pickWorktree = Effect.fn("ChatView.pickWorktree")(function* (this: ChatViewProvider) {
+    yield* this.tabWorktrees.pick(this.tabs.active);
   });
 
   /** The agent the active tab runs on. */
@@ -1146,8 +1209,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /** Opens a new tab with a fresh session, in the active editor's folder or else the active tab's. */
   readonly newSession = Effect.fn("ChatView.newSession")(function* (this: ChatViewProvider) {
-    const tab = this.tabs.add(cwdForNewTab(this.tabs.length ? this.tabs.active.cwd : undefined));
+    const tab = this.tabs.add(cwdForNewTab(this.tabs.length ? (this.tabs.active.worktree?.base ?? this.tabs.active.cwd) : undefined));
     tab.agentId = yield* this.manager.activeId;
+    tab.wantsWorktree = readSettings().worktreeForNewTabs;
     this.tabs.active = tab;
     this.postTabs();
     yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
@@ -1183,6 +1247,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (!this.tabs.has(tab)) {
       return;
     }
+    const fate = yield* this.tabWorktrees.askRelease(tab);
+    if (fate === "cancel") {
+      return;
+    }
     if (tab.busy) {
       yield* this.cancelTab(tab).pipe(Effect.ignore);
     }
@@ -1199,6 +1267,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       yield* this.closeSessionOnAgent(tab.running, tab.sessionId);
     }
     yield* this.stopIdleAgents;
+    if (tab.worktree && fate === "delete") {
+      yield* this.tabWorktrees.discard(tab.worktree, tab.cwd);
+    }
     if (this.tabs.length === 0) {
       yield* this.newSession();
       return;
@@ -1221,7 +1292,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     };
     post({ loading: true, sessions: [] });
     const running = yield* this.getAgent(this.tabs.active).pipe(Effect.catchTag("NoAgentError", () => Effect.undefined));
-    const folders = new Set([...workspaceFolders().map((f) => f.path), this.tabs.active.cwd]);
+    const worktrees = yield* Worktrees;
+    const roots = workspaceFolders().map((f) => f.path);
+    const kept = yield* Effect.forEach(roots, (root) => worktrees.list(root).pipe(Effect.orElseSucceed(() => [])));
+    const folders = new Set([...roots, ...kept.flat().map((placed) => placed.cwd), this.tabs.active.cwd]);
     const listing = running ? yield* listHistory(running.agent, [...folders]) : undefined;
     if (!listing || listing.unsupported) {
       post({ unsupported: true, sessions: [] });
@@ -1255,11 +1329,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     // The history lists the active tab's agent's sessions.
     const from = this.tabs.active;
+    const worktrees = yield* Worktrees;
+    if (!(yield* worktrees.exists(cwd))) {
+      this.postTab(from, { type: "notice", key: "worktree.folderGone" });
+      return;
+    }
     const running = yield* this.getAgent(from);
     const reuse = !from.used && !from.busy;
     const tab = reuse ? from : this.tabs.add(cwd);
     const replaced = tab.sessionId;
     const replacedOn = tab.running;
+    const replacedWorktree = tab.worktree;
+    const replacedCwd = tab.cwd;
+    tab.worktree = yield* worktrees.locate(workspaceFolders().map((f) => f.path), cwd);
+    tab.wantsWorktree = false;
     this.tabs.active = tab;
     tab.agentId = from.agentId;
     tab.title = title?.trim() || undefined;
@@ -1272,8 +1355,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.changes.clear(tab);
     yield* this.loadInto(tab, running, sessionId, cwd).pipe(
       // Fall back to a fresh session so the tab stays usable.
-      Effect.tapError(() => this.ensureSession(tab)),
+      Effect.tapError(() =>
+        Effect.suspend(() => {
+          tab.worktree = replacedWorktree;
+          return this.ensureSession(tab);
+        }),
+      ),
     );
+    // The tab was unused, so a worktree it had holds nothing it needs.
+    if (replacedWorktree && replacedWorktree.root !== tab.worktree?.root) {
+      yield* this.tabWorktrees.discardIfEmpty(tab, replacedWorktree, replacedCwd);
+    }
     this.saveTabs();
   });
 
@@ -1466,6 +1558,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       return;
     }
     const fork = this.tabs.add(tab.cwd);
+    fork.worktree = tab.worktree;
     this.tabs.move(fork, this.tabs.indexOf(tab) + 1);
     fork.agentId = running.agentId;
     fork.running = running;
@@ -1517,7 +1610,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         continue;
       }
-      const block = yield* attachmentBlock(caps, attachment).pipe(
+      const block = yield* attachmentBlock(caps, yield* this.tabWorktrees.localize(tab, attachment)).pipe(
         Effect.catch((err) =>
           Effect.sync(() => {
             this.postTab(tab, { type: "error", text: t("chat.attachFailed", attachment.name, err.message) });
@@ -1586,6 +1679,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           tab.busy = false;
           tab.turn = undefined;
           this.changes.post(tab);
+          this.run(this.refreshBranch(tab), tab);
           if (tab.sessionId) {
             this.status(tab, "chat.ready");
           } else {
@@ -1687,7 +1781,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   readonly tabAction = Effect.fn("ChatView.tabAction")(function* (
     this: ChatViewProvider,
     id: number,
-    action: "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeToRight" | "fork",
+    action: "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeToRight" | "fork" | "worktree",
   ) {
     const tab = this.tabs.byId(id);
     if (!tab) {
@@ -1702,6 +1796,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         return;
       case "fork":
         yield* this.fork(tab, undefined);
+        return;
+      case "worktree":
+        yield* this.tabWorktrees.pick(tab);
         return;
       case "rename":
         // Edited in place in the tab strip, which answers with "renameTab".

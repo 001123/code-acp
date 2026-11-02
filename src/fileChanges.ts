@@ -202,9 +202,11 @@ export const refresh = Effect.fn("ChangeSet.refresh")(function* (changes: Change
   const diff = yield* ShadowGit.use((git) => git.diff(root, base, current));
   changes.files = diff.map((change) => {
     const file = path.join(root, ...change.file.split("/"));
+    const shown = vscode.workspace.asRelativePath(file);
     return {
       path: file,
-      name: vscode.workspace.asRelativePath(file),
+      // A worktree is outside the workspace, which would leave the whole path.
+      name: path.isAbsolute(shown) ? change.file : shown,
       added: change.added,
       removed: change.removed,
       created: change.status === "added",

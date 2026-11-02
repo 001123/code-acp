@@ -131,7 +131,7 @@ export class ChangeReview implements vscode.Disposable {
   /** Takes the checkpoint before a turn. Outside the workspace (e.g. in the home folder) there are none. */
   readonly beginTurn = Effect.fn("ChangeReview.beginTurn")(function* (this: ChangeReview, tab: Tab, turn: number, label: string) {
     const position = tab.changes.countMessage();
-    if (folderOf(tab.cwd) === undefined) {
+    if (tab.worktree === undefined && folderOf(tab.cwd) === undefined) {
       this.host.saveTabs();
       return;
     }

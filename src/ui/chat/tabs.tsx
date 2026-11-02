@@ -4,6 +4,7 @@ import type { Attachment, ChangeHunk, ChangesMessage, QueuedInfo, TabInfo, Termi
 import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
+import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
 import pinIcon from "@tabler/icons/outline/pin.svg";
 import pinFilledIcon from "@tabler/icons/filled/pin.svg";
 import plusIcon from "@tabler/icons/outline/plus.svg";
@@ -138,6 +139,7 @@ export function TabStrip({
           const tooltip = [
             waiting ? `${title} · ${t("chat.tabWaiting")}` : title,
             ...(tab.createdAt === undefined ? [] : [t("chat.tabCreated", dateFormat.format(tab.createdAt))]),
+            ...(tab.worktree ? [t("chat.tabWorktree", tab.worktree.branch ?? tab.worktree.root)] : []),
           ].join("\n");
           const pinLabel = t(tab.pinned ? "chat.unpinTab" : "chat.pinTab");
           return (
@@ -189,6 +191,11 @@ export function TabStrip({
               }}
             >
               <span className="tab-dot" />
+              {tab.worktree && (
+                <span className="tab-worktree" aria-hidden="true">
+                  <Icon svg={gitBranchIcon} />
+                </span>
+              )}
               {tab.id === renaming ? (
                 <TabNameInput
                   // What the strip shows: the user's name, else the title. Clearing it drops the name.

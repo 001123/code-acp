@@ -29,6 +29,54 @@
   height: 22px;
   font-size: 0.88em;
 }
+#workspace-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  /* Sits close under the composer, whose bottom margin it shares. */
+  margin: -6px 14px 6px;
+  font-size: 0.92em;
+  color: var(--vscode-descriptionForeground);
+}
+.workspace-place,
+.workspace-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+.workspace-place span,
+.workspace-branch span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-place {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.workspace-place:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+#workspace-bar svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+#workspace-bar[data-worktree] .workspace-place {
+  color: var(--vscode-foreground);
+}
+#workspace-bar[data-worktree] .workspace-place svg {
+  color: var(--vscode-focusBorder);
+}
 
 #cancel svg {
   width: 12px;

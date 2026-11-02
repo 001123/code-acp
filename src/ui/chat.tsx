@@ -12,7 +12,7 @@ import { HistoryView, type History } from "./chat/history";
 import { post } from "./chat/post";
 import { NEW_TAB, TabStrip, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
-import { ChatSettings, ConfigLoading, ConfigSelect, UsageMeter, type AgentChoices } from "./chat/toolbar";
+import { ChatSettings, ConfigLoading, ConfigSelect, UsageMeter, type AgentChoices, WorkspaceBar } from "./chat/toolbar";
 import { clipContent, contentText, groupActivity, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
@@ -181,7 +181,7 @@ function App() {
       case "history":
         return setHistory(msg);
       case "notice":
-        return dispatch(tab, { type: "add", item: { kind: "notice", text: { key: msg.key } } });
+        return dispatch(tab, { type: "add", item: { kind: "notice", text: { key: msg.key, args: msg.args } } });
       case "compactWindow":
         return update(tab, (s) => ({ ...s, compactAt: msg.size ?? undefined }));
       case "configOptions":
@@ -427,6 +427,7 @@ function App() {
           </div>
         )}
         {composer.element}
+        <WorkspaceBar tab={tabs.find((x) => x.id === active)} />
         {preview && (
           <Lightbox
             key={preview.src}

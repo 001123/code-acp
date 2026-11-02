@@ -34,6 +34,9 @@ export class Uri {
   static file(p: string) {
     return new Uri("file", p);
   }
+  static parse(value: string) {
+    return new Uri("file", value.replace(/^file:\/\//, ""));
+  }
   static from(c: { scheme: string; path?: string; query?: string }) {
     return new Uri(c.scheme, c.path ?? "", c.query);
   }
@@ -163,6 +166,7 @@ export const workspace = {
 
 export const window = {
   activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
+  showWarningMessage: async (_message: string, _options: unknown, ..._actions: string[]): Promise<string | undefined> => undefined,
 };
 
 export const commands = { executeCommand: async () => undefined };

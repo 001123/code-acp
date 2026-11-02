@@ -88,6 +88,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.history", run(() => provider.showHistory())),
     vscode.commands.registerCommand("codeAcp.cancel", run(() => provider.cancel())),
     vscode.commands.registerCommand(ChatViewProvider.showAttentionCommand, run(() => provider.showAttention())),
+    vscode.commands.registerCommand("codeAcp.worktree", run(() => provider.pickWorktree())),
     vscode.commands.registerCommand("codeAcp.login", run(() => provider.login())),
     vscode.commands.registerCommand("codeAcp.restart", run(() => provider.restart())),
     vscode.commands.registerCommand("codeAcp.showLog", () => log.show()),
@@ -165,6 +166,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ["codeAcp.closeOtherTabs", "closeOthers"],
         ["codeAcp.closeTabsToRight", "closeToRight"],
         ["codeAcp.forkTab", "fork"],
+        ["codeAcp.tabWorktree", "worktree"],
       ] as const
     ).map(([command, action]) =>
       // The tab's `data-vscode-context` (see TabStrip in src/ui/chat.tsx).

@@ -49,6 +49,8 @@ export const Settings = Schema.Struct({
   notifications: Schema.Boolean,
   /** Start new chat sessions with the model, effort and fast mode last picked for their agent. */
   rememberSessionOptions: Schema.Boolean,
+  /** Run each new chat tab in a git worktree of its own, on a new branch. */
+  worktreeForNewTabs: Schema.Boolean,
   /** Installed agent id for commit messages; empty means the default agent. */
   "commitMessage.agent": Schema.String,
   /** Model value (or name) to pick in the commit session; empty keeps the agent's default. */
@@ -76,6 +78,7 @@ export const SETTING_KEYS = [
   "showChanges",
   "notifications",
   "rememberSessionOptions",
+  "worktreeForNewTabs",
   "commitMessage.agent",
   "commitMessage.model",
   "commitMessage.instructions",
@@ -100,6 +103,7 @@ const DEFAULTS: Settings = {
   showChanges: true,
   notifications: true,
   rememberSessionOptions: true,
+  worktreeForNewTabs: false,
   "commitMessage.agent": "",
   "commitMessage.model": "",
   "commitMessage.instructions": DEFAULT_COMMIT_INSTRUCTIONS,
@@ -133,6 +137,7 @@ export function readSettings(): Settings {
     showChanges: read("showChanges"),
     notifications: read("notifications"),
     rememberSessionOptions: read("rememberSessionOptions"),
+    worktreeForNewTabs: read("worktreeForNewTabs"),
     "commitMessage.agent": read("commitMessage.agent"),
     "commitMessage.model": read("commitMessage.model"),
     "commitMessage.instructions": read("commitMessage.instructions"),

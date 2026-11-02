@@ -3,6 +3,7 @@ import type { TerminalSnapshot } from "../agentTerminals";
 import type { ChangedFile } from "../fileChanges";
 import type { ProblemScope } from "../problems";
 import type { ChangeBlock } from "../ui/lineDiff";
+import type { TabWorktree } from "../worktrees";
 
 /** One change in a file, to keep or undo on its own. */
 export type ChangeHunk = ChangeBlock;
@@ -47,6 +48,8 @@ export type FromWebview =
   | { type: "setAgent"; tab: number; id: string }
   /** Moves `tab` to another workspace folder; it starts over in a fresh session there. */
   | { type: "setCwd"; tab: number; cwd: string }
+  /** Offers the worktrees `tab` can run in, and what can be done with its own. */
+  | { type: "pickWorktree"; tab: number }
   | { type: "manageAgents" }
   /** Opens the usage summary (clicking the context meter). */
   | { type: "showUsage" }
@@ -139,6 +142,10 @@ export interface TabInfo {
   agentId?: string;
   /** The folder the tab's session runs in. */
   cwd: string;
+  /** The git worktree `cwd` is in, when the tab has one of its own. */
+  worktree?: TabWorktree;
+  /** What is checked out in `cwd`; undefined outside git. */
+  branch?: string;
   /** The tab's agent can fork its session (session/fork). */
   canFork: boolean;
   /** Unsent composer content; the webview only uses it for tabs it has no draft for yet. */

@@ -37,6 +37,8 @@ export class ShadowGit extends Context.Service<ShadowGit, {
   merge(root: string, base: string, from: string, files: ReadonlyArray<string>): Effect.Effect<string, CheckpointError>;
   /** Snapshot `base` with `file`, which is in it, holding `content`. */
   withFile(root: string, base: string, file: string, content: string): Effect.Effect<string, CheckpointError>;
+  /** Deletes the snapshots of `root`, when the work tree itself is gone for good. */
+  forget(root: string): Effect.Effect<void>;
 }>()("code-acp/ShadowGit") {
   static readonly layer = Layer.effect(
     ShadowGit,
@@ -249,6 +251,13 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         restore: (root, tree, files) => withLock(restore(root, tree, files)),
         merge: (root, base, from, files) => withLock(merge(root, base, from, files)),
         withFile: (root, base, file, content) => withLock(withFile(root, base, file, content)),
+        forget: (root) =>
+          withLock(
+            Effect.suspend(() => {
+              ready.delete(root);
+              return fs.remove(gitDirOf(root), { recursive: true, force: true }).pipe(Effect.ignore);
+            }),
+          ),
       });
     }),
   );
