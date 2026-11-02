@@ -10,6 +10,7 @@ scripts/**
 skills/**
 skills-lock.json
 AGENTS.md
+BACKLOG.md
 **/.DS_Store
 release/**
 test/**
