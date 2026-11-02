@@ -10,8 +10,9 @@ import commitIcon from "@tabler/icons/outline/git-commit.svg";
 import plugIcon from "@tabler/icons/outline/plug-connected.svg";
 import terminalIcon from "@tabler/icons/outline/terminal-2.svg";
 import chartIcon from "@tabler/icons/outline/chart-bar.svg";
+import linkIcon from "@tabler/icons/outline/link.svg";
 
-export type Tab = "general" | "notifications" | "worktree" | "agent" | "commit" | "mcp" | "custom" | "usage";
+export type Tab = "general" | "notifications" | "worktree" | "agent" | "commit" | "mcp" | "custom" | "links" | "usage";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
   { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions", "tracing"] },
@@ -39,6 +40,7 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     icon: terminalIcon,
     keys: ["customAgents"],
   },
+  { id: "links", label: "settings.links", desc: "settings.linksDesc", icon: linkIcon, keys: ["allowedHttpHosts"] },
   { id: "usage", label: "settings.usage", desc: "settings.usageDesc", icon: chartIcon, keys: [] },
 ];
 

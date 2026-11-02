@@ -45,12 +45,12 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 - [ ] **F2. Permission auto-approval rules.** For example, allow file reads, or allow everything in worktree tabs. Every request needs a manual answer today.
 - [ ] **F3. Checks after each turn.** Run a command such as `npm run check` when the agent finishes and send failures back, with a limit on rounds.
 - [ ] **F4. Comments on diffs.** Comment on hunks and send them to the agent as one batch, on top of the keep/undo review.
-- [ ] **F5. Missing ACP support.**
-  - [ ] `session/delete` in History
-  - [ ] `logout`
-  - [ ] `session/set_mode` for agents that only offer modes
-  - [ ] URL elicitations
-  - [ ] Compaction shown in the transcript
+- [x] **F5. Missing ACP support.**
+  - [x] `session/delete` in History
+  - [x] `logout`
+  - [x] `session/set_mode` for agents that only offer modes
+  - [x] URL elicitations
+  - [x] Compaction shown in the transcript
 
 ### Differentiators
 

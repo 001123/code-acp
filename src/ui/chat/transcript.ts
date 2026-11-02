@@ -17,20 +17,45 @@ export type Item =
   | { kind: "plan"; id: number; entries: acp.PlanEntry[] }
   | { kind: "permission"; id: number; requestId: number; toolCall: acp.ToolCallUpdate; options: acp.PermissionOption[]; done: boolean }
   | ElicitationItem
+  | CompactionItem
   | { kind: "notice" | "error"; id: number; text: Text }
   /** The numbers of a finished turn; shown while codeAcp.tracing is on. */
   | { kind: "trace"; id: number; trace: TurnTrace };
 
-/** A form the agent asks the user to fill in; `outcome` is the answer's action once it was answered or dismissed. */
-export interface ElicitationItem {
+interface ElicitationBase {
   kind: "elicitation";
   id: number;
   requestId: number;
   message: string;
-  schema: acp.ElicitationSchema;
   /** The tool call that asks, e.g. Claude Code's AskUserQuestion. */
   toolCallId?: string;
+  /** The answer's action, once it was answered or dismissed. */
   outcome?: string;
+}
+
+/** A form the agent asks the user to fill in. */
+export interface FormElicitationItem extends ElicitationBase {
+  schema: acp.ElicitationSchema;
+}
+
+/** A link the agent asks the user to open. */
+export interface UrlElicitationItem extends ElicitationBase {
+  url: string;
+  elicitationId: string;
+  /** The agent said that what the link was opened for is done. */
+  completed?: boolean;
+}
+
+export type ElicitationItem = FormElicitationItem | UrlElicitationItem;
+
+/** The agent compacting the conversation's context; it stays where it started, and updates in place. */
+export interface CompactionItem {
+  kind: "compaction";
+  id: number;
+  compactionId: string;
+  status: acp.CompactionStatus;
+  summary: string;
+  error?: string;
 }
 
 export interface ToolItem {
@@ -64,6 +89,11 @@ export type Action =
   | { type: "add"; item: DistributiveOmit<Item, "id"> }
   | { type: "permissionDone"; requestId: number }
   | { type: "elicitationDone"; requestId: number; action: string }
+  | { type: "elicitationComplete"; elicitationId: string }
+  | { type: "compaction"; update: acp.CompactionUpdate }
+  | { type: "compactionChunk"; compactionId: string; text: string }
+  /** The agent's process is gone: what it was compacting will never report back. */
+  | { type: "agentStopped" }
   /** The turn ended: the next chunk starts a new block. */
   | { type: "endStream" }
   /** Drops the user message of `turn` and everything after it. */
@@ -123,6 +153,10 @@ export function openRequest(item: DistributiveOmit<Item, "id">): { requestId: nu
     return { requestId: item.requestId, toolCallId: item.toolCallId };
   }
   return undefined;
+}
+
+function findCompaction(state: Transcript, compactionId: string): CompactionItem | undefined {
+  return state.items.find((i): i is CompactionItem => i.kind === "compaction" && i.compactionId === compactionId);
 }
 
 export function transcript(state: Transcript, action: Action): Transcript {
@@ -229,6 +263,35 @@ export function transcript(state: Transcript, action: Action): Transcript {
           }
           return i;
         }),
+      };
+    case "elicitationComplete":
+      return {
+        ...state,
+        items: state.items.map((i) => (i.kind === "elicitation" && "url" in i && i.elicitationId === action.elicitationId ? { ...i, completed: true } : i)),
+      };
+    case "compaction": {
+      const { compactionId, status, summary, error } = action.update;
+      // Omitted: unchanged. Null: cleared.
+      const patch = {
+        status,
+        ...(summary !== undefined ? { summary: clip((summary ?? []).map(contentText).join("")) } : {}),
+        ...(error !== undefined ? { error: error ?? undefined } : {}),
+      };
+      const found = findCompaction(state, compactionId);
+      return found
+        ? { ...state, items: replace(found.id, () => ({ ...found, ...patch })) }
+        : add({ kind: "compaction", compactionId, summary: "", ...patch });
+    }
+    case "compactionChunk": {
+      const found = findCompaction(state, action.compactionId);
+      return found
+        ? { ...state, items: replace(found.id, () => ({ ...found, summary: clip(found.summary + action.text) })) }
+        : add({ kind: "compaction", compactionId: action.compactionId, status: "in_progress", summary: clip(action.text) });
+    }
+    case "agentStopped":
+      return {
+        ...state,
+        items: state.items.map((i) => (i.kind === "compaction" && i.status === "in_progress" ? { ...i, status: "cancelled" } : i)),
       };
     case "endStream":
       return { ...state, streaming: undefined };

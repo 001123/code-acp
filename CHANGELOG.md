@@ -8,12 +8,14 @@ First public version; nothing has been released yet.
 
 ### Added
 
-- Chat with coding agents over the Agent Client Protocol, in tabs you can pin, rename and reorder, with a searchable history.
+- Chat with coding agents over the Agent Client Protocol, in tabs you can pin, rename and reorder, with a searchable history you can delete from.
 - Install, update and switch agents from the ACP Registry, and add your own agents from local commands.
 - Queue, edit, resend and retry messages, and fork a conversation into a new tab.
 - A composer with live Markdown preview, drafts that survive reloads, and `/` agent commands and `$` skills.
-- Permission requests, form questions, plans, tools, subagents and terminals in the chat.
-- Model, effort and fast mode per tab, remembered for each agent.
+- Permission requests, form questions, links to open after asking, plans, tools, subagents, terminals and context compaction in the chat.
+- Model, effort and fast mode per tab, remembered for each agent, and modes for agents that only offer those.
+- Compact a conversation from the context window panel, for agents that offer `/compact`.
+- Log out of an agent.
 - Attach files, folders, images, problems, terminals and selections as context, and annotate images.
 - **Explain**, **Refactor**, **Write Tests** and **Fix with Code ACP** actions.
 - Review the agent's changes with Keep and Undo, restore checkpoints, and follow the agent in the editor.
@@ -25,4 +27,5 @@ First public version; nothing has been released yet.
 ### Security
 
 - Settings that decide what runs (custom agents, MCP servers, environment variables, Node and ccusage paths) apply only at machine scope, so a workspace cannot set them.
+- Links from agents open only after asking, over https, or over http to localhost, 127.0.0.1 and hosts you list in Settings; a workspace cannot add to that list.
 - Registry entries with unsafe paths are refused at install.

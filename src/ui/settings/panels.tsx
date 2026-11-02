@@ -3,6 +3,7 @@ import type { SettingKey } from "../../settings";
 import { useL10n } from "../l10n";
 import { AgentModelFields } from "./agentModel";
 import { Field, Text, Toggle } from "./fields";
+import { parseHosts } from "./hosts";
 import { formatPairs, parsePairs } from "./pairs";
 import { post, set } from "./post";
 import { stringOf, type LoadedOptions, type State } from "./state";
@@ -218,6 +219,40 @@ export function AgentTab({ state }: { state: State }) {
             }
             setEnvError(undefined);
             set("env", parsed);
+          }}
+        />
+      </Field>
+    </section>
+  );
+}
+
+export function LinksTab({ state }: { state: State }) {
+  const { t } = useL10n();
+  const [error, setError] = useState<string>();
+  const hosts = state.values.allowedHttpHosts as ReadonlyArray<string> | undefined;
+  return (
+    <section className="card">
+      <Field
+        id="allowedHttpHosts"
+        label="settings.allowedHttpHosts"
+        desc="settings.allowedHttpHostsDesc"
+        overridden={isOverridden(state)("allowedHttpHosts")}
+        error={error}
+      >
+        <Text
+          id="allowedHttpHosts"
+          rows={4}
+          placeholder="gitlab.internal"
+          value={(hosts ?? []).join("\n")}
+          onReset={() => setError(undefined)}
+          onCommit={(text) => {
+            const parsed = parseHosts(text);
+            if (typeof parsed === "number") {
+              setError(t("settings.allowedHttpHostsInvalid", parsed));
+              return;
+            }
+            setError(undefined);
+            set("allowedHttpHosts", parsed);
           }}
         />
       </Field>

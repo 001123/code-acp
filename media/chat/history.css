@@ -87,6 +87,10 @@
   color: var(--vscode-foreground);
   text-align: left;
 }
+.history-row {
+  position: relative;
+}
+.history-row:hover > .history-item:not(:disabled),
 .history-item:hover:not(:disabled) {
   background: var(--vscode-list-hoverBackground);
 }
@@ -127,4 +131,20 @@
   font-size: 0.85em;
   font-variant-numeric: tabular-nums;
   color: var(--vscode-descriptionForeground);
+}
+/* Over the time, which it hides while it shows. */
+.history-delete {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+.history-row:hover > .history-delete,
+.history-delete:focus-visible {
+  opacity: 1;
+}
+.history-row:hover:has(.history-delete) .history-item-meta,
+.history-row:has(.history-delete:focus-visible) .history-item-meta {
+  visibility: hidden;
 }

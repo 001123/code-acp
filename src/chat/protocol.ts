@@ -43,6 +43,8 @@ export type FromWebview =
   | { type: "draftText"; tab: number; text: string }
   | { type: "history" }
   | { type: "openSession"; sessionId: string; cwd: string; title?: string }
+  /** Deletes a past session, after asking; answered with "sessionDeleted". */
+  | { type: "deleteSession"; sessionId: string; title?: string }
   | { type: "login" }
   | { type: "selectAgent" }
   | { type: "setAgent"; tab: number; id: string }
@@ -132,11 +134,11 @@ export type ViewMessage = Extract<
 >;
 
 /**
- * What the user did with a form the agent asked them to fill in: sent it with the values of its fields, declined to
- * answer, or dismissed it (the agent stops what asked).
+ * What the user did with a form or link the agent sent: sent the form with the values of its fields or agreed to open
+ * the link, declined, or dismissed it (the agent stops what asked).
  */
 export type ElicitationAnswer =
-  | { action: "accept"; content: Record<string, ElicitationValue> }
+  | { action: "accept"; content?: Record<string, ElicitationValue> }
   | { action: "decline" | "cancel" };
 
 export type ElicitationValue = string | number | boolean | string[];

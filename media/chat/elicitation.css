@@ -145,3 +145,18 @@ button.elicitation-option.chosen {
   margin-top: 8px;
   font-style: italic;
 }
+
+/* A link the agent asks the user to open. */
+.elicitation-link-message {
+  white-space: pre-wrap;
+  margin-bottom: 6px;
+}
+.elicitation-link-host {
+  font-weight: bold;
+}
+.elicitation-link {
+  display: block;
+  margin: 2px 0 8px;
+  overflow-wrap: anywhere;
+  color: var(--vscode-descriptionForeground);
+}

@@ -12,9 +12,15 @@ import { writeFile } from "./fileChanges";
 import { mcpServersFor } from "./mcpServers";
 import { stopProcess } from "./processTree";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
+import { MODE_OPTION, SessionModes } from "./sessionModes";
 
 /** A form the agent asks the user to fill in: `elicitation/create` in form mode. */
 export type FormElicitation = Extract<acp.CreateElicitationRequest, { mode: "form" }>;
+
+/** A link the agent asks the user to open: `elicitation/create` in URL mode. */
+export type UrlElicitation = Extract<acp.CreateElicitationRequest, { mode: "url" }>;
+
+export type Elicitation = FormElicitation | UrlElicitation;
 
 export interface AgentHandlers {
   onUpdate(notification: acp.SessionNotification): void;
@@ -23,10 +29,12 @@ export interface AgentHandlers {
     signal: AbortSignal,
   ): Effect.Effect<acp.RequestPermissionResponse>;
   /**
-   * A form the agent asks the user to fill in (`elicitation/create`, form mode). Without it the client offers no
-   * elicitations.
+   * A form the agent asks the user to fill in, or a link to open (`elicitation/create`). Without it the client offers
+   * no elicitations.
    */
-  elicit?(request: FormElicitation, signal: AbortSignal): Effect.Effect<acp.CreateElicitationResponse>;
+  elicit?(request: Elicitation, signal: AbortSignal): Effect.Effect<acp.CreateElicitationResponse>;
+  /** What the link of a URL elicitation was opened for is done (`elicitation/complete`). */
+  onElicitationComplete?(elicitationId: string): void;
   /**
    * A terminal the agent runs a command in has new output, or its command exited. Without it the client
    * offers no terminals.
@@ -83,6 +91,8 @@ export interface AcpAgent {
   forkSession(sessionId: string, cwd: string): Effect.Effect<unstable.ForkSessionResponse, RequestError>;
   /** Needs `sessionCapabilities.close`; frees the session's resources on the agent. */
   closeSession(sessionId: string): Effect.Effect<void, RequestError>;
+  /** Needs `sessionCapabilities.delete`; removes a session from `session/list`. */
+  deleteSession(sessionId: string): Effect.Effect<void, RequestError>;
   prompt(sessionId: string, prompt: Array<acp.ContentBlock>): Effect.Effect<acp.PromptResponse, RequestError>;
   cancel(sessionId: string): Effect.Effect<void, RequestError>;
   setConfigOption(
@@ -91,6 +101,8 @@ export interface AcpAgent {
     value: string,
   ): Effect.Effect<acp.SetSessionConfigOptionResponse, RequestError>;
   authenticate(methodId: string): Effect.Effect<acp.AuthenticateResponse, RequestError>;
+  /** Needs `auth.logout`; new sessions need a login afterwards, and sessions already running may stop working. */
+  readonly logout: Effect.Effect<void, RequestError>;
   /** Stops the command of one of the agent's terminals; the agent still gets its output and exit status. */
   killTerminal(sessionId: string, terminalId: string): Effect.Effect<void, TerminalNotFoundError>;
 }
@@ -99,6 +111,11 @@ export interface AcpAgent {
 export function canFork(agent: AcpAgent): boolean {
   const caps: unstable.SessionCapabilities | null | undefined = agent.initializeResponse.agentCapabilities?.sessionCapabilities;
   return !!caps?.fork;
+}
+
+/** Whether the agent can log the user out. */
+export function canLogout(agent: AcpAgent): boolean {
+  return !!agent.initializeResponse.agentCapabilities?.auth?.logout;
 }
 
 /** The part of the extension's package.json sent as `clientInfo`. */
@@ -133,6 +150,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
     (sessionId) => sessionCwds.get(sessionId),
   );
   const remember = (sessionId: string, cwd: string) => Effect.sync(() => void sessionCwds.set(sessionId, cwd));
+  const modes = new SessionModes();
   const { command, args, env } = agentCommand;
   yield* Effect.logInfo(`[agent] spawn ${command} ${args.join(" ")}`);
 
@@ -156,16 +174,17 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
       );
       const connection = acp
         .client({ name: "code-acp" })
-        .onNotification(acp.methods.client.session.update, ({ params }) => handlers.onUpdate(params))
+        .onNotification(acp.methods.client.session.update, ({ params }) => handlers.onUpdate(modes.translate(params)))
         .onRequest(acp.methods.client.session.requestPermission, ({ params, signal }) =>
           runPromise(handlers.requestPermission(params, signal)),
         )
         .onRequest(acp.methods.client.elicitation.create, ({ params, signal }) =>
-          // Only forms are offered; a URL elicitation (or a future mode) is not shown to the user.
-          handlers.elicit && params.mode === "form"
-            ? runPromise(handlers.elicit(params as FormElicitation, signal))
+          // A future mode is not shown to the user.
+          handlers.elicit && (params.mode === "form" || params.mode === "url")
+            ? runPromise(handlers.elicit(params as Elicitation, signal))
             : ({ action: "cancel" } satisfies acp.CreateElicitationResponse),
         )
+        .onNotification(acp.methods.client.elicitation.complete, ({ params }) => handlers.onElicitationComplete?.(params.elicitationId))
         .onRequest(acp.methods.client.fs.readTextFile, ({ params }) => runPromise(readTextFile(params)))
         .onRequest(acp.methods.client.fs.writeTextFile, ({ params }) =>
           runPromise(
@@ -240,8 +259,8 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         fs: { readTextFile: true, writeTextFile: true },
         terminal: handlers.onTerminal !== undefined,
         auth: { terminal: true },
-        session: { notices: {} },
-        ...(handlers.elicit ? { elicitation: { form: {} } } : {}),
+        session: { notices: {}, compaction: {} },
+        ...(handlers.elicit ? { elicitation: { form: {}, url: {} } } : {}),
       },
     }),
   ).pipe(
@@ -271,6 +290,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
           request("session/new", (agent) => agent.request(acp.methods.agent.session.new, { cwd, mcpServers })),
         ),
         Effect.tap((res) => remember(res.sessionId, cwd)),
+        Effect.map((res) => modes.adopt(res.sessionId, res)),
       ),
     listSessions: (cwd, cursor) =>
       request("session/list", (agent) => agent.request(acp.methods.agent.session.list, { cwd, cursor })),
@@ -282,6 +302,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
           ),
         ),
         Effect.tap(() => remember(sessionId, cwd)),
+        Effect.map((res) => modes.adopt(sessionId, res)),
       ),
     resumeSession: (sessionId, cwd) =>
       mcpServers.pipe(
@@ -291,6 +312,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
           ),
         ),
         Effect.tap(() => remember(sessionId, cwd)),
+        Effect.map((res) => modes.adopt(sessionId, res)),
       ),
     forkSession: (sessionId, cwd) =>
       mcpServers.pipe(
@@ -300,22 +322,35 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
           ),
         ),
         Effect.tap((res) => remember(res.sessionId, cwd)),
+        Effect.map((res) => modes.adopt(res.sessionId, res)),
       ),
     closeSession: (sessionId) =>
       request("session/close", (agent) => agent.request(acp.methods.agent.session.close, { sessionId })).pipe(
-        Effect.tap(() => Effect.sync(() => sessionCwds.delete(sessionId))),
+        Effect.tap(() =>
+          Effect.sync(() => {
+            sessionCwds.delete(sessionId);
+            modes.forget(sessionId);
+          }),
+        ),
         Effect.asVoid,
       ),
+    deleteSession: (sessionId) =>
+      request("session/delete", (agent) => agent.request(acp.methods.agent.session.delete, { sessionId })).pipe(Effect.asVoid),
     prompt: (sessionId, prompt) =>
       request("session/prompt", (agent) => agent.request(acp.methods.agent.session.prompt, { sessionId, prompt })),
     cancel: (sessionId) =>
       request("session/cancel", (agent) => agent.notify(acp.methods.agent.session.cancel, { sessionId })),
     setConfigOption: (sessionId, configId, value) =>
-      request("session/set_config_option", (agent) =>
-        agent.request(acp.methods.agent.session.setConfigOption, { sessionId, configId, value }),
-      ),
+      configId === MODE_OPTION
+        ? request("session/set_mode", (agent) => agent.request(acp.methods.agent.session.setMode, { sessionId, modeId: value })).pipe(
+            Effect.map(() => ({ configOptions: modes.select(sessionId, value) })),
+          )
+        : request("session/set_config_option", (agent) =>
+            agent.request(acp.methods.agent.session.setConfigOption, { sessionId, configId, value }),
+          ),
     authenticate: (methodId) =>
       request("authenticate", (agent) => agent.request(acp.methods.agent.authenticate, { methodId })),
+    logout: request("logout", (agent) => agent.request(acp.methods.agent.logout, {})).pipe(Effect.asVoid),
     killTerminal: (sessionId, terminalId) => terminals.kill({ sessionId, terminalId }).pipe(Effect.asVoid),
   };
 });

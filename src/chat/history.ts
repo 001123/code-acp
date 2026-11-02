@@ -7,12 +7,17 @@ const MAX_HISTORY_PAGES = 5;
 
 export type HistoryListing =
   | { readonly unsupported: true }
-  | { readonly unsupported: false; readonly sessions: ReadonlyArray<acp.SessionInfo>; readonly canOpen: boolean };
+  | { readonly unsupported: false; readonly sessions: ReadonlyArray<acp.SessionInfo>; readonly canOpen: boolean; readonly canDelete: boolean };
 
 /** Whether the agent can show a past session again: replayed (session/load) or continued (session/resume). */
 export function canReopen(agent: AcpAgent): boolean {
   const caps = agent.initializeResponse.agentCapabilities;
   return !!caps?.loadSession || !!caps?.sessionCapabilities?.resume;
+}
+
+/** Whether the agent can delete sessions from its list (session/delete). */
+export function canDeleteSessions(agent: AcpAgent): boolean {
+  return !!agent.initializeResponse.agentCapabilities?.sessionCapabilities?.delete;
 }
 
 /**
@@ -43,7 +48,7 @@ export const listHistory = Effect.fn("listHistory")(function* (agent: AcpAgent, 
     return yield* failure.failure;
   }
   // Without load or resume the list can only be looked at.
-  return { unsupported: false, sessions: [...byId.values()], canOpen: canReopen(agent) } as HistoryListing;
+  return { unsupported: false, sessions: [...byId.values()], canOpen: canReopen(agent), canDelete: canDeleteSessions(agent) } as HistoryListing;
 });
 
 /** Numbers history requests, so a slower, older listing does not replace a newer one. */

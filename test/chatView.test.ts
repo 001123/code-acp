@@ -1,4 +1,4 @@
-import { assert, beforeEach, describe, it } from "@effect/vitest";
+import { afterEach, assert, beforeEach, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -11,7 +11,7 @@ import { ChatViewProvider } from "../src/chat/chatViewProvider";
 import type { FromWebview, TabInfo } from "../src/chat/protocol";
 import { makeRuntime } from "../src/runtime";
 import { makeOutput } from "./helpers";
-import { __test, commands, EventEmitter, Uri, workspace } from "./stubs/vscode";
+import { __test, commands, EventEmitter, Uri, window, workspace } from "./stubs/vscode";
 
 const MOCK_AGENT = fileURLToPath(new URL("./fixtures/mock-agent.mjs", import.meta.url));
 
@@ -504,6 +504,227 @@ describe("ChatViewProvider", () => {
       ),
     );
   });
+
+  describe("asking before something final", () => {
+    const showWarningMessage = window.showWarningMessage;
+    /** Answers the next questions with their action, or turns them down. */
+    const answering = (yes: boolean) => {
+      const asked: string[] = [];
+      window.showWarningMessage = async (message, _options, ...actions) => {
+        asked.push(message);
+        return yes ? actions[0] : undefined;
+      };
+      return asked;
+    };
+    afterEach(() => {
+      window.showWarningMessage = showWarningMessage;
+    });
+
+    it.live("deletes a past session from the history, after asking", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_HISTORY: "1" };
+        const { ofType, send } = yield* startChat;
+        const listed = () => ofType("history").at(-1)!;
+        send({ type: "history" });
+        yield* until(() => ofType("history").at(-1)?.sessions.length === 1, "the list");
+        assert.strictEqual(listed().canDelete, true);
+
+        const asked = answering(false);
+        send({ type: "deleteSession", sessionId: "old", title: "Session old" });
+        yield* until(() => asked.length === 1, "the question");
+        assert.include(asked[0], "Session old");
+        yield* Effect.sleep("20 millis");
+        assert.deepStrictEqual(ofType("sessionDeleted"), []);
+
+        answering(true);
+        send({ type: "deleteSession", sessionId: "old" });
+        yield* until(() => ofType("sessionDeleted").length === 1, "the deletion");
+        assert.strictEqual(ofType("sessionDeleted")[0]!.sessionId, "old");
+        const before = ofType("history").length;
+        send({ type: "history" });
+        yield* until(() => ofType("history").length === before + 2, "the new list");
+        assert.deepStrictEqual(listed().sessions, []);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("keeps the session of an open tab", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_HISTORY: "1" };
+        const { ofType, send, tab } = yield* startChat;
+        const asked = answering(true);
+        const sessionId = ofType("session", tab)[0]!.sessionId as string;
+        send({ type: "deleteSession", sessionId });
+        yield* Effect.sleep("50 millis");
+        assert.deepStrictEqual(asked, []);
+        assert.deepStrictEqual(ofType("sessionDeleted"), []);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("says so when the agent can't delete the session", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_HISTORY: "1" };
+        const { ofType, send } = yield* startChat;
+        answering(true);
+        const errors: string[] = [];
+        const showErrorMessage = window.showErrorMessage;
+        window.showErrorMessage = async (message) => {
+          errors.push(message);
+          return undefined;
+        };
+        send({ type: "deleteSession", sessionId: "gone" });
+        yield* until(() => errors.length === 1, "the error");
+        window.showErrorMessage = showErrorMessage;
+        assert.deepStrictEqual(ofType("sessionDeleted"), []);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("logs out and restarts the agent, whose tabs then need a login", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_LOGOUT: "1" };
+        const { ofType, provider, runtime, tab } = yield* startChat;
+        answering(false);
+        yield* Effect.promise(() => runtime.runPromise(provider.logout()));
+        assert.isFalse(ofType("status", tab).some((m) => m.needsLogin));
+
+        answering(true);
+        // The next process finds the user logged out.
+        agentEnv = { MOCK_LOGOUT: "1", MOCK_AUTH: "1" };
+        yield* Effect.promise(() => runtime.runPromise(provider.logout()));
+        yield* until(() => ofType("status", tab).at(-1)?.needsLogin === true, "the login to be asked for");
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("doesn't ask to log out of an agent that can't", () =>
+      Effect.gen(function* () {
+        const { ofType, provider, runtime } = yield* startChat;
+        const asked = answering(true);
+        const before = ofType("session").length;
+        yield* Effect.promise(() => runtime.runPromise(provider.logout()));
+        assert.deepStrictEqual(asked, []);
+        assert.strictEqual(ofType("session").length, before);
+      }).pipe(Effect.scoped),
+    );
+  });
+
+  describe("links the agent asks to open", () => {
+    it.live("opens the link when the user agrees, as it is, and tells when it is done", () =>
+      Effect.gen(function* () {
+        const { idle, ofType, replyOf, say, send, tab } = yield* startChat;
+        say(tab, "elicit url");
+        yield* until(() => ofType("elicitationRequest", tab).length === 1, "the question");
+        const asked = ofType("elicitationRequest", tab)[0]!;
+        assert.strictEqual(asked.url, "https://example.com/login?next=a%26b");
+        assert.strictEqual(asked.elicitationId, "e1");
+        assert.isUndefined(asked.schema);
+        assert.deepStrictEqual(__test.openedExternal, []);
+
+        // What the webview adds to its answer doesn't reach the agent.
+        send({ type: "elicitation", id: asked.id, response: { action: "accept", content: { extra: "x" } } });
+        yield* until(() => ofType("elicitationComplete", tab).length === 1, "the link to complete");
+        yield* idle(tab);
+        assert.deepStrictEqual(__test.openedExternal, ["https://example.com/login?next=a%26b"]);
+        assert.deepStrictEqual(JSON.parse(replyOf(tab)), { action: "accept" });
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("stops asking when the agent says it is done before the user answered", () =>
+      Effect.gen(function* () {
+        const { idle, ofType, replyOf, say, tab } = yield* startChat;
+        say(tab, "elicit finished");
+        yield* until(() => ofType("elicitationComplete", tab).length === 1, "the link to complete");
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+        yield* idle(tab);
+        assert.deepStrictEqual(ofType("elicitationDone", tab).map((m) => m.action), ["cancel"]);
+        assert.deepStrictEqual(__test.openedExternal, []);
+        assert.deepStrictEqual(JSON.parse(replyOf(tab)), { action: "cancel" });
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("doesn't open it when the user declines", () =>
+      Effect.gen(function* () {
+        const { idle, ofType, replyOf, say, send, tab } = yield* startChat;
+        say(tab, "elicit url");
+        yield* until(() => ofType("elicitationRequest", tab).length === 1, "the question");
+        send({ type: "elicitation", id: ofType("elicitationRequest", tab)[0]!.id, response: { action: "decline" } });
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+        yield* idle(tab);
+        assert.deepStrictEqual(__test.openedExternal, []);
+        assert.deepStrictEqual(JSON.parse(replyOf(tab)), { action: "decline" });
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("tells the agent when VS Code didn't open it", () =>
+      Effect.gen(function* () {
+        __test.openExternalResult = false;
+        const { idle, ofType, replyOf, say, send, tab } = yield* startChat;
+        say(tab, "elicit url");
+        yield* until(() => ofType("elicitationRequest", tab).length === 1, "the question");
+        send({ type: "elicitation", id: ofType("elicitationRequest", tab)[0]!.id, response: { action: "accept" } });
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+        yield* idle(tab);
+        assert.deepStrictEqual(JSON.parse(replyOf(tab)), { action: "cancel" });
+        assert.isTrue(ofType("notice", tab).some((m) => m.key === "chat.elicitation.notOpened"));
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("asks about an http link once the user listed its host", () =>
+      Effect.gen(function* () {
+        __test.setSetting("codeAcp.allowedHttpHosts", ["example.com"]);
+        const { ofType, say, send, tab } = yield* startChat;
+        say(tab, "elicit unsafe");
+        yield* until(() => ofType("elicitationRequest", tab).length === 1, "the question");
+        assert.strictEqual(ofType("elicitationRequest", tab)[0]!.url, "http://example.com/login");
+        send({ type: "elicitation", id: ofType("elicitationRequest", tab)[0]!.id, response: { action: "decline" } });
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("refuses a link that isn't safe without asking", () =>
+      Effect.gen(function* () {
+        const { idle, ofType, replyOf, say, tab } = yield* startChat;
+        say(tab, "elicit unsafe");
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+        yield* idle(tab);
+        assert.deepStrictEqual(ofType("elicitationRequest", tab), []);
+        assert.deepStrictEqual(__test.openedExternal, []);
+        assert.deepStrictEqual(JSON.parse(replyOf(tab)), { action: "decline" });
+        assert.isTrue(ofType("notice", tab).some((m) => m.key === "chat.elicitation.unsafeUrl"));
+      }).pipe(Effect.scoped),
+    );
+  });
+
+  it.live("sets the mode of an agent that only offers modes", () =>
+    Effect.gen(function* () {
+      agentEnv = { MOCK_MODES: "1" };
+      const { idle, ofType, replyOf, say, send, tab } = yield* startChat;
+      const option = ofType("session", tab)[0]!.configOptions[0];
+      assert.strictEqual(option.category, "mode");
+      assert.strictEqual(option.currentValue, "ask");
+      send({ type: "setConfig", tab, configId: option.id, value: "code" });
+      yield* until(() => ofType("configOptions", tab).length === 1, "the new options");
+      assert.strictEqual(ofType("configOptions", tab)[0]!.configOptions[0].currentValue, "code");
+      say(tab, "mode");
+      yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+      yield* idle(tab);
+      assert.strictEqual(replyOf(tab), "code");
+    }).pipe(Effect.scoped),
+  );
+
+  it.live("forwards compaction to the transcript", () =>
+    Effect.gen(function* () {
+      const { idle, ofType, say, tab } = yield* startChat;
+      say(tab, "compact");
+      yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+      yield* idle(tab);
+      const updates = ofType("update", tab).map((m) => m.update.sessionUpdate);
+      assert.deepStrictEqual(updates.filter((u) => u.startsWith("compaction")), [
+        "compaction_update",
+        "compaction_summary_chunk",
+        "compaction_summary_chunk",
+        "compaction_update",
+      ]);
+    }).pipe(Effect.scoped),
+  );
 
   it.live("shows the tab waiting for a permission", () =>
     Effect.scoped(

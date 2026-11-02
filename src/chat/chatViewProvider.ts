@@ -62,9 +62,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         const { toolCall, options } = ask.request;
         this.postTab(tab, { type: "permissionRequest", id, toolCall, options });
       } else {
-        const { message, requestedSchema } = ask.request;
-        const toolCallId = "toolCallId" in ask.request ? ask.request.toolCallId : undefined;
-        this.postTab(tab, { type: "elicitationRequest", id, message, schema: requestedSchema, toolCallId });
+        const { request } = ask;
+        const toolCallId = "toolCallId" in request ? request.toolCallId : undefined;
+        const asked = request.mode === "url" ? { url: request.url, elicitationId: request.elicitationId } : { schema: request.requestedSchema };
+        this.postTab(tab, { type: "elicitationRequest", id, message: request.message, toolCallId, ...asked });
       }
       this.attention.raise(tab, ask.kind === "permission" ? "permission" : "question");
       this.indicators.update();
@@ -448,6 +449,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "openSession":
         yield* this.sessions.openSession(msg.sessionId, msg.cwd, msg.title);
         break;
+      case "deleteSession":
+        yield* this.deleteSession(msg.sessionId, msg.title);
+        break;
       case "login":
         yield* this.tabAgents.login();
         break;
@@ -555,6 +559,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return this.tabAgents.login();
   }
 
+  logout() {
+    return this.tabAgents.logout();
+  }
+
   updateAgents(updates: ReadonlyArray<AgentUpdate>) {
     return this.tabAgents.updateAgents(updates);
   }
@@ -606,8 +614,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         return id ? [id] : [];
       }),
       canOpen: listing.canOpen,
+      canDelete: listing.canDelete,
     });
   });
+
+  /** Deletes a session of the history; a failure can't go in the transcript, which the history covers. */
+  private readonly deleteSession = Effect.fn("ChatView.deleteSession")(function* (this: ChatViewProvider, sessionId: string, title: string | undefined) {
+    const deleted = yield* this.sessions.deleteSession(sessionId, title).pipe(
+      Effect.catchTag("NoAgentError", () => Effect.succeed(false)),
+      Effect.catchTags({
+        AuthRequiredError: (err) => this.deleteFailed(err.message),
+        AgentRequestError: (err) => this.deleteFailed(err.message),
+      }),
+    );
+    if (deleted) {
+      this.post({ type: "sessionDeleted", sessionId });
+    }
+  });
+
+  private deleteFailed(message: string) {
+    return Effect.sync(() => {
+      void vscode.window.showErrorMessage(t("chat.deleteSessionFailed", message));
+      return false;
+    });
+  }
 
   /** Quotes text selected in the transcript into the composer (webview context menu). */
   quote(text: string): void {

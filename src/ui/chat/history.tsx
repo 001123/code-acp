@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import searchIcon from "@tabler/icons/outline/search.svg";
+import trashIcon from "@tabler/icons/outline/trash.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { post } from "./post";
 import { matchesSession } from "./search";
@@ -12,6 +13,7 @@ export interface History {
   loading?: boolean;
   unsupported?: boolean;
   canOpen?: boolean;
+  canDelete?: boolean;
   currentId?: string;
   /** Sessions shown in a tab. */
   openIds?: string[];
@@ -114,7 +116,7 @@ export function HistoryView({ history, onClose }: { history: History; onClose: (
         }}
       >
         {sessions.map((s) => (
-          <li key={s.sessionId}>
+          <li key={s.sessionId} className="history-row">
             <button
               className="history-item"
               data-current={s.sessionId === history.currentId || undefined}
@@ -136,6 +138,17 @@ export function HistoryView({ history, onClose }: { history: History; onClose: (
               )}
               <span className="history-item-meta">{relativeTime(lang, s.updatedAt)}</span>
             </button>
+            {/* An open tab's conversation stays: it is on screen, and the tab still works on it. */}
+            {history.canDelete && s.sessionId !== history.currentId && !history.openIds?.includes(s.sessionId) && (
+              <button
+                className="icon-btn small history-delete"
+                title={t("chat.deleteSession")}
+                aria-label={t("chat.deleteSession")}
+                onClick={() => post({ type: "deleteSession", sessionId: s.sessionId, title: s.title ?? undefined })}
+              >
+                <Icon svg={trashIcon} />
+              </button>
+            )}
           </li>
         ))}
       </ul>

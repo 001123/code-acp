@@ -9,15 +9,22 @@ export interface Usage {
   cost?: acp.Cost | null;
 }
 
-/** `compactAt`: where the agent auto-compacts, when that is before the end of the window. */
+/**
+ * `compactAt`: where the agent auto-compacts, when that is before the end of the window.
+ * `onCompact`: compacts the conversation; absent when the agent offers no such command.
+ */
 export function UsageMeter({
   usage,
   compactAt,
   totals,
+  busy,
+  onCompact,
 }: {
   usage: Usage | undefined;
   compactAt: number | undefined;
   totals: Totals | undefined;
+  busy: boolean;
+  onCompact: (() => void) | undefined;
 }) {
   const { t, lang } = useL10n();
   if (!usage) return <span id="usage" hidden />;
@@ -43,22 +50,22 @@ export function UsageMeter({
   // A ring of radius 7 in a 16×16 box; the dash covers `ratio` of the circumference.
   const circumference = 2 * Math.PI * 7;
   return (
-    // Focusable so the panel also opens from the keyboard.
-    <span
-      id="usage"
-      tabIndex={0}
-      role="button"
-      aria-label={summary}
-      onClick={() => post({ type: "showUsage" })}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") post({ type: "showUsage" });
-      }}
-      data-level={ratio >= 0.9 ? "high" : ratio >= 0.7 ? "medium" : "low"}>
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <circle className="usage-track" cx="8" cy="8" r="7" />
-        <circle className="usage-fill" cx="8" cy="8" r="7" strokeDasharray={`${ratio * circumference} ${circumference}`} />
-      </svg>
-      <span id="usage-panel" role="tooltip">
+    <span id="usage" onClick={() => post({ type: "showUsage" })} data-level={ratio >= 0.9 ? "high" : ratio >= 0.7 ? "medium" : "low"}>
+      {/* Focusable so the panel also opens from the keyboard. */}
+      <span
+        id="usage-ring"
+        tabIndex={0}
+        role="button"
+        aria-label={summary}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") post({ type: "showUsage" });
+        }}>
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <circle className="usage-track" cx="8" cy="8" r="7" />
+          <circle className="usage-fill" cx="8" cy="8" r="7" strokeDasharray={`${ratio * circumference} ${circumference}`} />
+        </svg>
+      </span>
+      <span id="usage-panel">
         <span className="usage-head">
           <span>{t("chat.contextWindow")}</span>
           <span>{summary}</span>
@@ -73,6 +80,14 @@ export function UsageMeter({
           </span>
         ))}
         <span className="usage-hint">{t("chat.showUsage")}</span>
+        {onCompact && (
+          // On the wrapper: a click on a disabled button must not open the summary either.
+          <span className="usage-actions" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="secondary" disabled={busy} title={t("chat.compactTitle")} onClick={onCompact}>
+              {t("chat.compact")}
+            </button>
+          </span>
+        )}
       </span>
     </span>
   );

@@ -36,8 +36,12 @@
 
 .thought,
 .tool,
-.activity {
+.activity,
+.compaction {
   color: var(--vscode-descriptionForeground);
+}
+.compaction > summary {
+  cursor: pointer;
 }
 .thought .text {
   white-space: pre-wrap;

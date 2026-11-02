@@ -1,16 +1,17 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { Effect, Exit, Scope } from "effect";
+import { Effect, Exit, Option, Scope } from "effect";
 import * as vscode from "vscode";
-import { spawnAgent } from "../acpClient";
+import { canLogout, spawnAgent, type UrlElicitation } from "../acpClient";
 import type { AgentManager } from "../agentManager";
 import type { AgentUpdate, AgentUpdates } from "../agentUpdates";
 import { t } from "../i18n";
 import { thenable, type AppRuntime } from "../runtime";
+import { readSettings } from "../settings";
 import { stopAll, type AgentPool } from "./agents";
-import type { ChangeReview } from "./changes";
+import { confirm, type ChangeReview } from "./changes";
 import type { Follower } from "./follow";
 import type { ChatUi } from "./host";
-import { CANCELLED, ELICITATION_CANCELLED, type Permissions } from "./permissions";
+import { CANCELLED, ELICITATION_CANCELLED, parseElicitationUrl, type Permissions } from "./permissions";
 import { canReopen } from "./history";
 import { replayedParts } from "./replay";
 import { NoAgentError, type TabSessions } from "./sessions";
@@ -89,6 +90,8 @@ export class TabAgents {
     // Set once spawned; the agent sends nothing before it answers `initialize`.
     let running: RunningAgent | undefined;
     const tabFor = (sessionId: string) => (running ? this.host.tabs.forSession(running, sessionId) : undefined);
+    /** Each link the agent asked to open: `elicitation/complete` only names the link. */
+    const links = new Map<string, { readonly tab: Tab; readonly finished: AbortController }>();
     const agent = yield* spawnAgent(command, {
       onUpdate: (n) => {
         const tab = tabFor(n.sessionId);
@@ -102,9 +105,26 @@ export class TabAgents {
         return tab ? this.host.permissions.request(tab, req, signal) : Effect.succeed(CANCELLED);
       },
       elicit: (req, signal) => {
-        // Only questions about a session have a tab to show in.
-        const tab = "sessionId" in req ? tabFor(req.sessionId) : undefined;
-        return tab ? this.host.permissions.elicit(tab, req, signal) : Effect.succeed(ELICITATION_CANCELLED);
+        // A form needs a session to be about. A link can come without one, e.g. to sign in while a session starts.
+        const tab = "sessionId" in req ? tabFor(req.sessionId) : req.mode === "url" ? this.host.tabs.active : undefined;
+        if (!tab) {
+          return Effect.succeed(ELICITATION_CANCELLED);
+        }
+        if (req.mode === "url") {
+          const finished = new AbortController();
+          links.set(req.elicitationId, { tab, finished });
+          return this.elicitUrl(tab, req, AbortSignal.any([signal, finished.signal]));
+        }
+        return this.host.permissions.elicit(tab, req, signal);
+      },
+      onElicitationComplete: (elicitationId) => {
+        const link = links.get(elicitationId);
+        links.delete(elicitationId);
+        if (link) {
+          // Done without the user: they are no longer asked, and what the agent gets back says they didn't agree.
+          link.finished.abort();
+          this.host.postTab(link.tab, { type: "elicitationComplete", elicitationId });
+        }
       },
       onTerminal: (snapshot) => {
         const tab = tabFor(snapshot.sessionId);
@@ -131,6 +151,34 @@ export class TabAgents {
       Effect.forkIn(scope),
     );
     return started;
+  });
+
+  /**
+   * Asks the user before opening a link the agent sent: an agent never opens one by itself, and one that isn't safe is
+   * refused unseen. Accepting tells the agent the link was opened, not that what it is for is done.
+   */
+  private readonly elicitUrl = Effect.fn("TabAgents.elicitUrl")(function* (this: TabAgents, tab: Tab, request: UrlElicitation, signal: AbortSignal) {
+    const url = Option.getOrUndefined(parseElicitationUrl(request.url, readSettings().allowedHttpHosts));
+    if (!url) {
+      this.host.postTab(tab, { type: "notice", key: "chat.elicitation.unsafeUrl", args: [request.url] });
+      return { action: "decline" } satisfies acp.CreateElicitationResponse;
+    }
+    const { href } = url;
+    const response = yield* this.host.permissions.elicit(tab, { ...request, url: href }, signal);
+    if (response.action !== "accept") {
+      return response;
+    }
+    // As a string, which VS Code opens as it is: a Uri decodes what is percent-encoded in the query, such as a
+    // redirect address. The type only allows Uri.
+    const opened = yield* thenable(() => vscode.env.openExternal(href as unknown as vscode.Uri)).pipe(
+      Effect.tapError((err) => Effect.logWarning(`Opening a link failed: ${err.message}`)),
+      Effect.orElseSucceed(() => false),
+    );
+    if (!opened) {
+      this.host.postTab(tab, { type: "notice", key: "chat.elicitation.notOpened" });
+      return ELICITATION_CANCELLED;
+    }
+    return { action: "accept" } satisfies acp.CreateElicitationResponse;
   });
 
   /** The turn a replayed user message chunk belongs to; each replayed message is kept to edit or send again. */
@@ -257,6 +305,23 @@ export class TabAgents {
       yield* agent.authenticate(picked.id);
       yield* sessions.ensureSession(tabs.active);
     }
+  });
+
+  /**
+   * Logs the active tab's agent out, after asking. Its process restarts, as sessions already running may stop working:
+   * its tabs need a login next, and reopen their conversations after it when the agent can.
+   */
+  readonly logout = Effect.fn("TabAgents.logout")(function* (this: TabAgents) {
+    const running = yield* this.getAgent(this.host.tabs.active);
+    if (!canLogout(running.agent)) {
+      void vscode.window.showInformationMessage(t("chat.logoutUnsupported"));
+      return;
+    }
+    if (!(yield* confirm(t("chat.logoutConfirm"), t("chat.logout")))) {
+      return;
+    }
+    yield* running.agent.logout;
+    yield* this.restart(running.agentId);
   });
 
   /** Installs the agent's pending update, if it has one. */

@@ -5,7 +5,7 @@ import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
 import { EntryList, serversOf } from "./settings/entries";
-import { AgentTab, CommitTab, GeneralTab, NotificationsTab, WorktreeTab } from "./settings/panels";
+import { AgentTab, CommitTab, GeneralTab, LinksTab, NotificationsTab, WorktreeTab } from "./settings/panels";
 import { post } from "./settings/post";
 import { optionsKey, type LoadedOptions, type State } from "./settings/state";
 import { TABS, Tabs, type Tab } from "./settings/tabs";
@@ -99,6 +99,8 @@ function App() {
           {tab === "mcp" && <EntryList value={v.mcpServers} overridden={overridden("mcpServers")} />}
 
           {tab === "custom" && <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} />}
+
+          {tab === "links" && <LinksTab state={state} />}
 
           {tab === "usage" && <UsageTab
               source={usageSource}

@@ -19,6 +19,10 @@ export const __test = {
   outputChannels: new Map<string, string[]>(),
   /** Paths passed to `openTextDocument`. */
   openedDocuments: [] as string[],
+  /** What `env.openExternal` was asked to open. */
+  openedExternal: [] as unknown[],
+  /** What `env.openExternal` answers: false when the user turned it down. */
+  openExternalResult: true,
   /** The terminals created. */
   terminals: [] as Array<{ options: unknown }>,
   /** As if the user closed the terminal. */
@@ -32,6 +36,8 @@ export const __test = {
     __test.outputChannels.clear();
     __test.openedDocuments.length = 0;
     __test.terminals.length = 0;
+    __test.openedExternal.length = 0;
+    __test.openExternalResult = true;
     env.language = "en";
     workspace.workspaceFolders = undefined;
     workspace.textDocuments = [];
@@ -39,7 +45,13 @@ export const __test = {
   },
 };
 
-export const env = { language: "en" };
+export const env = {
+  language: "en",
+  openExternal: async (target: unknown): Promise<boolean> => {
+    __test.openedExternal.push(target);
+    return __test.openExternalResult;
+  },
+};
 
 export class Uri {
   private constructor(
@@ -237,6 +249,7 @@ export const window = {
   },
   showWarningMessage: async (_message: string, _options: unknown, ..._actions: string[]): Promise<string | undefined> => undefined,
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
+  showErrorMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   state: { focused: true },
   onDidChangeWindowState: () => noDisposable,
   onDidStartTerminalShellExecution: () => noDisposable,

@@ -1,13 +1,13 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { NodeFileSystem } from "@effect/platform-node-shared";
 import { assert, beforeEach, describe, it } from "@effect/vitest";
-import { Effect, Fiber, FileSystem, Schema } from "effect";
+import { Effect, Fiber, FileSystem, Option, Schema } from "effect";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AgentRequestError, type AcpAgent } from "../src/acpClient";
 import { DraftStore, type DraftHolder } from "../src/chat/drafts";
 import { canReopen, HistoryRequests, listHistory } from "../src/chat/history";
-import { CANCELLED, ELICITATION_CANCELLED, Permissions, type Answer } from "../src/chat/permissions";
+import { CANCELLED, ELICITATION_CANCELLED, parseElicitationUrl, Permissions, type Answer } from "../src/chat/permissions";
 import type { Attachment } from "../src/chat/protocol";
 import { replayedParts } from "../src/chat/replay";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
@@ -280,6 +280,109 @@ describe("Permissions with questions", () => {
     assert.deepStrictEqual(tool?.kind === "tool" && tool.waiting, []);
     const form = answered.items.find((i) => i.kind === "elicitation");
     assert.strictEqual(form?.kind === "elicitation" && form.outcome, "accept");
+  });
+
+  it("marks only the link that completed", () => {
+    const link = (requestId: number, elicitationId: string): Action => ({
+      type: "add",
+      item: { kind: "elicitation", requestId, message: "Sign in", url: "https://example.com/", elicitationId },
+    });
+    const state = [link(1, "a"), link(2, "b"), { type: "elicitationComplete", elicitationId: "b" } satisfies Action].reduce(transcript, EMPTY);
+    assert.deepStrictEqual(state.items.map((i) => i.kind === "elicitation" && "url" in i && i.completed), [undefined, true]);
+  });
+
+  describe("compaction", () => {
+    const compaction = (state: typeof EMPTY) => {
+      const item = state.items.find((i) => i.kind === "compaction");
+      return item?.kind === "compaction" ? item : undefined;
+    };
+    const update = (fields: Omit<acp.CompactionUpdate, "compactionId">): Action => ({ type: "compaction", update: { compactionId: "c", ...fields } });
+    const chunk = (text: string): Action => ({ type: "compactionChunk", compactionId: "c", text });
+
+    it("stays where it started, and updates in place", () => {
+      const state = [
+        { type: "chunk", kind: "assistant", text: "before" } satisfies Action,
+        update({ status: "in_progress" }),
+        { type: "chunk", kind: "assistant", text: "after" } satisfies Action,
+        update({ status: "completed" }),
+      ].reduce(transcript, EMPTY);
+      assert.deepStrictEqual(state.items.map((i) => i.kind), ["assistant", "compaction", "assistant"]);
+      assert.strictEqual(compaction(state)?.status, "completed");
+    });
+
+    it("starts on a first chunk, and appends the next ones in order", () => {
+      const state = [chunk("the "), chunk("summary")].reduce(transcript, EMPTY);
+      assert.strictEqual(state.items.length, 1);
+      assert.strictEqual(compaction(state)?.status, "in_progress");
+      assert.strictEqual(compaction(state)?.summary, "the summary");
+    });
+
+    it("patches: omitted fields stay, null clears them, a value replaces them", () => {
+      const withBoth = [chunk("old"), update({ status: "failed", error: "boom" })].reduce(transcript, EMPTY);
+      assert.strictEqual(compaction(withBoth)?.summary, "old");
+      assert.strictEqual(compaction(withBoth)?.error, "boom");
+      const kept = transcript(withBoth, update({ status: "failed" }));
+      assert.strictEqual(compaction(kept)?.summary, "old");
+      assert.strictEqual(compaction(kept)?.error, "boom");
+      const replaced = transcript(kept, update({ status: "completed", summary: [{ type: "text", text: "new" }], error: null }));
+      assert.strictEqual(compaction(replaced)?.summary, "new");
+      assert.isUndefined(compaction(replaced)?.error);
+      assert.strictEqual(compaction(transcript(replaced, update({ status: "completed", summary: null })))?.summary, "");
+      assert.strictEqual(compaction(transcript(replaced, update({ status: "completed", summary: [] })))?.summary, "");
+    });
+
+    it("ends what is running when the agent stops, and leaves what already ended", () => {
+      const stopped: Action = { type: "agentStopped" };
+      assert.strictEqual(compaction([update({ status: "in_progress" }), stopped].reduce(transcript, EMPTY))?.status, "cancelled");
+      assert.strictEqual(compaction([update({ status: "completed" }), stopped].reduce(transcript, EMPTY))?.status, "completed");
+      assert.strictEqual(compaction([update({ status: "failed", error: "boom" }), stopped].reduce(transcript, EMPTY))?.status, "failed");
+    });
+  });
+});
+
+describe("parseElicitationUrl", () => {
+  const href = (url: string, httpHosts: ReadonlyArray<string> = []) => Option.getOrUndefined(parseElicitationUrl(url, httpHosts))?.href;
+
+  it("takes https links, normalized, keeping what is encoded in them", () => {
+    assert.strictEqual(href("https://example.com/a?next=a%26b"), "https://example.com/a?next=a%26b");
+    assert.strictEqual(href("https://münchen.example/"), "https://xn--mnchen-3ya.example/");
+  });
+
+  it("takes http only to this machine and the hosts the user listed", () => {
+    assert.strictEqual(href("http://localhost:8123/callback?code=1"), "http://localhost:8123/callback?code=1");
+    assert.strictEqual(href("http://127.0.0.1:8123/"), "http://127.0.0.1:8123/");
+    assert.strictEqual(href("http://gitlab.internal:8080/login", ["gitlab.internal"]), "http://gitlab.internal:8080/login");
+    assert.strictEqual(href("http://192.168.1.10/", ["192.168.1.10"]), "http://192.168.1.10/");
+    assert.strictEqual(href("http://gitlab.internal/", ["GitLab.Internal"]), "http://gitlab.internal/");
+    assert.strictEqual(href("http://xn--mnchen-3ya.example/", ["münchen.example"]), "http://xn--mnchen-3ya.example/");
+    for (const url of [
+      "http://192.168.1.1/",
+      "http://[::1]/",
+      "http://localhost.evil.example/",
+      "http://evil.example/localhost",
+      "http://localhost@evil.example/",
+      "http://user:secret@localhost/",
+      "http://sub.gitlab.internal/",
+    ]) {
+      assert.isUndefined(href(url, ["gitlab.internal"]), url);
+    }
+    assert.isUndefined(href("file://gitlab.internal/etc/passwd", ["gitlab.internal"]));
+  });
+
+  it("refuses other schemes, addresses with a user name and what isn't a link", () => {
+    for (const url of [
+      "http://example.com/",
+      "file:///etc/passwd",
+      "javascript:alert(1)",
+      "vscode://settings",
+      "command:workbench.action.reloadWindow",
+      "https://bank.example@evil.example/",
+      "https://user:secret@example.com/",
+      "not a link",
+      "",
+    ]) {
+      assert.isUndefined(href(url), url);
+    }
   });
 });
 

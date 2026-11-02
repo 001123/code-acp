@@ -19,11 +19,11 @@ import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import copyIcon from "@tabler/icons/outline/copy.svg";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import { copyMessage } from "./clipboard";
-import { ElicitationView } from "./elicitation";
+import { ElicitationView, UrlElicitationView } from "./elicitation";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { TurnTraceView } from "./turnTrace";
-import { clip, contentText, fileLinkTokens, type ActivityItem, type Item, type Text } from "./transcript";
+import { clip, contentText, fileLinkTokens, type ActivityItem, type CompactionItem, type Item, type Text } from "./transcript";
 import { TokenMark, type Token } from "./tokens";
 
 const HOVER_WIDTH = 240;
@@ -363,6 +363,31 @@ function UserText({ text, tokens }: { text: string; tokens: Token[] }) {
   );
 }
 
+/** The agent compacting the conversation: a line, which opens on the summary or the error when there is one. */
+function CompactionView({ item }: { item: CompactionItem }) {
+  const { t } = useL10n();
+  const label =
+    item.status === "in_progress"
+      ? t("chat.compaction.inProgress")
+      : item.status === "completed"
+        ? t("chat.compaction.completed")
+        : item.status === "failed"
+          ? t("chat.compaction.failed")
+          : item.status === "cancelled"
+            ? t("chat.compaction.cancelled")
+            : t("chat.compaction.other", item.status);
+  if (!item.summary && !item.error) {
+    return <div className="compaction">{label}</div>;
+  }
+  return (
+    <details className="compaction" open={!!item.error}>
+      <summary>{label}</summary>
+      {item.error && <div className="error">{item.error}</div>}
+      {item.summary && <MarkdownView className="text md" text={item.summary} onOpenFile={openFile} />}
+    </details>
+  );
+}
+
 /** One transcript entry; memoized so a streamed chunk only re-renders the entry it extends. */
 export const ItemView = memo(function ItemView({ item }: { item: Item }) {
   const { t } = useL10n();
@@ -465,7 +490,9 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
         </div>
       );
     case "elicitation":
-      return <ElicitationView item={item} />;
+      return "url" in item ? <UrlElicitationView item={item} /> : <ElicitationView item={item} />;
+    case "compaction":
+      return <CompactionView item={item} />;
     case "notice":
     case "error":
       return <div className={item.kind}>{render(t, item.text)}</div>;

@@ -9,17 +9,21 @@
 #usage {
   position: relative;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 24px;
   height: 24px;
   border-radius: 6px;
   cursor: pointer;
-  outline: none;
   --usage-color: var(--vscode-progressBar-background);
 }
+#usage-ring {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
 #usage:hover,
-#usage:focus-visible {
+#usage:has(:focus-visible) {
   background: var(--vscode-toolbar-hoverBackground);
 }
 #usage svg {
@@ -65,8 +69,24 @@
   font-variant-numeric: tabular-nums;
 }
 #usage:hover #usage-panel,
-#usage:focus-visible #usage-panel {
+#usage:has(:focus-visible) #usage-panel {
   display: flex;
+}
+/* Bridges the gap to the ring, so the pointer can reach the panel's button without closing it. */
+#usage-panel::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 8px;
+}
+#usage-panel .usage-actions {
+  display: flex;
+  margin-top: 2px;
+}
+#usage-panel .usage-actions button {
+  flex: 1;
 }
 #usage-panel .usage-head,
 #usage-panel .usage-row {

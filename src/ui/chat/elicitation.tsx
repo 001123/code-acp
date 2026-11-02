@@ -4,7 +4,7 @@ import type { ElicitationAnswer, ElicitationValue } from "../../chat/protocol";
 import { MarkdownView } from "../markdown";
 import { useL10n } from "../l10n";
 import { openFile, post } from "./post";
-import type { ElicitationItem } from "./transcript";
+import type { FormElicitationItem, UrlElicitationItem } from "./transcript";
 
 interface Choice {
   value: string;
@@ -117,8 +117,45 @@ function typingElsewhere(): boolean {
 
 const isMac = navigator.userAgent.includes("Mac");
 
+/**
+ * A link the agent asks the user to open: its host and whole address as the host normalized them, and the message as
+ * plain text, so nothing the agent wrote can pass for another address. Nothing has the focus, so typing can't open it.
+ */
+export const UrlElicitationView = memo(function UrlElicitationView({ item }: { item: UrlElicitationItem }) {
+  const { t } = useL10n();
+  const done = item.outcome !== undefined;
+  const answer = (response: ElicitationAnswer) => post({ type: "elicitation", id: item.requestId, response });
+  const outcome = item.completed
+    ? "chat.elicitation.linkFinished"
+    : item.outcome === "accept"
+      ? "chat.elicitation.linkOpened"
+      : item.outcome === "decline"
+        ? "chat.elicitation.declined"
+        : "chat.elicitation.cancelled";
+  return (
+    <div className={"elicitation" + (done ? " done" : "")}>
+      <div className="elicitation-title">{t("chat.elicitation.linkTitle")}</div>
+      {item.message && <div className="elicitation-link-message">{item.message}</div>}
+      <div className="elicitation-link-host">{new URL(item.url).host}</div>
+      <code className="elicitation-link">{item.url}</code>
+      {done ? (
+        <div className="elicitation-outcome">{t(outcome)}</div>
+      ) : (
+        <div className="elicitation-actions">
+          <button type="button" onClick={() => answer({ action: "accept" })}>
+            {t("chat.elicitation.open")}
+          </button>
+          <button type="button" className="secondary" onClick={() => answer({ action: "decline" })}>
+            {t("chat.elicitation.decline")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
 /** A form the agent asks the user to fill in: choices as cards, numbered for the keyboard, beside free text. */
-export const ElicitationView = memo(function ElicitationView({ item }: { item: ElicitationItem }) {
+export const ElicitationView = memo(function ElicitationView({ item }: { item: FormElicitationItem }) {
   const { t } = useL10n();
   const [fields] = useState(() => fieldsOf(item.schema));
   const [draft, setDraft] = useState<Draft>(() => drafts.get(item.requestId) ?? defaults(item.schema));

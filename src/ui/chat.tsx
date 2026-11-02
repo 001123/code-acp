@@ -123,7 +123,17 @@ function App() {
     setHover,
     settings: (
       <>
-        <UsageMeter usage={usage} compactAt={compactAt} totals={totals} />
+        <UsageMeter
+          usage={usage}
+          compactAt={compactAt}
+          totals={totals}
+          busy={!!status.busy}
+          onCompact={
+            active !== undefined && commands.some((c) => c.name === "compact")
+              ? () => post({ type: "send", tab: active, parts: ["/compact"] })
+              : undefined
+          }
+        />
         <ChatSettings followAgent={followAgent} autoScroll={autoScroll} />
       </>
     ),
@@ -200,6 +210,8 @@ function App() {
         return update(tab, (s) => ({ ...s, config: msg.configOptions ?? [], configLoading: false }));
       case "history":
         return setHistory(msg);
+      case "sessionDeleted":
+        return setHistory((h) => h && { ...h, sessions: h.sessions.filter((s) => s.sessionId !== msg.sessionId) });
       case "notice":
         return dispatch(tab, { type: "add", item: { kind: "notice", text: { key: msg.key, args: msg.args } } });
       case "compactWindow":
@@ -223,11 +235,22 @@ function App() {
       case "elicitationRequest":
         return dispatch(tab, {
           type: "add",
-          item: { kind: "elicitation", requestId: msg.id, message: msg.message, schema: msg.schema, toolCallId: msg.toolCallId ?? undefined },
+          item: {
+            kind: "elicitation",
+            requestId: msg.id,
+            message: msg.message,
+            toolCallId: msg.toolCallId ?? undefined,
+            ...(msg.url ? { url: msg.url, elicitationId: msg.elicitationId } : { schema: msg.schema }),
+          },
         });
+      case "elicitationComplete":
+        return dispatch(tab, { type: "elicitationComplete", elicitationId: msg.elicitationId });
       case "elicitationDone":
         return dispatch(tab, { type: "elicitationDone", requestId: msg.id, action: msg.action });
       case "status":
+        if (msg.stopped) {
+          dispatch(tab, { type: "agentStopped" });
+        }
         return update(tab, (s) => {
           const busySince = msg.busy ? (s.busySince ?? Date.now()) : undefined;
           // No session is coming until the user acts.
@@ -310,6 +333,10 @@ function App() {
         return;
       case "notice":
         return dispatch(tab, { type: "add", item: noticeItem(u) });
+      case "compaction_update":
+        return dispatch(tab, { type: "compaction", update: u });
+      case "compaction_summary_chunk":
+        return dispatch(tab, { type: "compactionChunk", compactionId: u.compactionId, text: contentText(u.content) });
     }
   }
 

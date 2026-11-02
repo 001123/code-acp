@@ -2,6 +2,7 @@ import { assert, describe, it, beforeEach } from "@effect/vitest";
 import { Schema } from "effect";
 import { readFileSync } from "node:fs";
 import { __test } from "./stubs/vscode";
+import { parseHosts } from "../src/ui/settings/hosts";
 import { CustomAgentEntry, DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, McpServerEntry, readSettings, Settings } from "../src/settings";
 
 beforeEach(() => __test.reset());
@@ -21,6 +22,7 @@ describe("readSettings", () => {
     assert.isTrue(s.notifyFinished);
     assert.isTrue(s.rememberSessionOptions);
     assert.isFalse(s.worktreeForNewTabs);
+    assert.deepStrictEqual(s.allowedHttpHosts, []);
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
   });
 
@@ -60,6 +62,24 @@ describe("readSettings", () => {
     const s = readSettings();
     assert.deepStrictEqual(s.customAgents, {});
     assert.deepStrictEqual(s.mcpServers, {});
+  });
+});
+
+describe("parseHosts", () => {
+  it("keeps one normalized host per line, without blanks or repeats", () => {
+    assert.deepStrictEqual(parseHosts(" GitLab.Internal \n\n192.168.1.10\r\ngitlab.internal\n[::1]\nmünchen.example"), [
+      "gitlab.internal",
+      "192.168.1.10",
+      "[::1]",
+      "xn--mnchen-3ya.example",
+    ]);
+    assert.deepStrictEqual(parseHosts(""), []);
+  });
+
+  it("gives the line of what is more than a host", () => {
+    for (const bad of ["http://a", "a:8080", "a:80", "[::1]:8080", "a/b", "a/", "*.internal", "a?b", "a#b", "u@a", "a b", "::1"]) {
+      assert.strictEqual(parseHosts(`ok\n${bad}`), 2, bad);
+    }
   });
 });
 

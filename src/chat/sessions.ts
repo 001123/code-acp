@@ -13,7 +13,7 @@ import { folderOf, defaultCwd, isWorkspaceFolder, workspaceFolders } from "../wo
 import { Worktrees } from "../worktrees";
 import type { AgentPool } from "./agents";
 import { confirm, type ChangeReview } from "./changes";
-import { canReopen } from "./history";
+import { canDeleteSessions, canReopen } from "./history";
 import type { ChatUi } from "./host";
 import type { LastOptions } from "./lastOptions";
 import type { Permissions } from "./permissions";
@@ -331,6 +331,26 @@ export class TabSessions {
       yield* this.host.tabWorktrees.discardIfEmpty(tab, replacedWorktree, replacedCwd);
     }
     this.host.saveTabs();
+  });
+
+  /**
+   * Deletes a past session of the active tab's agent, after asking; tells whether it did. The session of an open tab
+   * stays, so a conversation on screen can't vanish: the history only offers this for the others.
+   */
+  readonly deleteSession = Effect.fn("TabSessions.deleteSession")(function* (this: TabSessions, sessionId: string, title: string | undefined) {
+    const { agent } = yield* this.host.getAgent(this.host.tabs.active);
+    if (!canDeleteSessions(agent) || this.host.tabs.showing(sessionId)) {
+      return false;
+    }
+    if (!(yield* confirm(t("chat.deleteSessionConfirm", title?.trim() || t("chat.untitled")), t("chat.deleteSession")))) {
+      return false;
+    }
+    // The tab may have opened it while the question was up.
+    if (this.host.tabs.showing(sessionId)) {
+      return false;
+    }
+    yield* agent.deleteSession(sessionId);
+    return true;
   });
 
   /**

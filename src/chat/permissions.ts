@@ -1,15 +1,38 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { Deferred, Effect } from "effect";
-import type { FormElicitation } from "../acpClient";
+import { Deferred, Effect, Option, Schema } from "effect";
+import type { Elicitation } from "../acpClient";
 
 export const CANCELLED: acp.RequestPermissionResponse = { outcome: { outcome: "cancelled" } };
 
 export const ELICITATION_CANCELLED: acp.CreateElicitationResponse = { action: "cancel" };
 
-/** What the agent asks the user: to allow a tool call, or to fill in a form (an elicitation). */
+const decodeUrl = Schema.decodeUnknownOption(Schema.URLFromString);
+
+/** Hosts plain http may always reach: this machine, where sign-in flows wait for their callback. */
+const LOOPBACK_HOSTS: ReadonlyArray<string> = ["localhost", "127.0.0.1"];
+
+/** Compared as URL normalizes them, so a hand-written setting matches whatever its case or encoding. */
+const allowsHttp = (hostname: string, httpHosts: ReadonlyArray<string>): boolean =>
+  LOOPBACK_HOSTS.includes(hostname) || httpHosts.some((host) => URL.parse(`http://${host}`)?.hostname === hostname);
+
+/**
+ * A link an agent may ask the user to open: https, or http to this machine or a host the user listed, so it can't reach
+ * local programs or files; and no user name, which can pass for the host (https://bank.example@evil.example). Normalized,
+ * so an international host shows as punycode.
+ */
+export const parseElicitationUrl = (value: string, httpHosts: ReadonlyArray<string>): Option.Option<URL> =>
+  Option.filter(
+    decodeUrl(value),
+    (url) =>
+      !url.username &&
+      !url.password &&
+      (url.protocol === "https:" || (url.protocol === "http:" && allowsHttp(url.hostname, httpHosts))),
+  );
+
+/** What the agent asks the user: to allow a tool call, or to fill in a form or open a link (an elicitation). */
 export type Ask =
   | { readonly kind: "permission"; readonly request: acp.RequestPermissionRequest }
-  | { readonly kind: "elicitation"; readonly request: FormElicitation };
+  | { readonly kind: "elicitation"; readonly request: Elicitation };
 
 export type Answer =
   | { readonly kind: "permission"; readonly response: acp.RequestPermissionResponse }
@@ -49,11 +72,11 @@ export class Permissions<T> {
     return answer.kind === "permission" ? answer.response : CANCELLED;
   });
 
-  /** Shows the form and waits for what the user filled in; the agent aborting it answers "cancel". */
+  /** Shows the form or link and waits for the user's answer; the agent aborting it answers "cancel". */
   readonly elicit = Effect.fn("Permissions.elicit")(function* (
     this: Permissions<T>,
     owner: T,
-    request: FormElicitation,
+    request: Elicitation,
     signal: AbortSignal,
   ) {
     const answer = yield* this.wait(owner, { kind: "elicitation", request }, signal);

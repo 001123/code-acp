@@ -4,7 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Scope } from "effect";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type AcpAgent, type AgentHandlers, canFork, spawnAgent } from "../src/acpClient";
+import { type AcpAgent, type AgentHandlers, canFork, canLogout, spawnAgent, type UrlElicitation } from "../src/acpClient";
 import { __test, Uri, workspace } from "./stubs/vscode";
 import { makeExtensionCtx, makeOutput, type OutputStub, stubLayer } from "./helpers";
 
@@ -103,7 +103,7 @@ describe("spawnAgent", () => {
         const meta = init._meta as { clientInfo: { name: string; version: string }; clientCapabilities: acp.ClientCapabilities };
         assert.deepStrictEqual(meta.clientInfo, { name: "code-acp", version: "1.2.3" });
         assert.deepStrictEqual(meta.clientCapabilities.fs, { readTextFile: true, writeTextFile: true });
-        assert.deepStrictEqual(meta.clientCapabilities.session, { notices: {} });
+        assert.deepStrictEqual(meta.clientCapabilities.session, { notices: {}, compaction: {} });
         // No onTerminal handler: no terminal capability; no elicit handler: no elicitations.
         assert.strictEqual(meta.clientCapabilities.terminal, false);
         assert.isUndefined(meta.clientCapabilities.elicitation);
@@ -214,7 +214,7 @@ describe("spawnAgent", () => {
     );
   });
 
-  it.live("offers form elicitations and round-trips them through the handler", () => {
+  it.live("offers elicitations and round-trips them through the handler", () => {
     const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
     const handlers: AgentHandlers = {
       ...rec.handlers,
@@ -226,16 +226,112 @@ describe("spawnAgent", () => {
     return withAgent({}, { ...rec, handlers }, (agent) =>
       Effect.gen(function* () {
         const meta = agent.initializeResponse._meta as { clientCapabilities: acp.ClientCapabilities };
-        assert.deepStrictEqual(meta.clientCapabilities.elicitation, { form: {} });
+        assert.deepStrictEqual(meta.clientCapabilities.elicitation, { form: {}, url: {} });
         yield* prompt(agent, "elicit");
         assert.strictEqual(rec.elicitations.length, 1);
         assert.strictEqual(rec.elicitations[0]!.message, "Which one?");
         assert.deepStrictEqual(JSON.parse(messageText(rec)), { action: "accept", content: { question_0_custom: "neither" } });
-        // A URL elicitation is not offered: it is cancelled without asking the user.
+        // A mode the client doesn't know is cancelled without asking the user.
         rec.updates.length = 0;
-        yield* prompt(agent, "elicit url");
+        yield* prompt(agent, "elicit future");
         assert.strictEqual(rec.elicitations.length, 1);
         assert.deepStrictEqual(JSON.parse(messageText(rec)), { action: "cancel" });
+      }),
+    );
+  });
+
+  it.live("asks about URL elicitations and reports when they complete", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    const completed: string[] = [];
+    const handlers: AgentHandlers = {
+      ...rec.handlers,
+      elicit: (req) => {
+        rec.elicitations.push(req);
+        return Effect.succeed({ action: "accept" });
+      },
+      onElicitationComplete: (id) => void completed.push(id),
+    };
+    return withAgent({}, { ...rec, handlers }, (agent) =>
+      Effect.gen(function* () {
+        yield* prompt(agent, "elicit url");
+        const asked = rec.elicitations[0] as UrlElicitation;
+        assert.strictEqual(asked.mode, "url");
+        assert.strictEqual(asked.url, "https://example.com/login?next=a%26b");
+        assert.deepStrictEqual(JSON.parse(messageText(rec)), { action: "accept" });
+        // Sent before the prompt's answer, but not ordered with it.
+        yield* Effect.gen(function* () {
+          for (let waited = 0; completed.length === 0 && waited < 1000; waited++) {
+            yield* Effect.sleep("2 millis");
+          }
+        });
+        assert.deepStrictEqual(completed, ["e1"]);
+      }),
+    );
+  });
+
+  it.live("shows the modes of an agent without config options as an option, and sets them", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return withAgent({ MOCK_MODES: "1" }, rec, (agent) =>
+      Effect.gen(function* () {
+        const { sessionId, configOptions } = yield* agent.newSession(process.cwd());
+        const option = configOptions![0] as acp.SessionConfigOption & { type: "select" };
+        assert.strictEqual(option.category, "mode");
+        assert.strictEqual(option.currentValue, "ask");
+        assert.deepStrictEqual(option.options.map((o) => ("value" in o ? o.value : "")), ["ask", "code"]);
+
+        const set = yield* agent.setConfigOption(sessionId, option.id, "code");
+        assert.strictEqual((set.configOptions[0] as typeof option).currentValue, "code");
+        yield* agent.prompt(sessionId, [{ type: "text", text: "mode" }]);
+        assert.strictEqual(messageText(rec), "code");
+
+        // The agent switching by itself looks like the option changing.
+        rec.updates.length = 0;
+        yield* agent.prompt(sessionId, [{ type: "text", text: "mode ask" }]);
+        const update = rec.updates.at(-1)!.update;
+        assert.strictEqual(update.sessionUpdate, "config_option_update");
+        assert.strictEqual(update.sessionUpdate === "config_option_update" && (update.configOptions[0] as typeof option).currentValue, "ask");
+      }),
+    );
+  });
+
+  it.live("prefers config options over modes", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return withAgent({ MOCK_MODES: "both" }, rec, (agent) =>
+      Effect.gen(function* () {
+        const { sessionId, configOptions } = yield* agent.newSession(process.cwd());
+        assert.deepStrictEqual(configOptions?.map((o) => o.id), ["real"]);
+        yield* agent.prompt(sessionId, [{ type: "text", text: "mode code" }]);
+        assert.strictEqual(rec.updates.at(-1)!.update.sessionUpdate, "current_mode_update");
+      }),
+    );
+  });
+
+  it.live("deletes sessions and logs out when the agent can", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return withAgent({ MOCK_HISTORY: "1", MOCK_LOGOUT: "1" }, rec, (agent) =>
+      Effect.gen(function* () {
+        assert.isTrue(canLogout(agent));
+        yield* agent.deleteSession("old");
+        assert.deepStrictEqual((yield* agent.listSessions(process.cwd())).sessions, []);
+        const again = yield* Effect.flip(agent.deleteSession("old"));
+        assert.strictEqual(again._tag, "AgentRequestError");
+        yield* agent.logout;
+      }),
+    );
+  });
+
+  it.live("passes compaction updates on", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return withAgent({}, rec, (agent) =>
+      Effect.gen(function* () {
+        assert.isFalse(canLogout(agent));
+        yield* prompt(agent, "compact");
+        assert.deepStrictEqual(rec.updates.map((u) => u.update.sessionUpdate), [
+          "compaction_update",
+          "compaction_summary_chunk",
+          "compaction_summary_chunk",
+          "compaction_update",
+        ]);
       }),
     );
   });

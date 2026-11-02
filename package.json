@@ -100,6 +100,11 @@
         "category": "%command.category%"
       },
       {
+        "command": "codeAcp.logout",
+        "title": "%command.logout%",
+        "category": "%command.category%"
+      },
+      {
         "command": "codeAcp.restart",
         "title": "%command.restart%",
         "category": "%command.category%"
@@ -253,7 +258,7 @@
         {
           "command": "codeAcp.worktree",
           "when": "view == codeAcp.chat",
-          "group": "1_agent@4"
+          "group": "1_agent@5"
         },
         {
           "command": "codeAcp.login",
@@ -261,9 +266,14 @@
           "group": "1_agent@2"
         },
         {
-          "command": "codeAcp.restart",
+          "command": "codeAcp.logout",
           "when": "view == codeAcp.chat",
           "group": "1_agent@3"
+        },
+        {
+          "command": "codeAcp.restart",
+          "when": "view == codeAcp.chat",
+          "group": "1_agent@4"
         },
         {
           "command": "codeAcp.showUsage",
@@ -616,6 +626,15 @@
           "default": "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Write a single subject line only, no body.",
           "editPresentation": "multilineText",
           "description": "%config.commitMessage.instructions%"
+        },
+        "codeAcp.allowedHttpHosts": {
+          "scope": "machine",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "%config.allowedHttpHosts%"
         },
         "codeAcp.mcpServers": {
           "scope": "machine",

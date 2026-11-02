@@ -66,6 +66,8 @@ export const Settings = Schema.Struct({
   "commitMessage.fastMode": FastModeSetting,
   /** Extra MCP servers for every session, by name. */
   mcpServers: Schema.Record(Schema.String, McpServerEntry),
+  /** Hosts besides this machine that links from agents may reach over plain http. */
+  allowedHttpHosts: Schema.Array(Schema.String),
 });
 export type Settings = typeof Settings.Type;
 export type SettingKey = keyof Settings;
@@ -91,6 +93,7 @@ export const SETTING_KEYS = [
   "commitMessage.effort",
   "commitMessage.fastMode",
   "mcpServers",
+  "allowedHttpHosts",
 ] as const satisfies ReadonlyArray<SettingKey>;
 
 /** Default of codeAcp.commitMessage.instructions; keep in sync with package.json. */
@@ -119,6 +122,7 @@ const DEFAULTS: Settings = {
   "commitMessage.effort": LOWEST_EFFORT,
   "commitMessage.fastMode": "default",
   mcpServers: {},
+  allowedHttpHosts: [],
 };
 
 const decodeSettings = Schema.decodeUnknownOption(Settings);
@@ -154,6 +158,7 @@ export function readSettings(): Settings {
     "commitMessage.effort": read("commitMessage.effort"),
     "commitMessage.fastMode": read("commitMessage.fastMode"),
     mcpServers: read("mcpServers"),
+    allowedHttpHosts: read("allowedHttpHosts"),
   };
 }
 
