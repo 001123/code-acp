@@ -10,7 +10,7 @@ import pinFilledIcon from "@tabler/icons/filled/pin.svg";
 import plusIcon from "@tabler/icons/outline/plus.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { post } from "./post";
-import type { Usage } from "./toolbar";
+import type { Usage } from "./usageMeter";
 import { EMPTY, openRequest, type Transcript } from "./transcript";
 
 export interface Status {

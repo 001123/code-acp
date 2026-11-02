@@ -5,7 +5,7 @@ import { canFork, type AgentRequestError, type AgentStartError, type AuthRequire
 import type { ShadowGit } from "../checkpoints";
 import { ChangeSet } from "../fileChanges";
 import { t } from "../i18n";
-import type { ExtensionCtx, Output } from "../runtime";
+import { thenable, type ExtensionCtx, type Output } from "../runtime";
 import { configureSession } from "../sessionOptions";
 import { readSettings } from "../settings";
 import { folderOf, defaultCwd, isWorkspaceFolder, workspaceFolders } from "../workspace";
@@ -383,6 +383,22 @@ export class TabSessions {
       this.host.turns.rewindTo(fork, turn);
       this.host.turns.loadComposer(fork, { parts: [...original.parts] });
     }
+  });
+
+  /** Sets a config option of the tab's session, remembering it for the agent's next sessions (codeAcp.rememberSessionOptions). */
+  readonly setConfig = Effect.fn("TabSessions.setConfig")(function* (this: TabSessions, tab: Tab, configId: string, value: string) {
+    if (!tab.running || !tab.sessionId) {
+      return;
+    }
+    const { agentId } = tab.running;
+    const before = tab.configOptions;
+    const res = yield* tab.running.agent.setConfigOption(tab.sessionId, configId, value);
+    const picked = readSettings().rememberSessionOptions ? this.host.lastOptions.picked(agentId, before, configId, value) : undefined;
+    if (picked) {
+      yield* thenable(() => picked);
+    }
+    this.host.setConfigOptions(tab, res.configOptions);
+    this.host.postTab(tab, { type: "configOptions", configOptions: res.configOptions });
   });
 
   readonly cancelTab = Effect.fn("TabSessions.cancelTab")(function* (this: TabSessions, tab: Tab) {

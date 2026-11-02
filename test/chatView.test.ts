@@ -255,4 +255,75 @@ describe("ChatViewProvider", () => {
       }),
     ),
   );
+
+  it.live("closes the other tabs from the context menu, keeping pinned ones", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType, provider, runtime, send, tab, tabsNow } = yield* startChat;
+        const addTab = Effect.gen(function* () {
+          const before = tabsNow().tabs.length;
+          send({ type: "newTab" });
+          yield* until(() => tabsNow().tabs.length === before + 1, "the new tab");
+          const added = tabsNow().active;
+          yield* until(() => ofType("session", added).length === 1, "its session");
+          return added;
+        });
+        const pinned = yield* addTab;
+        const other = yield* addTab;
+        send({ type: "pinTab", tab: pinned, pinned: true });
+        yield* until(() => tabsNow().tabs.some((t) => t.id === pinned && t.pinned), "the pin");
+        const act = (id: number, action: Parameters<typeof provider.tabAction>[1]) => Effect.promise(() => runtime.runPromise(provider.tabAction(id, action)));
+        yield* act(pinned, "close");
+        assert.isTrue(tabsNow().tabs.some((t) => t.id === pinned));
+        yield* act(tab, "closeOthers");
+        assert.deepStrictEqual(tabsNow().tabs.map((t) => t.id).sort(), [tab, pinned].sort());
+        assert.isFalse(tabsNow().tabs.some((t) => t.id === other));
+        assert.strictEqual(tabsNow().active, tab);
+        assert.deepStrictEqual(ofType("error"), []);
+      }),
+    ),
+  );
+
+  it.live("starts over in a fresh session when the agent restarts", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { idle, ofType, provider, replyOf, runtime, say, tab } = yield* startChat;
+        say(tab, "pid");
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the first turn");
+        yield* idle(tab);
+        const pid = replyOf(tab);
+        yield* Effect.promise(() => runtime.runPromise(provider.restart()));
+        yield* until(() => ofType("session", tab).length === 2, "the new session");
+        assert.strictEqual(ofType("reset", tab).length, 1);
+        say(tab, "pid");
+        yield* until(() => ofType("turnEnd", tab).length === 2, "the second turn");
+        yield* idle(tab);
+        const restarted = replyOf(tab).slice(pid.length);
+        assert.isNotEmpty(restarted);
+        assert.notStrictEqual(restarted, pid);
+        assert.deepStrictEqual(ofType("error"), []);
+      }),
+    ),
+  );
+
+  it.live("shows the tab waiting for a permission", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { idle, ofType, provider, runtime, say, send, tab, tabsNow } = yield* startChat;
+        say(tab, "permission");
+        yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+        send({ type: "newTab" });
+        yield* until(() => tabsNow().tabs.length === 2, "the new tab");
+        const added = tabsNow().active;
+        assert.notStrictEqual(added, tab);
+        yield* until(() => ofType("session", added).length === 1, "its session");
+        yield* Effect.promise(() => runtime.runPromise(provider.showAttention()));
+        assert.strictEqual(tabsNow().active, tab);
+        send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "allow" });
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+        yield* idle(tab);
+        assert.deepStrictEqual(ofType("error"), []);
+      }),
+    ),
+  );
 });
