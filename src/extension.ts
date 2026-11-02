@@ -26,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const updates = await runtime.runPromise(AgentUpdates.use(Effect.succeed));
   const provider = new ChatViewProvider(context, runtime, manager, updates);
-  const dropView = new DropViewProvider(run((uris: ReadonlyArray<vscode.Uri>) => provider.attach(uris)));
+  const dropView = new DropViewProvider(run((uris: ReadonlyArray<vscode.Uri>) => provider.composer.attach(uris)));
 
   const selectAgent = Effect.fn("selectAgent")(function* () {
     const manage = { label: t("agent.manage"), id: undefined as string | undefined };
@@ -111,14 +111,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       run((uri?: vscode.Uri, selected?: Array<vscode.Uri>) => {
         const target = vscode.window.activeTextEditor?.document.uri;
         const uris = selected?.length ? selected : uri instanceof vscode.Uri ? [uri] : target ? [target] : [];
-        return uris.length ? provider.attach(uris) : Effect.void;
+        return uris.length ? provider.composer.attach(uris) : Effect.void;
       }),
     ),
     vscode.commands.registerCommand(
       "codeAcp.addSelection",
       run(() => {
         const editor = vscode.window.activeTextEditor;
-        return editor ? provider.attachSelection(editor) : Effect.void;
+        return editor ? provider.composer.attachSelection(editor) : Effect.void;
       }),
     ),
     // "Ask Code ACP": the editor context submenu, the palette and the lightbulb.
@@ -127,7 +127,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         command,
         run(() => {
           const editor = vscode.window.activeTextEditor;
-          return editor ? provider.askAboutSelection(editor, t(prompt)) : Effect.void;
+          return editor ? provider.composer.askAboutSelection(editor, t(prompt)) : Effect.void;
         }),
       ),
     ),
@@ -136,21 +136,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.languages.registerCodeActionsProvider({ scheme: "file" }, new AskAgentActions(), {
       providedCodeActionKinds: AskAgentActions.kinds,
     }),
-    vscode.commands.registerCommand("codeAcp.addProblems", run(() => provider.attachProblems("file"))),
-    vscode.commands.registerCommand("codeAcp.addWorkspaceProblems", run(() => provider.attachProblems("workspace"))),
+    vscode.commands.registerCommand("codeAcp.addProblems", run(() => provider.composer.attachProblems("file"))),
+    vscode.commands.registerCommand("codeAcp.addWorkspaceProblems", run(() => provider.composer.attachProblems("workspace"))),
     // The "Fix with Code ACP" quick fix passes the document's uri and the diagnostics under the cursor.
     vscode.commands.registerCommand(
       "codeAcp.fixProblems",
       run((uri?: unknown, diagnostics?: unknown) =>
-        uri instanceof vscode.Uri && Array.isArray(diagnostics) ? provider.fixProblems(uri, diagnostics) : Effect.void,
+        uri instanceof vscode.Uri && Array.isArray(diagnostics) ? provider.composer.fixProblems(uri, diagnostics) : Effect.void,
       ),
     ),
     vscode.languages.registerCodeActionsProvider({ scheme: "file" }, new FixProblemsActions(), {
       providedCodeActionKinds: FixProblemsActions.kinds,
     }),
-    vscode.commands.registerCommand("codeAcp.addTerminalSelection", run(() => provider.attachTerminalSelection())),
-    vscode.commands.registerCommand("codeAcp.addTerminalOutput", run(() => provider.attachTerminalOutput(false))),
-    vscode.commands.registerCommand("codeAcp.addTerminalFailure", run(() => provider.attachTerminalOutput(true))),
+    vscode.commands.registerCommand("codeAcp.addTerminalSelection", run(() => provider.composer.attachTerminalSelection())),
+    vscode.commands.registerCommand("codeAcp.addTerminalOutput", run(() => provider.composer.attachTerminalOutput(false))),
+    vscode.commands.registerCommand("codeAcp.addTerminalFailure", run(() => provider.composer.attachTerminalOutput(true))),
     // webview/context passes the merged `data-vscode-context` of the clicked element (see src/ui/chat.tsx).
     vscode.commands.registerCommand("codeAcp.quoteSelection", (context?: { selectedText?: unknown }) => {
       if (typeof context?.selectedText === "string") {

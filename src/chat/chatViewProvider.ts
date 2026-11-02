@@ -1,57 +1,40 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { Effect, Exit, Option, Predicate, Schema, Scope, Semaphore } from "effect";
+import { Effect, Exit, Scope } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { canFork, spawnAgent, type AgentRequestError, type AgentStartError } from "../acpClient";
+import { spawnAgent } from "../acpClient";
 import type { AgentManager } from "../agentManager";
 import type { AgentUpdate, AgentUpdates } from "../agentUpdates";
-import { ClaudeSettings } from "../claudeSettings";
-import { Completions } from "../completions";
-import type { ShadowGit } from "../checkpoints";
-import { ChangeSet } from "../fileChanges";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
-import { Problems, type ProblemScope } from "../problems";
-import { runIn, thenable, type AppRuntime, type AppServices, type ExtensionCtx, type Output } from "../runtime";
-import { choicesOf, configureSession, modelOption, thoughtOption } from "../sessionOptions";
+import { runIn, thenable, type AppRuntime, type AppServices } from "../runtime";
+import { choicesOf, modelOption, thoughtOption } from "../sessionOptions";
 import { readSettings } from "../settings";
-import { TerminalContext } from "../terminalContext";
-import { UsageLedger, type SessionRef } from "../usageLedger";
 import { webviewHtml, webviewRoots } from "../webview";
 import { Worktrees } from "../worktrees";
 import { AgentPool, stopAll } from "./agents";
 import { Attention, type AttentionReason } from "./attention";
-import { attachmentBlock, AttachmentQueue, imageToTempFile, pruneTempFiles, selectionAttachments, uriAttachments } from "./attachments";
-import { ChangeReview, confirm, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
+import { AttachmentQueue, pruneTempFiles } from "./attachments";
+import { ChangeReview, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
+import { ComposerCommands } from "./composerCommands";
 import { DraftStore } from "./drafts";
 import { LastOptions } from "./lastOptions";
 import { Follower } from "./follow";
-import { canReopen, HistoryRequests, listHistory } from "./history";
+import { HistoryRequests, listHistory } from "./history";
+import type { ChatUi } from "./host";
+import { ViewMessages } from "./messages";
+import { openFile } from "./openFile";
 import { CANCELLED, ELICITATION_CANCELLED, Permissions } from "./permissions";
+import { NoAgentError, TabSessions } from "./sessions";
 import { ChatStatusBar } from "./statusBar";
-import type { Attachment, ChangeHunk, Draft, FromWebview, LoadComposer, QueuedInfo, SentAttachment } from "./protocol";
-import {
-  messageText,
-  resetConversation,
-  TabList,
-  usageOf,
-  type OutgoingMessage,
-  type Reopen,
-  type RunningAgent,
-  type Tab,
-} from "./tabs";
+import type { ChangeHunk, Draft, FromWebview, TabMessage } from "./protocol";
+import { resetConversation, TabList, type RunningAgent, type Tab } from "./tabs";
 import { replayedParts } from "./replay";
+import { TabTurns } from "./turns";
+import { TabUsage } from "./usage";
 import { TabWorktrees } from "./worktrees";
-import { cwdForNewTab, defaultCwd, excludeGlob, folderOf, gitIgnored, isWorkspaceFolder, resolvePath, workspaceFolders } from "../workspace";
-
-/** `_meta` key on Claude agents' `usage_update` naming the model the usage belongs to. */
-const CLAUDE_MODEL_META = "_claude/model";
+import { cwdForNewTab, defaultCwd, workspaceFolders } from "../workspace";
 
 const TABS_KEY = "codeAcp.tabs";
-
-const MAX_TITLE_LENGTH = 40;
-
-/** Characters of a taken-back message quoted to the agent. */
-const MAX_EXCERPT_LENGTH = 80;
 
 /** Tabs are written to workspaceState at most this often; usage updates arrive many times per turn. */
 const SAVE_TABS_DELAY_MS = 500;
@@ -59,9 +42,6 @@ const SAVE_TABS_DELAY_MS = 500;
 function isTerminalAuth(m: acp.AuthMethod): m is acp.AuthMethodTerminal & { type: "terminal" } {
   return "type" in m && m.type === "terminal";
 }
-
-/** No agent installed or configured yet. */
-class NoAgentError extends Schema.TaggedError<NoAgentError>()("NoAgentError", {}) {}
 
 /** The chat view: tabs of ACP sessions, each on the process of its agent. */
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -74,6 +54,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly tabs: TabList;
   private readonly drafts: DraftStore;
   private readonly lastOptions: LastOptions;
+  private readonly turns: TabTurns;
+  private readonly sessions: TabSessions;
   private readonly permissions = new Permissions<Tab>({
     shown: (tab, id, ask) => {
       this.view?.show(true);
@@ -110,6 +92,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     run: (effect, tab) => this.run(effect, tab),
     openFile: (file, line) => this.openFile(file, line),
   });
+  private readonly ui: ChatUi = {
+    postTab: (tab, message) => this.postTab(tab, message),
+    postTabs: () => this.postTabs(),
+    status: (tab, key, extra) => this.status(tab, key, extra),
+    refreshStatus: (tab) => this.refreshStatus(tab),
+    saveTabs: () => this.saveTabs(),
+    setConfigOptions: (tab, options) => this.setConfigOptions(tab, options),
+    run: (effect, tab) => this.run(effect, tab),
+  };
+  private readonly usage = new TabUsage(this.ui);
   /** Keep and Undo above each change of the active tab, in editors. */
   readonly hunkLenses: vscode.CodeLensProvider = {
     onDidChangeCodeLenses: this.changes.onDidChangeLenses,
@@ -121,8 +113,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     postTab: (tab, message) => this.postTab(tab, message),
     postTabs: () => this.postTabs(),
     status: (tab, key) => this.status(tab, key),
-    confirmStartOver: (tab) => this.confirmStartOver(tab),
-    startOver: (tab, change) => this.startOver(tab, change),
+    confirmStartOver: (tab) => this.sessions.confirmStartOver(tab),
+    startOver: (tab, change) => this.sessions.startOver(tab, change),
   });
   private readonly history = new HistoryRequests();
   /** Attachments added before the webview was ready are delivered on "ready". */
@@ -133,6 +125,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.post({ type: "addAttachments", attachments, prompt });
     return true;
   });
+  private readonly focus = thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+  /** What VS Code's commands add to the composer. */
+  readonly composer = new ComposerCommands(this.attachments, this.focus);
+  private readonly viewMessages = new ViewMessages({
+    post: (message) => this.post(message),
+    attachments: this.attachments,
+    permissions: this.permissions,
+    openFile: (file, line) => this.openFile(file, line),
+  });
   private readonly statusBar = new ChatStatusBar(ChatViewProvider.showAttentionCommand);
   /** A status bar update is due; several changes in one tick share it. */
   private statusBarDue = false;
@@ -141,10 +142,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly disposables: vscode.Disposable[] = [];
   /** Pending `writeTabs`; flushed on dispose. */
   private saveTimer?: ReturnType<typeof setTimeout>;
-  /** Turn ids, unique across tabs. */
-  private nextTurn: number;
-  /** Ids of queued messages. */
-  private nextQueued = 1;
   /** codeAcp.followAgent: the active tab's agent's tool locations are opened in the editor. */
   private followAgent = readSettings().followAgent;
   private readonly follower = new Follower(this.followAgent, {
@@ -163,8 +160,42 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (saved === undefined) {
       this.tabs.active.wantsWorktree = readSettings().worktreeForNewTabs;
     }
-    this.nextTurn = this.tabs.lastTurn + 1;
     this.lastOptions = new LastOptions(context.globalState);
+    const parts = {
+      tabs: this.tabs,
+      changes: this.changes,
+      usage: this.usage,
+      tabWorktrees: this.tabWorktrees,
+    };
+    this.turns = new TabTurns(
+      {
+        ...this.ui,
+        ...parts,
+        ensureSession: (tab) => this.sessions.ensureSession(tab),
+        cancelTab: (tab) => this.sessions.cancelTab(tab),
+        finished: (tab) => this.attention.raise(tab, "finished"),
+        turnEnded: (tab) => {
+          this.changes.post(tab);
+          this.run(this.refreshBranch(tab), tab);
+          if (tab.sessionId) {
+            this.status(tab, "chat.ready");
+          } else {
+            this.refreshStatus(tab);
+          }
+        },
+      },
+      this.tabs.lastTurn + 1,
+    );
+    this.sessions = new TabSessions({
+      ...this.ui,
+      ...parts,
+      agents: this.agents,
+      permissions: this.permissions,
+      turns: this.turns,
+      lastOptions: this.lastOptions,
+      selectTab: (tab) => this.selectTab(tab),
+      getAgent: (tab) => this.getAgent(tab),
+    });
     // Raw bytes of draft attachments, which are too big for workspaceState.
     this.drafts = new DraftStore(path.join((context.storageUri ?? context.globalStorageUri).fsPath, "drafts"), () => this.tabs.all);
     this.run(pruneTempFiles);
@@ -322,7 +353,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (!this.tabs.has(tab)) {
       return;
     }
-    yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+    yield* this.focus;
     if (this.tabs.active !== tab) {
       yield* this.selectTab(tab);
     }
@@ -422,39 +453,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   });
 
-  /** Shows the saved usage of the tab's session (or the one it will reopen) until the agent reports again. */
-  private postSavedUsage(tab: Tab): void {
-    const sessionId = tab.sessionId ?? tab.reopen?.sessionId;
-    const usage = sessionId === undefined ? undefined : usageOf(tab, sessionId);
-    if (!usage) {
-      return;
-    }
-    const { compactAt, ...reported } = usage;
-    this.postTab(tab, { type: "update", update: { sessionUpdate: "usage_update", ...reported } });
-    this.postTab(tab, { type: "compactWindow", size: compactAt ?? null });
-    this.run(this.postSessionTotals(tab), tab);
+  /** Opens a path from the shown conversation, so a relative one starts at the active tab's folder. */
+  private openFile(file: string, line: number | undefined) {
+    return openFile(file, line, this.tabs.active.cwd);
   }
-
-  /** The ledger entry of a tab's session; undefined until it has one and knows its agent. */
-  private sessionRef(tab: Tab, sessionId: string | undefined = tab.sessionId): SessionRef | undefined {
-    const agentId = tab.running?.agentId ?? tab.reopen?.agentId ?? tab.agentId;
-    // A worktree's usage counts for the folder it came from.
-    return agentId && sessionId ? { agentId, sessionId, cwd: tab.worktree?.base ?? tab.cwd, title: tab.name ?? tab.title } : undefined;
-  }
-
-  /** The tokens and cost recorded for the tab's session, shown with its context usage. */
-  private readonly postSessionTotals = Effect.fn("ChatView.postSessionTotals")(function* (this: ChatViewProvider, tab: Tab) {
-    const ref = this.sessionRef(tab, tab.sessionId ?? tab.reopen?.sessionId);
-    const totals = ref ? yield* (yield* UsageLedger).session(ref.agentId, ref.sessionId) : undefined;
-    this.postTab(tab, { type: "sessionTotals", totals: totals ?? null });
-  });
 
   private tabOf(msg: FromWebview): Tab | undefined {
     return "tab" in msg ? this.tabs.byId(msg.tab) : undefined;
   }
 
   private readonly onMessage = Effect.fn("ChatView.onMessage")(function* (this: ChatViewProvider, msg: FromWebview) {
-    const tab = this.tabOf(msg);
+    if ("tab" in msg) {
+      const tab = this.tabs.byId(msg.tab);
+      if (tab) {
+        yield* this.onTabMessage(tab, msg);
+      }
+      return;
+    }
     switch (msg.type) {
       case "ready":
         yield* this.drafts.load();
@@ -467,135 +482,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.post({ type: "showChanges", enabled: readSettings().showChanges });
         for (const each of this.tabs.all) {
           this.refreshStatus(each);
-          this.postSavedUsage(each);
+          this.usage.postSaved(each);
           this.changes.postIfTracked(each);
           if (each.queue.length > 0) {
-            this.postQueue(each);
+            this.turns.postQueue(each);
           }
         }
         this.attachments.flush();
-        yield* this.ensureSession(this.tabs.active);
-        break;
-      case "send":
-        if (tab) {
-          const message: OutgoingMessage = { parts: msg.parts };
-          if (msg.rewind !== undefined) {
-            yield* this.resend(tab, msg.rewind, message, true);
-          } else if (msg.now) {
-            yield* this.sendNow(tab, message);
-          } else {
-            yield* this.send(tab, message);
-          }
-        }
-        break;
-      case "sendQueuedNow":
-        if (tab) {
-          yield* this.sendQueuedNow(tab, msg.id);
-        }
-        break;
-      case "unqueue":
-        if (tab) {
-          this.unqueue(tab, msg.id, msg.edit);
-        }
-        break;
-      case "editMessage":
-        if (tab) {
-          this.editMessage(tab, msg.turn);
-        }
-        break;
-      case "retry": {
-        const sent = tab?.sent.get(msg.turn);
-        if (tab && sent) {
-          yield* this.resend(tab, msg.turn, sent, false);
-        } else if (tab) {
-          this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
-        }
-        break;
-      }
-      case "fork":
-        if (tab) {
-          yield* this.fork(tab, msg.turn);
-        }
-        break;
-      case "cancel":
-        if (tab) {
-          yield* this.cancelTab(tab);
-        }
-        break;
-      case "draft":
-        if (tab) {
-          yield* this.setDraft(tab, msg.draft);
-        }
-        break;
-      case "draftText":
-        if (tab) {
-          yield* this.setDraft(tab, msg.text);
-        }
+        yield* this.sessions.ensureSession(this.tabs.active);
         break;
       case "newTab":
         yield* this.newSession();
-        break;
-      case "selectTab":
-        if (tab) {
-          yield* this.selectTab(tab);
-        }
-        break;
-      case "closeTab":
-        if (tab) {
-          yield* this.closeTab(tab);
-          yield* this.drafts.prune;
-        }
-        break;
-      case "pinTab":
-        if (tab && this.tabs.pin(tab, msg.pinned)) {
-          this.postTabs();
-        }
-        break;
-      case "renameTab":
-        if (tab && this.tabs.rename(tab, msg.title)) {
-          this.postTabs();
-        }
-        break;
-      case "moveTab":
-        if (tab && this.tabs.move(tab, msg.index)) {
-          this.postTabs();
-        }
         break;
       case "history":
         yield* this.showHistory();
         break;
       case "openSession":
-        yield* this.openSession(msg.sessionId, msg.cwd, msg.title);
+        yield* this.sessions.openSession(msg.sessionId, msg.cwd, msg.title);
         break;
       case "login":
         yield* this.login();
-        break;
-      case "selectAgent":
-        yield* thenable(() => vscode.commands.executeCommand("codeAcp.selectAgent"));
-        break;
-      case "setAgent":
-        if (tab) {
-          yield* this.setTabAgent(tab, msg.id);
-        }
-        break;
-      case "setCwd":
-        if (tab) {
-          yield* this.setTabCwd(tab, msg.cwd);
-        }
-        break;
-      case "pickWorktree":
-        if (tab) {
-          yield* this.tabWorktrees.pick(tab);
-        }
-        break;
-      case "manageAgents":
-        yield* thenable(() => vscode.commands.executeCommand("codeAcp.manageAgents"));
-        break;
-      case "showUsage":
-        yield* thenable(() => vscode.commands.executeCommand("codeAcp.showUsage"));
-        break;
-      case "openSettings":
-        yield* thenable(() => vscode.commands.executeCommand("codeAcp.openSettings"));
         break;
       case "updateAgent": {
         const update = (yield* this.updates.pending).find((u) => u.installed.id === msg.id);
@@ -604,14 +510,65 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         break;
       }
-      case "permission":
-        this.permissions.answer(msg.id, msg.optionId);
+      default:
+        yield* this.viewMessages.handle(msg);
+    }
+  });
+
+  private readonly onTabMessage = Effect.fn("ChatView.onTabMessage")(function* (this: ChatViewProvider, tab: Tab, msg: TabMessage) {
+    switch (msg.type) {
+      case "send":
+      case "sendQueuedNow":
+      case "unqueue":
+      case "editMessage":
+      case "retry":
+        yield* this.turns.onMessage(tab, msg);
         break;
-      case "elicitation":
-        this.permissions.answerElicitation(msg.id, msg.response);
+      case "fork":
+        yield* this.sessions.fork(tab, msg.turn);
+        break;
+      case "cancel":
+        yield* this.sessions.cancelTab(tab);
+        break;
+      case "draft":
+        yield* this.setDraft(tab, msg.draft);
+        break;
+      case "draftText":
+        yield* this.setDraft(tab, msg.text);
+        break;
+      case "selectTab":
+        yield* this.selectTab(tab);
+        break;
+      case "closeTab":
+        yield* this.closeTab(tab);
+        yield* this.drafts.prune;
+        break;
+      case "pinTab":
+        if (this.tabs.pin(tab, msg.pinned)) {
+          this.postTabs();
+        }
+        break;
+      case "renameTab":
+        if (this.tabs.rename(tab, msg.title)) {
+          this.postTabs();
+        }
+        break;
+      case "moveTab":
+        if (this.tabs.move(tab, msg.index)) {
+          this.postTabs();
+        }
+        break;
+      case "setAgent":
+        yield* this.setTabAgent(tab, msg.id);
+        break;
+      case "setCwd":
+        yield* this.sessions.setTabCwd(tab, msg.cwd);
+        break;
+      case "pickWorktree":
+        yield* this.tabWorktrees.pick(tab);
         break;
       case "setConfig":
-        if (tab?.running && tab.sessionId) {
+        if (tab.running && tab.sessionId) {
           const { agentId } = tab.running;
           const before = tab.configOptions;
           const res = yield* tab.running.agent.setConfigOption(tab.sessionId, msg.configId, msg.value);
@@ -625,155 +582,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           this.postTab(tab, { type: "configOptions", configOptions: res.configOptions });
         }
         break;
-      case "openFile":
-        yield* this.openFile(msg.path, msg.line);
-        break;
-      case "openImage": {
-        const file = yield* imageToTempFile(msg.src, msg.name);
-        if (file) {
-          yield* thenable(() => vscode.commands.executeCommand("vscode.open", vscode.Uri.file(file)));
-          yield* thenable(() => vscode.commands.executeCommand("workbench.action.moveEditorToNewWindow"));
-        }
-        break;
-      }
-      case "searchFiles": {
-        const completions = yield* Completions;
-        // A failed search offers nothing rather than an error in the chat.
-        const files = yield* completions.files(msg.query).pipe(
-          Effect.tapError((err) => Effect.logWarning(`File search failed: ${err.message}`)),
-          Effect.orElseSucceed(() => []),
-        );
-        const terminals = yield* (yield* TerminalContext).suggestions(msg.query);
-        const problems = yield* (yield* Problems).suggestions(msg.query);
-        this.post({ type: "files", id: msg.id, files, terminals, problems });
-        break;
-      }
-      case "attachProblems": {
-        const attachment = yield* (yield* Problems).attachment(msg.scope);
-        if (Option.isSome(attachment)) {
-          this.attachments.add([attachment.value]);
-        }
-        break;
-      }
-      case "attachTerminal": {
-        const attachment = yield* (yield* TerminalContext).command(msg.id);
-        if (Option.isSome(attachment)) {
-          this.attachments.add([attachment.value]);
-        }
-        break;
-      }
-      case "listSkills":
-        this.post({ type: "skills", skills: yield* (yield* Completions).skills });
-        break;
       case "killTerminal":
-        if (tab?.running && tab.sessionId) {
+        if (tab.running && tab.sessionId) {
           yield* tab.running.agent.killTerminal(tab.sessionId, msg.terminalId);
         }
         break;
-      case "openDiff":
-        if (tab) {
-          yield* this.changes.openDiff(tab, msg.path, msg.oldText, msg.newText, msg.line);
-        }
-        break;
-      case "listHunks":
-        if (tab) {
-          yield* this.changes.postHunks(tab, msg.path);
-        }
-        break;
-      case "keepHunk":
-        if (tab) {
-          yield* this.changes.keepHunk(tab, msg.path, msg.hunk);
-        }
-        break;
-      case "undoHunk":
-        if (tab) {
-          yield* this.changes.undoHunk(tab, msg.path, msg.hunk);
-        }
-        break;
-      case "keepChanges":
-        if (tab) {
-          yield* this.changes.keep(tab, msg.path);
-        }
-        break;
-      case "undoChanges":
-        if (tab) {
-          yield* this.changes.undo(tab, msg.path);
-        }
-        break;
-      case "restoreCheckpoint":
-        if (tab) {
-          yield* this.changes.restore(tab, msg.turn);
-        }
-        break;
-      case "setFollowAgent":
-        yield* thenable(() =>
-          vscode.workspace.getConfiguration("codeAcp").update("followAgent", msg.enabled, vscode.ConfigurationTarget.Global),
-        );
-        break;
-      case "setAutoScroll":
-        yield* thenable(() =>
-          vscode.workspace.getConfiguration("codeAcp").update("autoScroll", msg.enabled, vscode.ConfigurationTarget.Global),
-        );
-        break;
+      default:
+        yield* this.changes.onMessage(tab, msg);
     }
-  });
-
-  /**
-   * Opens a file in an editor (at `line` when given) or reveals a folder in the Explorer. Relative paths come
-   * from the shown conversation, so they start at the active tab's folder. A relative path missing there (agents
-   * often write a bare `protocol.ts`) is looked up in the workspace; several matches are offered in a pick.
-   */
-  private readonly openFile = Effect.fn("ChatView.openFile")(function* (
-    this: ChatViewProvider,
-    file: string,
-    line: number | undefined,
-  ) {
-    let uri = vscode.Uri.file(resolvePath(file, this.tabs.active.cwd));
-    let stat = yield* thenable(() => vscode.workspace.fs.stat(uri)).pipe(Effect.option);
-    if (Option.isNone(stat) && !path.isAbsolute(file) && !file.startsWith("~/")) {
-      const found = yield* this.findInWorkspace(file);
-      if (found) {
-        uri = found;
-        stat = yield* thenable(() => vscode.workspace.fs.stat(uri)).pipe(Effect.option);
-      } else if (found === null) {
-        return;
-      }
-    }
-    if (Option.isNone(stat)) {
-      vscode.window.setStatusBarMessage(t("chat.fileNotFound", file), 4000);
-      return;
-    }
-    if (stat.value.type & vscode.FileType.Directory) {
-      yield* thenable(() => vscode.commands.executeCommand("revealInExplorer", uri));
-      return;
-    }
-    const position = line ? new vscode.Position(line - 1, 0) : undefined;
-    // `vscode.open` picks the editor by file type, so images and other binaries open in their viewer.
-    const options: vscode.TextDocumentShowOptions = position ? { selection: new vscode.Range(position, position) } : {};
-    yield* thenable(() => vscode.commands.executeCommand("vscode.open", uri, options));
-  });
-
-  /** Workspace files ending in `file`, git-ignored ones left out: the only match, the picked one, `null` if the pick was dismissed. */
-  private readonly findInWorkspace = Effect.fn("ChatView.findInWorkspace")(function* (file: string) {
-    const name = file.replace(/^\.\//, "").replace(/\/$/, "");
-    if (!name || name.split("/").includes("..")) {
-      return undefined;
-    }
-    // Brackets and braces in a name are glob syntax; `[x]` matches the character itself.
-    const glob = `**/${name.replace(/[[\]{}]/g, "[$&]")}`;
-    const found = yield* thenable(() => vscode.workspace.findFiles(glob, excludeGlob(), 50));
-    // Build output and other ignored files only when nothing else matches.
-    const ignored = yield* gitIgnored(found);
-    const kept = found.filter((uri) => !ignored.has(uri.fsPath));
-    const uris = kept.length > 0 ? kept : found;
-    if (uris.length <= 1) {
-      return uris[0];
-    }
-    const items = uris
-      .map((uri) => ({ label: vscode.workspace.asRelativePath(uri), uri }))
-      .sort((a, b) => a.label.length - b.label.length || a.label.localeCompare(b.label));
-    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("chat.pickFile", name) }));
-    return picked?.uri ?? null;
   });
 
   /** The agent `tab` runs on: its pick while it exists, else the default (last picked). */
@@ -865,7 +681,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       return undefined;
     }
     if (replay.turn === undefined) {
-      replay.turn = this.nextTurn++;
+      replay.turn = this.turns.nextTurn();
       replay.turns.push(replay.turn);
     }
     replay.blocks.push(update.content);
@@ -891,44 +707,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }
     }
     if (update.sessionUpdate === "usage_update") {
-      const { used, size, cost } = update;
-      const ref = this.sessionRef(tab, n.sessionId);
-      if (cost && ref) {
-        // Read before it is replaced: a reopened session's last cost is not new spending.
-        const previous = usageOf(tab, n.sessionId)?.cost ?? undefined;
-        this.run(
-          UsageLedger.use((ledger) => ledger.recordCost(ref, cost, previous)).pipe(Effect.andThen(this.postSessionTotals(tab))),
-          tab,
-        );
-      }
-      const compactAt = tab.usageSessionId === n.sessionId ? tab.usage?.compactAt : undefined;
-      tab.usage = { used, size, cost, compactAt };
-      tab.usageSessionId = n.sessionId;
-      this.saveTabs();
-      this.postCompactWindow(tab, update);
+      this.usage.onUpdate(tab, n.sessionId, update);
     }
-  }
-
-  /**
-   * Claude agents name the model in `_meta`, but report its full window as `size`; Claude Code
-   * compacts earlier when `autoCompactWindow` is set, so the meter also shows that limit.
-   */
-  private postCompactWindow(tab: Tab, update: acp.UsageUpdate): void {
-    const model = update._meta?.[CLAUDE_MODEL_META];
-    if (!Predicate.isString(model)) {
-      return;
-    }
-    this.run(
-      Effect.gen({ self: this }, function* () {
-        const window = yield* (yield* ClaudeSettings).autoCompactWindow(model, tab.cwd);
-        if (tab.usage) {
-          tab.usage = { ...tab.usage, compactAt: Option.getOrUndefined(window) };
-          this.saveTabs();
-        }
-        this.postTab(tab, { type: "compactWindow", size: Option.getOrNull(window) });
-      }),
-      tab,
-    );
   }
 
   private onAgentExit(running: RunningAgent): void {
@@ -957,213 +737,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.runtime.runFork(Scope.close(running.scope, Exit.void));
   }
 
-  private readonly createSession = Effect.fn("ChatView.createSession")(function* (this: ChatViewProvider, tab: Tab) {
-    return yield* Semaphore.withPermits(
-      tab.sessionLock,
-      1,
-    )(
-      Effect.gen({ self: this }, function* () {
-        if (tab.sessionId) {
-          return tab.sessionId;
-        }
-        const running = yield* this.getAgent(tab);
-        yield* this.tabWorktrees.ensure(tab);
-        yield* this.tabWorktrees.prepare(tab);
-        if (tab.reopen) {
-          const reopened = yield* this.reopenSession(tab, running, tab.reopen);
-          if (reopened) {
-            return reopened;
-          }
-        }
-        // A folder removed from the workspace, or the folder of a past session outside it: start in the workspace.
-        if (!tab.worktree && folderOf(tab.cwd) === undefined) {
-          tab.cwd = defaultCwd();
-          this.postTabs();
-        }
-        const cwd = tab.cwd;
-        const res = yield* running.agent.newSession(cwd);
-        if (!this.tabs.has(tab) || tab.cwd !== cwd || tab.agentId !== running.agentId) {
-          // Closed, or moved to another folder or agent, while the session was starting.
-          yield* this.closeSessionOnAgent(running, res.sessionId);
-          return res.sessionId;
-        }
-        tab.sessionId = res.sessionId;
-        tab.running = running;
-        const configOptions = yield* this.restoreOptions(running, res);
-        this.setConfigOptions(tab, configOptions);
-        this.postTabs();
-        this.postTab(tab, { type: "session", sessionId: res.sessionId, configOptions });
-        this.status(tab, "chat.ready");
-        return res.sessionId;
-      }),
-    );
-  });
-
-  /**
-   * Sets the model, effort and fast mode last picked for the agent on a session just started or reopened (reopening
-   * gives the agent's defaults too), keeping the defaults for what it no longer offers. Gives the session's options.
-   */
-  private restoreOptions(running: RunningAgent, session: acp.NewSessionResponse) {
-    const wanted = readSettings().rememberSessionOptions ? this.lastOptions.wanted(running.agentId) : undefined;
-    return wanted
-      ? configureSession(running.agent, session, wanted).pipe(
-          Effect.tapError((err) => Effect.logWarning(`Restoring the session options failed: ${err.message}`)),
-          Effect.orElseSucceed(() => session.configOptions),
-        )
-      : Effect.succeed(session.configOptions);
-  }
-
-  /** Reopens a saved session in its tab; undefined when it can't be, and the tab should start over. */
-  private readonly reopenSession = Effect.fn("ChatView.reopenSession")(function* (
-    this: ChatViewProvider,
-    tab: Tab,
-    running: RunningAgent,
-    reopen: Reopen,
-  ) {
-    if (canReopen(running.agent) && reopen.agentId === running.agentId) {
-      const opened = yield* this.loadInto(tab, running, reopen.sessionId, reopen.cwd).pipe(
-        Effect.as(true),
-        // Auth errors keep `reopen`: the session can still be opened after logging in.
-        Effect.catchTag("AgentRequestError", () =>
-          Effect.sync(() => {
-            this.postTab(tab, { type: "notice", key: "chat.reopenFailed" });
-            return false;
-          }),
-        ),
-      );
-      if (opened) {
-        tab.reopen = undefined;
-        this.saveTabs();
-        return reopen.sessionId;
-      }
-    }
-    tab.reopen = undefined;
-    tab.title = undefined;
-    tab.createdAt = undefined;
-    tab.used = false;
-    this.postTabs();
-    return undefined;
-  });
-
-  /**
-   * Shows a past session in `tab`, replaying its history when the agent supports session/load. The tab's checkpoints
-   * stay: callers showing another session clear them first.
-   */
-  private readonly loadInto = Effect.fn("ChatView.loadInto")(function* (
-    this: ChatViewProvider,
-    tab: Tab,
-    running: RunningAgent,
-    sessionId: string,
-    cwd: string,
-  ) {
-    const { agent } = running;
-    const caps = agent.initializeResponse.agentCapabilities;
-    this.postTab(tab, { type: "reset" });
-    tab.sent.clear();
-    const previousCwd = tab.cwd;
-    // Set first: the replayed updates are only forwarded for a tab's session.
-    tab.sessionId = sessionId;
-    tab.running = running;
-    tab.cwd = cwd;
-    tab.used = true;
-    tab.busy = true;
-    this.status(tab, "chat.loadingSession");
-    this.postTabs();
-    const res = yield* (
-      caps?.loadSession
-        ? Effect.suspend(() => {
-            const replaying = (tab.replaying = { blocks: [], turns: [] });
-            return agent.loadSession(sessionId, cwd).pipe(Effect.tap(() => Effect.sync(() => this.changes.matchReplay(tab, replaying.turns))));
-          }).pipe(Effect.ensuring(Effect.sync(() => void (tab.replaying = undefined))))
-        : agent.resumeSession(sessionId, cwd).pipe(
-            Effect.tap(() => Effect.sync(() => this.postTab(tab, { type: "notice", key: "chat.resumedNoHistory" }))),
-          )
-    ).pipe(
-      Effect.tapError(() =>
-        Effect.sync(() => {
-          tab.sessionId = undefined;
-          tab.running = undefined;
-          tab.cwd = previousCwd;
-          this.postTabs();
-        }),
-      ),
-      Effect.ensuring(
-        Effect.sync(() => {
-          tab.busy = false;
-          this.refreshStatus(tab);
-        }),
-      ),
-    );
-    const configOptions = yield* this.restoreOptions(running, { sessionId, configOptions: res.configOptions });
-    this.setConfigOptions(tab, configOptions);
-    this.postTab(tab, { type: "session", sessionId, configOptions });
-    this.postSavedUsage(tab);
-    this.status(tab, "chat.ready");
-    // Messages sent while the session loaded.
-    this.sendQueued(tab);
-  });
-
-  /** The tab's session, created when missing; undefined when the user has to act first. */
-  private ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | Worktrees | ShadowGit> {
-    return this.createSession(tab).pipe(
-      Effect.catchTags({
-        NoAgentError: () => Effect.sync(() => void this.status(tab, "chat.noAgent", { needsAgent: true })),
-        AuthRequiredError: () => Effect.sync(() => void this.status(tab, "chat.needsLogin", { needsLogin: true })),
-      }),
-    );
-  }
-
-  /** Frees a session the chat no longer shows, when the agent supports session/close. */
-  private closeSessionOnAgent(running: RunningAgent | undefined, sessionId: string): Effect.Effect<void> {
-    const agent = running?.agent;
-    if (!agent?.initializeResponse.agentCapabilities?.sessionCapabilities?.close) {
-      return Effect.void;
-    }
-    return agent.closeSession(sessionId).pipe(Effect.ignore);
-  }
-
-  /** Stops agent processes that no tab uses any more, nor is about to start a session on. */
-  private get stopIdleAgents(): Effect.Effect<void> {
-    return this.agents.stopIdle((running) =>
-      this.tabs.all.some((tab) => tab.running === running || (!tab.running && tab.agentId === running.agentId)),
-    );
-  }
-
-  /** Ends the tab's conversation so it starts over in a fresh session, e.g. on another agent or in another folder. */
-  private readonly startOver = Effect.fn("ChatView.startOver")(function* (this: ChatViewProvider, tab: Tab, change: (tab: Tab) => void) {
-    if (tab.busy) {
-      yield* this.cancelTab(tab).pipe(Effect.ignore);
-    }
-    this.permissions.cancel(tab);
-    if (tab.sessionId) {
-      yield* this.closeSessionOnAgent(tab.running, tab.sessionId);
-    }
-    resetConversation(tab);
-    tab.usage = undefined;
-    tab.usageSessionId = undefined;
-    change(tab);
-    this.postTab(tab, { type: "reset" });
-    this.changes.clear(tab);
-    this.postTabs();
-    yield* this.stopIdleAgents;
-    yield* this.ensureSession(tab);
-  });
-
-  /**
-   * Asks before a start over ends a conversation (and stops a running turn); an unused tab has none to lose.
-   * When the user says no, the pickers go back to the tab's agent and folder.
-   */
-  private readonly confirmStartOver = Effect.fn("ChatView.confirmStartOver")(function* (this: ChatViewProvider, tab: Tab) {
-    if (!tab.used && !tab.busy) {
-      return true;
-    }
-    const ok = yield* confirm(t(tab.busy ? "chat.startOverBusyConfirm" : "chat.startOverConfirm"), t("chat.startOver"));
-    if (!ok) {
-      this.postTabs();
-    }
-    return ok && this.tabs.has(tab);
-  });
-
   /** Switches `tab` to another agent, starting over in a fresh session; it also becomes the default for new tabs. */
   private readonly setTabAgent = Effect.fn("ChatView.setTabAgent")(function* (
     this: ChatViewProvider,
@@ -1171,35 +744,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     agentId: string,
   ) {
     const change = tab.agentId !== agentId;
-    if (change && !(yield* this.confirmStartOver(tab))) {
+    if (change && !(yield* this.sessions.confirmStartOver(tab))) {
       return;
     }
     yield* this.manager.setActive(agentId);
     if (change) {
-      yield* this.startOver(tab, (tab) => (tab.agentId = agentId));
-    }
-  });
-
-  /** Moves `tab` to another workspace folder, starting over in a fresh session there. */
-  private readonly setTabCwd = Effect.fn("ChatView.setTabCwd")(function* (this: ChatViewProvider, tab: Tab, cwd: string) {
-    if ((tab.worktree?.base ?? tab.cwd) === cwd || !isWorkspaceFolder(cwd) || !(yield* this.confirmStartOver(tab))) {
-      return;
-    }
-    const left = tab.worktree;
-    const leftCwd = tab.cwd;
-    const fate = yield* this.tabWorktrees.askRelease(tab);
-    if (fate === "cancel") {
-      this.postTabs();
-      return;
-    }
-    yield* this.startOver(tab, (tab) => {
-      tab.cwd = cwd;
-      tab.worktree = undefined;
-      // A tab that had a worktree of its own, or would have had one, gets one in the new folder.
-      tab.wantsWorktree = left !== undefined || readSettings().worktreeForNewTabs;
-    });
-    if (left && fate === "delete") {
-      yield* this.tabWorktrees.discard(left, leftCwd);
+      yield* this.sessions.startOver(tab, (tab) => (tab.agentId = agentId));
     }
   });
 
@@ -1225,9 +775,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     tab.wantsWorktree = readSettings().worktreeForNewTabs;
     this.tabs.active = tab;
     this.postTabs();
-    yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+    yield* this.focus;
     this.post({ type: "focusComposer" });
-    yield* this.ensureSession(tab);
+    yield* this.sessions.ensureSession(tab);
   });
 
   /** The commands of the lenses, which keep or undo a change of the tab that offered it. */
@@ -1250,7 +800,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.changes.refreshLenses();
     this.postTabs();
     if (!tab.busy) {
-      yield* this.ensureSession(tab);
+      yield* this.sessions.ensureSession(tab);
     }
   });
 
@@ -1263,7 +813,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       return;
     }
     if (tab.busy) {
-      yield* this.cancelTab(tab).pipe(Effect.ignore);
+      yield* this.sessions.cancelTab(tab).pipe(Effect.ignore);
     }
     this.permissions.cancel(tab);
     this.follower.forget(tab);
@@ -1275,9 +825,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     clearTimeout(tab.changesTimer);
     if (tab.sessionId) {
-      yield* this.closeSessionOnAgent(tab.running, tab.sessionId);
+      yield* this.sessions.closeSessionOnAgent(tab.running, tab.sessionId);
     }
-    yield* this.stopIdleAgents;
+    yield* this.sessions.stopIdleAgents;
     if (tab.worktree && fate === "delete") {
       yield* this.tabWorktrees.discard(tab.worktree, tab.cwd);
     }
@@ -1289,12 +839,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.tabs.active = this.tabs.at(Math.min(index, this.tabs.length - 1))!;
     }
     this.postTabs();
-    yield* this.ensureSession(this.tabs.active);
+    yield* this.sessions.ensureSession(this.tabs.active);
   });
 
   /** Shows the active tab's agent's past sessions in the workspace folders, in the chat view. */
   readonly showHistory = Effect.fn("ChatView.showHistory")(function* (this: ChatViewProvider) {
-    yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
+    yield* this.focus;
     const latest = this.history.next();
     const post = (message: object) => {
       if (latest()) {
@@ -1323,471 +873,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     });
   });
 
-  /**
-   * Shows a past session: switches to its tab when it is open, else loads it into the active tab when that is
-   * unused, else into a new tab. History is replayed when the agent supports session/load.
-   */
-  private readonly openSession = Effect.fn("ChatView.openSession")(function* (
-    this: ChatViewProvider,
-    sessionId: string,
-    cwd: string,
-    title: string | undefined,
-  ) {
-    const open = this.tabs.showing(sessionId);
-    if (open) {
-      yield* this.selectTab(open);
-      return;
-    }
-    // The history lists the active tab's agent's sessions.
-    const from = this.tabs.active;
-    const worktrees = yield* Worktrees;
-    if (!(yield* worktrees.exists(cwd))) {
-      this.postTab(from, { type: "notice", key: "worktree.folderGone" });
-      return;
-    }
-    const running = yield* this.getAgent(from);
-    const reuse = !from.used && !from.busy;
-    const tab = reuse ? from : this.tabs.add(cwd);
-    const replaced = tab.sessionId;
-    const replacedOn = tab.running;
-    const replacedWorktree = tab.worktree;
-    const replacedCwd = tab.cwd;
-    tab.worktree = yield* worktrees.locate(workspaceFolders().map((f) => f.path), cwd);
-    tab.wantsWorktree = false;
-    this.tabs.active = tab;
-    tab.agentId = from.agentId;
-    tab.title = title?.trim() || undefined;
-    tab.createdAt = undefined;
-    tab.reopen = undefined;
-    this.postTabs();
-    if (replaced) {
-      yield* this.closeSessionOnAgent(replacedOn, replaced);
-    }
-    this.changes.clear(tab);
-    yield* this.loadInto(tab, running, sessionId, cwd).pipe(
-      // Fall back to a fresh session so the tab stays usable.
-      Effect.tapError(() =>
-        Effect.suspend(() => {
-          tab.worktree = replacedWorktree;
-          return this.ensureSession(tab);
-        }),
-      ),
-    );
-    // The tab was unused, so a worktree it had holds nothing it needs.
-    if (replacedWorktree && replacedWorktree.root !== tab.worktree?.root) {
-      yield* this.tabWorktrees.discardIfEmpty(tab, replacedWorktree, replacedCwd);
-    }
-    this.saveTabs();
-  });
-
-  /** Sends a message, or queues it while the tab is busy with a turn; queued ones follow when a turn ends. */
-  private readonly send = Effect.fn("ChatView.send")(function* (this: ChatViewProvider, tab: Tab, message: OutgoingMessage) {
-    if (message.parts.every((part) => typeof part === "string" && !part.trim())) {
-      return;
-    }
-    if (tab.busy || tab.sending) {
-      tab.queue.push({ ...message, id: this.nextQueued++ });
-      this.postQueue(tab);
-      return;
-    }
-    tab.sending = true;
-    yield* this.sendTurn(tab, message).pipe(
-      Effect.ensuring(Effect.sync(() => (tab.sending = false))),
-      Effect.onExit((exit) =>
-        Effect.sync(() => {
-          const stopReason = Exit.isSuccess(exit) ? exit.value : undefined;
-          // A turn the user stopped needs no word; one the queue follows is not the end yet.
-          if (stopReason && stopReason !== "cancelled" && !(stopReason === "end_turn" && tab.queue.length) && this.tabs.has(tab)) {
-            this.attention.raise(tab, "finished");
-          }
-          // The queue waits while the user looks at a turn they stopped, or that failed.
-          if (tab.steer || stopReason === "end_turn") {
-            this.sendQueued(tab);
-          }
-        }),
-      ),
-    );
-  });
-
-  /** Sends the first queued message, when the tab is idle. */
-  private sendQueued(tab: Tab): void {
-    tab.steer = false;
-    if (!this.tabs.has(tab) || tab.busy || tab.sending) {
-      return;
-    }
-    const next = tab.queue.shift();
-    if (next) {
-      this.postQueue(tab);
-      this.run(this.send(tab, next), tab);
-    }
-  }
-
-  private postQueue(tab: Tab): void {
-    const items: QueuedInfo[] = tab.queue.map(({ id, parts }) => ({
-      id,
-      text: messageText(parts),
-      attachments: parts.flatMap((part) => (typeof part !== "string" && !part.token ? [part.name] : [])),
-    }));
-    this.postTab(tab, { type: "queue", items });
-  }
-
-  /** Sends a message right away: a running turn is stopped, and the message goes first once it has. */
-  private readonly sendNow = Effect.fn("ChatView.sendNow")(function* (this: ChatViewProvider, tab: Tab, message: OutgoingMessage) {
-    if (!tab.busy && !tab.sending) {
-      return yield* this.send(tab, message);
-    }
-    tab.queue.unshift({ ...message, id: this.nextQueued++ });
-    this.postQueue(tab);
-    yield* this.steer(tab);
-  });
-
-  /** Moves a queued message first and sends it, stopping the running turn. */
-  private readonly sendQueuedNow = Effect.fn("ChatView.sendQueuedNow")(function* (this: ChatViewProvider, tab: Tab, id: number) {
-    const index = tab.queue.findIndex((each) => each.id === id);
-    if (index < 0) {
-      return;
-    }
-    tab.queue.unshift(...tab.queue.splice(index, 1));
-    this.postQueue(tab);
-    if (tab.busy) {
-      yield* this.steer(tab);
-    } else {
-      this.sendQueued(tab);
-    }
-  });
-
-  /** Stops the running turn so the first queued message goes next. */
-  private readonly steer = Effect.fn("ChatView.steer")(function* (this: ChatViewProvider, tab: Tab) {
-    // Still preparing its prompt: the queue follows once that turn ends.
-    if (tab.busy) {
-      tab.steer = true;
-      yield* this.cancelTab(tab);
-    }
-  });
-
-  /** Takes a message out of the queue, back to the composer when it is to be edited. */
-  private unqueue(tab: Tab, id: number, edit: boolean): void {
-    const index = tab.queue.findIndex((each) => each.id === id);
-    if (index < 0) {
-      return;
-    }
-    const [message] = tab.queue.splice(index, 1);
-    this.postQueue(tab);
-    if (edit && message) {
-      this.loadComposer(tab, { parts: [...message.parts] });
-    }
-  }
-
-  private loadComposer(tab: Tab, load: LoadComposer): void {
-    this.postTab(tab, { type: "loadComposer", ...load });
-  }
-
-  /** Puts a sent message back in the composer, to change it and send it in place of the original. */
-  private editMessage(tab: Tab, turn: number): void {
-    const sent = tab.sent.get(turn);
-    if (!sent) {
-      this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
-      return;
-    }
-    this.loadComposer(tab, { parts: [...sent.parts], rewind: turn });
-  }
-
-  /**
-   * Takes back the user message of `turn` and the rest of the conversation, then sends `message` in its place.
-   * The agent can't forget, so the prompt tells it what was taken back. An edit the user cancels goes back to
-   * the composer.
-   */
-  private readonly resend = Effect.fn("ChatView.resend")(function* (
-    this: ChatViewProvider,
-    tab: Tab,
-    turn: number,
-    message: OutgoingMessage,
-    edited: boolean,
-  ) {
-    const giveBack = () => {
-      if (edited) {
-        this.loadComposer(tab, { parts: [...message.parts], rewind: turn });
-      }
-    };
-    if (!tab.sent.has(turn)) {
-      this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
-      return;
-    }
-    if (tab.busy || tab.sending) {
-      void vscode.window.showInformationMessage(t("chat.rewindBusy"));
-      return giveBack();
-    }
-    // The dialog leaves time to start another turn.
-    if (!(yield* this.changes.rewind(tab, turn)) || tab.busy || tab.sending || !tab.sent.has(turn)) {
-      return giveBack();
-    }
-    this.rewindTo(tab, turn);
-    yield* this.send(tab, message);
-  });
-
-  /** Drops the user message of `turn` and what followed from the chat, and tells the agent with the next prompt. */
-  private rewindTo(tab: Tab, turn: number): void {
-    const original = tab.sent.get(turn);
-    const line = original ? messageText(original.parts).trim().split("\n")[0]! : "";
-    const excerpt = line.length > MAX_EXCERPT_LENGTH ? `${line.slice(0, MAX_EXCERPT_LENGTH - 1)}…` : line;
-    for (const each of [...tab.sent.keys()]) {
-      if (each >= turn) {
-        tab.sent.delete(each);
-      }
-    }
-    // Their messages are gone; the next turn takes a checkpoint of its own.
-    tab.changes.checkpoints = tab.changes.checkpoints.filter((c) => c.turn < turn);
-    this.saveTabs();
-    this.changes.post(tab);
-    tab.rewindNote = `[Note from the editor: the user went back in the conversation and took back their message "${excerpt}" and everything after it. Disregard that message, your replies to it and any later messages, as if they had never been sent, and continue from the message below.]`;
-    this.postTab(tab, { type: "rewind", turn });
-  }
-
-  /**
-   * Copies the conversation into a new tab next to `tab`, on a fork of its session (session/fork). With `turn`, the
-   * fork goes back to before that user message, which waits in its composer.
-   */
-  private readonly fork = Effect.fn("ChatView.fork")(function* (this: ChatViewProvider, tab: Tab, turn: number | undefined) {
-    const { running, sessionId } = tab;
-    if (!running || !sessionId || !canFork(running.agent)) {
-      void vscode.window.showInformationMessage(t("chat.forkUnsupported"));
-      return;
-    }
-    if (tab.busy || tab.sending) {
-      void vscode.window.showInformationMessage(t("chat.forkBusy"));
-      return;
-    }
-    const original = turn === undefined ? undefined : tab.sent.get(turn);
-    if (turn !== undefined && !original) {
-      this.postTab(tab, { type: "notice", key: "chat.cannotEdit" });
-      return;
-    }
-    const res = yield* running.agent.forkSession(sessionId, tab.cwd);
-    if (!this.tabs.has(tab) || !this.agents.isCurrent(running)) {
-      // Closed, or its agent stopped, while forking.
-      yield* this.closeSessionOnAgent(running, res.sessionId);
-      return;
-    }
-    const fork = this.tabs.add(tab.cwd);
-    fork.worktree = tab.worktree;
-    this.tabs.move(fork, this.tabs.indexOf(tab) + 1);
-    fork.agentId = running.agentId;
-    fork.running = running;
-    fork.sessionId = res.sessionId;
-    fork.used = true;
-    fork.title = t("chat.forkTitle", tab.name || tab.title || t("chat.untitled"));
-    fork.createdAt = Date.now();
-    fork.changes = ChangeSet.fromSaved(tab.changes.saved);
-    fork.sent = new Map(tab.sent);
-    fork.rewindNote = tab.rewindNote;
-    if (tab.usage) {
-      fork.usage = tab.usage;
-      fork.usageSessionId = res.sessionId;
-    }
-    this.tabs.active = fork;
-    this.postTabs();
-    this.postTab(fork, { type: "forked", from: tab.id });
-    this.setConfigOptions(fork, res.configOptions);
-    this.postTab(fork, { type: "session", sessionId: res.sessionId, configOptions: res.configOptions });
-    this.postSavedUsage(fork);
-    this.changes.postIfTracked(fork);
-    this.status(fork, "chat.ready");
-    if (turn !== undefined && original) {
-      this.rewindTo(fork, turn);
-      this.loadComposer(fork, { parts: [...original.parts] });
-    }
-  });
-
-  /** Runs a turn; its stop reason, or undefined when it could not start. */
-  private readonly sendTurn = Effect.fn("ChatView.sendTurn")(function* (
-    this: ChatViewProvider,
-    tab: Tab,
-    message: OutgoingMessage,
-  ) {
-    const { parts } = message;
-    const text = messageText(parts);
-    const sessionId = yield* this.ensureSession(tab);
-    const agent = tab.running?.agent;
-    if (!sessionId || !agent) {
-      return;
-    }
-    const caps = agent.initializeResponse.agentCapabilities?.promptCapabilities ?? {};
-    const prompt: Array<acp.ContentBlock> = [];
-    const sent: Array<SentAttachment> = [];
-    for (const attachment of parts) {
-      if (typeof attachment === "string") {
-        if (attachment.trim()) {
-          prompt.push({ type: "text", text: attachment });
-        }
-        continue;
-      }
-      const block = yield* attachmentBlock(caps, yield* this.tabWorktrees.localize(tab, attachment)).pipe(
-        Effect.catch((err) =>
-          Effect.sync(() => {
-            this.postTab(tab, { type: "error", text: t("chat.attachFailed", attachment.name, err.message) });
-            return undefined;
-          }),
-        ),
-      );
-      sent.push({
-        name: attachment.name,
-        token: attachment.token,
-        src: block?.type === "image" ? `data:${block.mimeType};base64,${block.data}` : undefined,
-      });
-      if (block) {
-        prompt.push(block);
-      }
-    }
-    if (prompt.length === 0) {
-      return;
-    }
-
-    tab.used = true;
-    tab.createdAt ??= Date.now();
-    if (!tab.title) {
-      const firstLine = text.trim().split("\n")[0] || sent[0]?.name || "";
-      tab.title = firstLine.length > MAX_TITLE_LENGTH ? `${firstLine.slice(0, MAX_TITLE_LENGTH - 1)}…` : firstLine;
-    }
-    this.postTabs();
-    const turn = this.nextTurn++;
-    tab.turn = turn;
-    tab.sent.set(turn, message);
-    yield* this.changes.beginTurn(tab, turn, text || sent[0]?.name || "");
-    const notes = [tab.rewindNote, tab.changes.takeNote()].filter(Predicate.isString);
-    tab.rewindNote = undefined;
-    if (notes.length > 0) {
-      prompt.unshift({ type: "text", text: notes.join("\n\n") });
-    }
-    this.postTab(tab, { type: "userMessage", text, attachments: sent, turn });
-    tab.busy = true;
-    this.status(tab, "chat.working");
-    return yield* agent.prompt(sessionId, prompt).pipe(
-      Effect.tap((res) => {
-        const ref = this.sessionRef(tab, sessionId);
-        // `usage` is unstable in ACP, so the stable PromptResponse leaves it out.
-        const usage = Predicate.hasProperty(res, "usage") ? res.usage : undefined;
-        return ref
-          ? UsageLedger.use((ledger) => ledger.recordTurn(ref, usage)).pipe(Effect.andThen(this.postSessionTotals(tab)))
-          : Effect.void;
-      }),
-      Effect.map((res) => {
-        this.postTab(tab, { type: "turnEnd", stopReason: res.stopReason });
-        return res.stopReason;
-      }),
-      Effect.catchTag("AuthRequiredError", () =>
-        Effect.sync(() => {
-          tab.sessionId = undefined;
-          this.status(tab, "chat.needsLogin", { needsLogin: true });
-          return undefined;
-        }),
-      ),
-      Effect.ensuring(
-        Effect.sync(() => {
-          // A turn cancelled by a start over may end after the tab's next turn began.
-          if (tab.turn !== turn) {
-            return;
-          }
-          tab.busy = false;
-          tab.turn = undefined;
-          this.changes.post(tab);
-          this.run(this.refreshBranch(tab), tab);
-          if (tab.sessionId) {
-            this.status(tab, "chat.ready");
-          } else {
-            this.refreshStatus(tab);
-          }
-        }),
-      ),
-    );
-  });
-
-  /** Adds attachments, after `prompt` when there is one, to the composer and shows the chat. */
-  private readonly queueAndFocus = Effect.fn("ChatView.queueAndFocus")(function* (
-    this: ChatViewProvider,
-    attachments: Attachment[],
-    prompt?: string,
-  ) {
-    // Queued first: they reach the composer once the view shows, even if focusing fails.
-    this.attachments.add(attachments, prompt);
-    yield* thenable(() => vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`));
-  });
-
-  /** Adds files/folders to the composer (Explorer / editor tab context menu). */
-  readonly attach = Effect.fn("ChatView.attach")(function* (this: ChatViewProvider, uris: ReadonlyArray<vscode.Uri>) {
-    yield* this.queueAndFocus(uriAttachments(uris));
-  });
-
-  /** Adds the editor's non-empty selections to the composer as snippets (editor context menu). */
-  readonly attachSelection = Effect.fn("ChatView.attachSelection")(function* (
-    this: ChatViewProvider,
-    editor: vscode.TextEditor,
-  ) {
-    yield* this.queueAndFocus(selectionAttachments(editor));
-  });
-
-  /** Adds `prompt` and the editor's non-empty selections to the composer ("Ask Code ACP" menu and code actions). */
-  readonly askAboutSelection = Effect.fn("ChatView.askAboutSelection")(function* (
-    this: ChatViewProvider,
-    editor: vscode.TextEditor,
-    prompt: string,
-  ) {
-    const attachments = selectionAttachments(editor);
-    if (attachments.length) {
-      yield* this.queueAndFocus(attachments, prompt);
-    }
-  });
-
-  /** Adds the active terminal's selection to the composer (terminal context menu). */
-  readonly attachTerminalSelection = Effect.fn("ChatView.attachTerminalSelection")(function* (this: ChatViewProvider) {
-    const selection = yield* (yield* TerminalContext).selection;
-    if (Option.isNone(selection)) {
-      void vscode.window.showInformationMessage(t("terminal.noSelection"));
-      return;
-    }
-    yield* this.queueAndFocus([selection.value]);
-  });
-
-  /**
-   * Adds the output of the active terminal's last command, or last failed one, to the composer
-   * (terminal context menu).
-   */
-  readonly attachTerminalOutput = Effect.fn("ChatView.attachTerminalOutput")(function* (this: ChatViewProvider, failed: boolean) {
-    const terminal = vscode.window.activeTerminal;
-    if (!terminal) {
-      return;
-    }
-    const terminals = yield* TerminalContext;
-    const command = yield* (failed ? terminals.lastFailed(terminal) : terminals.lastCommand(terminal));
-    if (Option.isNone(command)) {
-      const reason = !terminal.shellIntegration ? "terminal.noShellIntegration" : failed ? "terminal.noFailed" : "terminal.noCommands";
-      void vscode.window.showInformationMessage(t(reason));
-      return;
-    }
-    yield* this.queueAndFocus([command.value]);
-  });
-
-  /** Adds the problems of the active editor's file, or of the workspace, to the composer. */
-  readonly attachProblems = Effect.fn("ChatView.attachProblems")(function* (this: ChatViewProvider, scope: ProblemScope) {
-    const attachment = yield* (yield* Problems).attachment(scope);
-    if (Option.isNone(attachment)) {
-      void vscode.window.showInformationMessage(t(scope === "file" ? "problems.noneInFile" : "problems.none"));
-      return;
-    }
-    yield* this.queueAndFocus([attachment.value]);
-  });
-
-  /** Adds problems and the code around them to the composer ("Fix with Code ACP" quick fix). */
-  readonly fixProblems = Effect.fn("ChatView.fixProblems")(function* (
-    this: ChatViewProvider,
-    uri: vscode.Uri,
-    diagnostics: ReadonlyArray<vscode.Diagnostic>,
-  ) {
-    const attachments = yield* (yield* Problems).forDiagnostics(uri, diagnostics);
-    if (attachments.length) {
-      yield* this.queueAndFocus(attachments);
-    }
-  });
-
   /** Runs a tab context menu action (webview context menu); pinned tabs are never closed. */
   readonly tabAction = Effect.fn("ChatView.tabAction")(function* (
     this: ChatViewProvider,
@@ -1806,7 +891,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         }
         return;
       case "fork":
-        yield* this.fork(tab, undefined);
+        yield* this.sessions.fork(tab, undefined);
         return;
       case "worktree":
         yield* this.tabWorktrees.pick(tab);
@@ -1844,15 +929,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /** Stops the active tab's turn. */
   readonly cancel = Effect.fn("ChatView.cancel")(function* (this: ChatViewProvider) {
-    yield* this.cancelTab(this.tabs.active);
-  });
-
-  private readonly cancelTab = Effect.fn("ChatView.cancelTab")(function* (this: ChatViewProvider, tab: Tab) {
-    // ACP: the client must answer pending permission requests with "cancelled" on cancel.
-    this.permissions.cancel(tab);
-    if (tab.running && tab.sessionId) {
-      yield* tab.running.agent.cancel(tab.sessionId);
-    }
+    yield* this.sessions.cancelTab(this.tabs.active);
   });
 
   readonly login = Effect.fn("ChatView.login")(function* (this: ChatViewProvider) {
@@ -1902,7 +979,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       yield* this.restart(running.agentId);
     } else {
       yield* agent.authenticate(picked.id);
-      yield* this.ensureSession(this.tabs.active);
+      yield* this.sessions.ensureSession(this.tabs.active);
     }
   });
 
@@ -1950,7 +1027,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
     this.postTabs();
     yield* stopAll(stopped);
-    yield* this.ensureSession(this.tabs.active);
+    yield* this.sessions.ensureSession(this.tabs.active);
   });
 
   dispose(): void {

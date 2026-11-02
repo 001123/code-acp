@@ -94,6 +94,40 @@ export type FromWebview =
   | { type: "setFollowAgent"; enabled: boolean }
   | { type: "setAutoScroll"; enabled: boolean };
 
+/** Messages about one tab. */
+export type TabMessage = Extract<FromWebview, { tab: number }>;
+
+/** Messages about the turns of one tab. */
+export type TurnMessage = Extract<TabMessage, { type: "send" | "sendQueuedNow" | "unqueue" | "editMessage" | "retry" }>;
+
+/** Messages about the changes of one tab: the review answers them. */
+export type ChangeMessage = Extract<
+  TabMessage,
+  { type: "openDiff" | "listHunks" | "keepHunk" | "undoHunk" | "keepChanges" | "undoChanges" | "restoreCheckpoint" }
+>;
+
+/** Messages that don't touch a tab's conversation. */
+export type ViewMessage = Extract<
+  FromWebview,
+  {
+    type:
+      | "selectAgent"
+      | "manageAgents"
+      | "showUsage"
+      | "openSettings"
+      | "permission"
+      | "elicitation"
+      | "openFile"
+      | "openImage"
+      | "searchFiles"
+      | "attachProblems"
+      | "attachTerminal"
+      | "listSkills"
+      | "setFollowAgent"
+      | "setAutoScroll";
+  }
+>;
+
 /**
  * What the user did with a form the agent asked them to fill in: sent it with the values of its fields, declined to
  * answer, or dismissed it (the agent stops what asked).

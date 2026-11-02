@@ -40,11 +40,24 @@ export class Uri {
   static from(c: { scheme: string; path?: string; query?: string }) {
     return new Uri(c.scheme, c.path ?? "", c.query);
   }
+  static joinPath(base: Uri, ...segments: string[]) {
+    return new Uri(base.scheme, path.join(base.path, ...segments));
+  }
   get fsPath() {
     return this.path;
   }
   toString() {
     return `${this.scheme}://${this.path}`;
+  }
+}
+
+export class Disposable {
+  constructor(private readonly callback: () => void) {}
+  static from(...disposables: ReadonlyArray<{ dispose(): unknown }>) {
+    return new Disposable(() => disposables.forEach((each) => each.dispose()));
+  }
+  dispose() {
+    this.callback();
   }
 }
 
@@ -87,6 +100,19 @@ export class Range {
     readonly endCharacter: number,
   ) {}
 }
+export class ThemeColor {
+  constructor(readonly id: string) {}
+}
+export enum StatusBarAlignment {
+  Left = 1,
+  Right = 2,
+}
+export enum OverviewRulerLane {
+  Full = 7,
+}
+export enum TextEditorRevealType {
+  InCenterIfOutsideViewport = 2,
+}
 export enum DiagnosticSeverity {
   Error = 0,
   Warning = 1,
@@ -117,6 +143,8 @@ export class WorkspaceEdit {
     this.replaced.push({ uri, range, text });
   }
 }
+
+const noDisposable = { dispose() {} };
 
 const toError = (e: unknown, p: string) =>
   (e as NodeJS.ErrnoException).code === "ENOENT"
@@ -162,11 +190,28 @@ export const workspace = {
     },
   },
   registerTextDocumentContentProvider: () => ({ dispose() {} }),
+  onDidChangeWorkspaceFolders: () => noDisposable,
+  onDidSaveTextDocument: () => noDisposable,
+  createFileSystemWatcher: () => ({
+    onDidChange: () => noDisposable,
+    onDidCreate: () => noDisposable,
+    onDidDelete: () => noDisposable,
+    dispose() {},
+  }),
+  findFiles: async () => [],
 };
 
 export const window = {
   activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
   showWarningMessage: async (_message: string, _options: unknown, ..._actions: string[]): Promise<string | undefined> => undefined,
+  showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
+  state: { focused: true },
+  onDidChangeWindowState: () => noDisposable,
+  onDidStartTerminalShellExecution: () => noDisposable,
+  onDidEndTerminalShellExecution: () => noDisposable,
+  onDidCloseTerminal: () => noDisposable,
+  createTextEditorDecorationType: () => noDisposable,
+  createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
 };
 
 export const commands = { executeCommand: async () => undefined };

@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import { thenable, type AppServices, type VscodeError } from "../runtime";
 import { readSettings } from "../settings";
 import { folderOf } from "../workspace";
-import type { ChangeHunk, ChangesMessage } from "./protocol";
+import type { ChangeHunk, ChangeMessage, ChangesMessage } from "./protocol";
 import type { Tab } from "./tabs";
 
 /** The changed files are recounted at most this often while the agent writes. */
@@ -207,6 +207,42 @@ export class ChangeReview implements vscode.Disposable {
       this.post(tab);
     }
     return picked !== undefined;
+  });
+
+  /** Forgets the checkpoints from `turn` on: their messages are gone, and the next turn takes one of its own. */
+  forgetFrom(tab: Tab, turn: number): void {
+    tab.changes.checkpoints = tab.changes.checkpoints.filter((c) => c.turn < turn);
+    this.host.saveTabs();
+    this.post(tab);
+  }
+
+  /** Answers the webview's messages about the tab's changes. */
+  readonly onMessage = Effect.fn("ChangeReview.onMessage")(function* (this: ChangeReview, tab: Tab, msg: ChangeMessage) {
+    switch (msg.type) {
+      case "openDiff":
+        yield* this.openDiff(tab, msg.path, msg.oldText, msg.newText, msg.line);
+        break;
+      case "listHunks":
+        yield* this.postHunks(tab, msg.path);
+        break;
+      case "keepHunk":
+        yield* this.keepHunk(tab, msg.path, msg.hunk);
+        break;
+      case "undoHunk":
+        yield* this.undoHunk(tab, msg.path, msg.hunk);
+        break;
+      case "keepChanges":
+        yield* this.keep(tab, msg.path);
+        break;
+      case "undoChanges":
+        yield* this.undo(tab, msg.path);
+        break;
+      case "restoreCheckpoint":
+        yield* this.restore(tab, msg.turn);
+        break;
+      default:
+        msg satisfies never;
+    }
   });
 
   /** Turns snapshots off for the tab after one failed (no git, a work tree too big), saying why once. */
