@@ -3,7 +3,9 @@ import type * as unstable from "@agentclientprotocol/sdk/unstable";
 import { Deferred, Effect, Option, Schema, Scope } from "effect";
 import { execa } from "execa";
 import { Readable, Writable } from "node:stream";
+import * as path from "node:path";
 import * as vscode from "vscode";
+import { AcpTrace } from "./acpTrace";
 import { t } from "./i18n";
 import { makeAgentTerminals, type TerminalNotFoundError, type TerminalSnapshot } from "./agentTerminals";
 import { writeFile } from "./fileChanges";
@@ -116,8 +118,9 @@ function isAuthRequired(error: unknown): boolean {
 export const spawnAgent = Effect.fn("spawnAgent")(function* (
   agentCommand: AgentCommand,
   handlers: AgentHandlers,
-): Effect.fn.Return<AcpAgent, AgentStartError | RequestError, Scope.Scope | Output | ExtensionCtx> {
+): Effect.fn.Return<AcpAgent, AgentStartError | RequestError, Scope.Scope | Output | ExtensionCtx | AcpTrace> {
   const output = yield* Output;
+  const trace = yield* AcpTrace;
   const { version } = Schema.decodeUnknownOption(PackageVersion)((yield* ExtensionCtx).extension.packageJSON).pipe(
     Option.getOrElse(() => ({ version: "0.0.0" })),
   );
@@ -144,9 +147,12 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         buffer: false,
         reject: false,
       });
-      const stream = acp.ndJsonStream(
-        Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
-        Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
+      const stream = trace.tap(
+        acp.ndJsonStream(
+          Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
+          Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
+        ),
+        `${path.basename(command)}#${child.pid ?? "?"}`,
       );
       const connection = acp
         .client({ name: "code-acp" })

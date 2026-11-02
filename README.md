@@ -42,6 +42,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 - Track tokens and cost by day, conversation and agent, or read the logs agents keep on your machine through [ccusage](https://github.com/ryoppippi/ccusage).
 - See context window use and session cost in the chat, and activity and the tab's tokens and turns in the status bar.
 - Get notified when a conversation in the background finishes or needs you.
+- Turn on Tracing to see each turn's tokens, cost, context and duration in the chat, and every ACP message in a log.
 
 ### Language
 

@@ -3,6 +3,7 @@ import { Context, Deferred, Effect, Layer, Predicate, Schema, Stream } from "eff
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as vscode from "vscode";
 import { spawnAgent, type AcpAgent } from "./acpClient";
+import { AcpTrace } from "./acpTrace";
 import { AgentManager } from "./agentManager";
 import { t } from "./i18n";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
@@ -91,6 +92,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
       const manager = yield* AgentManager;
       const output = yield* Output;
       const context = yield* ExtensionCtx;
+      const trace = yield* AcpTrace;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       let stop: Deferred.Deferred<void> | undefined;
       let pushing = false;
@@ -229,6 +231,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         Effect.scoped,
         Effect.provideService(Output, output),
         Effect.provideService(ExtensionCtx, context),
+        Effect.provideService(AcpTrace, trace),
         Effect.catchTags({
           AuthRequiredError: () => Effect.fail(fail(t("commit.needsLogin"))),
           AgentStartError: (err) => Effect.fail(fail(err.message)),
@@ -248,6 +251,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         Effect.scoped,
         Effect.provideService(Output, output),
         Effect.provideService(ExtensionCtx, context),
+        Effect.provideService(AcpTrace, trace),
         Effect.catchTags({
           AuthRequiredError: () => Effect.fail(fail(t("commit.needsLogin"))),
           AgentStartError: (err) => Effect.fail(fail(err.message)),

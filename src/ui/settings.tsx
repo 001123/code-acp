@@ -596,7 +596,7 @@ function AgentModelFields(props: {
 type Tab = "general" | "notifications" | "worktree" | "agent" | "commit" | "mcp" | "custom" | "usage";
 
 const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions", "tracing"] },
   { id: "notifications", label: "settings.notificationsTab", desc: "settings.notificationsTabDesc", icon: bellIcon, keys: ["notifications", "notifyFinished"] },
   { id: "worktree", label: "settings.worktree", desc: "settings.worktreeDesc", icon: branchIcon, keys: ["worktreeForNewTabs"] },
   {
@@ -819,6 +819,15 @@ function App() {
                 inline
               >
                 <Toggle id="showChanges" checked={v.showChanges !== false} onChange={(checked) => set("showChanges", checked)} />
+              </Field>
+              <Field
+                id="tracing"
+                label="settings.tracing"
+                desc="settings.tracingDesc"
+                overridden={overridden("tracing")}
+                inline
+              >
+                <Toggle id="tracing" checked={v.tracing === true} onChange={(checked) => set("tracing", checked)} />
               </Field>
               <Field
                 id="rememberSessionOptions"

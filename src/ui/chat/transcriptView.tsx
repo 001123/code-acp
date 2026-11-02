@@ -22,6 +22,7 @@ import { copyMessage } from "./clipboard";
 import { ElicitationView } from "./elicitation";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
+import { TurnTraceView } from "./turnTrace";
 import { clip, contentText, fileLinkTokens, type ActivityItem, type Item, type Text } from "./transcript";
 import { TokenMark, type Token } from "./tokens";
 
@@ -468,5 +469,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
     case "notice":
     case "error":
       return <div className={item.kind}>{render(t, item.text)}</div>;
+    case "trace":
+      return <TurnTraceView trace={item.trace} />;
   }
 });

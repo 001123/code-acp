@@ -2,6 +2,7 @@ import { Effect, Option } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { AgentRequestError, AgentStartError } from "../acpClient";
+import type { AcpTrace } from "../acpTrace";
 import { ShadowGit } from "../checkpoints";
 import { t, type MessageKey } from "../i18n";
 import { thenable, type ExtensionCtx, type Output, type VscodeError } from "../runtime";
@@ -28,7 +29,7 @@ export interface WorktreesHost {
   postTabs(): void;
   status(tab: Tab, key: MessageKey): void;
   confirmStartOver(tab: Tab): Effect.Effect<boolean, VscodeError>;
-  startOver(tab: Tab, change: (tab: Tab) => void): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | Worktrees | ShadowGit>;
+  startOver(tab: Tab, change: (tab: Tab) => void): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
 }
 
 const nameOf = (worktree: TabWorktree) => worktree.branch ?? path.basename(worktree.root);

@@ -152,6 +152,7 @@ export class TabAgents {
 
   private onSessionUpdate(tab: Tab, n: acp.SessionNotification): void {
     const { update } = n;
+    tab.turnStats?.onUpdate(update);
     if (update.sessionUpdate === "session_info_update" && update.title !== undefined) {
       tab.title = update.title ?? undefined;
       this.host.postTabs();

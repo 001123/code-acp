@@ -63,7 +63,7 @@ const TurnUsage = Schema.Struct({
   cachedReadTokens: Schema.optional(Schema.NullOr(Schema.Finite)),
   cachedWriteTokens: Schema.optional(Schema.NullOr(Schema.Finite)),
 });
-const decodeTurnUsage = Schema.decodeUnknownOption(TurnUsage);
+export const decodeTurnUsage = Schema.decodeUnknownOption(TurnUsage);
 const decodeLedger = Schema.decodeUnknownOption(Ledger);
 
 /** The session a record belongs to. */

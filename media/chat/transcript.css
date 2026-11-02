@@ -48,6 +48,11 @@
 .activity > summary {
   cursor: pointer;
 }
+/* Like the turn trace: secondary to the reply, so it stays on the right until opened. */
+.activity > summary,
+.thought > summary {
+  text-align: right;
+}
 /* Replace the native disclosure triangle with a Tabler chevron that rotates when open. */
 details > summary {
   list-style: none;
@@ -302,4 +307,57 @@ pre.terminal-output {
 .error {
   color: var(--vscode-errorForeground);
   white-space: pre-wrap;
+}
+
+/* The numbers of a finished turn: metadata, so it stays out of the way on the right until opened. */
+.turn-trace {
+  container: turn-trace / inline-size;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+.turn-trace > summary {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.turn-trace > summary:hover {
+  opacity: 1;
+}
+.turn-trace > summary::before {
+  order: 1;
+  flex: none;
+  margin: 0 0 0 4px;
+}
+.turn-trace-part {
+  white-space: nowrap;
+}
+.turn-trace-part + .turn-trace-part::before {
+  content: "·";
+  margin: 0 4px;
+}
+/* Where there is no room, the line keeps tokens and cost, when the agent reports them. */
+@container turn-trace (max-width: 220px) {
+  .turn-trace > summary:has(.turn-trace-key) .turn-trace-optional {
+    display: none;
+  }
+  .turn-trace > summary:has(.turn-trace-key) .turn-trace-optional + .turn-trace-key::before {
+    content: none;
+  }
+}
+.turn-trace dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px 12px;
+  margin: 6px 0;
+}
+.turn-trace dl > div {
+  display: contents;
+}
+.turn-trace dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--vscode-foreground);
 }

@@ -1,4 +1,5 @@
 import type * as acp from "@agentclientprotocol/sdk";
+import type { TurnStats } from "./trace";
 import { Option, Schema, Scope, Semaphore } from "effect";
 import { canFork, type AcpAgent } from "../acpClient";
 import { ChangeSet, SavedChanges } from "../fileChanges";
@@ -109,6 +110,8 @@ export interface Tab extends DraftHolder {
   changes: ChangeSet;
   /** The turn being run; its user message carries the id. */
   turn?: number;
+  /** What the running turn did so far, for codeAcp.tracing. */
+  turnStats?: TurnStats;
   /** Messages sent while a turn ran, sent in order as each turn ends. */
   queue: QueuedMessage[];
   /** The running turn was stopped to send the first queued message right away. */

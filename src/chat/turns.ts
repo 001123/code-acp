@@ -1,20 +1,27 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { Effect, Exit, Predicate } from "effect";
+import { Effect, Exit, Option, Predicate } from "effect";
 import * as vscode from "vscode";
 import type { AgentRequestError, AgentStartError, AuthRequiredError } from "../acpClient";
+import type { AcpTrace } from "../acpTrace";
 import type { ShadowGit } from "../checkpoints";
+import { changesSinceTurn } from "../fileChanges";
 import { t } from "../i18n";
 import type { ExtensionCtx, Output } from "../runtime";
+import { readSettings } from "../settings";
 import type { Worktrees } from "../worktrees";
 import { attachmentBlock, attachmentLocation, withActiveFile } from "./attachments";
 import type { ChangeReview } from "./changes";
 import type { ChatUi } from "./host";
 import type { LoadComposer, QueuedInfo, SentAttachment, TurnMessage } from "./protocol";
-import { messageText, type OutgoingMessage, type Tab, type TabList } from "./tabs";
+import { messageText, usageOf, type OutgoingMessage, type Tab, type TabList } from "./tabs";
+import { TurnStats, turnTrace } from "./trace";
 import type { TabUsage } from "./usage";
 import type { TabWorktrees } from "./worktrees";
 
 const MAX_TITLE_LENGTH = 40;
+
+/** A large work tree shouldn't hold up the end of a turn for a number in its trace. */
+const TRACE_CHANGES_TIMEOUT = "3 seconds";
 
 /** Characters of a taken-back message quoted to the agent. */
 const MAX_EXCERPT_LENGTH = 80;
@@ -26,7 +33,7 @@ export interface TurnsHost extends ChatUi {
   readonly usage: TabUsage;
   readonly tabWorktrees: TabWorktrees;
   /** The tab's session, created when missing; undefined when the user has to act first. */
-  ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | Worktrees | ShadowGit>;
+  ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
   cancelTab(tab: Tab): Effect.Effect<void, AgentRequestError | AuthRequiredError>;
   /** A turn ended that the user should hear about. */
   finished(tab: Tab): void;
@@ -313,12 +320,14 @@ export class TabTurns {
     this.host.postTab(tab, { type: "userMessage", text, attachments: sent, turn });
     tab.busy = true;
     this.host.status(tab, "chat.working");
+    const stats = new TurnStats();
+    tab.turnStats = stats;
+    const costBefore = usageOf(tab, sessionId)?.cost;
     return yield* agent.prompt(sessionId, prompt).pipe(
       Effect.tap((res) => this.host.usage.recordTurn(tab, sessionId, res)),
-      Effect.map((res) => {
-        this.host.postTab(tab, { type: "turnEnd", stopReason: res.stopReason });
-        return res.stopReason;
-      }),
+      Effect.tap((res) => Effect.sync(() => this.host.postTab(tab, { type: "turnEnd", stopReason: res.stopReason }))),
+      Effect.tap((res) => (readSettings().tracing ? this.postTrace(tab, sessionId, turn, res, stats, costBefore) : Effect.void)),
+      Effect.map((res) => res.stopReason),
       Effect.catchTag("AuthRequiredError", () =>
         Effect.sync(() => {
           tab.sessionId = undefined;
@@ -328,6 +337,9 @@ export class TabTurns {
       ),
       Effect.ensuring(
         Effect.sync(() => {
+          if (tab.turnStats === stats) {
+            tab.turnStats = undefined;
+          }
           // A turn cancelled by a start over may end after the tab's next turn began.
           if (tab.turn !== turn) {
             return;
@@ -338,5 +350,28 @@ export class TabTurns {
         }),
       ),
     );
+  });
+
+  /** Shows the numbers of a turn that just ended. It waits for them, so they come before the next turn's message. */
+  private readonly postTrace = Effect.fn("TabTurns.postTrace")(function* (
+    this: TabTurns,
+    tab: Tab,
+    sessionId: string,
+    turn: number,
+    response: acp.PromptResponse,
+    stats: TurnStats,
+    costBefore: acp.Cost | null | undefined,
+  ) {
+    const now = Date.now();
+    const changes = yield* changesSinceTurn(tab.changes, turn).pipe(
+      Effect.timeoutOption(TRACE_CHANGES_TIMEOUT),
+      Effect.map(Option.getOrUndefined),
+      Effect.orElseSucceed(() => undefined),
+    );
+    const totals = yield* this.host.usage.totals(tab);
+    this.host.postTab(tab, {
+      type: "turnTrace",
+      trace: turnTrace(tab, sessionId, response, { stats: stats.summary(now), costBefore, changes, number: totals?.turns }),
+    });
   });
 }

@@ -35,6 +35,9 @@ export class ViewMessages {
       case "manageAgents":
         yield* runCommand("codeAcp.manageAgents");
         break;
+      case "showTrace":
+        yield* runCommand("codeAcp.showTrace");
+        break;
       case "showUsage":
         yield* runCommand("codeAcp.showUsage");
         break;

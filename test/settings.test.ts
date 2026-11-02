@@ -15,6 +15,7 @@ describe("readSettings", () => {
     assert.isFalse(s.followAgent);
     assert.isTrue(s.autoScroll);
     assert.isTrue(s.showChanges);
+    assert.isFalse(s.tracing);
     assert.isTrue(s.notifications);
     assert.isTrue(s.notifyFinished);
     assert.isTrue(s.rememberSessionOptions);

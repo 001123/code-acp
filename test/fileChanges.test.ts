@@ -6,7 +6,7 @@ import { Effect, FileSystem, Layer } from "effect";
 import * as os from "node:os";
 import * as path from "node:path";
 import { ShadowGit } from "../src/checkpoints";
-import { beginTurn, ChangeSet, hunksOf, keepHunk, refresh } from "../src/fileChanges";
+import { beginTurn, ChangeSet, changesSinceTurn, hunksOf, keepHunk, refresh } from "../src/fileChanges";
 import { ExtensionCtx } from "../src/runtime";
 import { changeBlocks, keepBlock, replacement, undoBlock } from "../src/ui/lineDiff";
 import { makeExtensionCtx } from "./helpers";
@@ -109,6 +109,24 @@ describe("reviewing changes one by one", () => {
         ),
       ),
     );
+
+  it.live("counts what changed since a turn's checkpoint, not what changed before it", () =>
+    inRepo((root, file) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const changes = new ChangeSet();
+        assert.isUndefined(yield* changesSinceTurn(changes, 1));
+        yield* fs.writeFileString(file, "one\ntwo\n");
+        yield* beginTurn(changes, root, 1, "first", 0);
+        yield* fs.writeFileString(file, "one\nTWO\n");
+        yield* beginTurn(changes, root, 2, "second", 1);
+        yield* fs.writeFileString(path.join(root, "new.txt"), "a\nb\n");
+        assert.deepStrictEqual(yield* changesSinceTurn(changes, 2), { files: 1, added: 2, removed: 0 });
+        assert.deepStrictEqual(yield* changesSinceTurn(changes, 1), { files: 2, added: 3, removed: 1 });
+        assert.isUndefined(yield* changesSinceTurn(changes, 3));
+      }),
+    ),
+  );
 
   it.live("keeps one change: the others stay listed", () =>
     inRepo((root, file) =>

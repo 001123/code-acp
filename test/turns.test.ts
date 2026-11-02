@@ -62,7 +62,7 @@ const makeTurns = Effect.fnUntraced(function* () {
       ...ui,
       tabs,
       changes: new ChangeReview({ postTab: ui.postTab, saveTabs: ui.saveTabs, run: () => {}, openFile: () => Effect.void }),
-      usage: { recordTurn: () => Effect.void } as unknown as TabUsage,
+      usage: { recordTurn: () => Effect.void, totals: () => Effect.succeed({ turns: 7 }) } as unknown as TabUsage,
       tabWorktrees: { localize: (_tab: Tab, attachment: unknown) => Effect.succeed(attachment) } as unknown as TabWorktrees,
       ensureSession: (each) => Effect.succeed(each.sessionId),
       cancelTab: () =>
@@ -87,6 +87,41 @@ const ofType = (posted: ReadonlyArray<Record<string, unknown>>, type: string) =>
 beforeEach(() => __test.reset());
 
 describe("TabTurns", () => {
+  it.live("posts the numbers of a finished turn only while tracing is on", () =>
+    Effect.gen(function* () {
+      const { say, answer, prompts, posted } = yield* makeTurns();
+      say("first");
+      yield* until(() => prompts.length === 1);
+      yield* answer(0);
+      assert.deepStrictEqual(ofType(posted, "turnTrace"), []);
+      __test.setSetting("codeAcp.tracing", true);
+      say("second");
+      yield* until(() => prompts.length === 2);
+      yield* answer(1, "max_tokens");
+      const traces = ofType(posted, "turnTrace") as Array<{ trace: { stopReason: string; sessionId: string; durationMs: number } }>;
+      assert.strictEqual(traces.length, 1);
+      assert.strictEqual(traces[0]!.trace.stopReason, "max_tokens");
+      assert.strictEqual(traces[0]!.trace.sessionId, "s");
+      assert.isAtLeast(traces[0]!.trace.durationMs, 0);
+      assert.strictEqual((traces[0]!.trace as unknown as { number: number }).number, 7);
+    }),
+  );
+
+  it.live("counts what the agent does during the running turn only", () =>
+    Effect.gen(function* () {
+      __test.setSetting("codeAcp.tracing", true);
+      const { say, answer, prompts, posted, tab } = yield* makeTurns();
+      tab.turnStats?.onUpdate({ sessionUpdate: "tool_call", toolCallId: "before", title: "t" });
+      say("first");
+      yield* until(() => prompts.length === 1);
+      tab.turnStats!.onUpdate({ sessionUpdate: "tool_call", toolCallId: "a", title: "t", kind: "read" });
+      yield* answer(0);
+      assert.isUndefined(tab.turnStats);
+      const [{ trace }] = ofType(posted, "turnTrace") as unknown as Array<{ trace: { tools: unknown } }>;
+      assert.deepStrictEqual(trace.tools, { total: 1, failed: 0, kinds: { read: 1 } });
+    }),
+  );
+
   it.live("ignores a message with nothing in it", () =>
     Effect.gen(function* () {
       const { say, prompts, tab } = yield* makeTurns();

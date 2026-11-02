@@ -5,7 +5,6 @@ import { Effect, FileSystem, Layer, Scope } from "effect";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type AcpAgent, type AgentHandlers, canFork, spawnAgent } from "../src/acpClient";
-import { ExtensionCtx, Output } from "../src/runtime";
 import { __test } from "./stubs/vscode";
 import { makeExtensionCtx, makeOutput, type OutputStub, stubLayer } from "./helpers";
 
@@ -68,6 +67,30 @@ const withAgent = <A, E>(
 const prompt = (agent: AcpAgent, value: string) => agent.prompt("s1", text(value));
 
 describe("spawnAgent", () => {
+  it.live("logs the messages exchanged with the agent while tracing is on", () =>
+    Effect.gen(function* () {
+      __test.setSetting("codeAcp.tracing", true);
+      yield* withAgent({}, allow, (agent) =>
+        Effect.gen(function* () {
+          yield* prompt(agent, "updates");
+          const lines = __test.outputChannels.get("Code ACP Trace") ?? [];
+          assert.isTrue(lines.some((line) => line.includes(" → ") && line.includes('"initialize"')));
+          assert.isTrue(lines.some((line) => line.includes(" ← ") && line.includes('"end_turn"')));
+          assert.isTrue(lines.some((line) => line.includes(" ← ×2 ") && line.includes("hello world")));
+          assert.match(lines[0]!, /\[node#\d+\]/);
+        }),
+      );
+    }),
+  );
+
+  it.live("keeps no log while tracing is off", () =>
+    Effect.gen(function* () {
+      __test.reset();
+      yield* withAgent({}, allow, (agent) => prompt(agent, "updates"));
+      assert.isFalse(__test.outputChannels.has("Code ACP Trace"));
+    }),
+  );
+
   it.live("completes the initialize handshake and reports capabilities", () => {
     const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
     return withAgent({ MOCK_HTTP: "1" }, rec, (agent) =>
@@ -104,8 +127,7 @@ describe("spawnAgent", () => {
       assert.strictEqual(meta.clientInfo.version, "0.0.0");
     }).pipe(
       Effect.scoped,
-      Effect.provideService(Output, output),
-      Effect.provideService(ExtensionCtx, makeExtensionCtx("/tmp/x", {})),
+      Effect.provide(stubLayer(output, makeExtensionCtx("/tmp/x", {}))),
     );
   });
 

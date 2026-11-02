@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import { Layer } from "effect";
+import { AcpTrace } from "../src/acpTrace";
 import { ExtensionCtx, Output } from "../src/runtime";
 
 export interface OutputStub extends vscode.OutputChannel {
@@ -28,4 +29,4 @@ export const makeExtensionCtx = (globalStorage = "/tmp/code-acp-test-storage", p
   }) as unknown as vscode.ExtensionContext;
 
 export const stubLayer = (output: OutputStub, ctx = makeExtensionCtx()) =>
-  Layer.mergeAll(Layer.succeed(Output, output), Layer.succeed(ExtensionCtx, ctx));
+  Layer.mergeAll(Layer.succeed(Output, output), Layer.succeed(ExtensionCtx, ctx), AcpTrace.layer);

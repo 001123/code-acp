@@ -53,6 +53,8 @@ export type FromWebview =
   | { type: "manageAgents" }
   /** Opens the usage summary (clicking the context meter). */
   | { type: "showUsage" }
+  /** Opens the log of the messages exchanged with agents. */
+  | { type: "showTrace" }
   | { type: "openSettings" }
   /** Installs the registry version the agent picker offers for agent `id`. */
   | { type: "updateAgent"; id: string }
@@ -114,6 +116,7 @@ export type ViewMessage = Extract<
       | "selectAgent"
       | "manageAgents"
       | "showUsage"
+      | "showTrace"
       | "openSettings"
       | "permission"
       | "elicitation"
@@ -142,6 +145,47 @@ export type ElicitationValue = string | number | boolean | string[];
 export interface ChangesMessage {
   files: ChangedFile[];
   turns: number[];
+}
+
+export interface TurnChanges {
+  files: number;
+  added: number;
+  removed: number;
+}
+
+/** What is known about a finished turn ("turnTrace" message); what the agent did not report is left out. */
+export interface TurnTrace {
+  stopReason: string;
+  durationMs: number;
+  /** Until the agent's first text, thought or tool call. */
+  firstResponseMs?: number;
+  /** The time the turn waited for the user to allow a tool call or answer a question. */
+  waiting: { asks: number; ms: number };
+  /** The tool calls made, subagents' too; `kinds` counts them by ACP's `ToolKind`. */
+  tools: { total: number; failed: number; kinds: Record<string, number> };
+  subagents: number;
+  /** What changed in the work tree during the turn, whoever did it; left out when there are no checkpoints. */
+  changes?: TurnChanges;
+  /** Which turn of the session this was, as far as the usage ledger knows. */
+  number?: number;
+  /** The agent's name and version. */
+  agent?: string;
+  sessionId: string;
+  model?: string;
+  effort?: string;
+  /** The turn's tokens. */
+  tokens?: {
+    total: number;
+    input: number;
+    output: number;
+    cachedRead?: number;
+    cachedWrite?: number;
+    thought?: number;
+  };
+  /** The tokens in the session's context when the turn ended. */
+  context?: { used: number; size: number };
+  /** What the turn cost, worked out from the session's cumulative cost. */
+  cost?: { turn: number; session: number; currency: string };
 }
 
 /** A message waiting for the running turn to end ("queue" message). */

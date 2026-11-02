@@ -110,6 +110,11 @@
         "category": "%command.category%"
       },
       {
+        "command": "codeAcp.showTrace",
+        "title": "%command.showTrace%",
+        "category": "%command.category%"
+      },
+      {
         "command": "codeAcp.attach",
         "title": "%command.attach%",
         "icon": "$(attach)"
@@ -269,6 +274,11 @@
           "command": "codeAcp.showLog",
           "when": "view == codeAcp.chat",
           "group": "2_info@2"
+        },
+        {
+          "command": "codeAcp.showTrace",
+          "when": "view == codeAcp.chat && config.codeAcp.tracing",
+          "group": "2_info@3"
         },
         {
           "command": "codeAcp.openSettings",
@@ -546,6 +556,11 @@
           "type": "boolean",
           "default": true,
           "description": "%config.showChanges%"
+        },
+        "codeAcp.tracing": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.tracing%"
         },
         "codeAcp.notifications": {
           "type": "boolean",

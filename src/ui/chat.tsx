@@ -78,6 +78,8 @@ function App() {
   autoScrollRef.current = autoScroll;
   /** codeAcp.showChanges: the files changed bar above the composer. */
   const [showChanges, setShowChanges] = useState(true);
+  /** codeAcp.tracing: the numbers below each turn. */
+  const [tracing, setTracing] = useState(false);
   const checkpointTurns = changes?.turns;
   const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;
   const shownTab = useMemo<ShownTab>(
@@ -186,6 +188,10 @@ function App() {
         return setAutoScroll(msg.enabled);
       case "showChanges":
         return setShowChanges(msg.enabled);
+      case "tracing":
+        return setTracing(msg.enabled);
+      case "turnTrace":
+        return dispatch(tab, { type: "add", item: { kind: "trace", trace: msg.trace } });
       case "turnEnd":
         return dispatch(
           tab,
@@ -429,7 +435,7 @@ function App() {
         {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
         <div id="messages" ref={messages} hidden={!!history}>
           {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
-          {groupActivity(state.items).map((entry) =>
+          {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map((entry) =>
             Array.isArray(entry) ? (
               <EntryBoundary key={entry[0]!.id} items={entry}>
                 <ActivityView items={entry} />

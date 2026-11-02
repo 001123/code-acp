@@ -14,8 +14,11 @@ export const __test = {
       listener({ affectsConfiguration: (section) => key === section || key.startsWith(`${section}.`) });
     }
   },
+  /** The lines of each output channel created, by name. */
+  outputChannels: new Map<string, string[]>(),
   reset() {
     settings.clear();
+    __test.outputChannels.clear();
     env.language = "en";
     workspace.workspaceFolders = undefined;
     workspace.textDocuments = [];
@@ -207,6 +210,11 @@ export const workspace = {
 
 export const window = {
   activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
+  createOutputChannel(name: string) {
+    const lines: string[] = [];
+    __test.outputChannels.set(name, lines);
+    return { name, appendLine: (line: string) => void lines.push(line), show: () => {}, dispose: () => {} };
+  },
   showWarningMessage: async (_message: string, _options: unknown, ..._actions: string[]): Promise<string | undefined> => undefined,
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   state: { focused: true },

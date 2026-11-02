@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import * as vscode from "vscode";
+import { AcpTrace } from "./acpTrace";
 import { AgentManager } from "./agentManager";
 import { AgentUpdates } from "./agentUpdates";
 import { ASKS, AskAgentActions } from "./askAgent";
@@ -92,6 +93,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.login", run(() => provider.login())),
     vscode.commands.registerCommand("codeAcp.restart", run(() => provider.restart())),
     vscode.commands.registerCommand("codeAcp.showLog", () => log.show()),
+    vscode.commands.registerCommand("codeAcp.showTrace", run(() => AcpTrace.use((trace) => trace.show))),
     // scm/title passes the SourceControl; the palette passes nothing.
     vscode.commands.registerCommand(
       "codeAcp.generateCommitMessage",

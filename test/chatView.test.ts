@@ -133,6 +133,27 @@ describe("ChatViewProvider", () => {
     ),
   );
 
+  it.live("with tracing on, shows a turn's numbers after it ends, with the wait for the user", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        __test.setSetting("codeAcp.tracing", true);
+        const { ofType, say, send, idle, tab } = yield* startChat;
+        assert.deepStrictEqual(ofType("tracing").at(-1), { type: "tracing", enabled: true });
+        say(tab, "permission");
+        yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+        send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "allow" });
+        yield* until(() => ofType("turnTrace", tab).length === 1, "the turn's numbers");
+        const { trace } = ofType("turnTrace", tab)[0]!;
+        assert.strictEqual(trace.stopReason, "end_turn");
+        assert.strictEqual(trace.waiting.asks, 1);
+        assert.strictEqual(trace.number, 1);
+        assert.isAtLeast(trace.firstResponseMs, 0);
+        assert.deepStrictEqual(trace.changes, { files: 0, added: 0, removed: 0 });
+        yield* idle(tab);
+      }),
+    ),
+  );
+
   it.live("runs a turn: the message, the agent's reply and its end reach the webview", () =>
     Effect.scoped(
       Effect.gen(function* () {

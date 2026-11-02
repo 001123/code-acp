@@ -2,6 +2,7 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { Effect, Schema, Semaphore } from "effect";
 import * as vscode from "vscode";
 import { canFork, type AgentRequestError, type AgentStartError, type AuthRequiredError } from "../acpClient";
+import type { AcpTrace } from "../acpTrace";
 import type { ShadowGit } from "../checkpoints";
 import { ChangeSet } from "../fileChanges";
 import { t } from "../i18n";
@@ -34,9 +35,9 @@ export interface SessionsHost extends ChatUi {
   readonly usage: TabUsage;
   readonly tabWorktrees: TabWorktrees;
   readonly turns: TabTurns;
-  selectTab(tab: Tab): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | Worktrees | ShadowGit>;
+  selectTab(tab: Tab): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
   /** The process of the agent `tab` runs on, started on first use. */
-  getAgent(tab: Tab): Effect.Effect<RunningAgent, NoAgentError | AgentStartError | AuthRequiredError | AgentRequestError, Output | ExtensionCtx>;
+  getAgent(tab: Tab): Effect.Effect<RunningAgent, NoAgentError | AgentStartError | AuthRequiredError | AgentRequestError, Output | ExtensionCtx | AcpTrace>;
 }
 
 /** The ACP sessions of chat tabs: starting, reopening, forking and ending them. */
@@ -190,7 +191,7 @@ export class TabSessions {
   });
 
   /** The tab's session, created when missing; undefined when the user has to act first. */
-  ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | Worktrees | ShadowGit> {
+  ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit> {
     return this.createSession(tab).pipe(
       Effect.catchTags({
         NoAgentError: () => Effect.sync(() => void this.host.status(tab, "chat.noAgent", { needsAgent: true })),

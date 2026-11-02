@@ -56,6 +56,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly indicators: ChatIndicators;
   private readonly permissions = new Permissions<Tab>({
     shown: (tab, id, ask) => {
+      tab.turnStats?.askShown();
       this.view?.show(true);
       if (ask.kind === "permission") {
         const { toolCall, options } = ask.request;
@@ -69,6 +70,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.indicators.update();
     },
     done: (tab, id, answer) => {
+      tab.turnStats?.askDone();
       if (answer.kind === "permission") {
         this.postTab(tab, { type: "permissionDone", id });
       } else {
@@ -254,6 +256,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         if (e.affectsConfiguration("codeAcp.autoScroll")) {
           this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
         }
+        if (e.affectsConfiguration("codeAcp.tracing")) {
+          this.post({ type: "tracing", enabled: readSettings().tracing });
+        }
         if (e.affectsConfiguration("codeAcp.showChanges")) {
           this.post({ type: "showChanges", enabled: readSettings().showChanges });
           this.changes.refreshLenses();
@@ -414,6 +419,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.post({ type: "followAgent", enabled: this.followAgent });
         this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
         this.post({ type: "showChanges", enabled: readSettings().showChanges });
+        this.post({ type: "tracing", enabled: readSettings().tracing });
         for (const each of this.tabs.all) {
           this.refreshStatus(each);
           this.usage.postSaved(each);

@@ -1,7 +1,8 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import type { SentAttachment } from "../../chat/protocol";
+import type { SentAttachment, TurnTrace } from "../../chat/protocol";
 import type { Translate } from "../l10n";
 import type { Token } from "./tokens";
+import { parentToolUseId, startsSubagent } from "./toolMeta";
 
 /** A localized line: a message key with its arguments, translated when rendered. */
 export type Text = { key: Parameters<Translate>[0]; args?: unknown[] } | { raw: string };
@@ -16,7 +17,9 @@ export type Item =
   | { kind: "plan"; id: number; entries: acp.PlanEntry[] }
   | { kind: "permission"; id: number; requestId: number; toolCall: acp.ToolCallUpdate; options: acp.PermissionOption[]; done: boolean }
   | ElicitationItem
-  | { kind: "notice" | "error"; id: number; text: Text };
+  | { kind: "notice" | "error"; id: number; text: Text }
+  /** The numbers of a finished turn; shown while codeAcp.tracing is on. */
+  | { kind: "trace"; id: number; trace: TurnTrace };
 
 /** A form the agent asks the user to fill in; `outcome` is the answer's action once it was answered or dismissed. */
 export interface ElicitationItem {
@@ -111,18 +114,6 @@ export function clipContent(content: acp.ToolCallContent[] | null | undefined): 
   });
 }
 
-/** A string field of claude-agent-acp's `_meta.claudeCode` extension. */
-function claudeMeta(u: acp.ToolCall | acp.ToolCallUpdate, key: "parentToolUseId" | "toolName"): string | undefined {
-  const claude = u._meta?.["claudeCode"];
-  const value = typeof claude === "object" && claude !== null ? (claude as Record<string, unknown>)[key] : undefined;
-  return typeof value === "string" ? value : undefined;
-}
-
-/** The Agent/Task call that started the subagent making this call. */
-function parentToolUseId(u: acp.ToolCall | acp.ToolCallUpdate): string | undefined {
-  return claudeMeta(u, "parentToolUseId");
-}
-
 /** The open permission request or question of `item`, and the tool call it is about. */
 export function openRequest(item: DistributiveOmit<Item, "id">): { requestId: number; toolCallId?: string; parentId?: string } | undefined {
   if (item.kind === "permission" && !item.done) {
@@ -133,9 +124,6 @@ export function openRequest(item: DistributiveOmit<Item, "id">): { requestId: nu
   }
   return undefined;
 }
-
-/** Claude Code's tools that start a subagent; `Task` is the older name of `Agent`. */
-const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
 
 export function transcript(state: Transcript, action: Action): Transcript {
   const add = (item: DistributiveOmit<Item, "id">, streaming?: boolean): Transcript => ({
@@ -168,10 +156,9 @@ export function transcript(state: Transcript, action: Action): Transcript {
     }
     case "toolCall": {
       const u = action.update;
-      const toolName = claudeMeta(u, "toolName");
       const merge = (i: ToolItem): ToolItem => ({
         ...i,
-        ...(toolName !== undefined && SUBAGENT_TOOLS.has(toolName) ? { subagent: true } : {}),
+        ...(startsSubagent(u) ? { subagent: true } : {}),
         ...(u.title ? { title: u.title } : {}),
         ...(u.status ? { status: u.status } : {}),
         ...(u.content ? { content: clipContent(u.content) } : {}),

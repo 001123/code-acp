@@ -218,6 +218,22 @@ export const refresh = Effect.fn("ChangeSet.refresh")(function* (changes: Change
   return current;
 });
 
+/** What changed in the work tree since the checkpoint of `turn`; undefined without one. */
+export const changesSinceTurn = Effect.fn("ChangeSet.changesSinceTurn")(function* (changes: ChangeSet, turn: number) {
+  const { root } = changes;
+  const from = changes.checkpoints.find((c) => c.turn === turn)?.tree;
+  if (root === undefined || from === undefined || changes.disabled) {
+    return undefined;
+  }
+  const current = yield* snapshotOf(root);
+  const diff = yield* ShadowGit.use((git) => git.diff(root, from, current));
+  return {
+    files: diff.length,
+    added: diff.reduce((sum, change) => sum + change.added, 0),
+    removed: diff.reduce((sum, change) => sum + change.removed, 0),
+  };
+});
+
 /** What `file` held at the last review; undefined when it is not among the changes. */
 export const beforeOf = Effect.fn("ChangeSet.beforeOf")(function* (changes: ChangeSet, file: string) {
   const rel = changes.relative(file);
