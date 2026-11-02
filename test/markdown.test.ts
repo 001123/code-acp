@@ -21,5 +21,29 @@ describe("user Markdown", () => {
   it("never renders raw HTML", () => {
     assert.notInclude(html("<mark data-token-index=\"0\">x</mark>", ["y"]), "<b>");
   });
+});
 
+describe("file references", () => {
+  it("decodes a file:// path", () => {
+    assert.include(html("`file:///tmp/caf%C3%A9.txt`"), 'data-file="/tmp/café.txt"');
+  });
+
+  it("takes a path with a stray % as written", () => {
+    assert.include(html("`file:///tmp/100%.txt`"), 'data-file="/tmp/100%.txt"');
+    assert.include(html("[report](file:///tmp/100%.txt)"), 'data-file="/tmp/100%.txt"');
+  });
+
+  it("opens file:// links", () => {
+    const link = html("[a](file:///w/a.ts#L12)");
+    assert.include(link, 'href="file:///w/a.ts#L12"');
+    assert.include(link, 'data-file="/w/a.ts"');
+    assert.include(link, 'data-line="12"');
+    assert.include(html("[a](file:///w/my%20dir/a.ts)"), 'data-file="/w/my dir/a.ts"');
+  });
+
+  it("keeps file:// out of images and drops links that name no file", () => {
+    assert.notInclude(html("![a](file:///w/a.png)"), "file:");
+    assert.notInclude(html("[a](file:///w/a*.ts)"), "file:");
+    assert.notInclude(html("[a](javascript:alert(1))"), "javascript:");
+  });
 });

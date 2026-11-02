@@ -1,6 +1,7 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import type { TabInfo, TerminalSnapshot, WorkspaceFolderInfo } from "../chat/protocol";
+import { ErrorBoundary } from "./errorBoundary";
 import { Lightbox } from "./lightbox";
 import { useL10n, type Translate } from "./l10n";
 import { mount } from "./mount";
@@ -20,6 +21,16 @@ import { WorkspaceBar } from "./chat/workspaceControls";
 import { clipContent, contentText, groupActivity, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
+
+/** The transcript only lives here, so an entry that fails to render must not take the rest down with it. */
+function EntryBoundary({ items, children }: { items: readonly unknown[]; children: ReactNode }) {
+  const { t } = useL10n();
+  return (
+    <ErrorBoundary resetKeys={items} fallback={(message) => <div className="error">{t("chat.entryFailed", message)}</div>}>
+      {children}
+    </ErrorBoundary>
+  );
+}
 
 function App() {
   const { t } = useL10n();
@@ -415,7 +426,15 @@ function App() {
         <div id="messages" ref={messages} hidden={!!history}>
           {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
           {groupActivity(state.items).map((entry) =>
-            Array.isArray(entry) ? <ActivityView key={entry[0]!.id} items={entry} /> : <ItemView key={entry.id} item={entry} />,
+            Array.isArray(entry) ? (
+              <EntryBoundary key={entry[0]!.id} items={entry}>
+                <ActivityView items={entry} />
+              </EntryBoundary>
+            ) : (
+              <EntryBoundary key={entry.id} items={[entry]}>
+                <ItemView item={entry} />
+              </EntryBoundary>
+            ),
           )}
           {busySince !== undefined && silent >= WAITING_AFTER_MS && (
             <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>

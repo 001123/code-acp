@@ -38,3 +38,13 @@ h1 {
   font-weight: 600;
   margin: 0 auto 0 0;
 }
+/* Fallback of the root error boundary (src/ui/mount.tsx). */
+.crashed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px;
+  color: var(--vscode-errorForeground);
+  white-space: pre-wrap;
+}

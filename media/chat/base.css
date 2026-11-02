@@ -113,3 +113,13 @@ pre {
   font-size: var(--vscode-editor-font-size);
   background: var(--vscode-textCodeBlock-background);
 }
+/* Fallback of the root error boundary (src/ui/mount.tsx). */
+.crashed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px;
+  color: var(--vscode-errorForeground);
+  white-space: pre-wrap;
+}

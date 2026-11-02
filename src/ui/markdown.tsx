@@ -1,7 +1,7 @@
 import { mount, render, type Mounted } from "pele";
 import type { ElementContent, Root, RootContent } from "hast";
 import { memo, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import Markdown, { type Components } from "react-markdown";
+import Markdown, { defaultUrlTransform, type Components, type UrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
@@ -54,16 +54,27 @@ const FILE_EXTENSIONS = new Set(
   ).split(" "),
 );
 
+/** A `file://` path; one with a stray `%` isn't percent-encoded, so it is taken as written. */
+function decodePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 /** `src/a.ts`, `.gitignore`, `src/a.ts:12`, `src/a.ts#L12`, `file:///abs/a.ts`; undefined for anything else. */
 function fileRef(text: string, strict: boolean): FileRef | undefined {
   let raw = text.trim();
-  if (raw.startsWith("file://")) {
-    raw = decodeURIComponent(raw.slice("file://".length));
+  const url = raw.startsWith("file://");
+  if (url) {
+    raw = decodePath(raw.slice("file://".length));
   } else if (/^[a-z][\w+.-]+:/i.test(raw) || raw.startsWith("#")) {
     return undefined;
   }
   const m = /^(.+?)(?::(\d+)(?::\d+)?|#L(\d+)(?:-L?\d+)?)?$/.exec(raw);
-  if (!m || /[\s*?<>|"'`]/.test(m[1]!)) return undefined;
+  // Only a file:// URL may have spaces: in other text they mean it isn't a path.
+  if (!m || (url ? /[*?<>|"'`]/ : /[\s*?<>|"'`]/).test(m[1]!)) return undefined;
   const path = m[1]!;
   const lineText = m[2] ?? m[3];
   const line = lineText ? Number(lineText) : undefined;
@@ -78,6 +89,10 @@ function fileRef(text: string, strict: boolean): FileRef | undefined {
 
 const fileData = (ref: FileRef | undefined) =>
   ref ? { "data-file": ref.path, "data-line": ref.line, className: "file-link" } : {};
+
+/** The default drops `file:` links, which open in the editor when they name a file; nothing else gets through. */
+const urlTransform: UrlTransform = (url, key) =>
+  key === "href" && url.startsWith("file://") && fileRef(url, false) ? url : defaultUrlTransform(url);
 
 // Raw HTML in agent output is never rendered: react-markdown escapes it unless rehype-raw is added.
 const components: Components = {
@@ -204,6 +219,7 @@ export const MarkdownView = memo(function MarkdownView({
         remarkPlugins={breaks ? remarkPluginsWithBreaks : remarkPlugins}
         rehypePlugins={rehypePlugins}
         components={parts}
+        urlTransform={urlTransform}
       >
         {text}
       </Markdown>
