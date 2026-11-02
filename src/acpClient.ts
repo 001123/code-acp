@@ -240,6 +240,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         fs: { readTextFile: true, writeTextFile: true },
         terminal: handlers.onTerminal !== undefined,
         auth: { terminal: true },
+        session: { notices: {} },
         ...(handlers.elicit ? { elicitation: { form: {} } } : {}),
       },
     }),
@@ -320,9 +321,14 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
 });
 
 const readTextFile = Effect.fn("readTextFile")(function* (params: acp.ReadTextFileRequest) {
-  // openTextDocument returns the editor buffer, so unsaved changes are visible to the agent.
-  const doc = yield* thenable(() => vscode.workspace.openTextDocument(vscode.Uri.file(params.path)));
-  let content = doc.getText();
+  const uri = vscode.Uri.file(params.path);
+  // The editor buffer shows the agent unsaved changes. Any other file stays closed: opening it would wake language servers.
+  const open = vscode.workspace.textDocuments.find((doc) => doc.uri.toString() === uri.toString());
+  let content = open
+    ? open.getText()
+    : yield* thenable(() => vscode.workspace.fs.readFile(uri)).pipe(
+        Effect.flatMap((bytes) => thenable(() => vscode.workspace.decode(bytes, { uri }))),
+      );
   if (params.line != null || params.limit != null) {
     const lines = content.split("\n");
     const start = Math.max(0, (params.line ?? 1) - 1);

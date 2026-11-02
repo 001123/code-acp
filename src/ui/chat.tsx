@@ -18,7 +18,7 @@ import { ChatSettings } from "./chat/chatSettings";
 import { ConfigLoading, ConfigSelect, QuickConfig } from "./chat/sessionConfig";
 import { UsageMeter } from "./chat/usageMeter";
 import { WorkspaceBar } from "./chat/workspaceControls";
-import { clipContent, contentText, groupActivity, transcript, type Action } from "./chat/transcript";
+import { clipContent, contentText, groupActivity, noticeItem, stopReasonText, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
 
@@ -190,13 +190,10 @@ function App() {
         return setTracing(msg.enabled);
       case "turnTrace":
         return dispatch(tab, { type: "add", item: { kind: "trace", trace: msg.trace } });
-      case "turnEnd":
-        return dispatch(
-          tab,
-          msg.stopReason === "end_turn"
-            ? { type: "endStream" }
-            : { type: "add", item: { kind: "notice", text: { key: "chat.stopReason", args: [msg.stopReason] } } },
-        );
+      case "turnEnd": {
+        const text = stopReasonText(msg.stopReason);
+        return dispatch(tab, text ? { type: "add", item: { kind: "notice", text } } : { type: "endStream" });
+      }
       case "session":
         // A loaded session's replayed history ends here.
         dispatch(tab, { type: "endStream" });
@@ -311,13 +308,8 @@ function App() {
       case "session_info_update":
         // The host renames the tab.
         return;
-      default: {
-        // Not in the ACP schema, but some agents send it.
-        const notice = u as { sessionUpdate: string; message?: string; text?: string };
-        if (notice.sessionUpdate === "notice") {
-          dispatch(tab, { type: "add", item: { kind: "notice", text: { raw: notice.message ?? notice.text ?? JSON.stringify(u) } } });
-        }
-      }
+      case "notice":
+        return dispatch(tab, { type: "add", item: noticeItem(u) });
     }
   }
 

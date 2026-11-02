@@ -113,6 +113,12 @@ acp
           await say(`error:${e.code}`);
         }
         return { stopReason: "end_turn" };
+      case "notice":
+        await client.notify(acp.methods.client.session.update, {
+          sessionId: params.sessionId,
+          update: { sessionUpdate: "notice", severity: "warning", title: "Slow down", description: "Rate limited" },
+        });
+        return { stopReason: "end_turn" };
       case "refuse":
         return { stopReason: "refusal" };
       case "expired":

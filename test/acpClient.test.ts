@@ -5,7 +5,7 @@ import { Effect, FileSystem, Layer, Scope } from "effect";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type AcpAgent, type AgentHandlers, canFork, spawnAgent } from "../src/acpClient";
-import { __test } from "./stubs/vscode";
+import { __test, Uri, workspace } from "./stubs/vscode";
 import { makeExtensionCtx, makeOutput, type OutputStub, stubLayer } from "./helpers";
 
 const MOCK_AGENT = fileURLToPath(new URL("./fixtures/mock-agent.mjs", import.meta.url));
@@ -103,6 +103,7 @@ describe("spawnAgent", () => {
         const meta = init._meta as { clientInfo: { name: string; version: string }; clientCapabilities: acp.ClientCapabilities };
         assert.deepStrictEqual(meta.clientInfo, { name: "code-acp", version: "1.2.3" });
         assert.deepStrictEqual(meta.clientCapabilities.fs, { readTextFile: true, writeTextFile: true });
+        assert.deepStrictEqual(meta.clientCapabilities.session, { notices: {} });
         // No onTerminal handler: no terminal capability; no elicit handler: no elicitations.
         assert.strictEqual(meta.clientCapabilities.terminal, false);
         assert.isUndefined(meta.clientCapabilities.elicitation);
@@ -255,6 +256,50 @@ describe("spawnAgent", () => {
       yield* withAgent({ MOCK_LINE: "3" }, rec, (agent) => prompt(agent, `read ${file}`));
       assert.strictEqual(messageText(rec), "three\nfour");
     }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer));
+  });
+
+  it.live("reads closed files from disk without opening them", () => {
+    __test.reset();
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const dir = yield* fs.makeTempDirectoryScoped();
+      const file = path.join(dir, "closed.txt");
+      yield* fs.writeFileString(file, "on disk");
+      yield* withAgent({}, rec, (agent) => prompt(agent, `read ${file}`));
+      assert.strictEqual(messageText(rec), "on disk");
+      assert.deepStrictEqual(__test.openedDocuments, []);
+    }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer));
+  });
+
+  it.live("reads open files from the editor buffer, with unsaved changes", () => {
+    __test.reset();
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const dir = yield* fs.makeTempDirectoryScoped();
+      const file = path.join(dir, "open.txt");
+      yield* fs.writeFileString(file, "on disk");
+      workspace.textDocuments = [
+        { uri: Uri.file(file), isClosed: false, lineCount: 1, save: async () => true, getText: () => "unsaved\nlines" },
+      ];
+      yield* withAgent({ MOCK_LINE: "2" }, rec, (agent) => prompt(agent, `read ${file}`));
+      assert.strictEqual(messageText(rec), "lines");
+      assert.deepStrictEqual(__test.openedDocuments, []);
+    }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer), Effect.ensuring(Effect.sync(() => __test.reset())));
+  });
+
+  it.live("passes session notices on", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return withAgent({}, rec, (agent) =>
+      Effect.gen(function* () {
+        yield* prompt(agent, "notice");
+        assert.deepStrictEqual(
+          rec.updates.map((u) => u.update),
+          [{ sessionUpdate: "notice", severity: "warning", title: "Slow down", description: "Rate limited" }],
+        );
+      }),
+    );
   });
 
   it.live("answers a read of a missing file with an error to the agent", () => {

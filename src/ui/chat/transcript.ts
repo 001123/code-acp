@@ -241,6 +241,31 @@ export function transcript(state: Transcript, action: Action): Transcript {
   }
 }
 
+/** The line a finished turn leaves in the transcript; none when it ended the way the user expects. */
+export function stopReasonText(stopReason: string): Text | undefined {
+  switch (stopReason) {
+    case "end_turn":
+    case "cancelled":
+      return undefined;
+    case "max_tokens":
+      return { key: "chat.stopReason.maxTokens" };
+    case "max_turn_requests":
+      return { key: "chat.stopReason.maxTurnRequests" };
+    case "refusal":
+      return { key: "chat.stopReason.refusal" };
+    default:
+      return { key: "chat.stopReason", args: [stopReason] };
+  }
+}
+
+/** A session notice as a transcript item; other severities than `error` look the same. */
+export function noticeItem(notice: acp.Notice): DistributiveOmit<Extract<Item, { kind: "notice" | "error" }>, "id"> {
+  return {
+    kind: notice.severity === "error" ? "error" : "notice",
+    text: { raw: notice.description ? `${notice.title} — ${notice.description}` : notice.title },
+  };
+}
+
 export function contentText(block: acp.ContentBlock | undefined): string {
   if (!block) return "";
   if (block.type === "text") return block.text;

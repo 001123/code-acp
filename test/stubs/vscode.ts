@@ -17,6 +17,8 @@ export const __test = {
   },
   /** The lines of each output channel created, by name. */
   outputChannels: new Map<string, string[]>(),
+  /** Paths passed to `openTextDocument`. */
+  openedDocuments: [] as string[],
   /** The terminals created. */
   terminals: [] as Array<{ options: unknown }>,
   /** As if the user closed the terminal. */
@@ -28,6 +30,7 @@ export const __test = {
   reset() {
     settings.clear();
     __test.outputChannels.clear();
+    __test.openedDocuments.length = 0;
     __test.terminals.length = 0;
     env.language = "en";
     workspace.workspaceFolders = undefined;
@@ -166,7 +169,7 @@ const toError = (e: unknown, p: string) =>
 
 export const workspace = {
   workspaceFolders: undefined as ReadonlyArray<{ name?: string; uri: Uri }> | undefined,
-  textDocuments: [] as Array<{ uri: Uri; isClosed: boolean; lineCount: number; save(): Promise<boolean> }>,
+  textDocuments: [] as Array<{ uri: Uri; isClosed: boolean; lineCount: number; save(): Promise<boolean>; getText?(): string }>,
   getConfiguration(section?: string) {
     const full = (key: string) => (section ? `${section}.${key}` : key);
     return {
@@ -181,6 +184,7 @@ export const workspace = {
     return { dispose: () => void listeners.delete(listener) };
   },
   async openTextDocument(uri: Uri) {
+    __test.openedDocuments.push(uri.fsPath);
     const text = await fs.readFile(uri.fsPath, "utf8");
     return { getText: () => text };
   },
@@ -188,7 +192,13 @@ export const workspace = {
     return true;
   },
   asRelativePath: (p: string) => p,
+  decode: async (content: Uint8Array, _options?: { uri: Uri }) => new TextDecoder().decode(content),
   fs: {
+    async readFile(uri: Uri): Promise<Uint8Array> {
+      return fs.readFile(uri.fsPath).catch((e) => {
+        throw toError(e, uri.fsPath);
+      });
+    },
     async stat(uri: Uri) {
       const info = await fs.stat(uri.fsPath);
       return { type: info.isDirectory() ? FileType.Directory : FileType.File, size: info.size };

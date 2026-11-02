@@ -12,7 +12,7 @@ import type { Attachment } from "../src/chat/protocol";
 import { replayedParts } from "../src/chat/replay";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
-import { transcript, EMPTY, fileLinkTokens, type Action } from "../src/ui/chat/transcript";
+import { transcript, EMPTY, fileLinkTokens, noticeItem, stopReasonText, type Action } from "../src/ui/chat/transcript";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../src/workspace";
 import { __test, Uri, window, workspace } from "./stubs/vscode";
 
@@ -440,6 +440,28 @@ describe("rewind and fork state", () => {
     assert.isFalse(tab.steer);
     assert.strictEqual(tab.sent.size, 0);
     assert.isUndefined(tab.rewindNote);
+  });
+});
+
+describe("turn end and notices", () => {
+  it("says nothing when a turn ends the way the user expects", () => {
+    assert.isUndefined(stopReasonText("end_turn"));
+    assert.isUndefined(stopReasonText("cancelled"));
+  });
+
+  it("explains the other stop reasons, and shows unknown ones as they are", () => {
+    assert.deepStrictEqual(stopReasonText("max_tokens"), { key: "chat.stopReason.maxTokens" });
+    assert.deepStrictEqual(stopReasonText("max_turn_requests"), { key: "chat.stopReason.maxTurnRequests" });
+    assert.deepStrictEqual(stopReasonText("refusal"), { key: "chat.stopReason.refusal" });
+    assert.deepStrictEqual(stopReasonText("_custom"), { key: "chat.stopReason", args: ["_custom"] });
+  });
+
+  it("shows a notice's title and description, as an error when it is one", () => {
+    assert.deepStrictEqual(noticeItem({ severity: "warning", title: "Slow down", description: "Rate limited" }), {
+      kind: "notice",
+      text: { raw: "Slow down — Rate limited" },
+    });
+    assert.deepStrictEqual(noticeItem({ severity: "error", title: "Failed" }), { kind: "error", text: { raw: "Failed" } });
   });
 });
 

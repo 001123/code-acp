@@ -23,15 +23,16 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 
 ### Low
 
-- [ ] **B6. `fs/read_text_file` opens a document for every read.** `openTextDocument` can activate language servers for each file the agent reads. Use the buffer only for files already open, else read from disk. `src/acpClient.ts:316`
-- [ ] **B7. Some session updates and stop reasons are handled poorly.** `compaction_*` and `current_mode_update` are dropped silently, the "Not in the ACP schema" comment on `notice` is outdated, and stop reasons show raw (`Stopped: max_tokens`). `src/ui/chat.tsx:181`, `src/ui/chat.tsx:298`
+- [x] **B6. `fs/read_text_file` opens a document for every read.** `openTextDocument` can activate language servers for each file the agent reads. Use the buffer only for files already open, else read from disk. `src/acpClient.ts:316`
+- [x] **B7. Notices and stop reasons are handled poorly.** `notice` reads the wrong fields and the `session.notices` capability isn't advertised, and stop reasons show raw (`Stopped: max_tokens`). `src/ui/chat.tsx:181`, `src/ui/chat.tsx:298`
+- [ ] **B8. `compaction_*` and `current_mode_update` are dropped silently.** Compaction needs a transcript item (upserts by ID, summary chunks) before advertising `session.compaction`. Modes have no UI; a notice may be enough. `src/ui/chat.tsx`
 
 ## Maintenance
 
 - [ ] **M1. Add CI** running `npm run check`.
 - [ ] **M2. Align versions.** `@types/vscode` is 1.120 while `engines.vscode` is 1.123, which breaks the rule in `AGENTS.md`; `CONTRIBUTING.md:3` says ≥ 1.144.
 - [ ] **M3. Add `CHANGELOG.md`** and plan a first release (the version is still 0.0.1).
-- [ ] **M4. Upgrade `@agentclientprotocol/sdk`** from 2.1.0 to 2.4.0.
+- [x] **M4. Upgrade `@agentclientprotocol/sdk`** from 2.1.0 to 2.4.0.
 - [ ] **M5. Add tests** for `completions`, `terminalContext` and `claudeSettings` (none yet), and direct ones for `agentTerminals`.
 - [ ] **M6. Split `src/ui/settings.tsx`** (1021 lines).
 - [ ] **M7. Fix the "Multilingual" typo.** `README.md:14`
