@@ -331,10 +331,17 @@ function SentAttachments({ attachments }: { attachments: SentAttachment[] }) {
   if (attachments.length === 0) return null;
   return (
     <div className="msg-attachments">
-      {attachments.map(({ name, src }, i) => (
-        <span key={i} className="chip" title={name}>
+      {attachments.map(({ name, src, path, line }, i) => (
+        <span key={i} className="chip" title={path ?? name}>
           {src && <img className="chip-preview" src={src} title={t("chat.previewImage")} onClick={() => open({ src, name })} />}
-          {name && <span>{name}</span>}
+          {name &&
+            (path ? (
+              <a href="#" onClick={(e) => (e.preventDefault(), openFile({ path, line }))}>
+                {name}
+              </a>
+            ) : (
+              <span>{name}</span>
+            ))}
         </span>
       ))}
     </div>
@@ -379,7 +386,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
         </details>
       );
     case "userMessage": {
-      const tokens = item.attachments.flatMap(({ token, src }) => (token ? [{ token, src }] : []));
+      const tokens = item.attachments.flatMap(({ token, src, path, line }) => (token ? [{ token, src, path, line }] : []));
       return (
         <div className="msg user">
           <UserText text={item.text} tokens={tokens} />

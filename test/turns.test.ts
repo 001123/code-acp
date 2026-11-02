@@ -257,8 +257,11 @@ describe("TabTurns", () => {
         { kind: "snippet", uri: `file://${file}`, name: "open.ts:2-3", languageId: "ts", startLine: 2, endLine: 3, text: "selected" },
       ]);
       assert.deepStrictEqual(
-        (ofType(posted, "userMessage")[0]!.attachments as Array<{ name: string }>).map((a) => a.name),
-        ["open.ts", "open.ts:2-3"],
+        (ofType(posted, "userMessage")[0]!.attachments as Array<{ name: string; path?: string; line?: number }>).map((a) => [a.name, a.path, a.line]),
+        [
+          ["open.ts", file, undefined],
+          ["open.ts:2-3", file, 2],
+        ],
       );
       assert.deepStrictEqual(ofType(posted, "error"), []);
       assert.strictEqual(prompts.length, 1);

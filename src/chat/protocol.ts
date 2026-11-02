@@ -216,4 +216,8 @@ export interface SentAttachment {
   src?: string;
   /** Set when the attachment sits inline in the message text. */
   token?: string;
+  /** The local file it came from, which opens on a click. */
+  path?: string;
+  /** The line the file opens at. */
+  line?: number;
 }

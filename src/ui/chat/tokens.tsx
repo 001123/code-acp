@@ -9,6 +9,7 @@ export interface Token {
   token: string;
   src?: string;
   path?: string;
+  line?: number;
 }
 
 /** One highlighted token: images open in the lightbox, files in an editor. */
@@ -38,9 +39,9 @@ export function TokenMark({ token }: { token: Token }) {
     );
   }
   if (token.path) {
-    const path = token.path;
+    const { path, line } = token;
     return (
-      <mark className="token file" title={path} onClick={() => openFile({ path })}>
+      <mark className="token file" title={path} onClick={() => openFile({ path, line })}>
         {token.token}
       </mark>
     );

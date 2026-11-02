@@ -5,7 +5,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { t } from "../i18n";
 import { thenable, type VscodeError } from "../runtime";
-import type { Attachment, PromptPart } from "./protocol";
+import type { Attachment, PromptPart, SentAttachment } from "./protocol";
 
 const IMAGE_MIME: Record<string, string> = {
   ".png": "image/png",
@@ -126,6 +126,18 @@ export function withActiveFile(parts: ReadonlyArray<PromptPart>): ReadonlyArray<
   const active = [...uriAttachments([editor.document.uri]), ...selectionAttachments(editor)];
   const held = (a: Attachment) => parts.some((p) => typeof p !== "string" && p.kind === a.kind && "uri" in p && "uri" in a && p.uri === a.uri && p.name === a.name);
   return [...parts, ...active.filter((a) => !held(a))];
+}
+
+/** Where a sent attachment opens on a click: its local file, at the first selected line. */
+export function attachmentLocation(attachment: Attachment): Pick<SentAttachment, "path" | "line"> {
+  if (attachment.kind !== "uri" && attachment.kind !== "snippet") {
+    return {};
+  }
+  const uri = vscode.Uri.parse(attachment.uri);
+  if (uri.scheme !== "file") {
+    return {};
+  }
+  return { path: uri.fsPath, line: attachment.kind === "snippet" ? attachment.startLine : undefined };
 }
 
 /**

@@ -6,7 +6,7 @@ import type { ShadowGit } from "../checkpoints";
 import { t } from "../i18n";
 import type { ExtensionCtx, Output } from "../runtime";
 import type { Worktrees } from "../worktrees";
-import { attachmentBlock, withActiveFile } from "./attachments";
+import { attachmentBlock, attachmentLocation, withActiveFile } from "./attachments";
 import type { ChangeReview } from "./changes";
 import type { ChatUi } from "./host";
 import type { LoadComposer, QueuedInfo, SentAttachment, TurnMessage } from "./protocol";
@@ -271,7 +271,8 @@ export class TabTurns {
         }
         continue;
       }
-      const block = yield* attachmentBlock(caps, yield* this.host.tabWorktrees.localize(tab, attachment)).pipe(
+      const localized = yield* this.host.tabWorktrees.localize(tab, attachment);
+      const block = yield* attachmentBlock(caps, localized).pipe(
         Effect.catch((err) =>
           Effect.sync(() => {
             this.host.postTab(tab, { type: "error", text: t("chat.attachFailed", attachment.name, err.message) });
@@ -283,6 +284,7 @@ export class TabTurns {
         name: attachment.name,
         token: attachment.token,
         src: block?.type === "image" ? `data:${block.mimeType};base64,${block.data}` : undefined,
+        ...attachmentLocation(localized),
       });
       if (block) {
         prompt.push(block);
