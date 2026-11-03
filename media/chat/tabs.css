@@ -9,28 +9,33 @@
   display: flex;
   flex-direction: column;
 }
-/* The rail keeps its room in the layout; the panel inside it opens over the conversation. */
+/* The rail keeps its room in the layout; the panel inside it, an island off the view's edges, opens over the conversation. */
 #tabs {
-  --tabs-rail: 36px;
+  --tabs-rail: 40px;
+  --tabs-gap: 6px;
   --tabs-open: min(220px, calc(100vw - 48px));
   position: relative;
   flex: none;
-  width: var(--tabs-rail);
+  width: calc(var(--tabs-rail) + var(--tabs-gap));
 }
 /* `clip` rather than `hidden`: rows keep the open width, and scrollIntoView can't scroll them sideways. */
 #tab-panel {
   position: absolute;
   z-index: 8;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  top: var(--tabs-gap);
+  right: var(--tabs-gap);
+  bottom: var(--tabs-gap);
+  /* The rows' highlights follow its width as it opens: see `.tab::before`. */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   width: var(--tabs-rail);
+  padding: 2px 0;
   overflow: clip;
   /* Not the panel border: themes may make it a strong accent, and this line runs the full height. */
-  border: 1px solid transparent;
-  border-left-color: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vscode-foreground) 3%, transparent);
   box-sizing: border-box;
   /* Waits a moment before closing, so that leaving by a few pixels doesn't drop the panel. */
   transition:
@@ -43,10 +48,10 @@
 #tabs:is(:hover, :has(:focus-visible), [data-open]) > #tab-panel {
   width: var(--tabs-open);
   border-color: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
-  border-radius: 8px;
   background: var(--vscode-sideBar-background);
-  box-shadow: -2px 0 5px -2px var(--vscode-widget-shadow);
-  transition-delay: 0.12s;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  transition-duration: 0.08s;
+  transition-delay: 0.06s;
 }
 @media (prefers-reduced-motion: reduce) {
   #tab-panel {
@@ -64,14 +69,13 @@
   align-items: center;
   height: 32px;
   padding: 0 8px 0 0;
-  border-left: 2px solid transparent;
   border-radius: 0;
   background: none;
   color: var(--vscode-foreground);
   text-align: left;
 }
 #new-tab:hover {
-  background: var(--vscode-list-hoverBackground);
+  background: none;
 }
 #new-tab svg {
   width: 16px;
@@ -88,28 +92,51 @@
   align-items: center;
   height: 40px;
   padding-right: 6px;
-  border-left: 2px solid transparent;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
   user-select: none;
 }
 .tab:hover {
-  background: var(--vscode-list-hoverBackground);
   color: var(--vscode-foreground);
 }
 .tab[data-active] {
-  background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-toolbar-hoverBackground));
-  border-left-color: var(--vscode-focusBorder);
   color: var(--vscode-foreground);
 }
-/* The column that stays in view when the panel is closed: the rail less the row's left border and the panel's two. */
+/* A row's highlight, inside the island on all sides. Rows keep the open width so that their text doesn't reflow, so it measures the panel instead. */
+#new-tab,
+.tab {
+  position: relative;
+  isolation: isolate;
+}
+#new-tab::before,
+.tab::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 2px;
+  bottom: 2px;
+  left: 3px;
+  width: calc(100cqw - 6px);
+  border: 1px solid transparent;
+  border-radius: 7px;
+  box-sizing: border-box;
+}
+#new-tab:hover::before,
+.tab:hover::before {
+  background: var(--vscode-list-hoverBackground);
+}
+.tab[data-active]::before {
+  background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-toolbar-hoverBackground));
+  border-color: color-mix(in srgb, var(--vscode-focusBorder) 55%, transparent);
+}
+/* The column that stays in view when the panel is closed: the rail less the panel's borders. */
 .tab-marker {
   position: relative;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--tabs-rail) - 4px);
+  width: calc(var(--tabs-rail) - 2px);
 }
 .tab-initial {
   position: relative;

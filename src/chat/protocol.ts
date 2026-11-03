@@ -4,11 +4,12 @@ import type { ChangedFile } from "../fileChanges";
 import type { ProblemScope } from "../problems";
 import type { ChangeBlock } from "../ui/lineDiff";
 import type { TabWorktree, WorktreeFileDiff, WorktreeSettled } from "../worktrees";
+import type { TurnTrace } from "./turnTraces";
 
 /** One change in a file, to keep or undo on its own. */
 export type ChangeHunk = ChangeBlock;
 
-export type { ChangedFile, TerminalSnapshot, WorktreeFileDiff, WorktreeSettled };
+export type { ChangedFile, TerminalSnapshot, TurnTrace, WorktreeFileDiff, WorktreeSettled };
 
 export type FromWebview =
   | { type: "ready" }
@@ -134,7 +135,11 @@ export type FromWebview =
   /** Puts the work tree back as it was before the user message of `turn`. */
   | { type: "restoreCheckpoint"; tab: number; turn: number }
   | { type: "setFollowAgent"; enabled: boolean }
-  | { type: "setAutoScroll"; enabled: boolean };
+  | { type: "setAutoScroll"; enabled: boolean }
+  | { type: "setTracing"; enabled: boolean }
+  | { type: "setShowChanges"; enabled: boolean }
+  | { type: "setShowRestore"; enabled: boolean }
+  | { type: "setRememberSessionOptions"; enabled: boolean };
 
 /** Messages about one tab. */
 export type TabMessage = Extract<FromWebview, { tab: number }>;
@@ -171,7 +176,11 @@ export type ViewMessage = Extract<
       | "listSkills"
       | "loadAttemptOptions"
       | "setFollowAgent"
-      | "setAutoScroll";
+      | "setAutoScroll"
+      | "setTracing"
+      | "setShowChanges"
+      | "setShowRestore"
+      | "setRememberSessionOptions";
   }
 >;
 
@@ -195,41 +204,6 @@ export interface TurnChanges {
   files: number;
   added: number;
   removed: number;
-}
-
-/** What is known about a finished turn ("turnTrace" message); what the agent did not report is left out. */
-export interface TurnTrace {
-  stopReason: string;
-  durationMs: number;
-  /** Until the agent's first text, thought or tool call. */
-  firstResponseMs?: number;
-  /** The time the turn waited for the user to allow a tool call or answer a question. */
-  waiting: { asks: number; ms: number };
-  /** The tool calls made, subagents' too; `kinds` counts them by ACP's `ToolKind`. */
-  tools: { total: number; failed: number; kinds: Record<string, number> };
-  subagents: number;
-  /** What changed in the work tree during the turn, whoever did it; left out when there are no checkpoints. */
-  changes?: TurnChanges;
-  /** Which turn of the session this was, as far as the usage ledger knows. */
-  number?: number;
-  /** The agent's name and version. */
-  agent?: string;
-  sessionId: string;
-  model?: string;
-  effort?: string;
-  /** The turn's tokens. */
-  tokens?: {
-    total: number;
-    input: number;
-    output: number;
-    cachedRead?: number;
-    cachedWrite?: number;
-    thought?: number;
-  };
-  /** The tokens in the session's context when the turn ended. */
-  context?: { used: number; size: number };
-  /** What the turn cost, worked out from the session's cumulative cost. */
-  cost?: { turn: number; session: number; currency: string };
 }
 
 /** A message waiting for the running turn to end ("queue" message). */

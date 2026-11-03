@@ -9,7 +9,7 @@ import { attachmentKey, attachmentTitle, imageSrc } from "./attachments";
 import type { Preview } from "./context";
 import { post } from "./post";
 
-/** A checkbox in the composer's row of actions. */
+/** A checkbox for how the composer's next message is sent. */
 export function ComposerCheckbox({ label, title, checked, disabled, onToggle }: { label: string; title: string; checked: boolean; disabled?: boolean; onToggle: () => void }) {
   return (
     <label className="composer-toggle" title={title}>

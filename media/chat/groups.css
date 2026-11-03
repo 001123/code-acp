@@ -4,10 +4,11 @@
   padding-left: 10px;
   overflow: hidden;
   /* In step with the panel's width. */
-  transition: height 0.14s ease 0.12s;
+  transition: height 0.08s ease 0.06s;
 }
 #tabs:not(:hover, :has(:focus-visible), [data-open]) .tab[data-member] {
   height: 0;
+  transition-duration: 0.14s;
   transition-delay: 0.2s;
 }
 .tab[data-member] .tab-initial {
@@ -188,28 +189,17 @@
   border-radius: 3px;
 }
 
-/* The composer's Worktree and Compare checkboxes, and the attempts the latter sends to. */
+/* The composer's Compare checkbox and the attempts it sends to, and the Worktree checkbox under the composer. */
 #compare,
 #worktree {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: 0.88em;
   color: var(--vscode-descriptionForeground);
 }
-/* Its word gives way in a narrow view; the row has to fit the send button. */
-#worktree {
-  flex-shrink: 1;
-  min-width: 34px;
-}
-#worktree .composer-toggle {
-  min-width: 0;
-}
-#worktree .composer-toggle span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+#compare {
+  font-size: 0.88em;
 }
 .composer-toggle {
   display: inline-flex;

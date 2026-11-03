@@ -16,7 +16,7 @@ import { NEW_TAB, TabSidebar, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
 import type { AgentChoices } from "./chat/agentPanel";
 import { ChatSettings } from "./chat/chatSettings";
-import { ConfigLoading, ConfigSelect, QuickConfig } from "./chat/sessionConfig";
+import { ConfigLoading, ConfigSelect, quickConfig } from "./chat/sessionConfig";
 import { UsageMeter } from "./chat/usageMeter";
 import { PrDraftForm, WorkspaceBar } from "./chat/workspaceControls";
 import { clipContent, contentText, groupActivity, noticeItem, stopReasonText, transcript, type Action } from "./chat/transcript";
@@ -87,6 +87,9 @@ function App() {
   const [showChanges, setShowChanges] = useState(true);
   /** codeAcp.tracing: the numbers below each turn. */
   const [tracing, setTracing] = useState(false);
+  /** codeAcp.showRestore, codeAcp.rememberSessionOptions: only for the gear's menu; the host applies them. */
+  const [showRestore, setShowRestore] = useState(false);
+  const [rememberSessionOptions, setRememberSessionOptions] = useState(true);
   const checkpointTurns = changes?.turns;
   const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;
   const shownTab = useMemo<ShownTab>(
@@ -129,21 +132,28 @@ function App() {
     error,
     setPreview,
     setHover,
+    usage: (
+      <UsageMeter
+        usage={usage}
+        compactAt={compactAt}
+        totals={totals}
+        busy={!!status.busy}
+        onCompact={
+          active !== undefined && commands.some((c) => c.name === "compact")
+            ? () => post({ type: "send", tab: active, parts: ["/compact"] })
+            : undefined
+        }
+      />
+    ),
     settings: (
-      <>
-        <UsageMeter
-          usage={usage}
-          compactAt={compactAt}
-          totals={totals}
-          busy={!!status.busy}
-          onCompact={
-            active !== undefined && commands.some((c) => c.name === "compact")
-              ? () => post({ type: "send", tab: active, parts: ["/compact"] })
-              : undefined
-          }
-        />
-        <ChatSettings followAgent={followAgent} autoScroll={autoScroll} />
-      </>
+      <ChatSettings
+        followAgent={followAgent}
+        autoScroll={autoScroll}
+        showChanges={showChanges}
+        showRestore={showRestore}
+        rememberSessionOptions={rememberSessionOptions}
+        tracing={tracing}
+      />
     ),
     agentConfig:
       active !== undefined &&
@@ -162,7 +172,7 @@ function App() {
           ) : null,
         )
       )),
-    quickConfig: active !== undefined && !configLoading && <QuickConfig options={config} />,
+    quickConfig: active !== undefined && !configLoading && quickConfig(config),
     config,
     hidden: group !== undefined,
   });
@@ -221,8 +231,14 @@ function App() {
         return setShowChanges(msg.enabled);
       case "tracing":
         return setTracing(msg.enabled);
+      case "showRestore":
+        return setShowRestore(msg.enabled);
+      case "rememberSessionOptions":
+        return setRememberSessionOptions(msg.enabled);
       case "turnTrace":
         return dispatch(tab, { type: "add", item: { kind: "trace", trace: msg.trace } });
+      case "turnTraces":
+        return dispatch(tab, { type: "restoreTraces", traces: msg.traces });
       case "turnEnd": {
         const text = stopReasonText(msg.stopReason);
         return dispatch(tab, text ? { type: "add", item: { kind: "notice", text } } : { type: "endStream" });
@@ -516,7 +532,7 @@ function App() {
               </div>
             )}
             {composer.element}
-            {!group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} busy={!!status.busy} />}
+            {!group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} busy={!!status.busy} comparing={composer.comparing} editing={editing !== undefined} />}
           </div>
           <TabSidebar
             tabs={tabs}

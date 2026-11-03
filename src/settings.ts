@@ -68,6 +68,8 @@ export const Settings = Schema.Struct({
   autoScroll: Schema.Boolean,
   /** Show the bar above the composer with the files the agent changed, to keep or undo them. */
   showChanges: Schema.Boolean,
+  /** Show the Restore button on the user's messages. */
+  showRestore: Schema.Boolean,
   /** Show each turn's numbers in the chat and log the messages exchanged with agents, for advanced users. */
   tracing: Schema.Boolean,
   /** Show a notification when a tab the user isn't looking at finishes or asks for permission. */
@@ -115,6 +117,7 @@ export const SETTING_KEYS = [
   "followAgent",
   "autoScroll",
   "showChanges",
+  "showRestore",
   "tracing",
   "notifications",
   "notifyFinished",
@@ -148,6 +151,7 @@ const DEFAULTS: Settings = {
   followAgent: false,
   autoScroll: true,
   showChanges: true,
+  showRestore: false,
   tracing: false,
   notifications: true,
   notifyFinished: true,
@@ -190,6 +194,7 @@ export function readSettings(): Settings {
     followAgent: read("followAgent"),
     autoScroll: read("autoScroll"),
     showChanges: read("showChanges"),
+    showRestore: read("showRestore"),
     tracing: read("tracing"),
     notifications: read("notifications"),
     notifyFinished: read("notifyFinished"),

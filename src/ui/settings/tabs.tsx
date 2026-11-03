@@ -3,6 +3,7 @@ import type { SettingKey } from "../../settings";
 import { Icon } from "../icon";
 import { useL10n, type MessageKey } from "../l10n";
 import settingsIcon from "@tabler/icons/outline/settings.svg";
+import languageIcon from "@tabler/icons/outline/language.svg";
 import bellIcon from "@tabler/icons/outline/bell.svg";
 import shieldIcon from "@tabler/icons/outline/shield-check.svg";
 import branchIcon from "@tabler/icons/outline/git-branch.svg";
@@ -14,10 +15,11 @@ import linkIcon from "@tabler/icons/outline/link.svg";
 import activityIcon from "@tabler/icons/outline/activity.svg";
 import stethoscopeIcon from "@tabler/icons/outline/stethoscope.svg";
 
-export type Tab = "general" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "links" | "tracing" | "usage" | "doctor";
+export type Tab = "general" | "language" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "links" | "tracing" | "usage" | "doctor";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["followAgent", "autoScroll", "showChanges", "showRestore", "rememberSessionOptions"] },
+  { id: "language", label: "settings.language", desc: "settings.languageTabDesc", icon: languageIcon, keys: ["language"] },
   { id: "notifications", label: "settings.notificationsTab", desc: "settings.notificationsTabDesc", icon: bellIcon, keys: ["notifications", "notifyFinished"] },
   { id: "permissions", label: "settings.permissions", desc: "settings.permissionsDesc", icon: shieldIcon, keys: ["autoApprove"] },
   { id: "worktree", label: "settings.worktree", desc: "settings.worktreeDesc", icon: branchIcon, keys: ["worktreeForNewTabs", "worktreeCopyFiles", "worktreeSetupCommand", "worktreeProjectSetupCommand"] },

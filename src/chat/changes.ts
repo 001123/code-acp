@@ -46,7 +46,8 @@ export class ChangeReview implements vscode.Disposable {
       this.host.run(
         Effect.gen({ self: this }, function* () {
           yield* refresh(tab.changes).pipe(Effect.catch((err) => this.disable(tab, err.message)));
-          const message: ChangesMessage = { files: tab.changes.files, turns: tab.changes.turns };
+          // A turn the webview isn't told about has no Restore button.
+          const message: ChangesMessage = { files: tab.changes.files, turns: readSettings().showRestore ? tab.changes.turns : [] };
           this.host.postTab(tab, { type: "changes", ...message });
           this.refreshLenses();
         }),

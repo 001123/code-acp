@@ -290,6 +290,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           this.post({ type: "showChanges", enabled: readSettings().showChanges });
           this.changes.refreshLenses();
         }
+        if (e.affectsConfiguration("codeAcp.rememberSessionOptions")) {
+          this.post({ type: "rememberSessionOptions", enabled: readSettings().rememberSessionOptions });
+        }
+        if (e.affectsConfiguration("codeAcp.showRestore")) {
+          this.post({ type: "showRestore", enabled: readSettings().showRestore });
+          for (const tab of this.tabs.all) {
+            this.changes.postIfTracked(tab);
+          }
+        }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.postFolders()),
       vscode.window.onDidChangeWindowState((state) => {
@@ -451,6 +460,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
         this.post({ type: "showChanges", enabled: readSettings().showChanges });
         this.post({ type: "tracing", enabled: readSettings().tracing });
+        this.post({ type: "showRestore", enabled: readSettings().showRestore });
+        this.post({ type: "rememberSessionOptions", enabled: readSettings().rememberSessionOptions });
         for (const each of this.tabs.all) {
           this.refreshStatus(each);
           this.usage.postSaved(each);

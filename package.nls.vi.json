@@ -23,6 +23,7 @@
   "config.followAgent": "Mở trong editor các file agent đang đọc và sửa, tại dòng agent đang làm việc, và tô sáng trong giây lát những dòng agent vừa sửa.",
   "config.autoScroll": "Tự động cuộn chat xuống nội dung mới nhất khi agent trả lời. Tắt đi để giữ nguyên vị trí bạn đang xem.",
   "config.showChanges": "Hiện thanh phía trên ô nhập tin nhắn liệt kê các file agent đã sửa, kèm nút Hoàn tác tất cả và Giữ tất cả, cùng nút Giữ và Hoàn tác phía trên mỗi thay đổi trong editor.",
+  "config.showRestore": "Hiện nút Khôi phục trên tin nhắn của bạn, để đưa các file agent đã sửa về trạng thái trước tin nhắn đó.",
   "config.tracing": "Dành cho người dùng nâng cao. Hiện lý do dừng, thời lượng, token, chi phí và context của mỗi lượt trong chat, đồng thời ghi mọi message ACP vào output channel Code ACP Trace. Log có thể chứa nội dung file, đầu vào và đầu ra của tool: giá trị env, header và các trường có tên giống secret được che, nhưng secret khác vẫn có thể còn sót, và VS Code lưu output channel trong thư mục log của nó.",
   "config.checkAgentUpdates": "Khi mở VS Code, kiểm tra ACP Registry để tìm bản cập nhật agent và đề nghị cài đặt.",
   "command.generateCommitMessage": "Code ACP: Tạo commit message",

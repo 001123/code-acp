@@ -23,7 +23,7 @@ import { post } from "./post";
 import type { Trigger } from "./suggestions";
 import type { TabState } from "./tabs";
 import { splitTokens } from "../markdown";
-import { FolderSelect, WorktreeToggle } from "./workspaceControls";
+import { FolderSelect } from "./workspaceControls";
 
 export interface ComposerOptions {
   /** The active tab; also as a ref for callbacks registered once (FileReader). */
@@ -48,6 +48,8 @@ export interface ComposerOptions {
   error: (key: Parameters<Translate>[0], ...args: unknown[]) => void;
   setPreview: (preview: Preview | undefined) => void;
   setHover: (hover: Hover | undefined | ((h: Hover | undefined) => Hover | undefined)) => void;
+  /** Shown first, at the left end of the actions. */
+  usage: ReactNode;
   /** Shown before the stop and send buttons. */
   settings: ReactNode;
   /** The session's config options, shown in the agent panel. */
@@ -62,7 +64,7 @@ export interface ComposerOptions {
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig, config, hidden } =
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, usage, settings, agentConfig, quickConfig, config, hidden } =
     options;
   const { t } = useL10n();
   const activeTab = tabs.find((x) => x.id === active);
@@ -310,13 +312,12 @@ export function useComposer(options: ComposerOptions) {
         <EditorContent editor={editor} />
       </div>
       <div id="actions">
+        {usage}
         <AgentPanel tab={activeTab} choices={agents} summary={quickConfig}>
           {agentConfig}
         </AgentPanel>
         <FolderSelect tab={activeTab} folders={folders} />
         <span className="spacer" />
-        {/* An edit stays in the conversation it changes. */}
-        {editing === undefined && <WorktreeToggle tab={activeTab} comparing={compare.on} />}
         {compare.element}
         {settings}
         <button
@@ -346,6 +347,7 @@ export function useComposer(options: ComposerOptions) {
 
   return {
     element,
+    comparing: compare.on,
     dragging,
     addAttachment,
     write,

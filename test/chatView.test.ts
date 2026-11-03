@@ -240,6 +240,39 @@ describe("ChatViewProvider", () => {
     );
   });
 
+  it.live("offers to restore a message's checkpoint only with the setting on", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType, say, idle, tab } = yield* startChat;
+        const file = path.join(workspace.workspaceFolders![0]!.uri.fsPath, "file.txt");
+        say(tab, `write ${file}`);
+        yield* idle(tab);
+        const changes = () => ofType("changes", tab).at(-1);
+        yield* until(() => changes()?.files.length === 1, "the changed file");
+        assert.deepStrictEqual(changes()!.turns, []);
+        __test.setSetting("codeAcp.showRestore", true);
+        yield* until(() => changes()!.turns.length === 1, "the checkpoint");
+        __test.setSetting("codeAcp.showRestore", false);
+        yield* until(() => changes()!.turns.length === 0, "the checkpoint to go");
+      }),
+    ),
+  );
+
+  it.live("keeps the gear's General settings in step with the configuration", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType } = yield* startChat;
+        assert.deepStrictEqual(ofType("showRestore").at(-1), { type: "showRestore", enabled: false });
+        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), { type: "rememberSessionOptions", enabled: true });
+        __test.setSetting("codeAcp.showRestore", true);
+        __test.setSetting("codeAcp.rememberSessionOptions", false);
+        yield* until(() => ofType("rememberSessionOptions").at(-1)?.enabled === false, "the setting");
+        assert.deepStrictEqual(ofType("showRestore").at(-1), { type: "showRestore", enabled: true });
+        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), { type: "rememberSessionOptions", enabled: false });
+      }),
+    ),
+  );
+
   it.live("with tracing on, shows a turn's numbers after it ends, with the wait for the user", () =>
     Effect.scoped(
       Effect.gen(function* () {

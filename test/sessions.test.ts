@@ -9,6 +9,7 @@ import type { LastOptions } from "../src/chat/lastOptions";
 import { Permissions } from "../src/chat/permissions";
 import { NoAgentError, TabSessions } from "../src/chat/sessions";
 import { TabList, type RunningAgent, type Tab } from "../src/chat/tabs";
+import { TurnTraces } from "../src/chat/turnTraces";
 import { TabTurns } from "../src/chat/turns";
 import type { TabUsage } from "../src/chat/usage";
 import type { TabWorktrees } from "../src/chat/worktrees";
@@ -221,6 +222,36 @@ describe("TabSessions", () => {
       assert.deepStrictEqual(created, []);
       assert.isTrue(tab.used);
       assert.strictEqual(tab.queue.length, 0);
+    }),
+  );
+
+  it.live("shows the saved traces of a session it reopens, and none in a new session", () =>
+    Effect.gen(function* () {
+      const replayed: { tab?: Tab } = {};
+      const { tab, sessions, posted, run } = yield* makeSessions(
+        {
+          loadSession: () =>
+            Effect.sync(() => {
+              replayed.tab!.replaying!.turns.push(10, 11);
+              return {};
+            }),
+        },
+        { loadSession: true },
+      );
+      replayed.tab = tab;
+      const trace = { stopReason: "end_turn", durationMs: 1, waiting: { asks: 0, ms: 0 }, tools: { total: 0, failed: 0, kinds: {} }, subagents: 0, sessionId: "saved" };
+      tab.traces = TurnTraces.fromSaved({ messages: 2, traces: [{ turn: 1, message: 1, trace }] });
+      tab.reopen = { sessionId: "saved", cwd: "/w", agentId: "a" };
+      yield* run(sessions.ensureSession(tab));
+      assert.deepStrictEqual(
+        ofType(posted, "turnTraces").map((message) => message.traces),
+        [[{ turn: 11, trace }]],
+      );
+
+      tab.sessionId = undefined;
+      tab.running = undefined;
+      yield* run(sessions.ensureSession(tab));
+      assert.isUndefined(tab.traces.saved);
     }),
   );
 

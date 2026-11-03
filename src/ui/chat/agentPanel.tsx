@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { TabInfo } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
+import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import updateIcon from "@tabler/icons/outline/cloud-download.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
 import { SubMenu, SubMenuContext, useHoverMenu, useSubMenus } from "./popupMenu";
@@ -21,7 +22,7 @@ export function AgentIcon({ icon }: { icon: string | undefined }) {
 }
 
 /**
- * The agent button and the session's `summary` beside it: hovering either opens a panel that picks the tab's agent (the
+ * The agent button and the session's `summary` beside it, a button too: hovering or clicking either opens a panel that picks the tab's agent (the
  * last entry opens the agent manager), installs its update, and holds the session's config options (`children`).
  */
 export function AgentPanel({
@@ -54,11 +55,16 @@ export function AgentPanel({
         aria-haspopup="dialog"
         aria-expanded={menu.open}
         data-update={current?.update ? "" : undefined}
-        onClick={menu.toggle}
+        onClick={menu.press}
       >
         <AgentIcon icon={current?.icon} />
       </button>
-      {summary}
+      {summary && (
+        <button type="button" id="agent-summary" title={t("chat.agentSettings")} aria-haspopup="dialog" aria-expanded={menu.open} onClick={menu.press}>
+          {summary}
+          <Icon svg={chevronDownIcon} />
+        </button>
+      )}
       {menu.open && (
         <div id="agent-panel" className="popup-menu" role="dialog" aria-label={t("chat.agentSettings")}>
           <SubMenuContext.Provider value={subMenus}>

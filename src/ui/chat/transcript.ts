@@ -98,6 +98,8 @@ export type Action =
   | { type: "endStream" }
   /** Drops the user message of `turn` and everything after it. */
   | { type: "rewind"; turn: number }
+  /** Puts back the numbers of a replayed session's turns, each after its user message's reply. */
+  | { type: "restoreTraces"; traces: ReadonlyArray<{ turn: number; trace: TurnTrace }> }
   | { type: "reset" };
 
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -305,6 +307,26 @@ export function transcript(state: Transcript, action: Action): Transcript {
     case "rewind": {
       const index = state.items.findIndex((i) => (i.kind === "userMessage" || i.kind === "user") && i.turn === action.turn);
       return index < 0 ? state : { ...state, items: state.items.slice(0, index), streaming: undefined };
+    }
+    case "restoreTraces": {
+      const byTurn = new Map(action.traces.map(({ turn, trace }) => [turn, trace]));
+      const items: Item[] = [];
+      let nextId = state.nextId;
+      let pending: TurnTrace | undefined;
+      const flush = () => {
+        if (pending) {
+          items.push({ kind: "trace", id: nextId++, trace: pending });
+        }
+      };
+      for (const item of state.items) {
+        if (item.kind === "user" || item.kind === "userMessage") {
+          flush();
+          pending = item.turn === undefined ? undefined : byTurn.get(item.turn);
+        }
+        items.push(item);
+      }
+      flush();
+      return { ...state, items, nextId, streaming: undefined };
     }
     case "reset":
       return EMPTY;

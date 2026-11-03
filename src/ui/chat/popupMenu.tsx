@@ -7,15 +7,17 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { Icon } from "../icon";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import chevronIcon from "@tabler/icons/outline/chevron-right.svg";
 
-/** An entry of a sub-menu: a pickable value, a group heading, or a separator. */
+/** An entry of a sub-menu: a pickable value, a switch, a group heading, or a separator. */
 export type SubMenuEntry =
   | { value: string; label: ReactNode; title?: string }
+  | { toggle: string; label: ReactNode; title?: string; on: boolean; onToggle: () => void }
   | { heading: string }
   | "separator";
 
@@ -57,23 +59,31 @@ export function useSubMenus(menuOpen: boolean): SubMenus {
   };
 }
 
-/** Where a sub-menu goes: beside the menu (right, else left), else over it; its top at its row, kept in the viewport. */
-function placeSubMenu(row: DOMRect, menu: DOMRect, width: number, height: number): CSSProperties {
+const MENU_ITEMS = "[role=menuitemradio],[role=menuitemcheckbox]";
+
+type SubMenuPlace = { left: number; top: number; opens: "right" | "left" | "up" | "down" };
+
+/**
+ * Where a sub-menu goes: beside the menu (right, else left) with its top at its row; else above or below the menu, as
+ * covering it would hide the row and put the pointer on an entry; else over it. Always in the viewport.
+ */
+export function placeSubMenu(row: DOMRect, menu: DOMRect, width: number, height: number): SubMenuPlace {
   const gap = 4;
   const margin = 4;
-  const left =
-    menu.right + gap + width <= window.innerWidth - margin
-      ? menu.right + gap
-      : menu.left - gap - width >= margin
-        ? menu.left - gap - width
-        : Math.max(margin, window.innerWidth - margin - width);
-  const top = Math.max(margin, Math.min(row.top - 5, window.innerHeight - margin - height));
-  return { left, top };
+  const maxTop = window.innerHeight - margin - height;
+  const atRow = Math.max(margin, Math.min(row.top - 5, maxTop));
+  if (menu.right + gap + width <= window.innerWidth - margin) return { left: menu.right + gap, top: atRow, opens: "right" };
+  if (menu.left - gap - width >= margin) return { left: menu.left - gap - width, top: atRow, opens: "left" };
+  // Lined up with the menu's left edge, or its right edge when that would leave the viewport.
+  const left = menu.left + width <= window.innerWidth - margin ? menu.left : Math.max(margin, menu.right - width);
+  if (menu.top - gap - height >= margin) return { left, top: menu.top - gap - height, opens: "up" };
+  if (menu.bottom + gap <= maxTop) return { left, top: menu.bottom + gap, opens: "down" };
+  return { left, top: atRow, opens: "right" };
 }
 
 /**
- * A row of a popup menu that opens a list of values beside it on hover, click, Enter or ArrowRight. A pick closes it;
- * Escape or ArrowLeft goes back to the row.
+ * A row of a popup menu that opens a list of values and switches beside it on hover, click, Enter or ArrowRight. A pick
+ * closes it; a switch never does. Escape or ArrowLeft goes back to the row.
  */
 export function SubMenu({
   id,
@@ -89,8 +99,8 @@ export function SubMenu({
   title?: string;
   trigger: ReactNode;
   entries: ReadonlyArray<SubMenuEntry>;
-  current: string;
-  onPick: (value: string) => void;
+  current?: string;
+  onPick?: (value: string) => void;
 }) {
   const ctx = useContext(SubMenuContext);
   const open = ctx.open === id;
@@ -98,21 +108,26 @@ export function SubMenu({
   const button = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({ visibility: "hidden" });
+  const [opens, setOpens] = useState<SubMenuPlace["opens"]>();
   const focusOnOpen = useRef(false);
   useLayoutEffect(() => {
     if (!open) {
       setStyle({ visibility: "hidden" });
+      setOpens(undefined);
       return;
     }
     const menu = row.current?.closest(".popup-menu");
     const el = list.current;
     if (!row.current || !menu || !el) return;
-    setStyle(placeSubMenu(row.current.getBoundingClientRect(), menu.getBoundingClientRect(), el.offsetWidth, el.offsetHeight));
-    const selected = el.querySelector<HTMLElement>('[aria-checked="true"]');
+    const box = el.getBoundingClientRect();
+    const place = placeSubMenu(row.current.getBoundingClientRect(), menu.getBoundingClientRect(), box.width, box.height);
+    setStyle({ left: place.left, top: place.top });
+    setOpens(place.opens);
+    const selected = el.querySelector<HTMLElement>('[role=menuitemradio][aria-checked="true"]');
     selected?.scrollIntoView({ block: "nearest" });
     if (focusOnOpen.current) {
       focusOnOpen.current = false;
-      (selected ?? el.querySelector<HTMLElement>("[role=menuitemradio]"))?.focus();
+      (selected ?? el.querySelector<HTMLElement>(MENU_ITEMS))?.focus();
     }
   }, [open]);
   const openNow = (focus: boolean) => {
@@ -124,7 +139,7 @@ export function SubMenu({
     button.current?.focus();
   };
   const onListKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    const items = [...(list.current?.querySelectorAll<HTMLElement>("[role=menuitemradio]") ?? [])];
+    const items = [...(list.current?.querySelectorAll<HTMLElement>(MENU_ITEMS) ?? [])];
     const at = items.indexOf(document.activeElement as HTMLElement);
     const move = (to: number) => items[(to + items.length) % items.length]?.focus();
     switch (e.key) {
@@ -168,7 +183,9 @@ export function SubMenu({
         title={title}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => (open ? ctx.set(undefined) : openNow(true))}
+        data-opens={opens}
+        // The pointer's hover has opened it, so its click keeps it open; a key (no click count) toggles it and moves in.
+        onClick={(e) => (e.detail > 0 ? ctx.set(id) : open ? ctx.set(undefined) : openNow(true))}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") {
             e.preventDefault();
@@ -190,6 +207,19 @@ export function SubMenu({
               <div key={`head-${i}`} className="menu-heading" role="presentation">
                 {entry.heading}
               </div>
+            ) : "toggle" in entry ? (
+              <button
+                key={entry.toggle}
+                type="button"
+                id={entry.toggle}
+                role="menuitemcheckbox"
+                aria-checked={entry.on}
+                title={entry.title}
+                onClick={entry.onToggle}
+              >
+                <span className="menu-label">{entry.label}</span>
+                <span className="switch" aria-hidden="true" />
+              </button>
             ) : (
               <button
                 key={entry.value}
@@ -198,7 +228,7 @@ export function SubMenu({
                 aria-checked={entry.value === current}
                 title={entry.title}
                 onClick={() => {
-                  onPick(entry.value);
+                  onPick?.(entry.value);
                   close();
                 }}
               >
@@ -251,6 +281,8 @@ export function useHoverMenu() {
   return {
     open,
     toggle: () => setOpen(!open),
+    /** For a button that looks like a dropdown: the pointer's hover has opened the menu, so its click keeps it open; a key (no click count) toggles it. */
+    press: (e: ReactMouseEvent) => setOpen(e.detail === 0 ? !open : true),
     rootProps: {
       ref: root,
       onMouseEnter: () => {

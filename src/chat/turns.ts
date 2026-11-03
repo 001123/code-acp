@@ -292,6 +292,7 @@ export class TabTurns {
         tab.sent.delete(each);
       }
     }
+    tab.traces.forgetFrom(turn);
     this.host.changes.forgetFrom(tab, turn);
     tab.rewindNote = `[Note from the editor: the user went back in the conversation and took back their message "${excerpt}" and everything after it. Disregard that message, your replies to it and any later messages, as if they had never been sent, and continue from the message below.]`;
     this.host.postTab(tab, { type: "rewind", turn });
@@ -386,6 +387,7 @@ export class TabTurns {
     const turn = this.nextTurn();
     tab.turn = turn;
     tab.sent.set(turn, message);
+    const position = tab.traces.countMessage();
     yield* this.host.changes.beginTurn(tab, turn, text || sent[0]?.name || "");
     const notes = [tab.rewindNote, tab.changes.takeNote()].filter(Predicate.isString);
     tab.rewindNote = undefined;
@@ -401,7 +403,7 @@ export class TabTurns {
     return yield* agent.prompt(sessionId, prompt).pipe(
       Effect.tap((res) => this.host.usage.recordTurn(tab, sessionId, res)),
       Effect.tap((res) => Effect.sync(() => this.host.postTab(tab, { type: "turnEnd", stopReason: res.stopReason }))),
-      Effect.tap((res) => (readSettings().tracing ? this.postTrace(tab, sessionId, turn, res, stats, costBefore) : Effect.void)),
+      Effect.tap((res) => (readSettings().tracing ? this.postTrace(tab, sessionId, turn, position, res, stats, costBefore) : Effect.void)),
       Effect.map((res) => res.stopReason),
       Effect.catchTags({
         AuthRequiredError: () =>
@@ -445,6 +447,7 @@ export class TabTurns {
     tab: Tab,
     sessionId: string,
     turn: number,
+    position: number,
     response: acp.PromptResponse,
     stats: TurnStats,
     costBefore: acp.Cost | null | undefined,
@@ -456,9 +459,12 @@ export class TabTurns {
       Effect.orElseSucceed(() => undefined),
     );
     const totals = yield* this.host.usage.totals(tab);
-    this.host.postTab(tab, {
-      type: "turnTrace",
-      trace: turnTrace(tab, sessionId, response, { stats: stats.summary(now), costBefore, changes, number: totals?.turns }),
-    });
+    const trace = turnTrace(tab, sessionId, response, { stats: stats.summary(now), costBefore, changes, number: totals?.turns });
+    this.host.postTab(tab, { type: "turnTrace", trace });
+    // Gathering the numbers takes a while, and the tab may have moved on to another session.
+    if (tab.sessionId === sessionId) {
+      tab.traces.add(turn, position, trace);
+      this.host.saveTabs();
+    }
   });
 }

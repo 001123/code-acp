@@ -7,6 +7,7 @@ import type { MessageKey } from "../i18n";
 import { isManaged, TabWorktree, WorktreeSettled } from "../worktrees";
 import { SavedDraft, type DraftHolder } from "./drafts";
 import type { Attempt, PromptPart, TabGroupInfo, TabInfo } from "./protocol";
+import { TurnTraces } from "./turnTraces";
 
 export interface RunningAgent {
   readonly agent: AcpAgent;
@@ -77,6 +78,8 @@ export const SavedTabs = Schema.Struct({
       name: Schema.optional(Schema.String),
       draft: Schema.optional(SavedDraft),
       changes: Schema.optional(SavedChanges),
+      /** Decoded by TurnTraces. */
+      traces: Schema.optional(Schema.Unknown),
       worktree: Schema.optional(TabWorktree),
       worktreeOnSend: Schema.optional(Schema.Boolean),
       group: Schema.optional(Schema.Int),
@@ -152,6 +155,8 @@ export interface Tab extends DraftHolder {
   turn?: number;
   /** What the running turn did so far, for codeAcp.tracing. */
   turnStats?: TurnStats;
+  /** The numbers of the session's finished turns, for codeAcp.tracing. */
+  traces: TurnTraces;
   /** Messages sent while a turn ran, sent in order as each turn ends. */
   queue: QueuedMessage[];
   /** The running turn was stopped to send the first queued message right away. */
@@ -254,6 +259,7 @@ export class TabList {
         tab.reopen = { sessionId: entry.sessionId, cwd: tab.cwd, agentId: entry.agentId };
         tab.usage = entry.usage;
         tab.usageSessionId = entry.sessionId;
+        tab.traces = TurnTraces.fromSaved(entry.traces);
       }
     }
     const active = this.tabs[decoded?.active ?? 0];
@@ -336,6 +342,7 @@ export class TabList {
       used: false,
       sessionLock: Semaphore.makeUnsafe(1),
       changes: new ChangeSet(),
+      traces: new TurnTraces(),
       queue: [],
       steer: false,
       sent: new Map(),
@@ -510,11 +517,11 @@ export class TabList {
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, traces: tab.traces.saved, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, traces: tab.traces.saved, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
         }
         return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
       }),

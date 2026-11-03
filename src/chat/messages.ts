@@ -25,7 +25,7 @@ export interface ViewMessagesHost {
 const runCommand = (command: string, ...args: ReadonlyArray<unknown>) =>
   thenable(() => vscode.commands.executeCommand(command, ...args));
 
-const updateSetting = (key: string, value: boolean) =>
+const updateSetting = (key: string, value: boolean | string) =>
   thenable(() => vscode.workspace.getConfiguration("codeAcp").update(key, value, vscode.ConfigurationTarget.Global));
 
 /** Answers the webview's messages that don't touch a tab's conversation. */
@@ -117,6 +117,18 @@ export class ViewMessages {
         break;
       case "setAutoScroll":
         yield* updateSetting("autoScroll", msg.enabled);
+        break;
+      case "setTracing":
+        yield* updateSetting("tracing", msg.enabled);
+        break;
+      case "setShowChanges":
+        yield* updateSetting("showChanges", msg.enabled);
+        break;
+      case "setShowRestore":
+        yield* updateSetting("showRestore", msg.enabled);
+        break;
+      case "setRememberSessionOptions":
+        yield* updateSetting("rememberSessionOptions", msg.enabled);
         break;
       default:
         msg satisfies never;

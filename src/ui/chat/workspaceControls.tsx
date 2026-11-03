@@ -127,8 +127,8 @@ function FinishState({ tab, busy }: { tab: TabInfo; busy: boolean }) {
   );
 }
 
-/** In the composer: whether the tab's next message moves it to a new worktree. Shown in git folders only, while the tab isn't in a worktree yet; then the bar under the composer tells. */
-export function WorktreeToggle({ tab, comparing }: { tab: TabInfo | undefined; comparing: boolean }) {
+/** Beside the branch: whether the tab's next message moves it to a new worktree. Shown in git folders only, while the tab isn't in a worktree yet; then the bar tells. */
+function WorktreeToggle({ tab, comparing }: { tab: TabInfo | undefined; comparing: boolean }) {
   const { t } = useL10n();
   if (!tab || tab.worktree || tab.branch === undefined) return null;
   // A comparison makes its own worktrees, whatever the tab's choice, which stays for when it is turned off.
@@ -147,8 +147,8 @@ export function WorktreeToggle({ tab, comparing }: { tab: TabInfo | undefined; c
   );
 }
 
-/** Under the composer: what is checked out where the tab works, which opens the picker of where it works, and what became of its worktree's work. Shown in git folders only. */
-export function WorkspaceBar({ tab, busy }: { tab: TabInfo | undefined; busy: boolean }) {
+/** Under the composer: what is checked out where the tab works, which opens the picker of where it works, whether its next message moves to a new worktree, and what became of its worktree's work. Shown in git folders only. */
+export function WorkspaceBar({ tab, busy, comparing, editing }: { tab: TabInfo | undefined; busy: boolean; comparing: boolean; editing: boolean }) {
   const { t } = useL10n();
   const branch = tab?.branch ?? tab?.worktree?.branch;
   if (!tab || (!tab.worktree && branch === undefined)) return null;
@@ -169,6 +169,8 @@ export function WorkspaceBar({ tab, busy }: { tab: TabInfo | undefined; busy: bo
         <span>{place}</span>
         <Icon svg={chevronDownIcon} />
       </button>
+      {/* An edit stays in the conversation it changes. */}
+      {!editing && <WorktreeToggle tab={tab} comparing={comparing} />}
       {tab.worktree && <FinishState tab={tab} busy={busy} />}
     </div>
   );

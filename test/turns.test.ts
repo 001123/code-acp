@@ -127,7 +127,7 @@ describe("TabTurns", () => {
 
   it.live("posts the numbers of a finished turn only while tracing is on", () =>
     Effect.gen(function* () {
-      const { say, answer, prompts, posted } = yield* makeTurns();
+      const { say, answer, prompts, posted, tab } = yield* makeTurns();
       say("first");
       yield* until(() => prompts.length === 1);
       yield* answer(0);
@@ -142,6 +142,11 @@ describe("TabTurns", () => {
       assert.strictEqual(traces[0]!.trace.sessionId, "s");
       assert.isAtLeast(traces[0]!.trace.durationMs, 0);
       assert.strictEqual((traces[0]!.trace as unknown as { number: number }).number, 7);
+      // Kept for a reload, under the position of its message: the first turn counted too.
+      assert.deepStrictEqual(
+        tab.traces.saved?.traces.map((each) => [each.message, each.trace.stopReason]),
+        [[1, "max_tokens"]],
+      );
     }),
   );
 

@@ -3,7 +3,7 @@ import type { ApprovalRules, SessionDefaults, SettingKey } from "../../settings"
 import { Icon } from "../icon";
 import { useL10n, type MessageKey } from "../l10n";
 import { AgentModelFields, SessionOptionFields } from "./agentModel";
-import { Field, Segmented, Text, Toggle } from "./fields";
+import { Field, Overridden, Segmented, Text, Toggle } from "./fields";
 import { parseHosts } from "./hosts";
 import { formatPairs, parsePairs } from "./pairs";
 import { post, set } from "./post";
@@ -13,24 +13,28 @@ import warningIcon from "@tabler/icons/outline/alert-triangle.svg";
 const isOverridden = (state: State) => (key: SettingKey) => state.overridden.includes(key);
 const isLocked = (state: State) => (key: SettingKey) => state.locked.includes(key);
 
-export function GeneralTab({ state }: { state: State }) {
+export function LanguageTab({ state }: { state: State }) {
   const { t } = useL10n();
+  const overridden = isOverridden(state);
+  return (
+    <section className="card">
+      <div className="field">
+        <select id="language" aria-label={t("settings.language")} value={stringOf(state, "language", "auto")} onChange={(e) => set("language", e.target.value)}>
+          <option value="auto">{t("settings.languageAuto")}</option>
+          <option value="en">{t("settings.languageEn")}</option>
+          <option value="vi">{t("settings.languageVi")}</option>
+        </select>
+        {overridden("language") && <Overridden />}
+      </div>
+    </section>
+  );
+}
+
+export function GeneralTab({ state }: { state: State }) {
   const v = state.values;
   const overridden = isOverridden(state);
   return (
     <section className="card">
-      <Field
-        id="language"
-        label="settings.language"
-        desc="settings.languageDesc"
-        overridden={overridden("language")}
-      >
-        <select id="language" value={stringOf(state, "language", "auto")} onChange={(e) => set("language", e.target.value)}>
-          <option value="auto">{t("settings.languageAuto")}</option>
-          <option value="en">English</option>
-          <option value="vi">Tiếng Việt</option>
-        </select>
-      </Field>
       <Field
         id="followAgent"
         label="settings.followAgent"
@@ -57,6 +61,15 @@ export function GeneralTab({ state }: { state: State }) {
         inline
       >
         <Toggle id="showChanges" checked={v.showChanges !== false} onChange={(checked) => set("showChanges", checked)} />
+      </Field>
+      <Field
+        id="showRestore"
+        label="settings.showRestore"
+        desc="settings.showRestoreDesc"
+        overridden={overridden("showRestore")}
+        inline
+      >
+        <Toggle id="showRestore" checked={v.showRestore === true} onChange={(checked) => set("showRestore", checked)} />
       </Field>
       <Field
         id="rememberSessionOptions"

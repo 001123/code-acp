@@ -10,7 +10,7 @@ import { AgentCatalogTab } from "./settings/catalog";
 import { DoctorTab } from "./settings/doctor";
 import { EntryList, serversOf } from "./settings/entries";
 import { ScopeContext, Segmented } from "./settings/fields";
-import { AgentTab, CommitTab, GeneralTab, LinksTab, NotificationsTab, PermissionsTab, TracingTab, WorktreeTab } from "./settings/panels";
+import { AgentTab, CommitTab, GeneralTab, LanguageTab, LinksTab, NotificationsTab, PermissionsTab, TracingTab, WorktreeTab } from "./settings/panels";
 import { post } from "./settings/post";
 import { optionsKey, type LoadedOptions, type State } from "./settings/state";
 import { SubTabs, TABS, Tabs, type Tab } from "./settings/tabs";
@@ -146,6 +146,8 @@ function App() {
           )}
 
           {tab === "general" && <GeneralTab state={state} />}
+
+          {tab === "language" && <LanguageTab state={state} />}
 
           {tab === "notifications" && <NotificationsTab state={state} />}
 

@@ -56,6 +56,7 @@ function isDefault(key: SettingKey, value: unknown): boolean {
   if (key === "followAgent") return value === false;
   if (key === "autoScroll") return value === true;
   if (key === "showChanges") return value === true;
+  if (key === "showRestore") return value === false;
   if (key === "tracing") return value === false;
   if (key === "notifications") return value === true;
   if (key === "notifyFinished") return value === true;

@@ -9,6 +9,7 @@
 #usage {
   position: relative;
   display: inline-flex;
+  flex: none;
   width: 24px;
   height: 24px;
   border-radius: 6px;
@@ -49,10 +50,10 @@
 #usage[data-level="high"] {
   --usage-color: var(--vscode-editorError-foreground);
 }
-/* Opens upward on hover or focus, aligned to the ring's right edge. */
+/* Opens upward on hover or focus, aligned to the ring's left edge. */
 #usage-panel {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: calc(100% + 6px);
   z-index: 20;
   display: none;

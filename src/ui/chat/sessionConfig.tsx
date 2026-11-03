@@ -1,4 +1,5 @@
 import type * as acp from "@agentclientprotocol/sdk";
+import type { ReactNode } from "react";
 import type { Choice } from "../../sessionOptions";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
@@ -101,10 +102,11 @@ export function ConfigSelect({
   );
 }
 
-/** Beside the agent button: the session's model and effort as text; hovering it opens the agent panel, which changes them. */
-export function QuickConfig({ options }: { options: ReadonlyArray<acp.SessionConfigOption> }) {
+/** The session's model and effort as text, for the button beside the agent's; undefined when the agent has neither. */
+export function quickConfig(options: ReadonlyArray<acp.SessionConfigOption>): ReactNode {
   const selects = options.filter((o): o is SelectOption => o.type === "select");
   const quick = (["model", "effort"] as const).flatMap((kind) => selects.find((o) => configKind(o) === kind) ?? []);
+  if (quick.length === 0) return undefined;
   return quick.map((option) => (
     <span key={option.id} className="quick-config" title={option.description ?? option.name}>
       {currentName(option)}

@@ -271,7 +271,10 @@ describe("TurnTraceView", () => {
 
   it("shows what was reported, and not what wasn't", () => {
     draw({ stopReason: "end_turn", durationMs: 18_000, sessionId: "s1" });
-    assert.strictEqual(container.querySelector("summary")!.textContent, "18send_turn");
+    const summary = container.querySelector("summary")!;
+    assert.strictEqual(summary.querySelector(".turn-trace-part")!.textContent, "18s");
+    assert.notInclude(summary.textContent!, "end_turn");
+    assert.strictEqual(summary.querySelector(".turn-trace-info")!.getAttribute("title"), "Stop reason: end_turn");
     assert.isNull(container.querySelector(".turn-trace-key"));
     const labels = [...container.querySelectorAll("dt")].map((dt) => dt.textContent);
     assert.isFalse(labels.includes("Input"));

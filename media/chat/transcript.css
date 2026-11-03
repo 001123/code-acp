@@ -342,6 +342,14 @@ pre.terminal-output {
   content: "·";
   margin: 0 4px;
 }
+.turn-trace-info {
+  display: inline-flex;
+  margin-left: 6px;
+}
+.turn-trace-info svg {
+  width: 1em;
+  height: 1em;
+}
 /* Where there is no room, the line keeps tokens and cost, when the agent reports them. */
 @container turn-trace (max-width: 220px) {
   .turn-trace > summary:has(.turn-trace-key) .turn-trace-optional {

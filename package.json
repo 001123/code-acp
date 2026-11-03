@@ -601,6 +601,11 @@
           "default": true,
           "description": "%config.showChanges%"
         },
+        "codeAcp.showRestore": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.showRestore%"
+        },
         "codeAcp.tracing": {
           "type": "boolean",
           "default": false,

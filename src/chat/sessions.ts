@@ -18,6 +18,7 @@ import type { ChatUi } from "./host";
 import type { LastOptions } from "./lastOptions";
 import type { Permissions } from "./permissions";
 import { resetConversation, type Reopen, type RunningAgent, type Tab, type TabList } from "./tabs";
+import { TurnTraces } from "./turnTraces";
 import type { TabTurns } from "./turns";
 import type { TabUsage } from "./usage";
 import type { TabWorktrees } from "./worktrees";
@@ -77,6 +78,7 @@ export class TabSessions {
           return res.sessionId;
         }
         tab.sessionId = res.sessionId;
+        tab.traces.clear();
         tab.running = running;
         const configOptions = yield* this.restoreOptions(tab, running, res);
         this.host.setConfigOptions(tab, configOptions);
@@ -173,7 +175,17 @@ export class TabSessions {
       caps?.loadSession
         ? Effect.suspend(() => {
             const replaying = (tab.replaying = { blocks: [], turns: [] });
-            return agent.loadSession(sessionId, cwd).pipe(Effect.tap(() => Effect.sync(() => this.host.changes.matchReplay(tab, replaying.turns))));
+            return agent.loadSession(sessionId, cwd).pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  const traces = tab.traces.matchReplay(replaying.turns);
+                  if (traces.length > 0) {
+                    this.host.postTab(tab, { type: "turnTraces", traces });
+                  }
+                  this.host.changes.matchReplay(tab, replaying.turns);
+                }),
+              ),
+            );
           }).pipe(Effect.ensuring(Effect.sync(() => void (tab.replaying = undefined))))
         : agent.resumeSession(sessionId, cwd).pipe(
             Effect.tap(() => Effect.sync(() => this.host.postTab(tab, { type: "notice", key: "chat.resumedNoHistory" }))),
@@ -354,6 +366,7 @@ export class TabSessions {
       yield* this.closeSessionOnAgent(replacedOn, replaced);
     }
     this.host.changes.clear(tab);
+    tab.traces.clear();
     yield* this.loadInto(tab, running, sessionId, cwd).pipe(
       // Fall back to a fresh session so the tab stays usable.
       Effect.tapError(() =>
@@ -425,6 +438,7 @@ export class TabSessions {
     fork.title = t("chat.forkTitle", tab.name || tab.title || t("chat.untitled"));
     fork.createdAt = Date.now();
     fork.changes = ChangeSet.fromSaved(tab.changes.saved);
+    fork.traces = TurnTraces.fromSaved(tab.traces.saved);
     fork.sent = new Map(tab.sent);
     fork.rewindNote = tab.rewindNote;
     if (tab.usage) {

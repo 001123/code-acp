@@ -1,4 +1,6 @@
+import infoIcon from "@tabler/icons/outline/info-circle.svg";
 import type { TurnTrace } from "../../chat/protocol";
+import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import { post } from "./post";
 import { formatDuration } from "./time";
@@ -54,13 +56,16 @@ export function TurnTraceView({ trace }: { trace: TurnTrace }) {
     [t("chat.sessionCost"), cost && money?.format(cost.session)],
     [t("chat.trace.session"), sessionId],
   ];
+  const stopReasonLabel = `${t("chat.trace.stopReason")}: ${stopReason}`;
   return (
     <details className="turn-trace">
       <summary>
         <span className="turn-trace-part turn-trace-optional">{formatDuration(durationMs)}</span>
         {cost && <span className="turn-trace-part turn-trace-key">{money?.format(cost.turn)}</span>}
         {tokens && <span className="turn-trace-part turn-trace-key">{t("chat.tokens", compact.format(tokens.total))}</span>}
-        <span className="turn-trace-part turn-trace-optional">{stopReason}</span>
+        <span className="turn-trace-info turn-trace-optional" title={stopReasonLabel} aria-label={stopReasonLabel}>
+          <Icon svg={infoIcon} />
+        </span>
       </summary>
       <dl>
         {rows.map(([label, value]) =>

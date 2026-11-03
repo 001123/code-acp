@@ -43,7 +43,7 @@ The walkthrough (`Code ACP: Get Started`) takes you through these steps:
 ### Changes
 
 - Review the agent's changes per file or per change, with Keep and Undo in the chat and in the editor.
-- Restore the files to a checkpoint from before any message.
+- Restore the files to a checkpoint from before any message (turn on `codeAcp.showRestore`).
 - Follow the agent in the editor: open the files it reads and edits, and highlight the lines it changes.
 
 ### Worktrees

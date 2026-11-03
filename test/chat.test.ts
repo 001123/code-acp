@@ -738,6 +738,36 @@ describe("rewind and fork state", () => {
     assert.strictEqual(transcript(rewound, { type: "rewind", turn: 2 }), rewound);
   });
 
+  it("puts a replayed session's traces back at the end of their turns", () => {
+    const trace = (stopReason: string) => ({ stopReason, durationMs: 1, waiting: { asks: 0, ms: 0 }, tools: { total: 0, failed: 0, kinds: {} }, subagents: 0, sessionId: "s" });
+    const actions: Action[] = [
+      { type: "chunk", kind: "user", text: "one", turn: 1 },
+      { type: "chunk", kind: "assistant", text: "reply one" },
+      { type: "chunk", kind: "user", text: "two", turn: 2 },
+      { type: "chunk", kind: "assistant", text: "reply two" },
+      { type: "chunk", kind: "user", text: "three", turn: 3 },
+      { type: "chunk", kind: "assistant", text: "reply three" },
+    ];
+    const state = actions.reduce(transcript, EMPTY);
+    const restored = transcript(state, {
+      type: "restoreTraces",
+      traces: [
+        { turn: 1, trace: trace("first") },
+        { turn: 3, trace: trace("third") },
+      ],
+    });
+    assert.deepStrictEqual(
+      restored.items.map((i) => (i.kind === "trace" ? i.trace.stopReason : "text" in i ? i.text : i.kind)),
+      ["one", "reply one", "first", "two", "reply two", "three", "reply three", "third"],
+    );
+    assert.strictEqual(new Set(restored.items.map((i) => i.id)).size, restored.items.length);
+    assert.isUndefined(restored.streaming);
+    // What comes next gets an id of its own, in a new block.
+    const next = transcript(restored, { type: "chunk", kind: "assistant", text: "more" });
+    assert.strictEqual(next.items.length, restored.items.length + 1);
+    assert.strictEqual(new Set(next.items.map((i) => i.id)).size, next.items.length);
+  });
+
   it("names inline attachments by their token in a message's text", () => {
     const file: Attachment = { kind: "uri", uri: "file:///w/a.ts", name: "a.ts" };
     assert.strictEqual(messageText(["look at ", { ...file, token: "@a.ts" }, " please", file]), "look at @a.ts please");
