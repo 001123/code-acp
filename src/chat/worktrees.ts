@@ -8,7 +8,7 @@ import { t, type MessageKey } from "../i18n";
 import { thenable, type ExtensionCtx, type Output, type VscodeError } from "../runtime";
 import type { UsageLedger } from "../usageLedger";
 import { folderOf, workspaceFolders } from "../workspace";
-import { attemptBranchName, fallbackPrText, intoWorktree, isManaged, parsePrText, Worktrees, type PlacedWorktree, type ProjectCommand, type TabWorktree, type WorktreeError, type WorktreeSettled } from "../worktrees";
+import { attemptBranchName, branchSlug, fallbackPrText, intoWorktree, isManaged, parsePrText, Worktrees, type PlacedWorktree, type ProjectCommand, type TabWorktree, type WorktreeError, type WorktreeSettled } from "../worktrees";
 import { confirm } from "./changes";
 import type { Attachment, PrDraft } from "./protocol";
 import type { Tab, TabGroup, TabList } from "./tabs";
@@ -38,7 +38,7 @@ interface OpenDraft {
 }
 
 /** Where the tab goes: its base folder, a new worktree there, or a worktree that exists. */
-type Target = { readonly kind: "local" | "new" } | { readonly kind: "existing"; readonly placed: PlacedWorktree };
+type Target = { readonly kind: "local" } | { readonly kind: "new"; readonly name?: string } | { readonly kind: "existing"; readonly placed: PlacedWorktree };
 
 /** What the worktrees of tabs need from the chat view. */
 export interface WorktreesHost {
@@ -96,12 +96,50 @@ export class TabWorktrees {
     return this.host.tabs().all.some((other) => other !== tab && other.worktree?.root === worktree.root);
   }
 
+  /** The folder the tab's worktrees fork off; undefined when it isn't in a git repository. */
+  private readonly repoBase = Effect.fn("TabWorktrees.repoBase")(function* (this: TabWorktrees, tab: Tab) {
+    const base = tab.worktree?.base ?? folderOf(tab.cwd)?.path;
+    return base !== undefined && (yield* (yield* Worktrees).isRepo(base)) ? base : undefined;
+  });
+
+  /** The Worktree box notes that the tab's next message moves it to a new worktree. A tab already in one has no box: a click that was on its way when it got there is dropped. */
+  toggle(tab: Tab): void {
+    if (tab.worktree) {
+      return;
+    }
+    tab.worktreeOnSend = !tab.worktreeOnSend;
+    this.host.postTabs();
+  }
+
+  /**
+   * Moves a tab with its Worktree box ticked to a new worktree named after `prompt`, for the message about to go; false
+   * when it stays where it is, so the message goes back to the composer. Outside git there is no worktree to have, and
+   * the message goes on. An unused tab keeps what was picked in its session; a used one starts over, after asking.
+   */
+  readonly enterOnSend = Effect.fn("TabWorktrees.enterOnSend")(function* (this: TabWorktrees, tab: Tab, prompt: string) {
+    const base = yield* this.repoBase(tab);
+    if (base === undefined) {
+      tab.worktreeOnSend = false;
+      this.host.postTabs();
+      return true;
+    }
+    const name = branchSlug(prompt);
+    if (tab.used || tab.busy) {
+      yield* this.switchTo(tab, base, { kind: "new", name });
+    } else {
+      tab.wantsWorktree = true;
+      tab.worktreeName = name;
+      yield* this.host.restartSession(tab);
+    }
+    return tab.worktree !== undefined;
+  });
+
   /** Offers the worktrees the tab can run in, and what can be done with its own. */
   readonly pick = Effect.fn("TabWorktrees.pick")(function* (this: TabWorktrees, tab: Tab) {
     const worktrees = yield* Worktrees;
     const current = tab.worktree;
-    const base = current?.base ?? folderOf(tab.cwd)?.path;
-    if (base === undefined || !(yield* worktrees.isRepo(base))) {
+    const base = yield* this.repoBase(tab);
+    if (base === undefined) {
       void vscode.window.showInformationMessage(t("worktree.noRepo"));
       return;
     }
@@ -109,12 +147,8 @@ export class TabWorktrees {
     const others = yield* worktrees.list(base);
     const separator = (label: string): Item => ({ label, kind: vscode.QuickPickItemKind.Separator });
     const items: Item[] = [
-      {
-        label: current ? `$(arrow-left) ${t("worktree.back", baseName)}` : `$(folder) ${t("worktree.local")}`,
-        description: current ? undefined : `${baseName} · ${t("worktree.current")}`,
-        choice: { kind: current ? "local" : "current" },
-      },
-      { label: `$(add) ${t("worktree.new")}`, description: t("worktree.newDesc"), choice: { kind: "new" } },
+      ...(current ? [{ label: `$(arrow-left) ${t("worktree.back", baseName)}`, choice: { kind: "local" } } satisfies Item] : []),
+      { label: `$(add) ${t("worktree.new")}`, description: t(current ? "worktree.newDesc" : "worktree.toggleOn"), choice: { kind: "new" } },
     ];
     if (others.length > 0) {
       items.push(separator(t("worktree.existing")));
@@ -135,6 +169,9 @@ export class TabWorktrees {
         { label: `$(empty-window) ${t("worktree.openWindow")}`, choice: { kind: "window" } },
         { label: `$(terminal) ${t("worktree.openTerminal")}`, choice: { kind: "terminal" } },
       );
+      if (isManaged(current.root) && !this.shared(tab, current)) {
+        items.push({ label: `$(trash) ${t("worktree.delete")}`, choice: { kind: "delete" } });
+      }
     }
     if (others.length > 0) {
       items.push(separator(""), { label: `$(clear-all) ${t("worktree.clean")}`, choice: { kind: "clean" } });
@@ -144,8 +181,16 @@ export class TabWorktrees {
     );
     switch (picked?.choice?.kind) {
       case "local":
+        yield* this.switchTo(tab, base, { kind: "local" });
+        return;
       case "new":
-        yield* this.switchTo(tab, base, { kind: picked.choice.kind });
+        // Outside a worktree this is the Worktree box: it waits for the message, whose words name the worktree.
+        if (current) {
+          yield* this.switchTo(tab, base, { kind: "new" });
+        } else {
+          tab.worktreeOnSend = true;
+          this.host.postTabs();
+        }
         return;
       case "existing":
         yield* this.switchTo(tab, base, picked.choice);
@@ -162,6 +207,9 @@ export class TabWorktrees {
         if (current) {
           vscode.window.createTerminal({ name: nameOf(current), cwd: tab.cwd }).show();
         }
+        return;
+      case "delete":
+        yield* this.deleteWorktree(tab);
         return;
     }
   });
@@ -580,7 +628,7 @@ export class TabWorktrees {
     if (target.kind === "new") {
       this.host.status(tab, "worktree.creating");
       next = Option.getOrUndefined(
-        yield* worktrees.create(base).pipe(
+        yield* worktrees.create(base, target.name).pipe(
           // The tab stays in its session.
           Effect.tapError(() => Effect.sync(() => this.host.status(tab, "chat.ready"))),
         ),
@@ -593,6 +641,7 @@ export class TabWorktrees {
     }
     yield* this.host.startOver(tab, (tab) => {
       tab.worktree = next?.worktree;
+      tab.worktreeOnSend = false;
       tab.cwd = next?.cwd ?? base;
     });
     if (next) {
@@ -699,8 +748,9 @@ export class TabWorktrees {
       return !required;
     }
     this.host.status(tab, "worktree.creating");
-    // A comparison's prompt is known by now; any other tab's branch gets its name with the first prompt.
-    const name = tab.group ? attemptBranchName(tab.group.prompt, tab.attemptLabel ?? tab.agentId ?? "") : undefined;
+    // A comparison's prompt is known by now, and so is that of a tab moving for its message; any other tab's branch gets its name with the first prompt.
+    const name = tab.group ? attemptBranchName(tab.group.prompt, tab.attemptLabel ?? tab.agentId ?? "") : tab.worktreeName;
+    tab.worktreeName = undefined;
     const created = yield* Semaphore.withPermits(this.creating, 1)(worktrees.create(base, name)).pipe(Effect.catch((err) => refuse(err.message)));
     if (Option.isNone(created)) {
       return !required;
@@ -711,6 +761,7 @@ export class TabWorktrees {
       return false;
     }
     tab.wantsWorktree = false;
+    tab.worktreeOnSend = false;
     tab.worktree = created.value.worktree;
     tab.cwd = created.value.cwd;
     this.host.postTabs();

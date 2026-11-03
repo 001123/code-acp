@@ -5,10 +5,12 @@ import { useEffect } from "react";
 import alertIcon from "@tabler/icons/outline/alert-triangle.svg";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import folderIcon from "@tabler/icons/outline/folder.svg";
+import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
 import gitForkIcon from "@tabler/icons/outline/git-fork.svg";
 import gitMergeIcon from "@tabler/icons/outline/git-merge.svg";
 import gitPullRequestIcon from "@tabler/icons/outline/git-pull-request.svg";
+import { ComposerCheckbox } from "./composerParts";
 import { post } from "./post";
 
 /** Picks the workspace folder the tab's session runs in; shown in multi-root workspaces only. */
@@ -125,31 +127,40 @@ function FinishState({ tab, busy }: { tab: TabInfo; busy: boolean }) {
   );
 }
 
-/** Under the composer: where the tab works, which opens the worktree picker, and what is checked out there. Shown in git folders only. */
+/** In the composer: whether the tab's next message moves it to a new worktree. Shown in git folders only, while the tab isn't in a worktree yet; then the bar under the composer tells. */
+export function WorktreeToggle({ tab }: { tab: TabInfo | undefined }) {
+  const { t } = useL10n();
+  if (!tab || tab.worktree || tab.branch === undefined) return null;
+  const hint = t(tab.worktreeOnSend ? "worktree.toggleCancel" : "worktree.toggleOn");
+  return (
+    <div id="worktree">
+      <ComposerCheckbox label={t("worktree.label")} title={`${hint}\n${tab.cwd}`} checked={!!tab.worktreeOnSend} onToggle={() => post({ type: "toggleWorktree", tab: tab.id })} />
+    </div>
+  );
+}
+
+/** Under the composer: what is checked out where the tab works, which opens the picker of where it works, and what became of its worktree's work. Shown in git folders only. */
 export function WorkspaceBar({ tab, busy }: { tab: TabInfo | undefined; busy: boolean }) {
   const { t } = useL10n();
   const branch = tab?.branch ?? tab?.worktree?.branch;
   if (!tab || (!tab.worktree && branch === undefined)) return null;
-  const place = t(tab.worktree ? "worktree.label" : "worktree.local");
+  // A worktree may have no branch: its folder names it then.
+  const place = branch ?? tab.worktree?.root.split(/[\\/]/).filter(Boolean).pop() ?? tab.cwd;
+  const pick = t("chat.pickWorktree");
   return (
-    <div id="workspace-bar" data-worktree={tab.worktree ? true : undefined}>
+    <div id="workspace-bar">
       <button
         type="button"
-        className="workspace-place"
-        title={`${t("chat.pickWorktree")}
-${tab.cwd}`}
-        aria-label={`${t("chat.pickWorktree")}: ${place}`}
+        className="workspace-branch"
+        data-worktree={tab.worktree ? true : undefined}
+        title={`${branch !== undefined ? `${t("chat.tabBranch", branch)}\n` : ""}${pick}\n${tab.cwd}`}
+        aria-label={`${pick}: ${place}`}
         onClick={() => post({ type: "pickWorktree", tab: tab.id })}
       >
-        <Icon svg={tab.worktree ? gitForkIcon : folderIcon} />
+        <Icon svg={tab.worktree ? gitForkIcon : gitBranchIcon} />
         <span>{place}</span>
+        <Icon svg={chevronDownIcon} />
       </button>
-      {branch !== undefined && (
-        <span className="workspace-branch" title={t("chat.tabBranch", branch)}>
-          <Icon svg={gitBranchIcon} />
-          <span>{branch}</span>
-        </span>
-      )}
       {tab.worktree && <FinishState tab={tab} busy={busy} />}
     </div>
   );

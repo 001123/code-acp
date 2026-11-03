@@ -23,7 +23,7 @@ import { post } from "./post";
 import type { Trigger } from "./suggestions";
 import type { TabState } from "./tabs";
 import { splitTokens } from "../markdown";
-import { FolderSelect } from "./workspaceControls";
+import { FolderSelect, WorktreeToggle } from "./workspaceControls";
 
 export interface ComposerOptions {
   /** The active tab; also as a ref for callbacks registered once (FileReader). */
@@ -315,6 +315,8 @@ export function useComposer(options: ComposerOptions) {
         </AgentPanel>
         <FolderSelect tab={activeTab} folders={folders} />
         <span className="spacer" />
+        {/* A comparison makes its own worktrees; an edit stays in the conversation it changes. */}
+        {!compare.on && editing === undefined && <WorktreeToggle tab={activeTab} />}
         {compare.element}
         {settings}
         <button

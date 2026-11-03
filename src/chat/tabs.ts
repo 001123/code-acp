@@ -78,6 +78,7 @@ export const SavedTabs = Schema.Struct({
       draft: Schema.optional(SavedDraft),
       changes: Schema.optional(SavedChanges),
       worktree: Schema.optional(TabWorktree),
+      worktreeOnSend: Schema.optional(Schema.Boolean),
       group: Schema.optional(Schema.Int),
       applied: Schema.optional(Schema.Boolean),
       settled: Schema.optional(WorktreeSettled),
@@ -122,8 +123,12 @@ export interface Tab extends DraftHolder {
   worktree?: TabWorktree;
   /** What is checked out in `cwd`, as last read. */
   branch?: string;
-  /** Its session starts in a new worktree (codeAcp.worktreeForNewTabs). */
+  /** Its session starts in a new worktree. */
   wantsWorktree?: boolean;
+  /** The name of that worktree's branch, when it is known by then. */
+  worktreeName?: string;
+  /** Its Worktree box is ticked, by the user or codeAcp.worktreeForNewTabs: the next message moves it to a new worktree. */
+  worktreeOnSend?: boolean;
   /** The agent picked for the tab, installed or custom. */
   agentId?: string;
   reopen?: Reopen;
@@ -236,6 +241,7 @@ export class TabList {
       tab.agentId = entry.agentId;
       tab.changes = ChangeSet.fromSaved(entry.changes);
       tab.worktree = entry.worktree;
+      tab.worktreeOnSend = entry.worktreeOnSend;
       tab.group = entry.group === undefined ? undefined : groups.get(entry.group);
       tab.applied = entry.applied;
       tab.settled = entry.settled;
@@ -464,6 +470,7 @@ export class TabList {
       agentId: tab.agentId,
       cwd: tab.cwd,
       worktree: tab.worktree,
+      worktreeOnSend: tab.worktreeOnSend,
       branch: tab.branch,
       canFork: !!tab.sessionId && !!tab.running && canFork(tab.running.agent),
       draft: tab.draft,
@@ -496,20 +503,20 @@ export class TabList {
       groups: this.tabGroups.map(({ id, title, name, prompt, createdAt, collapsed }) => ({ id, title, name, prompt, createdAt, collapsed })),
       shownGroup: this.shown?.id,
       tabs: this.tabs.map((tab) => {
-        const { pinned, name, savedDraft: draft, title, createdAt, worktree, applied, settled, wanted, attemptLabel } = tab;
+        const { pinned, name, savedDraft: draft, title, createdAt, worktree, worktreeOnSend, applied, settled, wanted, attemptLabel } = tab;
         const changes = tab.changes.saved;
         const group = tab.group?.id;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, settled, wanted, attemptLabel };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, settled, wanted, attemptLabel };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
         }
-        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, group, applied, settled, wanted, attemptLabel };
+        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
       }),
     };
   }

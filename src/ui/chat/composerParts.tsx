@@ -9,6 +9,26 @@ import { attachmentKey, attachmentTitle, imageSrc } from "./attachments";
 import type { Preview } from "./context";
 import { post } from "./post";
 
+/** A checkbox in the composer's row of actions. */
+export function ComposerCheckbox({ label, title, checked, onToggle }: { label: string; title: string; checked: boolean; onToggle: () => void }) {
+  return (
+    <label className="composer-toggle" title={title}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        onKeyDown={(e) => {
+          // In a form, Enter on a checkbox would send the message.
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          onToggle();
+        }}
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 /** Messages waiting for the agent: each can go now, come back to the composer, or be dropped. */
 export function QueuedMessages({ tab, queue }: { tab: number; queue: QueuedInfo[] }) {
   const { t } = useL10n();

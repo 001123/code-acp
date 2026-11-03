@@ -49,6 +49,9 @@ interface PreparedTurn {
   readonly sent: ReadonlyArray<SentAttachment>;
 }
 
+/** What a worktree gets named after when `parts` is its first message. */
+const promptName = (parts: OutgoingMessage["parts"]): string => messageText(parts).trim() || parts.find((part) => typeof part !== "string")?.name || "";
+
 /** The turns of chat tabs: sending messages, queueing them, taking them back. */
 export class TabTurns {
   /** Ids of queued messages. */
@@ -296,7 +299,13 @@ export class TabTurns {
 
   /** Runs a turn; its stop reason, or undefined without one. A message that gets no turn goes back to the composer. */
   private readonly sendTurn = Effect.fn("TabTurns.sendTurn")(function* (this: TabTurns, tab: Tab, message: OutgoingMessage) {
-    const prepared = yield* this.prepareTurn(tab, message).pipe(
+    const prepared = yield* Effect.gen({ self: this }, function* () {
+      // An edit or a retry stays in the conversation it changes. A session still starting has to get there first.
+      if (tab.worktreeOnSend && tab.rewindNote === undefined && (!(yield* this.host.ensureSession(tab)) || !(yield* this.host.tabWorktrees.enterOnSend(tab, promptName(message.parts))))) {
+        return undefined;
+      }
+      return yield* this.prepareTurn(tab, message);
+    }).pipe(
       // The chat doesn't show the message yet, so it would be lost.
       Effect.onExit((exit) =>
         Effect.sync(() => {
@@ -320,8 +329,7 @@ export class TabTurns {
     }
     if (!tab.used) {
       // Before the attachments are localized: the worktree's folder may move, and the session with it.
-      const attached = parts.find((part) => typeof part !== "string");
-      yield* this.host.tabWorktrees.nameAfter(tab, messageText(parts).trim() || attached?.name || "");
+      yield* this.host.tabWorktrees.nameAfter(tab, promptName(parts));
     }
     const { sessionId } = tab;
     const agent = tab.running?.agent;

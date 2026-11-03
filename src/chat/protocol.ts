@@ -72,6 +72,8 @@ export type FromWebview =
   | { type: "setCwd"; tab: number; cwd: string }
   /** Offers the worktrees `tab` can run in, and what can be done with its own. */
   | { type: "pickWorktree"; tab: number }
+  /** Has the tab's next message move it to a new worktree, or not any more. */
+  | { type: "toggleWorktree"; tab: number }
   /** Offers the ways to finish the work in the tab's worktree. */
   | { type: "finishWorktree"; tab: number }
   /** Deletes the tab's worktree, going back to its base folder, after asking. */
@@ -324,6 +326,8 @@ export interface TabInfo {
   cwd: string;
   /** The git worktree `cwd` is in, when the tab has one of its own. */
   worktree?: TabWorktree;
+  /** Its next message moves it to a new worktree. */
+  worktreeOnSend?: boolean;
   /** What is checked out in `cwd`; undefined outside git. */
   branch?: string;
   /** The tab's agent can fork its session (session/fork). */

@@ -48,7 +48,7 @@ The walkthrough (`Code ACP: Get Started`) takes you through these steps:
 
 ### Worktrees
 
-- Run a tab, or every new chat, in a git worktree of its own, on a branch named after the first prompt.
+- Run a tab, or every new chat, in a git worktree of its own, on a branch named after the first prompt. The branch under the composer shows where the tab works and switches between worktrees.
 - Compare attempts with the Compare checkbox (Best of N): send one prompt to several agents, models and efforts. Each works in its own worktree under a group tab, where you compare their diffs and apply the best one, or discard them all.
 - Finish a worktree from the button under the composer: merge it, create a pull request whose description its agent drafts (with the GitHub CLI), or copy its changes as staged changes. The bar then shows where the work went, a merge's conflicts, and the way to delete the worktree.
 - Clean up the worktrees you no longer use in one go.

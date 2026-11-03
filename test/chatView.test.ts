@@ -276,6 +276,26 @@ describe("ChatViewProvider", () => {
     ),
   );
 
+  it.live("sends a new tab's message where it is when the setting ticks its box outside git", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType, say, send, tabsNow, idle } = yield* startChat;
+        __test.setSetting("codeAcp.worktreeForNewTabs", true);
+        send({ type: "newTab" });
+        yield* until(() => tabsNow().tabs.length === 2, "the new tab");
+        const added = tabsNow().active;
+        const info = () => tabsNow().tabs.find((each) => each.id === added)!;
+        yield* until(() => ofType("session", added).length === 1, "its session");
+        say(added, "updates");
+        yield* until(() => ofType("turnEnd", added).length === 1, "the turn");
+        yield* idle(added);
+        assert.isUndefined(info().worktree);
+        assert.isNotOk(info().worktreeOnSend);
+        assert.strictEqual(ofType("loadComposer", added).length, 0);
+      }),
+    ),
+  );
+
   it.live("asks for a permission, queues what comes meanwhile and sends it after the answer", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -1077,6 +1097,93 @@ describe("ChatViewProvider", () => {
       }).pipe(Effect.scoped),
     );
 
+    it.live("makes the worktree of a ticked box only when a message goes, and goes back from the picker", () =>
+      Effect.gen(function* () {
+        const { folder, ofType, say, send, tab, tabsNow, idle, context } = yield* startInRepo;
+        const info = () => tabsNow().tabs.find((each) => each.id === tab)!;
+        const worktreeCount = () => git(folder, "worktree", "list").trim().split("\n").length;
+        yield* until(() => ofType("session", tab).length === 1, "the first session");
+        send({ type: "toggleWorktree", tab });
+        yield* until(() => info().worktreeOnSend === true, "the tick");
+        send({ type: "toggleWorktree", tab });
+        yield* until(() => !info().worktreeOnSend, "the box to clear");
+        send({ type: "toggleWorktree", tab });
+        yield* until(() => info().worktreeOnSend === true, "the tick");
+        assert.strictEqual(worktreeCount(), 1);
+        assert.isUndefined(info().worktree);
+        // Still ticked after a reload.
+        yield* until(() => new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d").all[0]?.worktreeOnSend === true, "the tick to be saved");
+        say(tab, "updates đăng nhập");
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+        yield* idle(tab);
+        // One session where the tab was and one in the worktree, which has its name from the start.
+        assert.strictEqual(ofType("session", tab).length, 2);
+        assert.strictEqual(info().worktree!.base, folder);
+        assert.strictEqual(info().worktree!.branch, "code-acp/updates-dang-nhap");
+        assert.isNotOk(info().worktreeOnSend);
+        assert.strictEqual(ofType("userMessage", tab).length, 1);
+        assert.strictEqual(worktreeCount(), 2);
+        // A click on its way when the tab got there changes nothing.
+        send({ type: "toggleWorktree", tab });
+        answering(true);
+        const { showQuickPick } = window;
+        window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "local")) as typeof window.showQuickPick;
+        send({ type: "pickWorktree", tab });
+        yield* until(() => info().worktree === undefined, "the tab back in the folder").pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              window.showQuickPick = showQuickPick;
+            }),
+          ),
+        );
+        assert.strictEqual(info().cwd, folder);
+        assert.isNotOk(info().worktreeOnSend);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("asks before a ticked box ends a conversation, and keeps the message and the tick when turned down", () =>
+      Effect.gen(function* () {
+        const { folder, ofType, say, send, tab, tabsNow, idle } = yield* startInRepo;
+        const info = () => tabsNow().tabs.find((each) => each.id === tab)!;
+        say(tab, "updates first");
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
+        yield* idle(tab);
+        send({ type: "toggleWorktree", tab });
+        yield* until(() => info().worktreeOnSend === true, "the tick");
+        const asked = answering(false);
+        say(tab, "updates second");
+        yield* until(() => ofType("loadComposer", tab).length === 1, "the message to come back");
+        assert.strictEqual(asked.length, 1);
+        assert.isUndefined(info().worktree);
+        assert.strictEqual(info().worktreeOnSend, true);
+        assert.strictEqual(ofType("userMessage", tab).length, 1);
+        answering(true);
+        say(tab, "updates second");
+        yield* until(() => info().worktree !== undefined && ofType("turnEnd", tab).length === 2, "the turn in the worktree");
+        assert.strictEqual(info().worktree!.base, folder);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("keeps the queued messages when a ticked box starts the conversation over, and sends them in the worktree", () =>
+      Effect.gen(function* () {
+        const { folder, ofType, say, send, tab, tabsNow, idle } = yield* startInRepo;
+        const info = () => tabsNow().tabs.find((each) => each.id === tab)!;
+        say(tab, "permission");
+        yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+        send({ type: "toggleWorktree", tab });
+        yield* until(() => info().worktreeOnSend === true, "the tick");
+        say(tab, "updates one");
+        say(tab, "updates two");
+        yield* until(() => ofType("queue", tab).at(-1)?.items.length === 2, "the queued messages");
+        answering(true);
+        send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "allow" });
+        yield* until(() => ofType("userMessage", tab).length === 3 && ofType("queue", tab).at(-1)?.items.length === 0, "both messages to go");
+        yield* idle(tab);
+        assert.deepStrictEqual(ofType("userMessage", tab).map((m) => m.text), ["permission", "updates one", "updates two"]);
+        assert.strictEqual(info().worktree!.base, folder);
+      }).pipe(Effect.scoped),
+    );
+
     it.live("names the branch of a new tab's worktree after its first prompt only", () =>
       Effect.gen(function* () {
         const { folder, ofType, say, send, tabsNow, idle } = yield* startInRepo;
@@ -1085,8 +1192,10 @@ describe("ChatViewProvider", () => {
         yield* until(() => tabsNow().tabs.length === 2, "the new tab");
         const added = tabsNow().active;
         const info = () => tabsNow().tabs.find((each) => each.id === added)!;
-        yield* until(() => info().worktree !== undefined && ofType("session", added).length === 1, "its session");
-        assert.match(info().worktree!.branch!, /^code-acp\/[0-9a-f]{6}$/);
+        yield* until(() => ofType("session", added).length === 1, "its session");
+        assert.strictEqual(info().worktreeOnSend, true);
+        assert.isUndefined(info().worktree);
+        assert.strictEqual(git(folder, "worktree", "list").trim().split("\n").length, 1);
         say(added, "updates sửa lỗi đăng");
         yield* until(() => ofType("turnEnd", added).length === 1, "the turn");
         yield* idle(added);
@@ -1107,7 +1216,7 @@ describe("ChatViewProvider", () => {
         yield* until(() => tabsNow().tabs.length === 2, "the new tab");
         const added = tabsNow().active;
         const info = () => tabsNow().tabs.find((each) => each.id === added)!;
-        yield* until(() => info().worktree !== undefined && ofType("session", added).length === 1, "its session");
+        yield* until(() => ofType("session", added).length === 1, "its session");
         say(added, "updates");
         yield* until(() => ofType("turnEnd", added).length === 1, "the turn");
         yield* idle(added);

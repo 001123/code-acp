@@ -51,32 +51,33 @@
   font-size: 0.92em;
   color: var(--vscode-descriptionForeground);
 }
-.workspace-place,
 .workspace-branch {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   min-width: 0;
   padding: 2px 4px;
-  white-space: nowrap;
-}
-.workspace-place span,
-.workspace-branch span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.workspace-place {
-  flex-shrink: 0;
   border: none;
   border-radius: 4px;
   background: none;
   color: inherit;
   font: inherit;
+  white-space: nowrap;
   cursor: pointer;
 }
-.workspace-place:hover {
+.workspace-branch span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-branch:hover {
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-foreground);
+}
+.workspace-branch[data-worktree] {
+  color: var(--vscode-foreground);
+}
+.workspace-branch[data-worktree] svg:first-child {
+  color: var(--vscode-focusBorder);
 }
 /* Where the worktree's work went, and what can be done next. */
 .workspace-state {
@@ -142,11 +143,9 @@ button.workspace-status:hover,
   width: 14px;
   height: 14px;
 }
-#workspace-bar[data-worktree] .workspace-place {
-  color: var(--vscode-foreground);
-}
-#workspace-bar[data-worktree] .workspace-place svg {
-  color: var(--vscode-focusBorder);
+#workspace-bar .workspace-branch svg:last-child {
+  width: 12px;
+  height: 12px;
 }
 
 #cancel svg {

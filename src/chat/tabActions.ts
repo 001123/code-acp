@@ -42,7 +42,7 @@ export class TabActions {
     const { tabs, manager, sessions } = this.host;
     const tab = tabs.add(cwdForNewTab(tabs.length ? (tabs.active.worktree?.base ?? tabs.active.cwd) : undefined));
     tab.agentId = agentId ?? (yield* manager.activeId);
-    tab.wantsWorktree = readSettings().worktreeForNewTabs;
+    tab.worktreeOnSend = readSettings().worktreeForNewTabs;
     tabs.active = tab;
     this.host.postTabs();
     yield* this.host.focus;

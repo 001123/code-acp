@@ -8,6 +8,7 @@ import chevronUpIcon from "@tabler/icons/outline/chevron-up.svg";
 import plusIcon from "@tabler/icons/outline/plus.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { AgentIcon, type AgentChoices } from "./agentPanel";
+import { ComposerCheckbox } from "./composerParts";
 import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow, type LoadedAttempt, type LoadedAttempts } from "./compareAttempts";
 import { useClickMenu } from "./popupMenu";
 import { post } from "./post";
@@ -152,20 +153,7 @@ export function useCompare({
 
   const element: ReactNode = !editing && agents.length > 0 && (
     <div id="compare" ref={menu.root}>
-      <label id="compare-toggle" title={t("bestOf.compareTitle")}>
-        <input
-          type="checkbox"
-          checked={on}
-          onChange={toggle}
-          onKeyDown={(e) => {
-            // In a form, Enter on a checkbox would send the message.
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            toggle();
-          }}
-        />
-        <span>{t("bestOf.compare")}</span>
-      </label>
+      <ComposerCheckbox label={t("bestOf.compare")} title={t("bestOf.compareTitle")} checked={on} onToggle={toggle} />
       {on && (
         <button
           type="button"

@@ -171,7 +171,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const saved = context.workspaceState.get(TABS_KEY);
     this.tabs = new TabList(saved, defaultCwd);
     if (saved === undefined) {
-      this.tabs.active.wantsWorktree = readSettings().worktreeForNewTabs;
+      this.tabs.active.worktreeOnSend = readSettings().worktreeForNewTabs;
     }
     this.lastOptions = new LastOptions(context.globalState);
     this.indicators = new ChatIndicators({
@@ -591,6 +591,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "pickWorktree":
         yield* this.tabWorktrees.pick(tab);
+        break;
+      case "toggleWorktree":
+        this.tabWorktrees.toggle(tab);
         break;
       case "finishWorktree":
         yield* this.tabWorktrees.finish(tab);

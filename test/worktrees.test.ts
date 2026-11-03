@@ -1130,11 +1130,54 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
           return undefined;
         }) as never;
         yield* withoutHost(controller.pick(tab));
-        for (const kind of ["merge", "pr", "apply", "delete"]) {
+        for (const kind of ["merge", "pr", "apply"]) {
           assert.notInclude(kinds, kind);
         }
-        assert.includeMembers(kinds, ["local", "new", "window", "terminal"]);
+        assert.includeMembers(kinds, ["local", "new", "window", "terminal", "delete"]);
       }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("deletes the tab's worktree from the picker, after asking when it holds work", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { worktree, cwd } = yield* created(repo);
+        const { controller, tab, asked } = makeController("Delete Worktree");
+        tab.worktree = worktree;
+        tab.cwd = cwd;
+        fs.writeFileSync(path.join(worktree.root, "new.txt"), "x\n");
+        pickFinish("delete");
+        yield* withoutHost(controller.pick(tab));
+        assert.lengthOf(asked, 1);
+        assert.include(asked[0]!, "1 uncommitted file(s)");
+        assert.isFalse(fs.existsSync(worktree.root));
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("offers no way to the checkout a tab is in, and has a new worktree wait for the message there", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { controller, tab } = makeController();
+        tab.cwd = repo;
+        workspace.workspaceFolders = [{ name: "repo", uri: Uri.file(repo) }];
+        let kinds: Array<string | undefined> = [];
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => {
+          kinds = items.map((item) => item.choice?.kind);
+          return items.find((item) => item.choice?.kind === "new");
+        }) as never;
+        yield* withoutHost(controller.pick(tab));
+        assert.notInclude(kinds, "local");
+        assert.notInclude(kinds, "current");
+        assert.isTrue(tab.worktreeOnSend);
+        assert.isUndefined(tab.worktree);
+        assert.strictEqual(git(repo, "worktree", "list").trim().split("\n").length, 1);
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            workspace.workspaceFolders = undefined;
+          }),
+        ),
+        Effect.provide(layer),
+      ),
     );
 
     it.effect("doesn't ask or commit when the base folder is dirty, or while an agent works in the worktree", () =>

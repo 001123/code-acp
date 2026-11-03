@@ -238,11 +238,17 @@ export class TabSessions {
     if (tab.sessionId) {
       yield* this.closeSessionOnAgent(tab.running, tab.sessionId);
     }
+    const queued = tab.queue;
     resetConversation(tab);
     tab.usage = undefined;
     tab.usageSessionId = undefined;
     change(tab);
     this.host.postTab(tab, { type: "reset" });
+    // The user's to send or drop, wherever the tab went; the reset just emptied the webview's list.
+    tab.queue = queued;
+    if (queued.length > 0) {
+      this.host.turns.postQueue(tab);
+    }
     this.host.changes.clear(tab);
     this.host.postTabs();
     yield* this.stopIdleAgents;
@@ -297,8 +303,9 @@ export class TabSessions {
     yield* this.startOver(tab, (tab) => {
       tab.cwd = cwd;
       tab.worktree = undefined;
-      // A tab that had a worktree of its own, or would have had one, gets one in the new folder.
-      tab.wantsWorktree = left !== undefined || readSettings().worktreeForNewTabs;
+      // A tab of a group may never work in the folder itself. Any other that had a worktree of its own, or would have had one, gets one in the new folder with its next message.
+      tab.wantsWorktree = tab.group !== undefined;
+      tab.worktreeOnSend = tab.group === undefined && (left !== undefined || tab.worktreeOnSend === true || readSettings().worktreeForNewTabs);
     });
     if (left && fate === "delete") {
       yield* this.host.tabWorktrees.discard(left, leftCwd);
@@ -336,6 +343,7 @@ export class TabSessions {
     const replacedCwd = tab.cwd;
     tab.worktree = yield* worktrees.locate(workspaceFolders().map((f) => f.path), cwd);
     tab.wantsWorktree = false;
+    tab.worktreeOnSend = false;
     this.host.tabs.active = tab;
     tab.agentId = from.agentId;
     tab.title = title?.trim() || undefined;

@@ -188,8 +188,9 @@
   border-radius: 3px;
 }
 
-/* The composer's Compare checkbox, and the attempts it sends to. */
-#compare {
+/* The composer's Worktree and Compare checkboxes, and the attempts the latter sends to. */
+#compare,
+#worktree {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -197,7 +198,20 @@
   font-size: 0.88em;
   color: var(--vscode-descriptionForeground);
 }
-#compare-toggle {
+/* Its word gives way in a narrow view; the row has to fit the send button. */
+#worktree {
+  flex-shrink: 1;
+  min-width: 34px;
+}
+#worktree .composer-toggle {
+  min-width: 0;
+}
+#worktree .composer-toggle span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composer-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -206,12 +220,12 @@
   cursor: pointer;
   white-space: nowrap;
 }
-#compare-toggle:hover {
+.composer-toggle:hover {
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-foreground);
 }
 /* Drawn from theme colors: the native box stays white on a dark theme. */
-#compare-toggle input {
+.composer-toggle input {
   appearance: none;
   -webkit-appearance: none;
   flex: none;
@@ -225,11 +239,11 @@
   background: transparent;
   cursor: pointer;
 }
-#compare-toggle input:checked {
+.composer-toggle input:checked {
   border-color: var(--vscode-button-background);
   background: var(--vscode-button-background);
 }
-#compare-toggle input:checked::before {
+.composer-toggle input:checked::before {
   content: "";
   width: 4px;
   height: 8px;
@@ -237,11 +251,11 @@
   border-width: 0 1.5px 1.5px 0;
   transform: translateY(-1px) rotate(45deg);
 }
-#compare-toggle input:focus-visible {
+.composer-toggle input:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: 1px;
 }
-#compare-toggle:has(input:checked) {
+.composer-toggle:has(input:checked) {
   color: var(--vscode-foreground);
 }
 #compare-count {
