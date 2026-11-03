@@ -10,7 +10,10 @@ import { canReopen, HistoryRequests, listHistory } from "../src/chat/history";
 import { CANCELLED, ELICITATION_CANCELLED, parseElicitationUrl, Permissions, type Answer } from "../src/chat/permissions";
 import type { Attachment } from "../src/chat/protocol";
 import { replayedParts } from "../src/chat/replay";
+import type { TabGroupInfo, TabInfo } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
+import { attemptStatus, diffTotals, dropIndex, memberTitle, tabRows } from "../src/ui/chat/tabRows";
+import type { TabState } from "../src/ui/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
 import { transcript, EMPTY, fileLinkTokens, noticeItem, stopReasonText, type Action } from "../src/ui/chat/transcript";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../src/workspace";
@@ -61,6 +64,160 @@ describe("workspace", () => {
     assert.strictEqual(resolvePath("src/x.ts", "/w/b"), "/w/b/src/x.ts");
     assert.strictEqual(resolvePath("/abs/x.ts", "/w/b"), "/abs/x.ts");
     assert.strictEqual(resolvePath("~/notes.md", "/w/b"), path.join(os.homedir(), "notes.md"));
+  });
+});
+
+describe("TabList groups", () => {
+  /** `solo`, then a group of `a` and `b`, then `end`. */
+  const grouped = () => {
+    const list = new TabList(undefined, () => "/d");
+    const solo = list.active;
+    const group = list.addGroup("g", "prompt");
+    const a = list.add("/a");
+    const b = list.add("/b");
+    a.group = group;
+    b.group = group;
+    const end = list.add("/e");
+    return { list, group, solo, a, b, end };
+  };
+  const order = (list: TabList) => list.all.map((tab) => tab.cwd);
+
+  it("keeps a group's tabs together when another tab moves through them", () => {
+    const { list, solo, end } = grouped();
+    list.move(end, 2);
+    assert.deepStrictEqual(order(list), ["/d", "/a", "/b", "/e"]);
+    list.move(solo, 1);
+    assert.deepStrictEqual(order(list), ["/a", "/b", "/d", "/e"]);
+  });
+
+  it("keeps a tab of a group inside it", () => {
+    const { list, a, b } = grouped();
+    list.move(a, 99);
+    assert.deepStrictEqual(order(list), ["/d", "/b", "/a", "/e"]);
+    list.move(a, 0);
+    assert.deepStrictEqual(order(list), ["/d", "/a", "/b", "/e"]);
+    assert.isTrue(list.has(b));
+  });
+
+  it("moves a group as a whole", () => {
+    const { list, group } = grouped();
+    list.moveGroup(group, 2);
+    assert.deepStrictEqual(order(list), ["/d", "/e", "/a", "/b"]);
+    list.moveGroup(group, 0);
+    assert.deepStrictEqual(order(list), ["/a", "/b", "/d", "/e"]);
+  });
+
+  it("pins a group's tabs together, and they stay before the others", () => {
+    const { list, a, b, solo } = grouped();
+    assert.isTrue(list.pin(b, true));
+    assert.isTrue(a.pinned);
+    assert.deepStrictEqual(order(list), ["/a", "/b", "/d", "/e"]);
+    assert.isFalse(list.pin(a, true));
+    list.move(solo, 0);
+    assert.deepStrictEqual(order(list), ["/a", "/b", "/d", "/e"]);
+    assert.isTrue(list.pin(a, false));
+    assert.isFalse(b.pinned);
+  });
+
+  it("drops a group with its last tab, once, and stops showing it", () => {
+    const { list, group, a, b } = grouped();
+    const other = list.addGroup("other", "");
+    const c = list.add("/c");
+    c.group = other;
+    list.showGroup(group);
+    list.remove(a);
+    assert.strictEqual(list.shownGroup, group);
+    list.remove(b);
+    assert.isUndefined(list.shownGroup);
+    // Removed twice: what the other group holds isn't touched.
+    assert.strictEqual(list.remove(b), -1);
+    assert.deepStrictEqual(list.groups, [other]);
+  });
+
+  it("stops showing a group when a tab becomes active", () => {
+    const { list, group, solo } = grouped();
+    list.showGroup(group);
+    assert.strictEqual(list.active, solo);
+    list.active = solo;
+    assert.isUndefined(list.shownGroup);
+  });
+
+  it("restores groups, and repairs what doesn't hold together", () => {
+    const { list, group, a } = grouped();
+    a.applied = true;
+    group.collapsed = true;
+    list.showGroup(group);
+    const restored = new TabList(list.saved, () => "/d");
+    assert.deepStrictEqual(order(restored), order(list));
+    assert.strictEqual(restored.groups[0]!.collapsed, true);
+    assert.strictEqual(restored.shownGroup, restored.groups[0]);
+    assert.isTrue(restored.all[1]!.applied);
+    assert.strictEqual(restored.addGroup("next", "").id, group.id + 1);
+
+    const scattered = {
+      active: 2,
+      groups: [
+        { id: 1, title: "g", prompt: "", createdAt: 1 },
+        { id: 9, title: "no tabs", prompt: "", createdAt: 1 },
+      ],
+      shownGroup: 9,
+      tabs: [
+        { cwd: "/a", group: 1, pinned: true },
+        { cwd: "/x" },
+        { cwd: "/b", group: 1 },
+        { cwd: "/y", group: 77 },
+      ],
+    };
+    const repaired = new TabList(scattered, () => "/d");
+    assert.deepStrictEqual(order(repaired), ["/a", "/b", "/x", "/y"]);
+    assert.deepStrictEqual(repaired.all.map((tab) => tab.pinned), [true, true, false, false]);
+    assert.strictEqual(repaired.active.cwd, "/b");
+    assert.strictEqual(repaired.groups.length, 1);
+    assert.isUndefined(repaired.shownGroup);
+    assert.isUndefined(repaired.all[3]!.group);
+  });
+});
+
+describe("the sidebar's groups", () => {
+  const info = (id: number, group?: number): TabInfo => ({ id, group, named: false, pinned: false, cwd: "/", canFork: false });
+  const group = (id: number): TabGroupInfo => ({ id, title: "g", prompt: "", createdAt: 0, collapsed: false });
+
+  it("puts a group's tabs under one row, and stands alone what has no known group", () => {
+    const rows = tabRows([info(1), info(2, 7), info(3, 7), info(4, 8)], [group(7)]);
+    assert.deepStrictEqual(
+      rows.map((row) => (row.kind === "tab" ? row.tab.id : row.members.map((tab) => tab.id))),
+      [1, [2, 3], 4],
+    );
+  });
+
+  it("works out where tabs drop, counting those that leave from before the line", () => {
+    const tabs = [info(1), info(2), info(3), info(4)];
+    assert.strictEqual(dropIndex(tabs, [1], 3), 2);
+    assert.strictEqual(dropIndex(tabs, [4], 1), 1);
+    assert.strictEqual(dropIndex(tabs, [1, 2], 4), 2);
+    assert.isUndefined(dropIndex(tabs, [2], 1));
+    assert.isUndefined(dropIndex(tabs, [2], 2));
+    assert.isUndefined(dropIndex(tabs, [9], 1));
+  });
+
+  it("names a tab of a group after its agent, unless the user named it", () => {
+    const agents = [{ id: "a", name: "Agent A" }];
+    assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "From the session" }, agents), "Agent A");
+    assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "Mine", named: true }, agents), "Mine");
+    assert.strictEqual(memberTitle({ ...info(1), agentId: "gone", title: "From the session" }, agents), "From the session");
+  });
+
+  it("adds up what a worktree changed, with no lines for binary files", () => {
+    assert.deepStrictEqual(diffTotals({ files: [{ path: "a", added: 2, removed: 1 }, { path: "b" }, { path: "c", added: 3, removed: 0 }] }), { added: 5, removed: 1 });
+  });
+
+  it("says where a tab of a group stands", () => {
+    const state = (busy: boolean) => ({ transcript: EMPTY, status: { text: "", busy } }) as TabState;
+    assert.strictEqual(attemptStatus({ ...info(1), attempt: "running" }, undefined), "bestOf.running");
+    assert.strictEqual(attemptStatus({ ...info(1), attempt: "done" }, state(true)), "bestOf.running");
+    assert.strictEqual(attemptStatus({ ...info(1), attempt: "done", applied: true }, state(false)), "bestOf.applied");
+    assert.strictEqual(attemptStatus({ ...info(1), attempt: "failed" }, state(false)), "bestOf.failed");
+    assert.strictEqual(attemptStatus(info(1), state(false)), "bestOf.done");
   });
 });
 

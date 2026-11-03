@@ -54,7 +54,7 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 
 ### Differentiators
 
-- [ ] **F6. Best of N.** Send one prompt to several agents, each in its own worktree, then compare the diffs and apply the best one.
+- [x] **F6. Best of N.** Send one prompt to several agents, each in its own worktree, then compare the diffs and apply the best one.
 - [ ] **F7. Overview board.** One screen with every tab's status, worktree, changed files and pending requests.
 - [ ] **F8. Finishing a worktree.** Merge, open a PR with a generated description, clean up old worktrees.
 

@@ -17,6 +17,7 @@ import { ComposerCommands } from "./composerCommands";
 import { DraftStore } from "./drafts";
 import { LastOptions } from "./lastOptions";
 import { Follower } from "./follow";
+import { TabGroups } from "./groups";
 import { HistoryRequests, listHistory } from "./history";
 import type { ChatUi } from "./host";
 import { ChatIndicators } from "./indicators";
@@ -24,7 +25,7 @@ import { ViewMessages } from "./messages";
 import { openFile } from "./openFile";
 import { Permissions } from "./permissions";
 import { TabSessions } from "./sessions";
-import type { ChangeHunk, Draft, FromWebview, TabMessage } from "./protocol";
+import type { ChangeHunk, Draft, FromWebview, GroupMessage, TabMessage } from "./protocol";
 import { TabActions, type TabAction } from "./tabActions";
 import { TabAgents } from "./tabAgents";
 import { TabList, type Tab } from "./tabs";
@@ -53,6 +54,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly sessions: TabSessions;
   private readonly tabAgents: TabAgents;
   private readonly tabActions: TabActions;
+  private readonly groups: TabGroups;
   private readonly indicators: ChatIndicators;
   private readonly permissions = new Permissions<Tab>({
     shown: (tab, id, ask) => {
@@ -83,7 +85,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   });
   /** Tabs that finished or wait for a permission while the user looked elsewhere: the view's badge and notifications. */
   private readonly attention = new Attention<Tab>({
-    sees: (tab) => vscode.window.state.focused && this.view?.visible === true && this.tabs.active === tab,
+    sees: (tab) => vscode.window.state.focused && this.view?.visible === true && this.tabs.active === tab && this.tabs.shownGroup === undefined,
     badge: () => this.indicators.showBadge(),
     notify: (tab, reason) => this.indicators.notify(tab, reason),
   });
@@ -193,6 +195,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         turnEnded: (tab) => {
           this.changes.post(tab);
           this.run(this.refreshBranch(tab), tab);
+          this.run(this.groups.turnEnded(tab), tab);
           if (tab.sessionId) {
             this.status(tab, "chat.ready");
           } else {
@@ -237,6 +240,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       focus: this.focus,
       post: (message) => this.post(message),
       postTabs: () => this.postTabs(),
+    });
+    this.groups = new TabGroups({
+      ...this.ui,
+      ...parts,
+      manager,
+      turns: this.turns,
+      closeGroup: (group, fate) => this.tabActions.closeGroup(group, fate),
     });
     // Raw bytes of draft attachments, which are too big for workspaceState.
     this.drafts = new DraftStore(path.join((context.storageUri ?? context.globalStorageUri).fsPath, "drafts"), () => this.tabs.all);
@@ -335,7 +345,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   private postTabs(): void {
-    this.post({ type: "tabs", tabs: this.tabs.info, active: this.tabs.active.id });
+    this.post({ type: "tabs", tabs: this.tabs.info, groups: this.tabs.groupsInfo, active: this.tabs.active.id, shownGroup: this.tabs.shownGroup?.id });
     // Answers with another post only when the branch changed.
     this.run(this.refreshBranch(this.tabs.active));
     this.attention.refresh();
@@ -439,10 +449,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           }
         }
         this.attachments.flush();
+        for (const group of this.tabs.groups) {
+          this.run(this.groups.postDiffs(group));
+        }
         yield* this.sessions.ensureSession(this.tabs.active);
         break;
       case "newTab":
         yield* this.tabActions.newSession();
+        break;
+      case "selectGroup":
+      case "closeGroup":
+      case "renameGroup":
+      case "moveGroup":
+      case "collapseGroup":
+      case "refreshGroup":
+        yield* this.onGroupMessage(msg);
         break;
       case "history":
         yield* this.showHistory();
@@ -464,6 +485,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   });
 
+  private readonly onGroupMessage = Effect.fn("ChatView.onGroupMessage")(function* (this: ChatViewProvider, msg: GroupMessage) {
+    const group = this.tabs.groupById(msg.group);
+    if (!group) {
+      return;
+    }
+    switch (msg.type) {
+      case "selectGroup":
+        yield* this.groups.select(group);
+        break;
+      case "closeGroup":
+        yield* this.tabActions.closeGroup(group);
+        yield* this.drafts.prune;
+        break;
+      case "renameGroup":
+        group.name = msg.title.trim() || undefined;
+        this.postTabs();
+        break;
+      case "moveGroup":
+        this.tabs.moveGroup(group, msg.index);
+        this.postTabs();
+        break;
+      case "collapseGroup":
+        group.collapsed = msg.collapsed;
+        this.postTabs();
+        break;
+      case "refreshGroup":
+        yield* this.groups.postDiffs(group);
+        break;
+    }
+  });
+
   private readonly onTabMessage = Effect.fn("ChatView.onTabMessage")(function* (this: ChatViewProvider, tab: Tab, msg: TabMessage) {
     switch (msg.type) {
       case "send":
@@ -475,6 +527,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "fork":
         yield* this.sessions.fork(tab, msg.turn);
+        break;
+      case "bestOf":
+        yield* this.groups.start(tab, msg.parts);
+        break;
+      case "applyWorktree":
+        yield* this.groups.apply(tab).pipe(Effect.catchTag("WorktreeError", (err) => this.groupFailed(err.message)));
+        break;
+      case "openWorktreeDiff":
+        yield* this.groups.openDiff(tab, msg.path).pipe(Effect.catchTag("WorktreeError", (err) => this.groupFailed(err.message)));
         break;
       case "cancel":
         yield* this.sessions.cancelTab(tab);
@@ -632,6 +693,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.post({ type: "sessionDeleted", sessionId });
     }
   });
+
+  /** A group's comparison shows no conversation to put a failure in. */
+  private groupFailed(message: string) {
+    return Effect.sync(() => void vscode.window.showErrorMessage(message));
+  }
 
   private deleteFailed(message: string) {
     return Effect.sync(() => {

@@ -112,6 +112,7 @@
   width: calc(var(--tabs-rail) - 4px);
 }
 .tab-initial {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -125,6 +126,37 @@
 .tab[data-active] .tab-initial {
   background: var(--vscode-badge-background);
   color: var(--vscode-badge-foreground);
+}
+/* A light sweeps around the initial while the agent works. A masked ring: the initial's background may be translucent. */
+@property --tab-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.tab[data-busy]:not([data-waiting]) .tab-initial::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  padding: 1.5px;
+  border-radius: 8px;
+  background: conic-gradient(
+    from var(--tab-angle),
+    color-mix(in srgb, var(--vscode-progressBar-background) 20%, transparent),
+    var(--vscode-progressBar-background) 25%,
+    color-mix(in srgb, var(--vscode-progressBar-background) 20%, transparent) 50%
+  );
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: tab-sweep 2.4s linear infinite;
+}
+@keyframes tab-sweep {
+  to {
+    --tab-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab[data-busy]:not([data-waiting]) .tab-initial::after {
+    animation: none;
+  }
 }
 .tab-text {
   flex: 1;
@@ -174,21 +206,10 @@
   height: 7px;
   border-radius: 50%;
   outline: 1px solid var(--vscode-sideBar-background);
-}
-.tab[data-busy] .tab-dot {
-  display: block;
-  background: var(--vscode-progressBar-background);
-  animation: tab-pulse 1.2s ease-in-out infinite;
+  background: var(--vscode-editorWarning-foreground);
 }
 .tab[data-waiting] .tab-dot {
   display: block;
-  background: var(--vscode-editorWarning-foreground);
-  animation: none;
-}
-@keyframes tab-pulse {
-  50% {
-    opacity: 0.3;
-  }
 }
 .tab-close,
 .tab-pin {

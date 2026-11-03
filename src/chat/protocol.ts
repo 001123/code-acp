@@ -3,12 +3,12 @@ import type { TerminalSnapshot } from "../agentTerminals";
 import type { ChangedFile } from "../fileChanges";
 import type { ProblemScope } from "../problems";
 import type { ChangeBlock } from "../ui/lineDiff";
-import type { TabWorktree } from "../worktrees";
+import type { TabWorktree, WorktreeFileDiff } from "../worktrees";
 
 /** One change in a file, to keep or undo on its own. */
 export type ChangeHunk = ChangeBlock;
 
-export type { ChangedFile, TerminalSnapshot };
+export type { ChangedFile, TerminalSnapshot, WorktreeFileDiff };
 
 export type FromWebview =
   | { type: "ready" }
@@ -30,6 +30,22 @@ export type FromWebview =
   | { type: "fork"; tab: number; turn?: number }
   | { type: "cancel"; tab: number }
   | { type: "newTab" }
+  /** Asks which agents get the composer's content, each in a new tab and worktree of a new group ("loadComposer" if not). */
+  | { type: "bestOf"; tab: number; parts: PromptPart[] }
+  /** Shows the comparison of a group's tabs. */
+  | { type: "selectGroup"; group: number }
+  | { type: "closeGroup"; group: number }
+  /** An empty name shows the group's title again. */
+  | { type: "renameGroup"; group: number; title: string }
+  /** `index` is where the group's first tab ends up. */
+  | { type: "moveGroup"; group: number; index: number }
+  | { type: "collapseGroup"; group: number; collapsed: boolean }
+  /** Counts what the tabs of the group changed again; answered with "worktreeDiff" for each. */
+  | { type: "refreshGroup"; group: number }
+  /** Applies what the tab's worktree holds to its base folder, after asking. */
+  | { type: "applyWorktree"; tab: number }
+  /** Opens a diff of `path` (from the top of the tab's worktree) against the commit the worktree forked off. */
+  | { type: "openWorktreeDiff"; tab: number; path: string }
   | { type: "selectTab"; tab: number }
   | { type: "closeTab"; tab: number }
   | { type: "pinTab"; tab: number; pinned: boolean }
@@ -100,6 +116,9 @@ export type FromWebview =
 
 /** Messages about one tab. */
 export type TabMessage = Extract<FromWebview, { tab: number }>;
+
+/** Messages about one group of tabs. */
+export type GroupMessage = Extract<FromWebview, { group: number }>;
 
 /** Messages about the turns of one tab. */
 export type TurnMessage = Extract<TabMessage, { type: "send" | "sendQueuedNow" | "unqueue" | "editMessage" | "retry" }>;
@@ -214,11 +233,37 @@ export interface WorkspaceFolderInfo {
   path: string;
 }
 
+/** How the prompt of a group went in one of its tabs; unknown after a reload. */
+export type Attempt = "running" | "done" | "failed";
+
+/** A group of tabs as the webview shows it in the tab sidebar. */
+export interface TabGroupInfo {
+  id: number;
+  /** The user's name for the group, else its title. */
+  title: string;
+  prompt: string;
+  createdAt: number;
+  collapsed: boolean;
+}
+
+/** What a tab's worktree changed ("worktreeDiff" message); `error` when that couldn't be read. */
+export interface WorktreeDiff {
+  files: ReadonlyArray<WorktreeFileDiff>;
+  error?: string;
+}
+
 /** A chat tab as the webview shows it in the tab sidebar. */
 export interface TabInfo {
   id: number;
   /** The user's name for the tab, else its title; undefined until the first message or the agent names the session. */
   title?: string;
+  /** `title` is the user's name for the tab. */
+  named: boolean;
+  /** The group it belongs to; a group's tabs come next to each other. */
+  group?: number;
+  attempt?: Attempt;
+  /** Its worktree's changes were applied to the base folder. */
+  applied?: boolean;
   pinned: boolean;
   /** When the conversation started (epoch ms); undefined until the first message, or for sessions opened from history. */
   createdAt?: number;

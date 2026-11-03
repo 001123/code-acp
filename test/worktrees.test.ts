@@ -13,7 +13,7 @@ import { TabList } from "../src/chat/tabs";
 import { TabWorktrees } from "../src/chat/worktrees";
 import { ShadowGit } from "../src/checkpoints";
 import { ExtensionCtx } from "../src/runtime";
-import { intoWorktree, isManaged, outermostEntries, parseWorktreeList, Worktrees, type ProjectCommand } from "../src/worktrees";
+import { intoWorktree, isManaged, outermostEntries, parseNumstat, parseWorktreeList, Worktrees, type ProjectCommand } from "../src/worktrees";
 import { makeExtensionCtx } from "./helpers";
 import { __test, Uri, workspace } from "./stubs/vscode";
 
@@ -173,6 +173,38 @@ describe("Worktrees", () => {
       assert.deepStrictEqual(yield* worktrees.status(worktree), { changed: 0, commits: 0 });
     }).pipe(Effect.provide(layer)),
   );
+
+  it.effect("lists what a worktree changed, committed or not, against the commit it forked off", () =>
+    Effect.gen(function* () {
+      const repo = makeRepo();
+      const { worktree } = yield* created(repo);
+      const worktrees = yield* Worktrees;
+      assert.deepStrictEqual(yield* worktrees.diff(worktree), []);
+      fs.writeFileSync(path.join(worktree.root, "a.txt"), "one\nmore\n");
+      git(worktree.root, "add", "a.txt");
+      git(worktree.root, "commit", "--quiet", "-m", "more");
+      fs.rmSync(path.join(worktree.root, "sub", "b.txt"));
+      fs.writeFileSync(path.join(worktree.root, "new name.txt"), "new\n");
+      fs.writeFileSync(path.join(worktree.root, "data.bin"), Buffer.from([0, 1, 2, 0]));
+      const before = git(worktree.root, "status", "--porcelain");
+      assert.deepStrictEqual(yield* worktrees.diff(worktree), [
+        { path: "a.txt", added: 1, removed: 0 },
+        { path: "data.bin" },
+        { path: "new name.txt", added: 1, removed: 0 },
+        { path: "sub/b.txt", added: 0, removed: 1 },
+      ]);
+      // What it has staged stays as it is.
+      assert.strictEqual(git(worktree.root, "status", "--porcelain"), before);
+      assert.strictEqual(yield* worktrees.original(worktree, "a.txt"), "one\n");
+      assert.strictEqual(yield* worktrees.original(worktree, "sub/b.txt"), "two\n");
+      assert.isNull(yield* worktrees.original(worktree, "new name.txt"));
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it("reads git's list of changed files", () => {
+    assert.deepStrictEqual(parseNumstat("1\t2\ta b.txt\0-\t-\tpic.png\0"), [{ path: "a b.txt", added: 1, removed: 2 }, { path: "pic.png" }]);
+    assert.deepStrictEqual(parseNumstat(""), []);
+  });
 
   it.effect("applies committed and uncommitted work to the base folder, and leaves the worktree as it is", () =>
     Effect.gen(function* () {

@@ -1,14 +1,17 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
+import * as vscode from "vscode";
 import type { AgentManager } from "../agentManager";
-import type { VscodeError } from "../runtime";
+import { t } from "../i18n";
+import { thenable, type VscodeError } from "../runtime";
 import { readSettings } from "../settings";
 import { cwdForNewTab } from "../workspace";
+import { Worktrees } from "../worktrees";
 import type { Attention } from "./attention";
 import type { ChangeReview } from "./changes";
 import type { Follower } from "./follow";
 import type { Permissions } from "./permissions";
 import type { TabSessions } from "./sessions";
-import type { Tab, TabList } from "./tabs";
+import type { Tab, TabGroup, TabList } from "./tabs";
 import type { TabWorktrees } from "./worktrees";
 
 /** What the tab actions need from the chat view. */
@@ -56,15 +59,9 @@ export class TabActions {
     }
   });
 
-  readonly closeTab = Effect.fn("TabActions.closeTab")(function* (this: TabActions, tab: Tab) {
+  /** Ends the tab's session and takes it off the list, its worktree going as `fate` says; where it was, or -1 if gone. */
+  private readonly detach = Effect.fn("TabActions.detach")(function* (this: TabActions, tab: Tab, fate: "keep" | "delete") {
     const { tabs, sessions, tabWorktrees } = this.host;
-    if (!tabs.has(tab)) {
-      return;
-    }
-    const fate = yield* tabWorktrees.askRelease(tab);
-    if (fate === "cancel") {
-      return;
-    }
     if (tab.busy) {
       yield* sessions.cancelTab(tab).pipe(Effect.ignore);
     }
@@ -74,25 +71,97 @@ export class TabActions {
     const index = tabs.remove(tab);
     if (index < 0) {
       // Closed by another caller while its turn was being cancelled.
-      return;
+      return index;
     }
     clearTimeout(tab.changesTimer);
     if (tab.sessionId) {
       yield* sessions.closeSessionOnAgent(tab.running, tab.sessionId);
     }
     yield* sessions.stopIdleAgents;
-    if (tab.worktree && fate === "delete") {
+    if (tab.worktree && fate === "delete" && !tabWorktrees.shared(tab, tab.worktree)) {
       yield* tabWorktrees.discard(tab.worktree, tab.cwd);
     }
+    return index;
+  });
+
+  /** After tabs closed: another one takes over from the active tab if that went, near `index`, where it was. */
+  private readonly settle = Effect.fn("TabActions.settle")(function* (this: TabActions, index: number) {
+    const { tabs, sessions } = this.host;
     if (tabs.length === 0) {
       yield* this.newSession();
       return;
     }
-    if (tabs.active === tab) {
+    if (!tabs.has(tabs.active)) {
       tabs.active = tabs.at(Math.min(index, tabs.length - 1))!;
     }
     this.host.postTabs();
     yield* sessions.ensureSession(tabs.active);
+  });
+
+  readonly closeTab = Effect.fn("TabActions.closeTab")(function* (this: TabActions, tab: Tab) {
+    const { tabs, tabWorktrees } = this.host;
+    if (!tabs.has(tab)) {
+      return;
+    }
+    const fate = yield* tabWorktrees.askRelease(tab);
+    if (fate === "cancel") {
+      return;
+    }
+    const index = yield* this.detach(tab, fate);
+    if (index >= 0) {
+      yield* this.settle(index);
+    }
+  });
+
+  /**
+   * Closes the tabs of a group. One question covers their worktrees, unless `fate` is given; applied ones have nothing
+   * left to lose, and neither do those without changes.
+   */
+  readonly closeGroup = Effect.fn("TabActions.closeGroup")(function* (this: TabActions, group: TabGroup, fate?: "keep" | "delete") {
+    const { tabs } = this.host;
+    const members = tabs.members(group);
+    if (members.length === 0) {
+      return;
+    }
+    const decided = fate ?? (yield* this.askReleaseGroup(group));
+    if (decided === "cancel") {
+      return;
+    }
+    let index = tabs.indexOf(members[0]!);
+    // Nothing else should start on the way out: a session for the tab that would become active next, say.
+    for (const tab of members) {
+      const at = yield* this.detach(tab, decided);
+      if (at >= 0) {
+        index = at;
+      }
+    }
+    yield* this.settle(index);
+  });
+
+  private readonly askReleaseGroup = Effect.fn("TabActions.askReleaseGroup")(function* (this: TabActions, group: TabGroup) {
+    const { tabs, tabWorktrees } = this.host;
+    const worktrees = yield* Worktrees;
+    const members = tabs.members(group);
+    let holding = 0;
+    for (const tab of members) {
+      const { worktree } = tab;
+      if (!worktree || tab.applied || tabWorktrees.shared(tab, worktree) || !(yield* worktrees.exists(worktree.root))) {
+        continue;
+      }
+      const status = yield* worktrees.status(worktree).pipe(Effect.option);
+      if (Option.isNone(status) || status.value.changed > 0 || status.value.commits > 0) {
+        holding++;
+      }
+    }
+    if (holding === 0) {
+      return "delete" as const;
+    }
+    const remove = t("bestOf.deleteWorktrees");
+    const keep = t("bestOf.keepWorktrees");
+    const picked = yield* thenable(() =>
+      vscode.window.showWarningMessage(t("bestOf.closeConfirm", group.name ?? group.title, holding), { modal: true }, remove, keep),
+    );
+    return picked === remove ? ("delete" as const) : picked === keep ? ("keep" as const) : ("cancel" as const);
   });
 
   /** Runs a tab context menu action (webview context menu); pinned tabs are never closed. */
@@ -126,13 +195,21 @@ export class TabActions {
         return;
       case "closeOthers":
       case "closeToRight": {
-        const index = tabs.indexOf(tab);
-        const targets = tabs.all.filter((each, i) => !each.pinned && (action === "closeOthers" ? each !== tab : i > index));
+        // A group counts as one: its tabs stay with `tab`, or close with one question.
+        const siblings = tab.group ? tabs.members(tab.group) : [tab];
+        const last = tabs.indexOf(siblings.at(-1)!);
+        const targets = tabs.all.filter((each, i) => !each.pinned && !siblings.includes(each) && (action === "closeOthers" || i > last));
         if (targets.length && tabs.active !== tab && targets.includes(tabs.active)) {
           yield* this.selectTab(tab);
         }
+        const groups = new Set(targets.flatMap((each) => (each.group ? [each.group] : [])));
         for (const each of targets) {
-          yield* this.closeTab(each);
+          if (!each.group) {
+            yield* this.closeTab(each);
+          }
+        }
+        for (const group of groups) {
+          yield* this.closeGroup(group);
         }
         return;
       }
@@ -145,7 +222,7 @@ export class TabActions {
       return;
     }
     yield* this.host.focus;
-    if (this.host.tabs.active !== tab) {
+    if (this.host.tabs.active !== tab || this.host.tabs.shownGroup) {
       yield* this.selectTab(tab);
     }
   });

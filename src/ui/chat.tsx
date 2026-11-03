@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
-import type { TabInfo, TerminalSnapshot, WorkspaceFolderInfo } from "../chat/protocol";
+import type { TabGroupInfo, TabInfo, TerminalSnapshot, WorkspaceFolderInfo } from "../chat/protocol";
 import { ErrorBoundary } from "./errorBoundary";
 import { Lightbox } from "./lightbox";
 import { useL10n, type Translate } from "./l10n";
@@ -9,6 +9,7 @@ import { useMessages } from "./vscode";
 import { ChangesBar } from "./chat/changes";
 import { HoverPreview, OpenPreview, ShownTab, Terminals, type Hover, type Preview } from "./chat/context";
 import { useComposer } from "./chat/composer";
+import { GroupPanel } from "./chat/groupPanel";
 import { HistoryView, type History } from "./chat/history";
 import { post } from "./chat/post";
 import { NEW_TAB, TabSidebar, tabStates, type TabState } from "./chat/tabs";
@@ -35,7 +36,10 @@ function EntryBoundary({ items, children }: { items: readonly unknown[]; childre
 function App() {
   const { t } = useL10n();
   const [tabs, setTabs] = useState<TabInfo[]>([]);
+  const [groups, setGroups] = useState<TabGroupInfo[]>([]);
   const [active, setActive] = useState<number>();
+  /** The group whose comparison is shown, instead of the active tab. */
+  const [shownGroup, setShownGroup] = useState<number>();
   const [states, dispatchTabs] = useReducer(tabStates, {});
   const [agents, setAgents] = useState<AgentChoices>({ agents: [] });
   const [folders, setFolders] = useState<WorkspaceFolderInfo[]>([]);
@@ -47,11 +51,14 @@ function App() {
   /** The active tab for callbacks registered once (drop, FileReader). */
   const activeRef = useRef(active);
   activeRef.current = active;
+  const shownGroupRef = useRef(shownGroup);
+  shownGroupRef.current = shownGroup;
 
   const [preview, setPreview] = useState<Preview>();
   const closePreview = useCallback(() => setPreview(undefined), []);
   const [hover, setHover] = useState<Hover>();
   const current = (active !== undefined && states[active]) || NEW_TAB;
+  const group = groups.find((each) => each.id === shownGroup);
   const {
     transcript: state,
     config,
@@ -155,7 +162,13 @@ function App() {
         )
       )),
     quickConfig: active !== undefined && !configLoading && <QuickConfig options={config} />,
+    hidden: group !== undefined,
   });
+
+  /** Back to the active tab, for what lands in its composer while a group's comparison is shown. */
+  const showComposer = () => {
+    if (activeRef.current !== undefined && shownGroupRef.current !== undefined) selectTab(activeRef.current);
+  };
 
   useMessages((msg) => {
     // Messages about one conversation name their tab.
@@ -163,7 +176,9 @@ function App() {
     switch (msg.type) {
       case "tabs":
         setTabs(msg.tabs);
+        setGroups(msg.groups);
         setActive(msg.active);
+        setShownGroup(msg.shownGroup);
         dispatchTabs({ type: "keep", ids: msg.tabs.map((x: TabInfo) => x.id) });
         composer.seed(msg.tabs);
         return;
@@ -180,6 +195,8 @@ function App() {
         return update(tab, (s) => ({ ...s, changes: { files: msg.files, turns: msg.turns } }));
       case "hunks":
         return update(tab, (s) => ({ ...s, hunks: { ...s.hunks, [msg.path]: msg.hunks } }));
+      case "worktreeDiff":
+        return update(tab, (s) => ({ ...s, worktreeDiff: msg.diff }));
       case "queue":
         return update(tab, (s) => ({ ...s, queue: msg.items }));
       case "loadComposer":
@@ -268,13 +285,16 @@ function App() {
       case "environment":
         return setRemote(msg.remote);
       case "addAttachments":
+        showComposer();
         if (msg.prompt) composer.write(msg.prompt);
         for (const a of msg.attachments) composer.addAttachment(a);
         composer.focus();
         return;
       case "quote":
+        showComposer();
         return composer.quote(msg.text);
       case "focusComposer":
+        showComposer();
         return composer.focus();
       case "sessionTotals":
         return update(tab, (s) => ({ ...s, totals: msg.totals ?? undefined }));
@@ -341,10 +361,17 @@ function App() {
   }
 
   function selectTab(id: number): void {
-    if (id === active) return;
+    if (id === activeRef.current && shownGroupRef.current === undefined) return;
     setActive(id);
+    setShownGroup(undefined);
     setHistory(undefined);
     post({ type: "selectTab", tab: id });
+  }
+
+  function selectGroup(id: number): void {
+    setShownGroup(id);
+    setHistory(undefined);
+    post({ type: "selectGroup", group: id });
   }
 
 
@@ -449,7 +476,10 @@ function App() {
         <div id="chat-body">
           <div id="chat-main">
             {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
-            <div id="messages" ref={messages} hidden={!!history}>
+            {group && !history && (
+              <GroupPanel group={group} members={tabs.filter((tab) => tab.group === group.id)} states={states} agents={agents.agents} onOpen={selectTab} />
+            )}
+            <div id="messages" ref={messages} hidden={!!history || !!group}>
               {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
               {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map((entry) =>
                 Array.isArray(entry) ? (
@@ -467,13 +497,24 @@ function App() {
               )}
         </div>
         </div>
-        <TabSidebar tabs={tabs} states={states} active={active} onSelect={selectTab} renaming={renaming} onRename={setRenaming} />
+        <TabSidebar
+          tabs={tabs}
+          groups={groups}
+          states={states}
+          active={active}
+          shownGroup={shownGroup}
+          agents={agents.agents}
+          onSelect={selectTab}
+          onSelectGroup={selectGroup}
+          renaming={renaming}
+          onRename={setRenaming}
+        />
         </div>
         <div id="drop-overlay" className={composer.dragging ? "visible" : undefined}>
           {t("chat.dropHint")}
         </div>
-        {showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
-        {(status.needsLogin || status.needsAgent) && (
+        {!group && showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
+        {!group && (status.needsLogin || status.needsAgent) && (
           <div id="status">
             <span id="status-text">{status.text}</span>
             {status.needsLogin && <button onClick={() => post({ type: "login" })}>{t("chat.login")}</button>}
@@ -481,7 +522,7 @@ function App() {
           </div>
         )}
         {composer.element}
-        <WorkspaceBar tab={tabs.find((x) => x.id === active)} />
+        {!group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} />}
         {preview && (
           <Lightbox
             key={preview.src}

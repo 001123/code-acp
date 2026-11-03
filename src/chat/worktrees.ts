@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Schema, Semaphore } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import type { AgentRequestError, AgentStartError } from "../acpClient";
@@ -10,7 +10,7 @@ import { folderOf } from "../workspace";
 import { intoWorktree, isManaged, Worktrees, type PlacedWorktree, type ProjectCommand, type TabWorktree, type WorktreeError } from "../worktrees";
 import { confirm } from "./changes";
 import type { Attachment } from "./protocol";
-import type { Tab, TabList } from "./tabs";
+import type { Tab, TabGroup, TabList } from "./tabs";
 
 /** Where the fingerprints of the project setup commands the user allowed are kept. */
 const APPROVED_COMMANDS_KEY = "codeAcp.approvedWorktreeCommands";
@@ -41,10 +41,15 @@ const nameOf = (worktree: TabWorktree) => worktree.branch ?? path.basename(workt
 
 /** The git worktrees of chat tabs: choosing them, bringing their changes back and cleaning them up. */
 export class TabWorktrees {
+  /** Git is asked for one new worktree at a time: the tabs of a group ask at once. */
+  private readonly creating = Semaphore.makeUnsafe(1);
+  /** Per group: its tabs set up at once, and the project's command is one question for all of them. */
+  private readonly groupApprovals = new WeakMap<TabGroup, { readonly lock: Semaphore.Semaphore; readonly answers: Map<string, boolean> }>();
+
   constructor(private readonly host: WorktreesHost) {}
 
   /** Whether another open tab runs in the worktree too (a fork); it stays while one does. */
-  private shared(tab: Tab, worktree: TabWorktree): boolean {
+  shared(tab: Tab, worktree: TabWorktree): boolean {
     return this.host.tabs().all.some((other) => other !== tab && other.worktree?.root === worktree.root);
   }
 
@@ -187,7 +192,7 @@ export class TabWorktrees {
   /** Readies a new worktree, before the agent starts there; returns what went wrong, which doesn't stop the tab. */
   private readonly setUp = Effect.fn("TabWorktrees.setUp")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
     this.host.status(tab, "worktree.settingUp");
-    return yield* (yield* Worktrees).setup(worktree, (request) => this.approve(worktree, request)).pipe(
+    return yield* (yield* Worktrees).setup(worktree, (request) => (tab.group ? this.approveOnce(tab.group, worktree, request) : this.approve(worktree, request))).pipe(
       Effect.as(undefined),
       Effect.catch((err) => Effect.succeed(err.message)),
     );
@@ -219,42 +224,72 @@ export class TabWorktrees {
     Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(false))),
   );
 
+  /** Like `approve`, with a single question and answer for the tabs of `group`. */
+  private approveOnce(group: TabGroup, worktree: TabWorktree, request: ProjectCommand) {
+    let shared = this.groupApprovals.get(group);
+    if (!shared) {
+      this.groupApprovals.set(group, (shared = { lock: Semaphore.makeUnsafe(1), answers: new Map() }));
+    }
+    const { lock, answers } = shared;
+    return Semaphore.withPermits(lock, 1)(
+      Effect.gen({ self: this }, function* () {
+        const known = answers.get(request.fingerprint);
+        if (known !== undefined) {
+          return known;
+        }
+        const answer = yield* this.approve(worktree, request);
+        answers.set(request.fingerprint, answer);
+        return answer;
+      }),
+    );
+  }
+
   private reportSetup(tab: Tab, error: string | undefined): void {
     if (error !== undefined && this.host.tabs().has(tab)) {
       this.host.postTab(tab, { type: "error", text: error });
     }
   }
 
-  /** Runs a tab that asked for it in a new worktree; it stays where it is when its folder isn't in git, or that fails. */
+  /**
+   * Runs a tab that asked for it in a new worktree; it stays where it is when its folder isn't in git, or that fails.
+   * A tab of a group must not work in the base folder, where the others would see its changes: false until it has its
+   * worktree, and it keeps asking.
+   */
   readonly prepare = Effect.fn("TabWorktrees.prepare")(function* (this: TabWorktrees, tab: Tab) {
     if (!tab.wantsWorktree) {
-      return;
+      return true;
     }
-    tab.wantsWorktree = false;
+    const required = tab.group !== undefined;
+    tab.wantsWorktree = required;
+    const refuse = (text: string) =>
+      Effect.sync(() => {
+        this.host.postTab(tab, { type: "error", text });
+        return Option.none<PlacedWorktree>();
+      });
     const base = folderOf(tab.cwd)?.path;
-    if (base === undefined || tab.worktree) {
-      return;
+    if (tab.worktree) {
+      tab.wantsWorktree = false;
+      return true;
     }
     const worktrees = yield* Worktrees;
-    if (!(yield* worktrees.isRepo(base))) {
-      return;
+    if (base === undefined || !(yield* worktrees.isRepo(base))) {
+      if (required) {
+        yield* refuse(t("worktree.noRepo"));
+      }
+      return !required;
     }
     this.host.status(tab, "worktree.creating");
-    const created = yield* worktrees.create(base).pipe(
-      Effect.catch((err) =>
-        Effect.sync(() => {
-          this.host.postTab(tab, { type: "error", text: err.message });
-          return Option.none<PlacedWorktree>();
-        }),
-      ),
-    );
-    if (Option.isSome(created)) {
-      tab.worktree = created.value.worktree;
-      tab.cwd = created.value.cwd;
-      this.host.postTabs();
-      this.announce(tab, created.value.worktree);
-      this.reportSetup(tab, yield* this.setUp(tab, created.value.worktree));
+    const created = yield* Semaphore.withPermits(this.creating, 1)(worktrees.create(base)).pipe(Effect.catch((err) => refuse(err.message)));
+    if (Option.isNone(created)) {
+      return !required;
     }
+    tab.wantsWorktree = false;
+    tab.worktree = created.value.worktree;
+    tab.cwd = created.value.cwd;
+    this.host.postTabs();
+    this.announce(tab, created.value.worktree);
+    this.reportSetup(tab, yield* this.setUp(tab, created.value.worktree));
+    return true;
   });
 
   /** Before the tab's session starts: brings its worktree back if it went missing, else returns the tab to its base folder. */
@@ -341,29 +376,39 @@ export class TabWorktrees {
     }
   });
 
-  /** Brings what the worktree holds into its base folder, and offers to delete it when that went cleanly. */
-  private readonly apply = Effect.fn("TabWorktrees.apply")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  /** Brings what the worktree holds into its base folder, after asking; true when that went cleanly. */
+  readonly applyChanges = Effect.fn("TabWorktrees.applyChanges")(function* (this: TabWorktrees, worktree: TabWorktree) {
     const worktrees = yield* Worktrees;
     const name = nameOf(worktree);
     const baseName = path.basename(worktree.base);
     const status = yield* worktrees.status(worktree);
     if (status.changed === 0 && status.commits === 0) {
       void vscode.window.showInformationMessage(t("worktree.nothingToApply", name));
-      return;
+      return false;
     }
     const message = t("worktree.applyConfirm", status.changed, status.commits, name, baseName);
     if (!(yield* confirm(message, t("worktree.applyAction")))) {
-      return;
+      return false;
     }
     const applied = yield* worktrees.apply(worktree);
     if (!applied.applied) {
       void vscode.window.showInformationMessage(t("worktree.nothingToApply", name));
-      return;
+      return false;
     }
     if (applied.conflicts.length > 0) {
       void vscode.window.showWarningMessage(t("worktree.appliedConflicts", name, baseName, applied.conflicts.join(", ")));
+      return false;
+    }
+    return true;
+  });
+
+  /** Brings what the worktree holds into its base folder, and offers to delete it when that went cleanly. */
+  private readonly apply = Effect.fn("TabWorktrees.apply")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+    if (!(yield* this.applyChanges(worktree))) {
       return;
     }
+    const name = nameOf(worktree);
+    const baseName = path.basename(worktree.base);
     if (!isManaged(worktree.root) || this.shared(tab, worktree)) {
       void vscode.window.showInformationMessage(t("worktree.applied", name, baseName));
       return;

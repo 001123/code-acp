@@ -1,5 +1,6 @@
 import { afterEach, assert, beforeEach, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -8,7 +9,8 @@ import type * as vscode from "vscode";
 import type { AgentManager } from "../src/agentManager";
 import type { AgentUpdates } from "../src/agentUpdates";
 import { ChatViewProvider } from "../src/chat/chatViewProvider";
-import type { FromWebview, TabInfo } from "../src/chat/protocol";
+import type { FromWebview, TabGroupInfo, TabInfo } from "../src/chat/protocol";
+import { TabList } from "../src/chat/tabs";
 import { makeRuntime } from "../src/runtime";
 import { makeOutput } from "./helpers";
 import { __test, commands, EventEmitter, Uri, window, workspace } from "./stubs/vscode";
@@ -27,11 +29,12 @@ const memento = (values = new Map<string, unknown>()) =>
 /** Set per test: what the mock agent can do, and whether it is still installed. */
 let agentEnv: Record<string, string> = {};
 let installed = true;
+let agentList = [{ id: "mock", name: "Mock" }];
 
 const manager = {
   onDidChange: new EventEmitter<void>().event,
-  agents: Effect.succeed([{ id: "mock", name: "Mock" }]),
-  has: (id: string) => Effect.sync(() => installed && id === "mock"),
+  agents: Effect.sync(() => agentList),
+  has: (id: string) => Effect.sync(() => installed && agentList.some((agent) => agent.id === id)),
   command: () => Effect.sync(() => ({ command: process.execPath, args: [MOCK_AGENT], env: { ...process.env, MOCK_FORK: "1", ...agentEnv } })),
   activeId: Effect.succeed("mock"),
   setActive: () => Effect.void,
@@ -108,7 +111,7 @@ const startChat = Effect.gen(function* () {
   const chat = yield* openChat;
   const { posted, send } = chat;
   const ofType = (type: string, tab?: number) => posted.filter((m) => m.type === type && (tab === undefined || m.tab === tab));
-  const tabsNow = () => ofType("tabs").at(-1) as { tabs: TabInfo[]; active: number };
+  const tabsNow = () => ofType("tabs").at(-1) as { tabs: TabInfo[]; groups: TabGroupInfo[]; active: number; shownGroup?: number };
   const say = (tab: number, text: string) => send({ type: "send", tab, parts: [text] });
   const replyOf = (tab: number) =>
     ofType("update", tab)
@@ -126,6 +129,7 @@ beforeEach(() => {
   __test.reset();
   agentEnv = {};
   installed = true;
+  agentList = [{ id: "mock", name: "Mock" }];
 });
 
 describe("ChatViewProvider", () => {
@@ -798,4 +802,205 @@ describe("ChatViewProvider", () => {
       }),
     ),
   );
+
+  describe("best of N", () => {
+    const showQuickPick = window.showQuickPick;
+    const showWarningMessage = window.showWarningMessage;
+    const realHome = process.env.HOME;
+    const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" });
+    /** The question's first action, or none. */
+    const answering = (yes: boolean) => {
+      const asked: string[] = [];
+      window.showWarningMessage = async (message, _options, ...actions) => {
+        asked.push(message);
+        return yes ? actions[0] : undefined;
+      };
+      return asked;
+    };
+    const pickAll = () => {
+      window.showQuickPick = async (items) => [...items];
+    };
+
+    beforeEach(() => {
+      agentList = [
+        { id: "mock", name: "Mock" },
+        { id: "other", name: "Other" },
+      ];
+    });
+    afterEach(() => {
+      window.showQuickPick = showQuickPick;
+      window.showWarningMessage = showWarningMessage;
+      process.env.HOME = realHome;
+    });
+
+    /** A chat in a git repository, with the worktrees under a home of its own. */
+    const startInRepo = Effect.gen(function* () {
+      const chat = yield* startChat;
+      const folder = path.join(chat.root, "workspace");
+      process.env.HOME = path.join(chat.root, "home");
+      yield* Effect.promise(async () => {
+        await fs.mkdir(process.env.HOME!);
+        await fs.writeFile(path.join(folder, "a.txt"), "one\n");
+      });
+      git(folder, "init", "--quiet");
+      git(folder, "add", "--all");
+      git(folder, "commit", "--quiet", "-m", "init");
+      const members = () => chat.tabsNow().tabs.filter((tab) => tab.group !== undefined);
+      const finished = until(() => members().length === 2 && members().every((tab) => tab.attempt === "done"), "both agents to finish");
+      const started = (prompt: string) =>
+        Effect.gen(function* () {
+          pickAll();
+          chat.send({ type: "bestOf", tab: chat.tab, parts: [prompt] });
+          yield* finished;
+          for (const tab of members()) {
+            yield* chat.idle(tab.id);
+          }
+        });
+      return { ...chat, folder, members, started };
+    });
+
+    it.live("runs each agent on the prompt in a worktree of its own, and shows the group", () =>
+      Effect.gen(function* () {
+        const { folder, members, started, replyOf, tabsNow, tab } = yield* startInRepo;
+        yield* started("updates first\nand more");
+        const [first, second] = members();
+        assert.deepStrictEqual(
+          members().map((each) => each.agentId),
+          ["mock", "other"],
+        );
+        assert.isDefined(first!.worktree);
+        assert.isDefined(second!.worktree);
+        assert.notStrictEqual(first!.worktree!.root, second!.worktree!.root);
+        assert.notStrictEqual(first!.cwd, folder);
+        assert.isNotEmpty(replyOf(first!.id));
+        assert.isNotEmpty(replyOf(second!.id));
+        const { groups, shownGroup, active } = tabsNow();
+        assert.strictEqual(groups.length, 1);
+        assert.strictEqual(groups[0]!.title, "updates first");
+        assert.strictEqual(groups[0]!.prompt, "updates first\nand more");
+        assert.strictEqual(shownGroup, groups[0]!.id);
+        // The tab that sent it stays where it was.
+        assert.strictEqual(active, tab);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("compares what the worktrees changed, applies one and deletes them all with the group", () =>
+      Effect.gen(function* () {
+        const { folder, members, started, send, ofType, tabsNow, tab } = yield* startInRepo;
+        yield* started("updates");
+        const [winner, loser] = members();
+        yield* Effect.promise(() => fs.writeFile(path.join(winner!.worktree!.root, "new.txt"), "hi\nthere\n"));
+        const diffOf = (id: number) => ofType("worktreeDiff", id).at(-1)?.diff;
+        const posted = ofType("worktreeDiff").length;
+        send({ type: "refreshGroup", group: winner!.group! });
+        yield* until(() => ofType("worktreeDiff").length === posted + 2, "the counts");
+        assert.deepStrictEqual(diffOf(winner!.id), { files: [{ path: "new.txt", added: 2, removed: 0 }] });
+        assert.deepStrictEqual(diffOf(loser!.id), { files: [] });
+
+        const asked = answering(true);
+        send({ type: "applyWorktree", tab: winner!.id });
+        yield* until(() => members()[0]!.applied === true, "the changes to be applied");
+        assert.strictEqual(asked.length, 1);
+        assert.strictEqual(git(folder, "status", "--porcelain").trim(), "A  new.txt");
+
+        // Nothing is left to lose: applied, or without changes.
+        send({ type: "closeGroup", group: winner!.group! });
+        yield* until(() => tabsNow().groups.length === 0, "the group to close");
+        assert.strictEqual(asked.length, 1);
+        assert.strictEqual(tabsNow().tabs.length, 1);
+        assert.strictEqual(tabsNow().active, tab);
+        assert.isUndefined(tabsNow().shownGroup);
+        yield* until(() => git(folder, "worktree", "list").trim().split("\n").length === 1, "the worktrees to go");
+        assert.notInclude(git(folder, "branch"), winner!.worktree!.branch!);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("asks once before closing a group whose worktrees hold changes, and leaves it when turned down", () =>
+      Effect.gen(function* () {
+        const { members, started, send, tabsNow } = yield* startInRepo;
+        yield* started("updates");
+        const [first, second] = members();
+        yield* Effect.promise(async () => {
+          await fs.writeFile(path.join(first!.worktree!.root, "x.txt"), "x\n");
+          await fs.writeFile(path.join(second!.worktree!.root, "y.txt"), "y\n");
+        });
+        const asked = answering(false);
+        send({ type: "closeGroup", group: first!.group! });
+        yield* until(() => asked.length === 1, "the question");
+        yield* Effect.sleep("20 millis");
+        assert.include(asked[0], "2 worktree");
+        assert.strictEqual(tabsNow().groups.length, 1);
+        assert.strictEqual(members().length, 2);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("puts the prompt back when no group comes of it", () =>
+      Effect.gen(function* () {
+        const { send, ofType, tab, tabsNow } = yield* startInRepo;
+        window.showQuickPick = async () => undefined;
+        send({ type: "bestOf", tab, parts: ["cancelled"] });
+        yield* until(() => ofType("loadComposer", tab).length === 1, "the prompt to come back");
+        window.showQuickPick = async (items) => items.slice(0, 1);
+        send({ type: "bestOf", tab, parts: ["just one"] });
+        yield* until(() => ofType("loadComposer", tab).length === 2, "the prompt to come back");
+        assert.deepStrictEqual(ofType("loadComposer", tab).map((m) => m.parts), [["cancelled"], ["just one"]]);
+        assert.strictEqual(tabsNow().tabs.length, 1);
+        assert.deepStrictEqual(tabsNow().groups, []);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("won't start outside git, where the agents would share a folder", () =>
+      Effect.gen(function* () {
+        const { send, ofType, tab, tabsNow } = yield* startChat;
+        let asked = false;
+        window.showQuickPick = async () => {
+          asked = true;
+          return undefined;
+        };
+        send({ type: "bestOf", tab, parts: ["go"] });
+        yield* until(() => ofType("loadComposer", tab).length === 1, "the prompt to come back");
+        assert.isFalse(asked);
+        assert.deepStrictEqual(tabsNow().groups, []);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("never lets an agent work in the base folder when its worktree can't be made", () =>
+      Effect.gen(function* () {
+        const { send, ofType, tab, tabsNow, root } = yield* startChat;
+        // A repository without a commit has no HEAD for a worktree to start from.
+        const folder = path.join(root, "workspace");
+        process.env.HOME = path.join(root, "home");
+        yield* Effect.promise(() => fs.mkdir(process.env.HOME!));
+        git(folder, "init", "--quiet");
+        pickAll();
+        send({ type: "bestOf", tab, parts: ["go"] });
+        const members = () => tabsNow().tabs.filter((each) => each.group !== undefined);
+        yield* until(() => members().length === 2 && members().every((each) => each.attempt === "failed"), "both to fail");
+        for (const member of members()) {
+          assert.isUndefined(member.worktree);
+          assert.deepStrictEqual(ofType("session", member.id), []);
+          assert.deepStrictEqual(ofType("userMessage", member.id), []);
+          assert.isNotEmpty(ofType("error", member.id));
+          // Theirs to send again.
+          assert.deepStrictEqual(ofType("loadComposer", member.id).at(-1)!.parts, ["go"]);
+        }
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("brings groups and their tabs back after a reload", () =>
+      Effect.gen(function* () {
+        const { members, started, send, context, tabsNow } = yield* startInRepo;
+        yield* started("updates");
+        send({ type: "renameGroup", group: members()[0]!.group!, title: "Named" });
+        yield* until(() => tabsNow().groups[0]?.title === "Named", "the name");
+        yield* until(() => (context.workspaceState.get("codeAcp.tabs") as { groups?: Array<{ name?: string }> } | undefined)?.groups?.[0]?.name === "Named", "the tabs to be saved");
+        const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
+        assert.strictEqual(restored.groups.length, 1);
+        assert.strictEqual(restored.groups[0]!.name, "Named");
+        assert.strictEqual(restored.shownGroup, restored.groups[0]);
+        assert.strictEqual(restored.members(restored.groups[0]!).length, 2);
+        assert.isDefined(restored.members(restored.groups[0]!)[0]!.worktree);
+      }).pipe(Effect.scoped),
+    );
+  });
 });

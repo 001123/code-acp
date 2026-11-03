@@ -6,7 +6,7 @@ import { ChangeSet, SavedChanges } from "../fileChanges";
 import type { MessageKey } from "../i18n";
 import { TabWorktree } from "../worktrees";
 import { SavedDraft, type DraftHolder } from "./drafts";
-import type { PromptPart, TabInfo } from "./protocol";
+import type { Attempt, PromptPart, TabGroupInfo, TabInfo } from "./protocol";
 
 export interface RunningAgent {
   readonly agent: AcpAgent;
@@ -48,8 +48,20 @@ export const SavedUsage = Schema.Struct({
 });
 export type SavedUsage = typeof SavedUsage.Type;
 
+const SavedTabGroup = Schema.Struct({
+  id: Schema.Int,
+  title: Schema.String,
+  name: Schema.optional(Schema.String),
+  prompt: Schema.String,
+  createdAt: Schema.Finite,
+  collapsed: Schema.optional(Schema.Boolean),
+});
+
 export const SavedTabs = Schema.Struct({
   active: Schema.Int,
+  groups: Schema.optional(Schema.Array(SavedTabGroup)),
+  /** The group whose comparison the view shows, instead of the active tab. */
+  shownGroup: Schema.optional(Schema.Int),
   tabs: Schema.Array(
     Schema.Struct({
       title: Schema.optional(Schema.String),
@@ -63,10 +75,27 @@ export const SavedTabs = Schema.Struct({
       draft: Schema.optional(SavedDraft),
       changes: Schema.optional(SavedChanges),
       worktree: Schema.optional(TabWorktree),
+      group: Schema.optional(Schema.Int),
+      applied: Schema.optional(Schema.Boolean),
     }),
   ),
 });
 export type SavedTabs = typeof SavedTabs.Type;
+
+/** The tabs that got one prompt, each with an agent of its own in a worktree of its own (Best of N). */
+export interface TabGroup {
+  readonly id: number;
+  /** From the prompt. */
+  readonly title: string;
+  /** The name the user gave the group; shown instead of `title`. */
+  name?: string;
+  /** The prompt's text. */
+  readonly prompt: string;
+  /** Epoch ms. */
+  readonly createdAt: number;
+  /** Its tabs are left out of the sidebar. */
+  collapsed: boolean;
+}
 
 /** One conversation: an ACP session on its agent's process; tabs on the same agent share the process. */
 export interface Tab extends DraftHolder {
@@ -122,6 +151,12 @@ export interface Tab extends DraftHolder {
   rewindNote?: string;
   /** While session/load replays the history: the user message being replayed, kept in `sent` by its turn. */
   replaying?: { turn?: number; blocks: acp.ContentBlock[]; turns: number[] };
+  /** The group the tab belongs to; a group's tabs stay next to each other. */
+  group?: TabGroup;
+  /** How the prompt of its group went, while this session knows. */
+  attempt?: Attempt;
+  /** Its worktree's changes were applied to the base folder. */
+  applied?: boolean;
   /** Pending `postChanges`. */
   changesTimer?: ReturnType<typeof setTimeout>;
 }
@@ -163,11 +198,16 @@ export function usageOf(tab: Tab, sessionId: string): SavedUsage | undefined {
 export class TabList {
   private nextId = 1;
   private readonly tabs: Tab[] = [];
-  active: Tab;
+  private readonly tabGroups: TabGroup[] = [];
+  private nextGroupId = 1;
+  private activeTab: Tab;
+  /** The group whose comparison the view shows, instead of the active tab; choosing a tab ends that. */
+  private shown: TabGroup | undefined;
 
   /** Recreates the tabs saved for the workspace (`saved` is untrusted); their sessions reopen when first used. */
   constructor(saved: unknown, defaultCwd: () => string) {
     const decoded = Option.getOrUndefined(Schema.decodeUnknownOption(SavedTabs)(saved));
+    const groups = new Map((decoded?.groups ?? []).map((group) => [group.id, { ...group, collapsed: group.collapsed ?? false }]));
     for (const entry of decoded?.tabs ?? []) {
       const tab = this.add(entry.cwd ?? defaultCwd());
       tab.pinned = entry.pinned ?? false;
@@ -176,6 +216,8 @@ export class TabList {
       tab.agentId = entry.agentId;
       tab.changes = ChangeSet.fromSaved(entry.changes);
       tab.worktree = entry.worktree;
+      tab.group = entry.group === undefined ? undefined : groups.get(entry.group);
+      tab.applied = entry.applied;
       if (entry.sessionId) {
         tab.title = entry.title;
         tab.createdAt = entry.createdAt;
@@ -185,7 +227,66 @@ export class TabList {
         tab.usageSessionId = entry.sessionId;
       }
     }
-    this.active = this.tabs[decoded?.active ?? 0] ?? this.tabs[0] ?? this.add(defaultCwd());
+    const active = this.tabs[decoded?.active ?? 0];
+    this.keepGroupsTogether();
+    this.activeTab = active ?? this.tabs[0] ?? this.add(defaultCwd());
+    this.tabGroups.push(...[...groups.values()].filter((group) => this.tabs.some((tab) => tab.group === group)));
+    this.nextGroupId = Math.max(0, ...this.tabGroups.map((group) => group.id)) + 1;
+    this.shown = this.tabGroups.find((group) => group.id === decoded?.shownGroup);
+  }
+
+  /** Saved tabs are untrusted: puts each group's tabs where its first one is, pinned as that one is. */
+  private keepGroupsTogether(): void {
+    const ordered = this.tabs.flatMap((tab) => {
+      if (tab.group === undefined) {
+        return [tab];
+      }
+      const members = this.members(tab.group);
+      return members[0] === tab ? members : [];
+    });
+    this.tabs.splice(0, this.tabs.length, ...ordered);
+    for (const tab of this.tabs) {
+      if (tab.group) {
+        tab.pinned = this.members(tab.group)[0]!.pinned;
+      }
+    }
+  }
+
+  get active(): Tab {
+    return this.activeTab;
+  }
+
+  set active(tab: Tab) {
+    this.activeTab = tab;
+    this.shown = undefined;
+  }
+
+  get shownGroup(): TabGroup | undefined {
+    return this.shown;
+  }
+
+  /** Shows the group's comparison; the active tab stays what the rest of the extension talks about. */
+  showGroup(group: TabGroup): void {
+    this.shown = group;
+  }
+
+  get groups(): ReadonlyArray<TabGroup> {
+    return this.tabGroups;
+  }
+
+  groupById(id: number): TabGroup | undefined {
+    return this.tabGroups.find((group) => group.id === id);
+  }
+
+  addGroup(title: string, prompt: string): TabGroup {
+    const group: TabGroup = { id: this.nextGroupId++, title, prompt, createdAt: Date.now(), collapsed: false };
+    this.tabGroups.push(group);
+    return group;
+  }
+
+  /** The tabs of `group`, in order. */
+  members(group: TabGroup): ReadonlyArray<Tab> {
+    return this.tabs.filter((tab) => tab.group === group);
   }
 
   get all(): ReadonlyArray<Tab> {
@@ -217,8 +318,16 @@ export class TabList {
   /** Removes `tab`; returns where it was, or -1 when it was already gone. */
   remove(tab: Tab): number {
     const index = this.tabs.indexOf(tab);
-    if (index >= 0) {
-      this.tabs.splice(index, 1);
+    if (index < 0) {
+      return index;
+    }
+    this.tabs.splice(index, 1);
+    // A group lasts as long as it has tabs.
+    if (tab.group && this.members(tab.group).length === 0) {
+      this.tabGroups.splice(this.tabGroups.indexOf(tab.group), 1);
+      if (this.shown === tab.group) {
+        this.shown = undefined;
+      }
     }
     return index;
   }
@@ -249,26 +358,61 @@ export class TabList {
     return this.tabs.find((tab) => tab.sessionId === sessionId || tab.reopen?.sessionId === sessionId);
   }
 
-  /** Moves `tab` to `index`, kept inside its group: pinned tabs stay before the others. False if it is gone. */
+  /** Puts `moved`, next to each other, at `index` of the tabs left: pinned tabs stay first, and no group gets split. */
+  private place(moved: ReadonlyArray<Tab>, index: number): void {
+    const rest = this.tabs.filter((tab) => !moved.includes(tab));
+    const pinnedCount = rest.filter((each) => each.pinned).length;
+    const [min, max] = moved[0]!.pinned ? [0, pinnedCount] : [pinnedCount, rest.length];
+    let at = Math.min(Math.max(index, min), max);
+    while (at > 0 && at < rest.length && rest[at - 1]!.group !== undefined && rest[at - 1]!.group === rest[at]!.group) {
+      at++;
+    }
+    rest.splice(at, 0, ...moved);
+    this.tabs.splice(0, this.tabs.length, ...rest);
+  }
+
+  /**
+   * Moves `tab` to `index`. It stays with the others of its kind: pinned tabs before the rest, a group's tabs inside
+   * their group. False if it is gone.
+   */
   move(tab: Tab, index: number): boolean {
     const from = this.tabs.indexOf(tab);
     if (from < 0) {
       return false;
     }
-    this.tabs.splice(from, 1);
-    const pinnedCount = this.tabs.filter((each) => each.pinned).length;
-    const [min, max] = tab.pinned ? [0, pinnedCount] : [pinnedCount, this.tabs.length];
-    this.tabs.splice(Math.min(Math.max(index, min), max), 0, tab);
+    if (tab.group) {
+      const first = this.tabs.indexOf(this.members(tab.group)[0]!);
+      const last = first + this.members(tab.group).length - 1;
+      this.tabs.splice(from, 1);
+      this.tabs.splice(Math.min(Math.max(index, first), last), 0, tab);
+      return true;
+    }
+    this.place([tab], index);
     return true;
   }
 
-  /** Pinning appends to the pinned group; unpinning puts the tab first among the others. False if nothing changed. */
+  /** Moves the tabs of `group`, so that the first ends up at `index`. */
+  moveGroup(group: TabGroup, index: number): void {
+    const members = this.members(group);
+    if (members.length > 0) {
+      this.place(members, index);
+    }
+  }
+
+  /**
+   * Pinning appends to the pinned tabs; unpinning puts the tab first among the others. A group's tabs go together, as
+   * pinned tabs come first and it would come apart. False if nothing changed.
+   */
   pin(tab: Tab, pinned: boolean): boolean {
     if (tab.pinned === pinned) {
       return false;
     }
-    tab.pinned = pinned;
-    return this.move(tab, this.tabs.filter((each) => each.pinned && each !== tab).length);
+    const moved = tab.group ? this.members(tab.group) : [tab];
+    for (const each of moved) {
+      each.pinned = pinned;
+    }
+    this.place(moved, this.tabs.filter((each) => each.pinned && !moved.includes(each)).length);
+    return true;
   }
 
   /** Names `tab` as the user typed it; an empty name shows its title again. False if nothing changed. */
@@ -291,6 +435,7 @@ export class TabList {
     return this.tabs.map((tab) => ({
       id: tab.id,
       title: tab.name ?? tab.title,
+      named: tab.name !== undefined,
       createdAt: tab.createdAt,
       pinned: tab.pinned,
       agentId: tab.agentId,
@@ -299,6 +444,20 @@ export class TabList {
       branch: tab.branch,
       canFork: !!tab.sessionId && !!tab.running && canFork(tab.running.agent),
       draft: tab.draft,
+      group: tab.group?.id,
+      attempt: tab.attempt,
+      applied: tab.applied,
+    }));
+  }
+
+  /** The groups as the webview shows them. */
+  get groupsInfo(): TabGroupInfo[] {
+    return this.tabGroups.map((group) => ({
+      id: group.id,
+      title: group.name ?? group.title,
+      prompt: group.prompt,
+      createdAt: group.createdAt,
+      collapsed: group.collapsed,
     }));
   }
 
@@ -306,20 +465,23 @@ export class TabList {
   get saved(): SavedTabs {
     return {
       active: this.tabs.indexOf(this.active),
+      groups: this.tabGroups.map(({ id, title, name, prompt, createdAt, collapsed }) => ({ id, title, name, prompt, createdAt, collapsed })),
+      shownGroup: this.shown?.id,
       tabs: this.tabs.map((tab) => {
-        const { pinned, name, savedDraft: draft, title, createdAt, worktree } = tab;
+        const { pinned, name, savedDraft: draft, title, createdAt, worktree, applied } = tab;
         const changes = tab.changes.saved;
+        const group = tab.group?.id;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied };
         }
-        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree };
+        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, group, applied };
       }),
     };
   }

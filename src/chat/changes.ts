@@ -158,6 +158,11 @@ export class ChangeReview implements vscode.Disposable {
     }
   });
 
+  /** Diff of `before` against `file` as it is, or against `after` when given. */
+  openWorktreeDiff(file: string, before: string | null, after: string | undefined) {
+    return this.beforeDocuments.open(file, before, after);
+  }
+
   readonly keep = Effect.fn("ChangeReview.keep")(function* (this: ChangeReview, tab: Tab, file: string | undefined) {
     yield* keep(tab.changes, file);
     this.host.saveTabs();

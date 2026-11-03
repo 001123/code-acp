@@ -54,6 +54,14 @@ export interface WorktreeStatus {
   readonly commits: number;
 }
 
+/** A file a worktree changed; binary files have no line counts. */
+export interface WorktreeFileDiff {
+  /** From the top of the worktree. */
+  readonly path: string;
+  readonly added?: number;
+  readonly removed?: number;
+}
+
 export interface AppliedWorktree {
   readonly applied: boolean;
   /** Files left with conflict markers in the base folder. */
@@ -96,6 +104,17 @@ export function outermostEntries(entries: ReadonlyArray<string>): ReadonlyArray<
     .map((entry) => entry.replace(/\/$/, ""));
 }
 
+/** The files in the output of `git diff --numstat -z --no-renames`. */
+export const parseNumstat = (out: string): ReadonlyArray<WorktreeFileDiff> =>
+  out.split("\0").flatMap((entry) => {
+    const [added, removed, ...name] = entry.split("\t");
+    if (added === undefined || removed === undefined || name.length === 0) {
+      return [];
+    }
+    const counts = added === "-" ? {} : { added: Number(added), removed: Number(removed) };
+    return [{ path: name.join("\t"), ...counts }];
+  });
+
 /** The git worktrees chat tabs run in. Listings come from git, so worktrees made outside the extension show up too. */
 export class Worktrees extends Context.Service<Worktrees, {
   /** Whether `folder` is in a git work tree. */
@@ -118,6 +137,10 @@ export class Worktrees extends Context.Service<Worktrees, {
   /** Puts a missing worktree the extension created back on its branch; false when it can't be. */
   restore(worktree: TabWorktree): Effect.Effect<boolean>;
   status(worktree: TabWorktree): Effect.Effect<WorktreeStatus, WorktreeError>;
+  /** The files the worktree holds differently from the commit it forked off, committed or not. */
+  diff(worktree: TabWorktree): Effect.Effect<ReadonlyArray<WorktreeFileDiff>, WorktreeError>;
+  /** What `file` (from the top of the worktree) held in the commit the worktree forked off; null when it didn't exist. */
+  original(worktree: TabWorktree, file: string): Effect.Effect<string | null, WorktreeError>;
   /**
    * Brings what the worktree holds, committed or not, into its base folder as staged changes. The worktree stays
    * as it is. Nothing is changed when the base folder's own changes are in the way.
@@ -344,18 +367,38 @@ export class Worktrees extends Context.Service<Worktrees, {
         return { changed, commits };
       });
 
+      /** The tree of everything the worktree holds, on a scratch index so that what it has staged stays as it is. */
+      const snapshot = Effect.fnUntraced(function* (worktree: TabWorktree) {
+        const scratch = yield* fs.makeTempDirectoryScoped().pipe(Effect.mapError((err) => failed("snapshot", err.message)));
+        const env = { GIT_INDEX_FILE: path.join(scratch, "index") };
+        yield* git(worktree.root, ["read-tree", "HEAD"], env);
+        yield* git(worktree.root, ["add", "--all"], env);
+        return { scratch, tree: (yield* git(worktree.root, ["write-tree"], env)).trim() };
+      });
+
+      const diff = Effect.fn("Worktrees.diff")(
+        function* (worktree: TabWorktree) {
+          const { tree } = yield* snapshot(worktree);
+          const fork = yield* forkPoint(worktree);
+          const out = yield* git(worktree.root, ["diff", "--numstat", "-z", "--no-renames", "--no-color", "--no-ext-diff", fork, tree]);
+          return parseNumstat(out);
+        },
+        Effect.scoped,
+      );
+
+      const original = Effect.fn("Worktrees.original")(function* (worktree: TabWorktree, file: string) {
+        const fork = yield* forkPoint(worktree);
+        const { out, code } = yield* exec(worktree.root, ["show", `${fork}:${file}`]);
+        return code === 0 ? out : null;
+      });
+
       const apply = Effect.fn("Worktrees.apply")(
         function* (worktree: TabWorktree) {
           const repo = yield* repoOf(worktree.base);
           if (Option.isNone(repo)) {
             return yield* failed("apply", worktree.base);
           }
-          const scratch = yield* fs.makeTempDirectoryScoped().pipe(Effect.mapError((err) => failed("apply", err.message)));
-          // On a scratch index, so what the worktree has staged stays as it is.
-          const env = { GIT_INDEX_FILE: path.join(scratch, "index") };
-          yield* git(worktree.root, ["read-tree", "HEAD"], env);
-          yield* git(worktree.root, ["add", "--all"], env);
-          const tree = (yield* git(worktree.root, ["write-tree"], env)).trim();
+          const { scratch, tree } = yield* snapshot(worktree);
           const fork = yield* forkPoint(worktree);
           // A file, not a pipe: the patch of a file in another encoding isn't text.
           const patch = path.join(scratch, "patch");
@@ -399,6 +442,8 @@ export class Worktrees extends Context.Service<Worktrees, {
         exists,
         restore,
         status,
+        diff,
+        original,
         apply,
         remove,
       });

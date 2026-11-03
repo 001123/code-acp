@@ -11,7 +11,7 @@ VS Code extension "Code ACP": chat with coding agents over ACP, install agents f
 - Code, names, comments: English.
 - User-facing strings: never hard-code. Add a key to `src/l10n/en.ts` and `src/l10n/vi.ts`; use `t()` from `src/i18n.ts` in the host, `useL10n().t` in webviews (`src/ui/l10n.ts`). `package.json` strings go in `package.nls.json` + `package.nls.vi.json`.
 - Chat: reply in the conversation's language.
-- Chat view: host in `src/chat/` (`chatViewProvider.ts` is the adapter; tabs, sessions, turns, usage, drafts, attachments, permissions, history, changes beside it), webview in `src/ui/chat.tsx` + `src/ui/chat/`. Messages shared by both live in `src/chat/protocol.ts`.
+- Chat view: host in `src/chat/` (`chatViewProvider.ts` is the adapter; tabs, groups, sessions, turns, usage, drafts, attachments, permissions, history, changes beside it), webview in `src/ui/chat.tsx` + `src/ui/chat/`. Messages shared by both live in `src/chat/protocol.ts`.
 - Tests: `test/*.test.ts` with `@effect/vitest`; `vscode` is aliased to `test/stubs/vscode.ts` (extend it as needed), `test/fixtures/mock-agent.mjs` is an ACP agent over stdio.
 - Run `npm run check` (typecheck + tests) before finishing.
 - Local dev (the `code`, `codium` CLI is on `PATH`): after the checks pass, run `npm run reinstall` to package and reinstall the extension, then tell the user to run "Developer: Reload Window". Skip this in CI or remote sessions.

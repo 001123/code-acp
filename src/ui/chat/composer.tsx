@@ -4,6 +4,7 @@ import type { Attachment, PromptPart, QueuedInfo, TabInfo, WorkspaceFolderInfo }
 import { Icon } from "../icon";
 import { useL10n, type Translate } from "../l10n";
 import arrowUpIcon from "@tabler/icons/outline/arrow-up.svg";
+import splitIcon from "@tabler/icons/outline/arrows-split-2.svg";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
 import { AgentPanel, type AgentChoices } from "./agentPanel";
 import { imageSrc } from "./attachments";
@@ -52,11 +53,13 @@ export interface ComposerOptions {
   agentConfig: ReactNode;
   /** The session's model and effort, shown beside the agent button. */
   quickConfig: ReactNode;
+  /** A group's comparison is shown instead of the conversation. */
+  hidden: boolean;
 }
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig } =
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig, hidden } =
     options;
   const { t } = useL10n();
   /** Handlers of the latest render, for the editor's callbacks, which are registered once. */
@@ -230,13 +233,28 @@ export function useComposer(options: ComposerOptions) {
     paste: onPaste,
   };
 
+  /** The composer content in order; undefined when there is nothing to send. */
+  function content(tab: number): PromptPart[] | undefined {
+    const text = textOf(editor.state.doc);
+    const tokens = [...drafts.inlineOf(tab)].map(([token, a]) => ({ ...a, token }));
+    const parts: PromptPart[] = [...splitTokens(text, tokens), ...attachments];
+    return parts.every((p) => typeof p === "string" && !p.trim()) ? undefined : parts;
+  }
+
+  /** Offers the composer content to several agents; the host puts it back if that doesn't happen. */
+  function sendToSeveral(): void {
+    if (active === undefined) return;
+    const parts = content(active);
+    if (!parts) return;
+    post({ type: "bestOf", tab: active, parts });
+    drafts.clear(active);
+  }
+
   /** Sends the composer content; while the agent works it is queued, unless `now`. An edit replaces its message. */
   function submit(now: boolean): void {
     if (active === undefined) return;
-    const text = textOf(editor.state.doc);
-    const tokens = [...drafts.inlineOf(active)].map(([token, a]) => ({ ...a, token }));
-    const parts: PromptPart[] = [...splitTokens(text, tokens), ...attachments];
-    if (parts.every((p) => typeof p === "string" && !p.trim())) return;
+    const parts = content(active);
+    if (!parts) return;
     post({ type: "send", tab: active, parts, now: now || undefined, rewind: editing });
     if (editing !== undefined) {
       drafts.endEdit(active);
@@ -248,6 +266,7 @@ export function useComposer(options: ComposerOptions) {
   const element: ReactNode = (
     <form
       id="composer"
+      hidden={hidden}
       data-busy={busy || undefined}
       onSubmit={(e) => {
         e.preventDefault();
@@ -305,6 +324,17 @@ export function useComposer(options: ComposerOptions) {
           onClick={() => active !== undefined && post({ type: "cancel", tab: active })}
         >
           <Icon svg={stopIcon} />
+        </button>
+        <button
+          type="button"
+          id="best-of"
+          className="icon-btn"
+          title={t("bestOf.send")}
+          aria-label={t("bestOf.send")}
+          hidden={agents.agents.length < 2 || editing !== undefined}
+          onClick={sendToSeveral}
+        >
+          <Icon svg={splitIcon} />
         </button>
         <button
           type="submit"

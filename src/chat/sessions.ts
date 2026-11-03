@@ -55,7 +55,9 @@ export class TabSessions {
         }
         const running = yield* this.host.getAgent(tab);
         yield* this.host.tabWorktrees.ensure(tab);
-        yield* this.host.tabWorktrees.prepare(tab);
+        if (!(yield* this.host.tabWorktrees.prepare(tab))) {
+          return undefined;
+        }
         if (tab.reopen) {
           const reopened = yield* this.reopenSession(tab, running, tab.reopen);
           if (reopened) {

@@ -271,6 +271,7 @@ export const window = {
   showWarningMessage: async (_message: string, _options: unknown, ..._actions: string[]): Promise<string | undefined> => undefined,
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   showErrorMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
+  showQuickPick: async <T>(_items: ReadonlyArray<T>, _options?: unknown): Promise<T | T[] | undefined> => undefined,
   state: { focused: true },
   onDidChangeWindowState: () => noDisposable,
   onDidStartTerminalShellExecution: () => noDisposable,
