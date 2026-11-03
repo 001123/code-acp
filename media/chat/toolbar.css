@@ -1,4 +1,6 @@
 #actions {
+  /* The comparison's popover spans it. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -96,7 +98,12 @@
   color: var(--vscode-button-secondaryForeground);
 }
 
-#cancel:not([hidden]) + #send {
+/* Round even when the row is tight: the model and effort text gives way first. */
+#actions > .icon-btn {
+  flex: none;
+}
+/* A comparison doesn't wait for the running turn, so its send button stays. */
+#cancel:not([hidden]) + #send:not([data-compare]) {
   display: none;
 }
 #actions .label-text {

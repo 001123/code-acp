@@ -13,7 +13,7 @@ import { TabList } from "../src/chat/tabs";
 import { TabWorktrees } from "../src/chat/worktrees";
 import { ShadowGit } from "../src/checkpoints";
 import { ExtensionCtx } from "../src/runtime";
-import { intoWorktree, isManaged, outermostEntries, parseNumstat, parseWorktreeList, Worktrees, type ProjectCommand } from "../src/worktrees";
+import { attemptBranchName, branchSlug, freeBranchName, intoWorktree, isManaged, outermostEntries, parseNumstat, parseWorktreeList, Worktrees, type ProjectCommand } from "../src/worktrees";
 import { makeExtensionCtx } from "./helpers";
 import { __test, Uri, workspace } from "./stubs/vscode";
 
@@ -105,7 +105,96 @@ describe("worktree helpers", () => {
   });
 });
 
+describe("branch names", () => {
+  it("makes a slug of the first line, without accents", () => {
+    assert.strictEqual(branchSlug("Sửa lỗi đăng nhập\nvà thêm test"), "sua-loi-dang-nhap");
+    assert.strictEqual(branchSlug("  Fix the login timeout in the session store"), "fix-the-login-timeout-in");
+    assert.strictEqual(branchSlug("修复 login"), "login");
+    assert.isUndefined(branchSlug("修复 🎉"));
+    assert.isUndefined(branchSlug(""));
+  });
+
+  it("cuts a slug without leaving a dash at the end", () => {
+    assert.strictEqual(branchSlug("abcd efgh", 5), "abcd");
+    assert.strictEqual(branchSlug("a".repeat(100))?.length, 40);
+  });
+
+  it("puts the branches of a comparison in a folder of their own", () => {
+    assert.strictEqual(attemptBranchName("Fix login", "Gemini 4 Argon · High"), "compare/fix-login-gemini-4-argon-high");
+    assert.strictEqual(attemptBranchName("", "gemini"), "compare/gemini");
+    assert.strictEqual(attemptBranchName("Fix login", ""), "compare/fix-login");
+    assert.strictEqual(attemptBranchName("", ""), "compare/attempt");
+  });
+
+  it("numbers a name that is taken, and never gives the one of the comparisons' folder", () => {
+    assert.strictEqual(freeBranchName("fix", new Set()), "fix");
+    assert.strictEqual(freeBranchName("fix", new Set(["fix", "fix-2"])), "fix-3");
+    assert.strictEqual(freeBranchName("compare", new Set()), "compare-2");
+  });
+});
+
 describe("Worktrees", () => {
+  it.effect("names a new worktree's branch after the prompt, keeping its folder", () =>
+    Effect.gen(function* () {
+      const dir = makeRepo();
+      const { worktree, cwd } = yield* created(dir);
+      assert.match(worktree.branch!, /^code-acp\/[0-9a-f]{6}$/);
+      const named = yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "Sửa lỗi đăng nhập"));
+      assert.strictEqual(named.branch, "code-acp/sua-loi-dang-nhap");
+      assert.strictEqual(named.root, worktree.root);
+      assert.strictEqual(git(cwd, "symbolic-ref", "--short", "HEAD").trim(), named.branch);
+      // Named once; a later prompt doesn't change it.
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(named, "something else")), named);
+      yield* Worktrees.use((worktrees) => worktrees.remove(named));
+      assert.notInclude(git(dir, "branch"), "sua-loi");
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("numbers the branch when the name is taken", () =>
+    Effect.gen(function* () {
+      const dir = makeRepo();
+      const nameNew = created(dir).pipe(Effect.flatMap(({ worktree }) => Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it"))));
+      assert.strictEqual((yield* nameNew).branch, "code-acp/fix-it");
+      assert.strictEqual((yield* nameNew).branch, "code-acp/fix-it-2");
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("leaves a branch with commits, or with nothing to name it after", () =>
+    Effect.gen(function* () {
+      const dir = makeRepo();
+      const { worktree, cwd } = yield* created(dir);
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "🎉")), worktree);
+      fs.writeFileSync(path.join(cwd, "new.txt"), "x\n");
+      git(cwd, "add", "--all");
+      git(cwd, "commit", "--quiet", "-m", "work");
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it")), worktree);
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("leaves a worktree the user made", () =>
+    Effect.gen(function* () {
+      const dir = makeRepo();
+      const root = path.join(scratch, `own-${count++}`);
+      git(dir, "worktree", "add", "--quiet", "-b", "code-acp/abc123", root);
+      const worktree = { root: fs.realpathSync(root), branch: "code-acp/abc123", base: dir };
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it")), worktree);
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("creates a worktree on a branch of the given name, in a folder of its own", () =>
+    Effect.gen(function* () {
+      const dir = makeRepo();
+      const create = Worktrees.use((worktrees) => worktrees.create(dir, "compare/fix-gemini")).pipe(Effect.map(Option.getOrThrow));
+      const first = yield* create;
+      const second = yield* create;
+      assert.strictEqual(first.worktree.branch, "code-acp/compare/fix-gemini");
+      assert.strictEqual(second.worktree.branch, "code-acp/compare/fix-gemini-2");
+      assert.notStrictEqual(first.worktree.root, second.worktree.root);
+      yield* Worktrees.use((worktrees) => worktrees.remove(first.worktree));
+      assert.notInclude(git(dir, "branch"), "code-acp/compare/fix-gemini\n");
+    }).pipe(Effect.provide(layer)),
+  );
+
   it.effect("creates nothing outside a git repository", () =>
     Effect.gen(function* () {
       const dir = path.join(scratch, "plain");
@@ -504,6 +593,28 @@ describe("TabWorktrees", () => {
     });
     return { asked, posted, tabs, controller, tab: tabs.active };
   };
+
+  it.effect("names the branch for every tab in the worktree, and doesn't stop the turn when git fails", () =>
+    Effect.gen(function* () {
+      const { worktree } = yield* created(makeRepo());
+      const { controller, tab, tabs } = makeController();
+      const fork = tabs.add("/w");
+      const other = tabs.add("/w");
+      tab.worktree = worktree;
+      tab.branch = worktree.branch;
+      fork.worktree = worktree;
+      yield* controller.nameAfter(tab, "fix it");
+      assert.strictEqual(tab.worktree.branch, "code-acp/fix-it");
+      assert.strictEqual(tab.branch, "code-acp/fix-it");
+      assert.strictEqual(fork.worktree.branch, "code-acp/fix-it");
+      assert.isUndefined(other.worktree);
+
+      const lost = { root: path.join(os.homedir(), ".code-acp", "worktrees", "gone", "abc123"), branch: "code-acp/abc123", base: path.join(scratch, "gone") };
+      tab.worktree = lost;
+      yield* controller.nameAfter(tab, "fix it");
+      assert.deepStrictEqual(tab.worktree, lost);
+    }).pipe(Effect.provide(layer)),
+  );
 
   it.effect("deletes a worktree with nothing to lose without asking", () =>
     Effect.gen(function* () {

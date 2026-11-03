@@ -328,11 +328,16 @@ export class TabTurns {
     { sessionId, agent, prompt, sent }: PreparedTurn,
   ) {
     const text = messageText(message.parts);
+    const first = !tab.used;
     tab.used = true;
     tab.createdAt ??= Date.now();
     if (!tab.title) {
       const firstLine = text.trim().split("\n")[0] || sent[0]?.name || "";
       tab.title = firstLine.length > MAX_TITLE_LENGTH ? `${firstLine.slice(0, MAX_TITLE_LENGTH - 1)}…` : firstLine;
+    }
+    if (first) {
+      // Before the agent gets the prompt: it may run git in there.
+      yield* this.host.tabWorktrees.nameAfter(tab, text.trim() || sent[0]?.name || "");
     }
     this.host.postTabs();
     const turn = this.nextTurn();

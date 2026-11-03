@@ -67,7 +67,7 @@ const makeSessions = Effect.fnUntraced(function* (
   const tabs = new TabList(undefined, () => "/w");
   const changes = new ChangeReview({ postTab: ui.postTab, saveTabs: ui.saveTabs, run: () => {}, openFile: () => Effect.void });
   const usage = { postSaved: () => {}, recordTurn: () => Effect.void } as unknown as TabUsage;
-  const tabWorktrees = { ensure: () => Effect.void, prepare: () => Effect.succeed(true) } as unknown as TabWorktrees;
+  const tabWorktrees = { ensure: () => Effect.void, prepare: () => Effect.succeed(true), nameAfter: () => Effect.void } as unknown as TabWorktrees;
   const parts = { tabs, changes, usage, tabWorktrees };
   const turns: TabTurns = new TabTurns(
     {

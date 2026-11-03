@@ -1,14 +1,15 @@
 import { EditorContent, useEditor } from "@tiptap/react";
+import type * as acp from "@agentclientprotocol/sdk";
 import { useRef, type MutableRefObject, type ReactNode } from "react";
 import type { Attachment, PromptPart, QueuedInfo, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n, type Translate } from "../l10n";
 import arrowUpIcon from "@tabler/icons/outline/arrow-up.svg";
-import splitIcon from "@tabler/icons/outline/arrows-split-2.svg";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
 import { AgentPanel, type AgentChoices } from "./agentPanel";
 import { imageSrc } from "./attachments";
 import { copiedImages, pastedContent } from "./clipboard";
+import { useCompare } from "./compare";
 import { addToken, pruneTokens, tokenInfos } from "./composerContent";
 import { useComposerDrafts } from "./composerDrafts";
 import { codeKey, continueList, paragraphEdit, quoteEdit, type Edit, type Selected } from "./composerEdits";
@@ -53,15 +54,19 @@ export interface ComposerOptions {
   agentConfig: ReactNode;
   /** The session's model and effort, shown beside the agent button. */
   quickConfig: ReactNode;
+  /** The session's config options, which a comparison starts from. */
+  config: ReadonlyArray<acp.SessionConfigOption>;
   /** A group's comparison is shown instead of the conversation. */
   hidden: boolean;
 }
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig, hidden } =
+  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, settings, agentConfig, quickConfig, config, hidden } =
     options;
   const { t } = useL10n();
+  const activeTab = tabs.find((x) => x.id === active);
+  const compare = useCompare({ agentId: activeTab?.agentId ?? agents.activeId, agents: agents.agents, config, editing: editing !== undefined });
   /** Handlers of the latest render, for the editor's callbacks, which are registered once. */
   const handlers = useRef<{ update(): void; select(): void; blur(): void; keyDown(e: KeyboardEvent): boolean; paste(e: ClipboardEvent): boolean }>(undefined);
   const placeholder = useRef(t("chat.placeholder"));
@@ -241,20 +246,17 @@ export function useComposer(options: ComposerOptions) {
     return parts.every((p) => typeof p === "string" && !p.trim()) ? undefined : parts;
   }
 
-  /** Offers the composer content to several agents; the host puts it back if that doesn't happen. */
-  function sendToSeveral(): void {
-    if (active === undefined) return;
-    const parts = content(active);
-    if (!parts) return;
-    post({ type: "bestOf", tab: active, parts });
-    drafts.clear(active);
-  }
-
-  /** Sends the composer content; while the agent works it is queued, unless `now`. An edit replaces its message. */
+  /** Sends the composer content; while the agent works it is queued, unless `now`. An edit replaces its message. With Compare on it goes to the attempts instead; the host puts it back if that doesn't happen. */
   function submit(now: boolean): void {
     if (active === undefined) return;
     const parts = content(active);
     if (!parts) return;
+    if (compare.on) {
+      post({ type: "bestOf", tab: active, parts, attempts: compare.attempts() });
+      compare.turnOff();
+      drafts.clear(active);
+      return;
+    }
     post({ type: "send", tab: active, parts, now: now || undefined, rewind: editing });
     if (editing !== undefined) {
       drafts.endEdit(active);
@@ -308,11 +310,12 @@ export function useComposer(options: ComposerOptions) {
         <EditorContent editor={editor} />
       </div>
       <div id="actions">
-        <AgentPanel tab={tabs.find((x) => x.id === active)} choices={agents} summary={quickConfig}>
+        <AgentPanel tab={activeTab} choices={agents} summary={quickConfig}>
           {agentConfig}
         </AgentPanel>
-        <FolderSelect tab={tabs.find((x) => x.id === active)} folders={folders} />
+        <FolderSelect tab={activeTab} folders={folders} />
         <span className="spacer" />
+        {compare.element}
         {settings}
         <button
           type="button"
@@ -326,22 +329,12 @@ export function useComposer(options: ComposerOptions) {
           <Icon svg={stopIcon} />
         </button>
         <button
-          type="button"
-          id="best-of"
-          className="icon-btn"
-          title={t("bestOf.send")}
-          aria-label={t("bestOf.send")}
-          hidden={agents.agents.length < 2 || editing !== undefined}
-          onClick={sendToSeveral}
-        >
-          <Icon svg={splitIcon} />
-        </button>
-        <button
           type="submit"
           id="send"
           className="icon-btn"
-          title={t(busy ? "chat.queueTitle" : "chat.sendTitle")}
-          aria-label={t("chat.send")}
+          data-compare={compare.on || undefined}
+          title={compare.on ? t("bestOf.send", compare.count) : t(busy ? "chat.queueTitle" : "chat.sendTitle")}
+          aria-label={compare.on ? t("bestOf.send", compare.count) : t("chat.send")}
         >
           <Icon svg={arrowUpIcon} />
         </button>
@@ -358,6 +351,7 @@ export function useComposer(options: ComposerOptions) {
     seed: drafts.seed,
     setSearchResults: suggest.setSearchResults,
     setSkills: suggest.setSkills,
+    setAttemptOptions: compare.receive,
     focus: () => editor.view.focus(),
     load: drafts.load,
     endEdit: drafts.endEdit,

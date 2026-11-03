@@ -141,6 +141,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     post: (message) => this.post(message),
     attachments: this.attachments,
     permissions: this.permissions,
+    liveTabs: () => this.tabs.all,
+    usualOptions: (agentId) => this.sessions.usualOptions(agentId),
     openFile: (file, line) => this.openFile(file, line),
   });
   private readonly disposables: vscode.Disposable[] = [];
@@ -459,6 +461,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "selectGroup":
       case "closeGroup":
+      case "discardGroup":
       case "renameGroup":
       case "moveGroup":
       case "collapseGroup":
@@ -496,6 +499,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "closeGroup":
         yield* this.tabActions.closeGroup(group);
+        break;
+      case "discardGroup":
+        yield* this.tabActions.discardGroup(group);
         yield* this.drafts.prune;
         break;
       case "renameGroup":
@@ -529,7 +535,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.sessions.fork(tab, msg.turn);
         break;
       case "bestOf":
-        yield* this.groups.start(tab, msg.parts);
+        yield* this.groups.start(tab, msg.parts, msg.attempts);
         break;
       case "applyWorktree":
         yield* this.groups.apply(tab).pipe(Effect.catchTag("WorktreeError", (err) => this.groupFailed(err.message)));

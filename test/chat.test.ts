@@ -12,10 +12,11 @@ import type { Attachment } from "../src/chat/protocol";
 import { replayedParts } from "../src/chat/replay";
 import type { TabGroupInfo, TabInfo } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
+import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow } from "../src/ui/chat/compareAttempts";
 import { attemptStatus, diffTotals, dropIndex, memberTitle, tabRows } from "../src/ui/chat/tabRows";
 import type { TabState } from "../src/ui/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
-import { transcript, EMPTY, fileLinkTokens, noticeItem, stopReasonText, type Action } from "../src/ui/chat/transcript";
+import { transcript, EMPTY, fileLinkTokens, noticeItem, permissionInput, stopReasonText, type Action } from "../src/ui/chat/transcript";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../src/workspace";
 import { __test, Uri, window, workspace } from "./stubs/vscode";
 
@@ -203,6 +204,8 @@ describe("the sidebar's groups", () => {
   it("names a tab of a group after its agent, unless the user named it", () => {
     const agents = [{ id: "a", name: "Agent A" }];
     assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "From the session" }, agents), "Agent A");
+    assert.strictEqual(memberTitle({ ...info(1), agentId: "a", attemptLabel: "Big · High" }, agents), "Agent A · Big · High");
+    assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "Mine", named: true, attemptLabel: "Big" }, agents), "Mine");
     assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "Mine", named: true }, agents), "Mine");
     assert.strictEqual(memberTitle({ ...info(1), agentId: "gone", title: "From the session" }, agents), "From the session");
   });
@@ -388,6 +391,15 @@ describe("Permissions", () => {
 });
 
 describe("Permissions with questions", () => {
+  it("shows no raw input for an empty one", () => {
+    const input = (rawInput: unknown) => permissionInput({ toolCallId: "t", rawInput });
+    assert.isUndefined(input(undefined));
+    assert.isUndefined(input(null));
+    assert.isUndefined(input({}));
+    assert.isUndefined(input([]));
+    assert.strictEqual(input({ a: 1 }), '{\n  "a": 1\n}');
+  });
+
   const permission = { sessionId: "s", toolCall: { toolCallId: "t" }, options: [] } as unknown as acp.RequestPermissionRequest;
   const question = {
     sessionId: "s",
@@ -764,5 +776,32 @@ describe("replayedParts", () => {
       " here",
     ]);
     assert.strictEqual(messageText(parts), "fix @README.md and @image.jpg here");
+  });
+});
+
+describe("comparison attempts", () => {
+  const models = [
+    { value: "small", name: "Small" },
+    { value: "big", name: "Big" },
+  ];
+  const row = (agentId: string, model = "", effort = ""): AttemptRow => ({ id: 1, agentId, model, effort });
+
+  it("adds an agent not in the comparison yet, then another model of the last one", () => {
+    assert.deepStrictEqual(nextRow(2, [row("a", "big", "high")], ["a", "b"], () => models), { id: 2, agentId: "b", model: "", effort: "" });
+    assert.deepStrictEqual(nextRow(2, [row("a", "big", "high")], ["a"], () => models), { id: 2, agentId: "a", model: "small", effort: "" });
+    assert.deepStrictEqual(nextRow(3, [row("a", "big"), row("a", "small")], ["a"], () => models), { id: 3, agentId: "a", model: "", effort: "" });
+    assert.deepStrictEqual(nextRow(2, [row("a")], ["a"], () => undefined), { id: 2, agentId: "a", model: "", effort: "" });
+  });
+
+  it("labels an attempt with the names of its picks, leaving out an effort the model doesn't have", () => {
+    const efforts = [{ value: "high", name: "High" }];
+    const options = { models, efforts, fastMode: false };
+    const loaded = { [attemptKey("a", "big")]: { agentId: "a", model: "big", options } };
+    const modelsOf = (id: string) => modelsIn(loaded, id);
+    assert.deepStrictEqual(attemptPick(row("a", "big", "high"), loaded, modelsOf), { agentId: "a", model: "big", effort: "high", label: "Big · High" });
+    assert.deepStrictEqual(attemptPick(row("a", "big", "max"), loaded, modelsOf), { agentId: "a", model: "big", effort: "max", label: "Big" });
+    assert.deepStrictEqual(attemptPick(row("a"), loaded, modelsOf), { agentId: "a", model: "", effort: "" });
+    // Not read yet: the values are all there is.
+    assert.deepStrictEqual(attemptPick(row("b", "m", "e"), {}, () => undefined), { agentId: "b", model: "m", effort: "e", label: "m · e" });
   });
 });

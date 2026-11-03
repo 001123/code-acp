@@ -7,7 +7,7 @@ import type { ShadowGit } from "../checkpoints";
 import { ChangeSet } from "../fileChanges";
 import { t } from "../i18n";
 import { thenable, type ExtensionCtx, type Output } from "../runtime";
-import { configureSession, startingOptions } from "../sessionOptions";
+import { configureSession, modelOption, startingOptions, thoughtOption } from "../sessionOptions";
 import { readSettings } from "../settings";
 import { folderOf, defaultCwd, isWorkspaceFolder, workspaceFolders } from "../workspace";
 import { Worktrees } from "../worktrees";
@@ -78,7 +78,7 @@ export class TabSessions {
         }
         tab.sessionId = res.sessionId;
         tab.running = running;
-        const configOptions = yield* this.restoreOptions(running, res);
+        const configOptions = yield* this.restoreOptions(tab, running, res);
         this.host.setConfigOptions(tab, configOptions);
         this.host.postTabs();
         this.host.postTab(tab, { type: "session", sessionId: res.sessionId, configOptions });
@@ -88,15 +88,21 @@ export class TabSessions {
     );
   });
 
+  /** What sessions of the agent start with: chosen for it in settings, else last picked for it. */
+  usualOptions(agentId: string) {
+    const settings = readSettings();
+    const remembered = settings.rememberSessionOptions ? this.host.lastOptions.wanted(agentId) : undefined;
+    return startingOptions(settings.sessionDefaults[agentId], remembered);
+  }
+
   /**
-   * Sets the model, effort and fast mode chosen for the agent in settings, else those last picked for it, on a session
+   * Sets the model, effort and fast mode a comparison picked for the tab, else those usual for the agent, on a session
    * just started or reopened (reopening gives the agent's defaults too), keeping the defaults for what it no longer
    * offers. Gives the session's options.
    */
-  private restoreOptions(running: RunningAgent, session: acp.NewSessionResponse) {
-    const settings = readSettings();
-    const remembered = settings.rememberSessionOptions ? this.host.lastOptions.wanted(running.agentId) : undefined;
-    const wanted = startingOptions(settings.sessionDefaults[running.agentId], remembered);
+  private restoreOptions(tab: Tab, running: RunningAgent, session: acp.NewSessionResponse) {
+    const usual = this.usualOptions(running.agentId);
+    const wanted = tab.wanted ? startingOptions(tab.wanted, usual) : usual;
     return wanted
       ? configureSession(running.agent, session, wanted).pipe(
           Effect.tapError((err) => Effect.logWarning(`Restoring the session options failed: ${err.message}`)),
@@ -188,7 +194,7 @@ export class TabSessions {
         }),
       ),
     );
-    const configOptions = yield* this.restoreOptions(running, { sessionId, configOptions: res.configOptions });
+    const configOptions = yield* this.restoreOptions(tab, running, { sessionId, configOptions: res.configOptions });
     this.host.setConfigOptions(tab, configOptions);
     this.host.postTab(tab, { type: "session", sessionId, configOptions });
     this.host.usage.postSaved(tab);
@@ -424,6 +430,11 @@ export class TabSessions {
     const picked = readSettings().rememberSessionOptions ? this.host.lastOptions.picked(agentId, before, configId, value) : undefined;
     if (picked) {
       yield* thenable(() => picked);
+    }
+    if (tab.wanted) {
+      // It reopens with what the user picked since.
+      if (modelOption(before)?.id === configId) tab.wanted = { ...tab.wanted, model: value };
+      else if (thoughtOption(before)?.id === configId) tab.wanted = { ...tab.wanted, effort: value };
     }
     this.host.setConfigOptions(tab, res.configOptions);
     this.host.postTab(tab, { type: "configOptions", configOptions: res.configOptions });

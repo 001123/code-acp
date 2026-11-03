@@ -215,12 +215,10 @@ export function SubMenu({
   );
 }
 
-/** Open state of a menu that opens on hover or click and closes on Escape, a click outside, or a moment after the pointer leaves (so it can cross the gap between the button and the menu). */
-export function useHoverMenu() {
+/** Open state of a menu that closes on Escape or a click outside `root`. */
+function useDismissedMenu() {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(closeTimer.current), []);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -236,6 +234,20 @@ export function useHoverMenu() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+  return { open, setOpen, root };
+}
+
+/** A menu opened by clicks alone: it stays while the pointer leaves, as native selects in it open outside it. */
+export function useClickMenu() {
+  const { open, setOpen, root } = useDismissedMenu();
+  return { open, set: setOpen, toggle: () => setOpen(!open), root };
+}
+
+/** Open state of a menu that opens on hover or click and closes on Escape, a click outside, or a moment after the pointer leaves (so it can cross the gap between the button and the menu). */
+export function useHoverMenu() {
+  const { open, setOpen, root } = useDismissedMenu();
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
   return {
     open,
     toggle: () => setOpen(!open),

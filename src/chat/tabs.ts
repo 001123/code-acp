@@ -57,6 +57,9 @@ const SavedTabGroup = Schema.Struct({
   collapsed: Schema.optional(Schema.Boolean),
 });
 
+/** The model and effort a comparison picked for a tab; empty ones are left to what its agent's sessions usually start with. */
+const SavedWanted = Schema.Struct({ model: Schema.String, effort: Schema.String });
+
 export const SavedTabs = Schema.Struct({
   active: Schema.Int,
   groups: Schema.optional(Schema.Array(SavedTabGroup)),
@@ -77,6 +80,8 @@ export const SavedTabs = Schema.Struct({
       worktree: Schema.optional(TabWorktree),
       group: Schema.optional(Schema.Int),
       applied: Schema.optional(Schema.Boolean),
+      wanted: Schema.optional(SavedWanted),
+      attemptLabel: Schema.optional(Schema.String),
     }),
   ),
 });
@@ -157,6 +162,10 @@ export interface Tab extends DraftHolder {
   attempt?: Attempt;
   /** Its worktree's changes were applied to the base folder. */
   applied?: boolean;
+  /** The model and effort its sessions start with, over those usual for the agent: what its group's comparison picked. */
+  wanted?: typeof SavedWanted.Type;
+  /** `wanted` by name. */
+  attemptLabel?: string;
   /** Pending `postChanges`. */
   changesTimer?: ReturnType<typeof setTimeout>;
 }
@@ -187,6 +196,8 @@ export function resetConversation(tab: Tab): void {
   tab.steer = false;
   tab.sent.clear();
   tab.rewindNote = undefined;
+  tab.wanted = undefined;
+  tab.attemptLabel = undefined;
 }
 
 /** The usage saved for `sessionId`, if the tab's last report was about it. */
@@ -218,6 +229,8 @@ export class TabList {
       tab.worktree = entry.worktree;
       tab.group = entry.group === undefined ? undefined : groups.get(entry.group);
       tab.applied = entry.applied;
+      tab.wanted = entry.wanted;
+      tab.attemptLabel = entry.attemptLabel;
       if (entry.sessionId) {
         tab.title = entry.title;
         tab.createdAt = entry.createdAt;
@@ -446,6 +459,7 @@ export class TabList {
       draft: tab.draft,
       group: tab.group?.id,
       attempt: tab.attempt,
+      attemptLabel: tab.attemptLabel,
       applied: tab.applied,
     }));
   }
@@ -468,20 +482,20 @@ export class TabList {
       groups: this.tabGroups.map(({ id, title, name, prompt, createdAt, collapsed }) => ({ id, title, name, prompt, createdAt, collapsed })),
       shownGroup: this.shown?.id,
       tabs: this.tabs.map((tab) => {
-        const { pinned, name, savedDraft: draft, title, createdAt, worktree, applied } = tab;
+        const { pinned, name, savedDraft: draft, title, createdAt, worktree, applied, wanted, attemptLabel } = tab;
         const changes = tab.changes.saved;
         const group = tab.group?.id;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, wanted, attemptLabel };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, wanted, attemptLabel };
         }
-        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, group, applied };
+        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, group, applied, wanted, attemptLabel };
       }),
     };
   }

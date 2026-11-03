@@ -63,7 +63,7 @@ const makeTurns = Effect.fnUntraced(function* (ensureSession: TurnsHost["ensureS
       tabs,
       changes: new ChangeReview({ postTab: ui.postTab, saveTabs: ui.saveTabs, run: () => {}, openFile: () => Effect.void }),
       usage: { recordTurn: () => Effect.void, totals: () => Effect.succeed({ turns: 7 }) } as unknown as TabUsage,
-      tabWorktrees: { localize: (_tab: Tab, attachment: unknown) => Effect.succeed(attachment) } as unknown as TabWorktrees,
+      tabWorktrees: { localize: (_tab: Tab, attachment: unknown) => Effect.succeed(attachment), nameAfter: () => Effect.void } as unknown as TabWorktrees,
       ensureSession,
       cancelTab: () =>
         Effect.sync(() => {

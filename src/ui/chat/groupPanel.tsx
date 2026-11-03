@@ -104,6 +104,13 @@ export function GroupPanel({
           <Attempt key={tab.id} tab={tab} state={states[tab.id]} agents={agents} onOpen={onOpen} />
         ))}
       </div>
+      {!members.some((tab) => tab.applied) && (
+        <div id="group-actions">
+          <button type="button" className="secondary" title={t("bestOf.discardTitle")} onClick={() => post({ type: "discardGroup", group: group.id })}>
+            {t("bestOf.discardAll")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type * as acp from "@agentclientprotocol/sdk";
+import type { Choice } from "../../sessionOptions";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import adjustmentsIcon from "@tabler/icons/outline/adjustments.svg";
@@ -44,6 +45,21 @@ function configIcon(option: acp.SessionConfigOption): string {
 function currentName(option: SelectOption): string {
   const flat = option.options.flatMap((o) => ("options" in o ? o.options : [o]));
   return flat.find((o) => o.value === option.currentValue)?.name ?? option.currentValue;
+}
+
+/** The session's models and its current model and level of thinking, as a comparison starts from them. */
+export function sessionChoices(options: ReadonlyArray<acp.SessionConfigOption>): { models?: ReadonlyArray<Choice>; model?: string; effort?: string } {
+  const selects = options.filter((o): o is SelectOption => o.type === "select");
+  const model = selects.find((o) => configKind(o) === "model");
+  const effort = selects.find((o) => configKind(o) === "effort")?.currentValue;
+  return {
+    ...(model && {
+      model: model.currentValue,
+      models: model.options.flatMap((o) => ("options" in o ? o.options : [o])).map((o) => ({ value: o.value, name: o.name })),
+    }),
+    // The agent's own "default" is what no pick means.
+    ...(effort !== undefined && !/^(default|auto)$/i.test(effort) && { effort }),
+  };
 }
 
 /** One row of the agent panel: picks a value for a select config option. */

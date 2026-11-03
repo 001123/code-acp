@@ -116,6 +116,13 @@ export function clip(text: string, max = MAX_TOOL_TEXT): string {
   return text.length > max ? `${text.slice(0, max)}\n…` : text;
 }
 
+/** A permission request's raw input as shown on its card; nothing for an empty one, which some agents always send. */
+export function permissionInput(toolCall: acp.ToolCallUpdate): string | undefined {
+  const input = toolCall.rawInput;
+  if (!input || (typeof input === "object" && Object.keys(input).length === 0)) return undefined;
+  return clip(JSON.stringify(input, null, 2));
+}
+
 /** Tool call content as the transcript keeps it: long text clipped, binary data dropped (only its kind is shown). */
 export function clipContent(content: acp.ToolCallContent[] | null | undefined): acp.ToolCallContent[] | undefined {
   return content?.map((item): acp.ToolCallContent => {

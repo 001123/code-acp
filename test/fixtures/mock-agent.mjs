@@ -12,6 +12,22 @@ let sessions = 0;
 /** MOCK_HISTORY: what session/list gives; session/delete takes from it. */
 const past = new Set(["old"]);
 let mode = "ask";
+/** MOCK_MODELS: the model and effort picked, by session. */
+const picks = new Map();
+const pickedOptions = (sessionId) => {
+  const pick = picks.get(sessionId) ?? { model: "small", effort: "low" };
+  return [
+    { type: "select", id: "model", name: "Model", category: "model", currentValue: pick.model, options: [{ value: "small", name: "Small" }, { value: "big", name: "Big" }] },
+    {
+      type: "select",
+      id: "effort",
+      name: "Effort",
+      category: "thought_level",
+      currentValue: pick.effort,
+      options: [{ value: "low", name: "Low" }, ...(pick.model === "big" ? [{ value: "high", name: "High" }] : [])],
+    },
+  ];
+};
 const MODES = { currentModeId: "ask", availableModes: [{ id: "ask", name: "Ask" }, { id: "code", name: "Code", description: "Edits files" }] };
 const sessionOptions = () => ({
   ...(process.env.MOCK_MODES ? { modes: { ...MODES, currentModeId: mode } } : {}),
@@ -43,7 +59,13 @@ acp
     if (process.env.MOCK_AUTH === "1") {
       throw acp.RequestError.authRequired();
     }
-    return { sessionId: `s${++sessions}`, ...sessionOptions(), _meta: { cwd: params.cwd, mcpServers: params.mcpServers } };
+    const sessionId = `s${++sessions}`;
+    return { sessionId, ...sessionOptions(), ...(process.env.MOCK_MODELS ? { configOptions: pickedOptions(sessionId) } : {}), _meta: { cwd: params.cwd, mcpServers: params.mcpServers } };
+  })
+  .onRequest(acp.methods.agent.session.setConfigOption, ({ params }) => {
+    const pick = picks.get(params.sessionId) ?? { model: "small", effort: "low" };
+    picks.set(params.sessionId, { ...pick, [params.configId]: params.value });
+    return { configOptions: pickedOptions(params.sessionId) };
   })
   .onRequest(acp.methods.agent.session.list, () => ({
     sessions: [...past].map((sessionId) => ({ sessionId, cwd: process.cwd(), title: `Session ${sessionId}` })),

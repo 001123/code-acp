@@ -7,7 +7,7 @@ import { readSettings } from "../settings";
 import { cwdForNewTab } from "../workspace";
 import { Worktrees } from "../worktrees";
 import type { Attention } from "./attention";
-import type { ChangeReview } from "./changes";
+import { confirm, type ChangeReview } from "./changes";
 import type { Follower } from "./follow";
 import type { Permissions } from "./permissions";
 import type { TabSessions } from "./sessions";
@@ -138,12 +138,21 @@ export class TabActions {
     yield* this.settle(index);
   });
 
-  private readonly askReleaseGroup = Effect.fn("TabActions.askReleaseGroup")(function* (this: TabActions, group: TabGroup) {
+  /** Drops every attempt of the group, none being applied: asks first when an agent is still working or changes would go. */
+  readonly discardGroup = Effect.fn("TabActions.discardGroup")(function* (this: TabActions, group: TabGroup) {
+    const working = this.host.tabs.members(group).some((tab) => tab.busy || tab.attempt === "running");
+    if ((working || (yield* this.holdingChanges(group)) > 0) && !(yield* confirm(t("bestOf.discardConfirm", group.name ?? group.title), t("bestOf.discardAction")))) {
+      return;
+    }
+    yield* this.closeGroup(group, "delete");
+  });
+
+  /** How many of the group's worktrees would lose something if deleted. */
+  private readonly holdingChanges = Effect.fn("TabActions.holdingChanges")(function* (this: TabActions, group: TabGroup) {
     const { tabs, tabWorktrees } = this.host;
     const worktrees = yield* Worktrees;
-    const members = tabs.members(group);
     let holding = 0;
-    for (const tab of members) {
+    for (const tab of tabs.members(group)) {
       const { worktree } = tab;
       if (!worktree || tab.applied || tabWorktrees.shared(tab, worktree) || !(yield* worktrees.exists(worktree.root))) {
         continue;
@@ -153,6 +162,11 @@ export class TabActions {
         holding++;
       }
     }
+    return holding;
+  });
+
+  private readonly askReleaseGroup = Effect.fn("TabActions.askReleaseGroup")(function* (this: TabActions, group: TabGroup) {
+    const holding = yield* this.holdingChanges(group);
     if (holding === 0) {
       return "delete" as const;
     }

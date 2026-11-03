@@ -30,11 +30,15 @@ export type FromWebview =
   | { type: "fork"; tab: number; turn?: number }
   | { type: "cancel"; tab: number }
   | { type: "newTab" }
-  /** Asks which agents get the composer's content, each in a new tab and worktree of a new group ("loadComposer" if not). */
-  | { type: "bestOf"; tab: number; parts: PromptPart[] }
+  /** Sends the composer's content to each of `attempts`, in a new tab and worktree of a new group ("loadComposer" if not). */
+  | { type: "bestOf"; tab: number; parts: PromptPart[]; attempts: AttemptPick[] }
+  /** What agent `agentId` offers for a comparison, with the efforts of `model`; answered with "attemptOptions". */
+  | { type: "loadAttemptOptions"; agentId: string; model: string }
   /** Shows the comparison of a group's tabs. */
   | { type: "selectGroup"; group: number }
   | { type: "closeGroup"; group: number }
+  /** Closes the group and deletes its worktrees, after asking if that loses anything. */
+  | { type: "discardGroup"; group: number }
   /** An empty name shows the group's title again. */
   | { type: "renameGroup"; group: number; title: string }
   /** `index` is where the group's first tab ends up. */
@@ -147,6 +151,7 @@ export type ViewMessage = Extract<
       | "attachProblems"
       | "attachTerminal"
       | "listSkills"
+      | "loadAttemptOptions"
       | "setFollowAgent"
       | "setAutoScroll";
   }
@@ -252,6 +257,15 @@ export interface WorktreeDiff {
   error?: string;
 }
 
+/** One try of a comparison: an agent, with a model and effort; empty ones are left to what its sessions usually start with. */
+export interface AttemptPick {
+  agentId: string;
+  model: string;
+  effort: string;
+  /** The model and effort by name, to tell the group's tabs apart. */
+  label?: string;
+}
+
 /** A chat tab as the webview shows it in the tab sidebar. */
 export interface TabInfo {
   id: number;
@@ -262,6 +276,8 @@ export interface TabInfo {
   /** The group it belongs to; a group's tabs come next to each other. */
   group?: number;
   attempt?: Attempt;
+  /** The model and effort its group's comparison picked, by name. */
+  attemptLabel?: string;
   /** Its worktree's changes were applied to the base folder. */
   applied?: boolean;
   pinned: boolean;

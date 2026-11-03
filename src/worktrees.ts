@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, FileSystem, Layer, Option, Schema, Stream } from "effect";
+import { Context, Duration, Effect, FileSystem, Layer, Option, Predicate, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { createHash, randomBytes } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
@@ -11,6 +11,14 @@ import { projectSetupCommand, readSettings } from "./settings";
 
 /** Branches of the worktrees the extension creates. */
 const BRANCH_PREFIX = "code-acp/";
+/** A branch still on the random name it was created with. */
+const UNNAMED_BRANCH = new RegExp(`^${BRANCH_PREFIX}[0-9a-f]{6}$`);
+/** Under the prefix, the branches of the attempts of a comparison. No other branch may take this name: git couldn't have both. */
+const COMPARE_DIR = "compare";
+const MAX_SLUG_WORDS = 5;
+const MAX_SLUG_LENGTH = 40;
+/** Of a comparison's branch: the prompt and the attempt each get this much, to keep it readable. */
+const MAX_ATTEMPT_SLUG_LENGTH = 24;
 
 /** Where the extension's worktrees live, outside the repository so that they never show up in it. */
 const MANAGED_DIR = path.join(".code-acp", "worktrees");
@@ -104,6 +112,34 @@ export function outermostEntries(entries: ReadonlyArray<string>): ReadonlyArray<
     .map((entry) => entry.replace(/\/$/, ""));
 }
 
+/** The start of the first line of `text` as a part of a branch name, without accents; undefined when nothing in it can be one. */
+export function branchSlug(text: string, maxLength = MAX_SLUG_LENGTH): string | undefined {
+  const words = (text.trim().split("\n")[0] ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/đ/gi, "d")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  return words.slice(0, MAX_SLUG_WORDS).join("-").slice(0, maxLength).replace(/-$/, "") || undefined;
+}
+
+/** The name, under the prefix, for the branch of an attempt at `prompt` in a comparison. */
+export function attemptBranchName(prompt: string, attempt: string): string {
+  const parts = [branchSlug(prompt, MAX_ATTEMPT_SLUG_LENGTH), branchSlug(attempt, MAX_ATTEMPT_SLUG_LENGTH)].filter(Predicate.isString);
+  return `${COMPARE_DIR}/${parts.join("-") || "attempt"}`;
+}
+
+/** `name`, with a number when it is in `taken` or reserved. */
+export function freeBranchName(name: string, taken: ReadonlySet<string>): string {
+  const isFree = (candidate: string) => candidate !== COMPARE_DIR && !taken.has(candidate);
+  let candidate = name;
+  for (let n = 2; !isFree(candidate); n++) {
+    candidate = `${name}-${n}`;
+  }
+  return candidate;
+}
+
 /** The files in the output of `git diff --numstat -z --no-renames`. */
 export const parseNumstat = (out: string): ReadonlyArray<WorktreeFileDiff> =>
   out.split("\0").flatMap((entry) => {
@@ -121,8 +157,16 @@ export class Worktrees extends Context.Service<Worktrees, {
   isRepo(folder: string): Effect.Effect<boolean>;
   /** The branch checked out in `folder`, else its short commit when HEAD is detached; undefined outside git. */
   branchOf(folder: string): Effect.Effect<string | undefined>;
-  /** A new worktree on a new branch from the HEAD of `folder`; none when `folder` isn't in a git work tree. */
-  create(folder: string): Effect.Effect<Option.Option<PlacedWorktree>, WorktreeError>;
+  /**
+   * A new worktree from the HEAD of `folder`, on a new branch called `name` under the prefix, or a random name without
+   * one; none when `folder` isn't in a git work tree.
+   */
+  create(folder: string, name?: string): Effect.Effect<Option.Option<PlacedWorktree>, WorktreeError>;
+  /**
+   * The worktree with its branch named after `text`. Only a branch the extension created and that still has its random
+   * name and no commits changes; the worktree's folder stays, as sessions run in it.
+   */
+  nameAfter(worktree: TabWorktree, text: string): Effect.Effect<TabWorktree, WorktreeError>;
   /**
    * Readies a new worktree as the settings say: copies ignored files from its base checkout, then runs a setup
    * command at its top: the project's if `approve` allows it (without `approve` it doesn't run), else the user's.
@@ -200,7 +244,14 @@ export class Worktrees extends Context.Service<Worktrees, {
           Effect.orElseSucceed(() => undefined),
         );
 
-      const create = Effect.fn("Worktrees.create")(function* (folder: string) {
+      /** The branch under the prefix to use for `name`, given the ones that exist. */
+      const freeBranch = Effect.fnUntraced(function* (folder: string, name: string) {
+        const refs = yield* git(folder, ["for-each-ref", "--format=%(refname)", `refs/heads/${BRANCH_PREFIX}`]);
+        const taken = refs.split("\n").filter(Boolean).map((ref) => ref.slice(`refs/heads/${BRANCH_PREFIX}`.length));
+        return `${BRANCH_PREFIX}${freeBranchName(name, new Set(taken))}`;
+      });
+
+      const create = Effect.fn("Worktrees.create")(function* (folder: string, name?: string) {
         const repo = yield* repoOf(folder);
         if (Option.isNone(repo)) {
           return Option.none<PlacedWorktree>();
@@ -209,7 +260,7 @@ export class Worktrees extends Context.Service<Worktrees, {
         const slug = randomBytes(3).toString("hex");
         const repoDir = `${path.basename(top)}-${createHash("sha256").update(top).digest("hex").slice(0, 8)}`;
         const dir = path.join(os.homedir(), MANAGED_DIR, repoDir, slug);
-        const branch = `${BRANCH_PREFIX}${slug}`;
+        const branch = name === undefined ? `${BRANCH_PREFIX}${slug}` : yield* freeBranch(folder, name);
         yield* fs.makeDirectory(path.dirname(dir), { recursive: true }).pipe(Effect.mapError((err) => failed("worktree", err.message)));
         yield* git(folder, ["worktree", "add", "--quiet", "-b", branch, dir, "HEAD"]);
         // As git reports it, with symbolic links resolved, to match its listings.
@@ -360,11 +411,25 @@ export class Worktrees extends Context.Service<Worktrees, {
         return (yield* git(worktree.root, ["merge-base", "HEAD", baseHead])).trim();
       });
 
+      const commitsSinceFork = Effect.fnUntraced(function* (worktree: TabWorktree) {
+        const fork = yield* forkPoint(worktree);
+        return Number((yield* git(worktree.root, ["rev-list", "--count", `${fork}..HEAD`])).trim());
+      });
+
       const status = Effect.fn("Worktrees.status")(function* (worktree: TabWorktree) {
         const changed = (yield* git(worktree.root, ["status", "--porcelain"])).split("\n").filter(Boolean).length;
-        const fork = yield* forkPoint(worktree);
-        const commits = Number((yield* git(worktree.root, ["rev-list", "--count", `${fork}..HEAD`])).trim());
-        return { changed, commits };
+        return { changed, commits: yield* commitsSinceFork(worktree) };
+      });
+
+      const nameAfter = Effect.fn("Worktrees.nameAfter")(function* (worktree: TabWorktree, text: string) {
+        const { branch } = worktree;
+        const slug = branchSlug(text);
+        if (slug === undefined || branch === undefined || !UNNAMED_BRANCH.test(branch) || !isManaged(worktree.root) || (yield* commitsSinceFork(worktree)) > 0) {
+          return worktree;
+        }
+        const named = yield* freeBranch(worktree.base, slug);
+        yield* git(worktree.base, ["branch", "-m", branch, named]);
+        return { ...worktree, branch: named };
       });
 
       /** The tree of everything the worktree holds, on a scratch index so that what it has staged stays as it is. */
@@ -436,6 +501,7 @@ export class Worktrees extends Context.Service<Worktrees, {
         isRepo: (folder) => repoOf(folder).pipe(Effect.map(Option.isSome)),
         branchOf,
         create,
+        nameAfter,
         setup,
         list,
         locate,

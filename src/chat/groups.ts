@@ -8,7 +8,7 @@ import { folderOf } from "../workspace";
 import { Worktrees } from "../worktrees";
 import type { ChangeReview } from "./changes";
 import type { ChatUi } from "./host";
-import type { PromptPart, WorktreeDiff } from "./protocol";
+import type { AttemptPick, PromptPart, WorktreeDiff } from "./protocol";
 import type { TabActions } from "./tabActions";
 import { messageText, type Tab, type TabGroup, type TabList } from "./tabs";
 import type { TabTurns } from "./turns";
@@ -36,8 +36,8 @@ export class TabGroups {
 
   constructor(private readonly host: GroupsHost) {}
 
-  /** Asks which agents get the prompt, and sends it to them; what `from` held goes back to its composer if not. */
-  readonly start = Effect.fn("TabGroups.start")(function* (this: TabGroups, from: Tab, parts: ReadonlyArray<PromptPart>) {
+  /** Sends the prompt to each of `attempts`; what `from` held goes back to its composer if there aren't two to compare. */
+  readonly start = Effect.fn("TabGroups.start")(function* (this: TabGroups, from: Tab, parts: ReadonlyArray<PromptPart>, attempts: ReadonlyArray<AttemptPick>) {
     const giveBack = () => this.host.turns.loadComposer(from, { parts: [...parts] });
     const base = from.worktree?.base ?? folderOf(from.cwd)?.path;
     if (base === undefined || !(yield* (yield* Worktrees).isRepo(base))) {
@@ -45,23 +45,9 @@ export class TabGroups {
       return giveBack();
     }
     const agents = yield* this.host.manager.agents;
-    if (agents.length < 2) {
-      void vscode.window.showInformationMessage(t("bestOf.needsAgents"));
-      return giveBack();
-    }
-    const items = agents.map((agent) => ({
-      label: agent.name,
-      description: agent.version,
-      picked: agent.id === from.agentId,
-      id: agent.id,
-    }));
-    const picked = yield* thenable(() =>
-      vscode.window.showQuickPick(items, { canPickMany: true, title: t("bestOf.pickTitle"), placeHolder: t("bestOf.pickPlaceholder") }),
-    ).pipe(Effect.tapError(() => Effect.sync(giveBack)));
-    if (!picked || picked.length < 2) {
-      if (picked) {
-        void vscode.window.showInformationMessage(t("bestOf.pickTwo"));
-      }
+    const picked = attempts.filter(({ agentId }) => agents.some((agent) => agent.id === agentId));
+    if (picked.length < 2) {
+      void vscode.window.showInformationMessage(t("bestOf.pickTwo"));
       return giveBack();
     }
     const text = messageText(parts).trim();
@@ -70,10 +56,12 @@ export class TabGroups {
     const { tabs } = this.host;
     const group = tabs.addGroup(title, text);
     // All at once, so that nothing comes between them.
-    const members = picked.map(({ id }) => {
+    const members = picked.map(({ agentId, model, effort, label }) => {
       const tab = tabs.add(base);
       tab.group = group;
-      tab.agentId = id;
+      tab.agentId = agentId;
+      tab.wanted = { model, effort };
+      tab.attemptLabel = label;
       tab.attempt = "running";
       tab.wantsWorktree = true;
       // Not for another session to take over: its prompt is on the way.

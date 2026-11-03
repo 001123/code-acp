@@ -162,6 +162,7 @@ function App() {
         )
       )),
     quickConfig: active !== undefined && !configLoading && <QuickConfig options={config} />,
+    config,
     hidden: group !== undefined,
   });
 
@@ -304,6 +305,8 @@ function App() {
         return composer.setSearchResults(msg.id, msg.files, msg.terminals, msg.problems);
       case "skills":
         return composer.setSkills(msg.skills);
+      case "attemptOptions":
+        return composer.setAttemptOptions(msg);
       case "reset":
         if (tab !== undefined) composer.endEdit(tab);
         dispatch(tab, { type: "reset" });

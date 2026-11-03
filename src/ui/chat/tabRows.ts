@@ -28,9 +28,12 @@ export function dropIndex(tabs: ReadonlyArray<TabInfo>, moved: ReadonlyArray<num
   return index === from ? undefined : index;
 }
 
-/** What a tab of a group is called: its agent, unless the user named it. */
+/** What a tab of a group is called: its agent with the model and effort picked for it, unless the user named it. */
 export function memberTitle(tab: TabInfo, agents: AgentChoices["agents"]): string {
-  return (tab.named ? tab.title : agents.find((agent) => agent.id === tab.agentId)?.name) ?? tab.title ?? "";
+  if (tab.named) return tab.title ?? "";
+  const agent = agents.find((each) => each.id === tab.agentId)?.name;
+  if (agent === undefined) return tab.title ?? "";
+  return tab.attemptLabel ? `${agent} · ${tab.attemptLabel}` : agent;
 }
 
 /** Lines added and removed in all the files of `diff`. */

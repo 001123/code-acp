@@ -20,8 +20,8 @@ First public version; nothing has been released yet.
 - Attach files, folders, images, problems, terminals and selections as context, and annotate images.
 - **Explain**, **Refactor**, **Write Tests** and **Fix with Code ACP** actions.
 - Review the agent's changes with Keep and Undo, restore checkpoints, and follow the agent in the editor.
-- Run a tab in its own git worktree and apply its changes to your checkout.
-- Best of N: send one prompt to several agents, each in its own worktree, grouped under one tab; compare their diffs and apply the best one.
+- Run a tab in its own git worktree and apply its changes to your checkout. Its branch is named after the first prompt, and those of Best of N go under `code-acp/compare/`.
+- Best of N: tick Compare in the composer to send one prompt to several agents, models and efforts, each in its own worktree, grouped under one tab; compare their diffs and apply the best one, or discard them all.
 - Copy ignored files and run a setup command when a worktree is created. A project can have its own command, which runs only after you allow it.
 - Switch the Settings page between user and workspace settings.
 - Commit message generation, then commit and push, from the Source Control view.

@@ -804,7 +804,6 @@ describe("ChatViewProvider", () => {
   );
 
   describe("best of N", () => {
-    const showQuickPick = window.showQuickPick;
     const showWarningMessage = window.showWarningMessage;
     const realHome = process.env.HOME;
     const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" });
@@ -817,9 +816,10 @@ describe("ChatViewProvider", () => {
       };
       return asked;
     };
-    const pickAll = () => {
-      window.showQuickPick = async (items) => [...items];
-    };
+    const both = [
+      { agentId: "mock", model: "", effort: "" },
+      { agentId: "other", model: "", effort: "" },
+    ];
 
     beforeEach(() => {
       agentList = [
@@ -828,7 +828,6 @@ describe("ChatViewProvider", () => {
       ];
     });
     afterEach(() => {
-      window.showQuickPick = showQuickPick;
       window.showWarningMessage = showWarningMessage;
       process.env.HOME = realHome;
     });
@@ -849,8 +848,7 @@ describe("ChatViewProvider", () => {
       const finished = until(() => members().length === 2 && members().every((tab) => tab.attempt === "done"), "both agents to finish");
       const started = (prompt: string) =>
         Effect.gen(function* () {
-          pickAll();
-          chat.send({ type: "bestOf", tab: chat.tab, parts: [prompt] });
+          chat.send({ type: "bestOf", tab: chat.tab, parts: [prompt], attempts: both });
           yield* finished;
           for (const tab of members()) {
             yield* chat.idle(tab.id);
@@ -871,6 +869,8 @@ describe("ChatViewProvider", () => {
         assert.isDefined(first!.worktree);
         assert.isDefined(second!.worktree);
         assert.notStrictEqual(first!.worktree!.root, second!.worktree!.root);
+        assert.strictEqual(first!.worktree!.branch, "code-acp/compare/updates-first-mock");
+        assert.strictEqual(second!.worktree!.branch, "code-acp/compare/updates-first-other");
         assert.notStrictEqual(first!.cwd, folder);
         assert.isNotEmpty(replyOf(first!.id));
         assert.isNotEmpty(replyOf(second!.id));
@@ -934,16 +934,152 @@ describe("ChatViewProvider", () => {
       }).pipe(Effect.scoped),
     );
 
+    it.live("discards a group after asking: its tabs close and its worktrees go, changes and all", () =>
+      Effect.gen(function* () {
+        const { folder, members, started, send, tabsNow, tab } = yield* startInRepo;
+        yield* started("updates");
+        const [first, second] = members();
+        yield* Effect.promise(() => fs.writeFile(path.join(first!.worktree!.root, "x.txt"), "x\n"));
+        const worktreeCount = () => git(folder, "worktree", "list").trim().split("\n").length;
+
+        const declined = answering(false);
+        send({ type: "discardGroup", group: first!.group! });
+        yield* until(() => declined.length === 1, "the question");
+        yield* Effect.sleep("20 millis");
+        assert.include(declined[0], "updates");
+        assert.strictEqual(tabsNow().groups.length, 1);
+        assert.strictEqual(worktreeCount(), 3);
+
+        const asked = answering(true);
+        send({ type: "discardGroup", group: first!.group! });
+        yield* until(() => tabsNow().groups.length === 0, "the group to go");
+        assert.strictEqual(asked.length, 1);
+        assert.strictEqual(tabsNow().active, tab);
+        assert.isUndefined(tabsNow().shownGroup);
+        yield* until(() => worktreeCount() === 1, "the worktrees to go");
+        const branches = git(folder, "branch");
+        assert.notInclude(branches, first!.worktree!.branch!);
+        assert.notInclude(branches, second!.worktree!.branch!);
+        assert.strictEqual(git(folder, "status", "--porcelain").trim(), "");
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("discards a group without asking when nothing would be lost", () =>
+      Effect.gen(function* () {
+        const { folder, members, started, send, tabsNow } = yield* startInRepo;
+        yield* started("updates");
+        const asked = answering(false);
+        send({ type: "discardGroup", group: members()[0]!.group! });
+        yield* until(() => tabsNow().groups.length === 0, "the group to go");
+        assert.deepStrictEqual(asked, []);
+        yield* until(() => git(folder, "worktree", "list").trim().split("\n").length === 1, "the worktrees to go");
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("leaves no worktree behind for a group discarded while its agents start", () =>
+      Effect.gen(function* () {
+        const { folder, members, send, tabsNow, tab } = yield* startInRepo;
+        answering(true);
+        send({ type: "bestOf", tab, parts: ["updates"], attempts: both });
+        yield* until(() => members().length === 2, "the group");
+        send({ type: "discardGroup", group: members()[0]!.group! });
+        yield* until(() => tabsNow().groups.length === 0, "the group to go");
+        // What was on its way when the group went has to land, and be cleaned up.
+        yield* Effect.sleep("500 millis");
+        yield* until(() => git(folder, "worktree", "list").trim().split("\n").length === 1, "the worktrees to go");
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("starts each attempt on the model and effort picked for it, without changing what the agent's next sessions start with", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_MODELS: "1" };
+        const { send, members, ofType, tabsNow, tab, context } = yield* startInRepo;
+        send({
+          type: "bestOf",
+          tab,
+          parts: ["updates"],
+          attempts: [
+            { agentId: "mock", model: "big", effort: "high", label: "Big · High" },
+            { agentId: "mock", model: "small", effort: "", label: "Small" },
+          ],
+        });
+        yield* until(() => members().length === 2 && members().every((each) => each.attempt === "done"), "both to finish");
+        const [big, small] = members();
+        const picked = (id: number) =>
+          (ofType("session", id).at(-1)!.configOptions as Array<{ id: string; currentValue: string }>).map((option) => option.currentValue);
+        assert.deepStrictEqual(picked(big!.id), ["big", "high"]);
+        assert.deepStrictEqual(picked(small!.id), ["small", "low"]);
+        assert.strictEqual(big!.attemptLabel, "Big · High");
+        assert.isUndefined(context.globalState.get("codeAcp.lastSessionOptions"));
+        for (const each of members()) {
+          yield* until(() => ofType("status", each.id).at(-1)?.busy === false, "the tab to be idle");
+        }
+
+        // Still so after a reload, for the sessions to reopen with.
+        yield* until(() => (context.workspaceState.get("codeAcp.tabs") as { tabs: Array<{ wanted?: unknown }> } | undefined)?.tabs.some((each) => each.wanted) === true, "the tabs to be saved");
+        const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
+        const saved = restored.all.find((each) => each.group !== undefined);
+        assert.deepStrictEqual(saved!.wanted, { model: "big", effort: "high" });
+        assert.strictEqual(saved!.attemptLabel, "Big · High");
+        assert.strictEqual(tabsNow().groups.length, 1);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("reads an attempt's options from a session on that model, and says why it can't otherwise", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_MODELS: "1" };
+        const { send, ofType } = yield* startInRepo;
+        send({ type: "loadAttemptOptions", agentId: "mock", model: "small" });
+        yield* until(() => ofType("attemptOptions").length === 1, "the options");
+        const answer = ofType("attemptOptions")[0]!;
+        assert.deepStrictEqual(
+          answer.options.models.map((m: { value: string }) => m.value),
+          ["small", "big"],
+        );
+        assert.deepStrictEqual(
+          answer.options.efforts.map((e: { value: string }) => e.value),
+          ["low"],
+        );
+        // This model has no session to read, and the stub's agent isn't one the real manager can start.
+        send({ type: "loadAttemptOptions", agentId: "other", model: "big" });
+        yield* until(() => ofType("attemptOptions").length === 2, "the second answer");
+        const failed = ofType("attemptOptions")[1]!;
+        assert.isUndefined(failed.options);
+        assert.isString(failed.error);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("names the branch of a new tab's worktree after its first prompt only", () =>
+      Effect.gen(function* () {
+        const { folder, ofType, say, send, tabsNow, idle } = yield* startInRepo;
+        __test.setSetting("codeAcp.worktreeForNewTabs", true);
+        send({ type: "newTab" });
+        yield* until(() => tabsNow().tabs.length === 2, "the new tab");
+        const added = tabsNow().active;
+        const info = () => tabsNow().tabs.find((each) => each.id === added)!;
+        yield* until(() => info().worktree !== undefined && ofType("session", added).length === 1, "its session");
+        assert.match(info().worktree!.branch!, /^code-acp\/[0-9a-f]{6}$/);
+        say(added, "updates sửa lỗi đăng");
+        yield* until(() => ofType("turnEnd", added).length === 1, "the turn");
+        yield* idle(added);
+        assert.strictEqual(info().worktree!.branch, "code-acp/updates-sua-loi-dang");
+        assert.include(git(folder, "branch"), "code-acp/updates-sua-loi-dang");
+        say(added, "updates something else");
+        yield* until(() => ofType("turnEnd", added).length === 2, "the second turn");
+        yield* idle(added);
+        assert.strictEqual(info().worktree!.branch, "code-acp/updates-sua-loi-dang");
+      }).pipe(Effect.scoped),
+    );
+
     it.live("puts the prompt back when no group comes of it", () =>
       Effect.gen(function* () {
         const { send, ofType, tab, tabsNow } = yield* startInRepo;
-        window.showQuickPick = async () => undefined;
-        send({ type: "bestOf", tab, parts: ["cancelled"] });
+        send({ type: "bestOf", tab, parts: ["just one"], attempts: both.slice(0, 1) });
         yield* until(() => ofType("loadComposer", tab).length === 1, "the prompt to come back");
-        window.showQuickPick = async (items) => items.slice(0, 1);
-        send({ type: "bestOf", tab, parts: ["just one"] });
+        // An agent uninstalled since it was picked doesn't count.
+        send({ type: "bestOf", tab, parts: ["one left"], attempts: [both[0]!, { agentId: "gone", model: "", effort: "" }] });
         yield* until(() => ofType("loadComposer", tab).length === 2, "the prompt to come back");
-        assert.deepStrictEqual(ofType("loadComposer", tab).map((m) => m.parts), [["cancelled"], ["just one"]]);
+        assert.deepStrictEqual(ofType("loadComposer", tab).map((m) => m.parts), [["just one"], ["one left"]]);
         assert.strictEqual(tabsNow().tabs.length, 1);
         assert.deepStrictEqual(tabsNow().groups, []);
       }).pipe(Effect.scoped),
@@ -952,14 +1088,8 @@ describe("ChatViewProvider", () => {
     it.live("won't start outside git, where the agents would share a folder", () =>
       Effect.gen(function* () {
         const { send, ofType, tab, tabsNow } = yield* startChat;
-        let asked = false;
-        window.showQuickPick = async () => {
-          asked = true;
-          return undefined;
-        };
-        send({ type: "bestOf", tab, parts: ["go"] });
+        send({ type: "bestOf", tab, parts: ["go"], attempts: both });
         yield* until(() => ofType("loadComposer", tab).length === 1, "the prompt to come back");
-        assert.isFalse(asked);
         assert.deepStrictEqual(tabsNow().groups, []);
       }).pipe(Effect.scoped),
     );
@@ -972,8 +1102,7 @@ describe("ChatViewProvider", () => {
         process.env.HOME = path.join(root, "home");
         yield* Effect.promise(() => fs.mkdir(process.env.HOME!));
         git(folder, "init", "--quiet");
-        pickAll();
-        send({ type: "bestOf", tab, parts: ["go"] });
+        send({ type: "bestOf", tab, parts: ["go"], attempts: both });
         const members = () => tabsNow().tabs.filter((each) => each.group !== undefined);
         yield* until(() => members().length === 2 && members().every((each) => each.attempt === "failed"), "both to fail");
         for (const member of members()) {

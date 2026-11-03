@@ -16,7 +16,7 @@ export interface AgentChoices {
 const MANAGE_AGENTS = "\0manage";
 
 /** The agent's registry icon, tinted with the text color; the robot when it has none. */
-function AgentIcon({ icon }: { icon: string | undefined }) {
+export function AgentIcon({ icon }: { icon: string | undefined }) {
   return icon ? <span className="agent-icon" style={{ maskImage: `url("${icon}")` }} /> : <Icon svg={robotIcon} />;
 }
 

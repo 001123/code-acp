@@ -23,7 +23,7 @@ import { ElicitationView, UrlElicitationView } from "./elicitation";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { TurnTraceView } from "./turnTrace";
-import { clip, contentText, fileLinkTokens, type ActivityItem, type CompactionItem, type Item, type Text } from "./transcript";
+import { contentText, fileLinkTokens, permissionInput, type ActivityItem, type CompactionItem, type Item, type Text } from "./transcript";
 import { TokenMark, type Token } from "./tokens";
 
 const HOVER_WIDTH = 240;
@@ -463,17 +463,18 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
           ))}
         </div>
       );
-    case "permission":
+    case "permission": {
+      const input = permissionInput(item.toolCall);
       return (
         <div className={"permission" + (item.done ? " done" : "")}>
           <div className="permission-title">{t("chat.allow", item.toolCall.title ?? "tool")}</div>
-          {item.toolCall.content ? (
+          {item.toolCall.content?.length ? (
             <div>
               <ToolContent content={item.toolCall.content} />
             </div>
-          ) : item.toolCall.rawInput ? (
+          ) : input ? (
             <pre className="tool-output">
-              <LongOutput text={clip(JSON.stringify(item.toolCall.rawInput, null, 2))} />
+              <LongOutput text={input} />
             </pre>
           ) : null}
           <div className="permission-buttons">
@@ -489,6 +490,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
           </div>
         </div>
       );
+    }
     case "elicitation":
       return "url" in item ? <UrlElicitationView item={item} /> : <ElicitationView item={item} />;
     case "compaction":

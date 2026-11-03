@@ -1,8 +1,10 @@
 import { Effect, Option } from "effect";
 import * as vscode from "vscode";
+import { CommitMessage, type CommitMessageError } from "../commitMessage";
 import { Completions } from "../completions";
 import { Problems } from "../problems";
 import { thenable, type AppServices, type VscodeError } from "../runtime";
+import { agentOptions, modelOption, type AgentOptions, type Wanted } from "../sessionOptions";
 import { TerminalContext } from "../terminalContext";
 import { imageToTempFile, type AttachmentQueue } from "./attachments";
 import type { Permissions } from "./permissions";
@@ -14,6 +16,9 @@ export interface ViewMessagesHost {
   post(message: unknown): void;
   readonly attachments: AttachmentQueue;
   readonly permissions: Permissions<Tab>;
+  /** The tabs' sessions, whose options can be read without starting the agent again. */
+  liveTabs(): ReadonlyArray<Tab>;
+  usualOptions(agentId: string): Wanted | undefined;
   openFile(file: string, line: number | undefined): Effect.Effect<void, VscodeError, AppServices>;
 }
 
@@ -26,6 +31,14 @@ const updateSetting = (key: string, value: boolean) =>
 /** Answers the webview's messages that don't touch a tab's conversation. */
 export class ViewMessages {
   constructor(private readonly host: ViewMessagesHost) {}
+
+  /** What the agent offers: from a session already on that model, else from a throwaway one on the model asked for or its usual one. */
+  private attemptOptions(agentId: string, model: string): Effect.Effect<AgentOptions, CommitMessageError, CommitMessage> {
+    const live = this.host.liveTabs().find((tab) => tab.running?.agentId === agentId && model !== "" && modelOption(tab.configOptions)?.currentValue === model);
+    return live
+      ? Effect.succeed(agentOptions(live.configOptions))
+      : CommitMessage.use((commit) => commit.options(agentId, model || (this.host.usualOptions(agentId)?.model ?? "")));
+  }
 
   readonly handle = Effect.fn("ViewMessages.handle")(function* (this: ViewMessages, msg: ViewMessage) {
     switch (msg.type) {
@@ -90,6 +103,15 @@ export class ViewMessages {
       case "listSkills":
         this.host.post({ type: "skills", skills: yield* (yield* Completions).skills });
         break;
+      case "loadAttemptOptions": {
+        const { agentId, model } = msg;
+        const result = yield* this.attemptOptions(agentId, model).pipe(
+          Effect.map((options) => ({ options })),
+          Effect.catchTag("CommitMessageError", (err) => Effect.succeed({ error: err.message })),
+        );
+        this.host.post({ type: "attemptOptions", agentId, model, ...result });
+        break;
+      }
       case "setFollowAgent":
         yield* updateSetting("followAgent", msg.enabled);
         break;
