@@ -98,6 +98,8 @@ export type FromWebview =
   | Extract<CatalogMessage, { type: "catalogLoad" | "catalogRefresh" | "catalogInstall" }>
   /** The first-run panel: checks the tools before offering agents, answered with "doctor", and opens where to get a missing one. */
   | Extract<DoctorMessage, { type: "doctorRun" | "doctorFix" }>
+  /** The tab's conversation as Markdown, empty if it has none, to save to a file ("exportConversation" asks for it). */
+  | { type: "saveConversation"; tab: number; markdown: string }
   /** Opens the usage summary (clicking the context meter). */
   | { type: "showUsage" }
   /** Opens the log of the messages exchanged with agents. */
@@ -310,6 +312,8 @@ export interface TabInfo {
   worktreeOnSend?: boolean;
   /** What is checked out in `cwd`; undefined outside git. */
   branch?: string;
+  /** Something was sent or loaded in it: it has a conversation to keep. */
+  used: boolean;
   /** The tab's agent can fork its session (session/fork). */
   canFork: boolean;
   /** Unsent composer content; the webview only uses it for tabs it has no draft for yet. */

@@ -4,6 +4,7 @@ import type { Attachment, ChangeHunk, ChangesMessage, PrDraft, QueuedInfo, TabGr
 import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
+import archiveIcon from "@tabler/icons/outline/archive.svg";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import chevronRightIcon from "@tabler/icons/outline/chevron-right.svg";
 import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
@@ -214,6 +215,8 @@ export function TabSidebar({
       tab.worktree?.root ??
       (changed || tab.createdAt === undefined ? undefined : dateFormat.format(tab.createdAt));
     const pinLabel = t(tab.pinned ? "chat.unpinTab" : "chat.pinTab");
+    // Closing a tab ends its session, not the conversation: that stays in the history.
+    const closeLabel = t(tab.used ? "chat.archiveTab" : "chat.closeTab");
     const key = `tab-${tab.id}`;
     return (
       <div
@@ -289,14 +292,14 @@ export function TabSidebar({
         {!tab.pinned && (
           <button
             className="tab-close"
-            title={t("chat.closeTab")}
-            aria-label={t("chat.closeTab")}
+            title={closeLabel}
+            aria-label={closeLabel}
             onClick={(e) => {
               e.stopPropagation();
               post({ type: "closeTab", tab: tab.id });
             }}
           >
-            <Icon svg={xIcon} />
+            <Icon svg={tab.used ? archiveIcon : xIcon} />
           </button>
         )}
       </div>

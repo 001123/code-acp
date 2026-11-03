@@ -340,8 +340,10 @@ describe("ChatViewProvider", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { ofType, say, replyOf, idle, tab, tabsNow } = yield* startChat;
+        assert.strictEqual(tabsNow().tabs[0]!.used, false);
         say(tab, "updates");
         yield* until(() => ofType("turnEnd", tab).length === 1, "the end of the turn");
+        assert.strictEqual(tabsNow().tabs[0]!.used, true);
         assert.strictEqual(ofType("userMessage", tab)[0]!.text, "updates");
         assert.strictEqual(replyOf(tab), "hello world");
         assert.strictEqual(ofType("turnEnd", tab)[0]!.stopReason, "end_turn");
@@ -521,6 +523,56 @@ describe("ChatViewProvider", () => {
         assert.isFalse(tabsNow().tabs.some((t) => t.id === other));
         assert.strictEqual(tabsNow().active, tab);
         assert.deepStrictEqual(ofType("error"), []);
+      }),
+    ),
+  );
+
+  it.live("exports a conversation from the webview's Markdown to the file the user picks", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType, provider, root, runtime, send, tab, tabsNow } = yield* startChat;
+        yield* Effect.promise(() => runtime.runPromise(provider.tabAction(tab, "export")));
+        assert.deepStrictEqual(ofType("exportConversation").at(-1), { type: "exportConversation", tab });
+        yield* Effect.promise(() => runtime.runPromise(provider.exportConversation));
+        assert.lengthOf(ofType("exportConversation"), 2);
+
+        const target = path.join(root, "out.md");
+        const defaults: string[] = [];
+        const saveDialog = window.showSaveDialog;
+        window.showSaveDialog = async (options?: unknown) => {
+          defaults.push((options as { defaultUri: Uri }).defaultUri.fsPath);
+          return Uri.file(target);
+        };
+        yield* Effect.addFinalizer(() => Effect.sync(() => void (window.showSaveDialog = saveDialog)));
+        send({ type: "renameTab", tab, title: "a/b" });
+        yield* until(() => tabsNow().tabs.find((t) => t.id === tab)?.title === "a/b", "the name");
+        send({ type: "saveConversation", tab, markdown: "# Hello\n" });
+        yield* until(() => defaults.length === 1, "the save dialog");
+        assert.strictEqual(path.basename(defaults[0]!), "a b.md");
+        const written = yield* Effect.promise(async () => {
+          for (;;) {
+            const text = await fs.readFile(target, "utf8").catch(() => undefined);
+            if (text) return text;
+            await new Promise((resolve) => setTimeout(resolve, 5));
+          }
+        });
+        assert.strictEqual(written, "# Hello\n");
+
+        // Nothing to save: no dialog.
+        send({ type: "saveConversation", tab, markdown: "" });
+        yield* Effect.sleep("20 millis");
+        assert.lengthOf(defaults, 1);
+        assert.deepStrictEqual(ofType("error"), []);
+      }),
+    ),
+  );
+
+  it.live("asks the webview for the find box", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType, provider, runtime } = yield* startChat;
+        yield* Effect.promise(() => runtime.runPromise(provider.findInConversation));
+        assert.lengthOf(ofType("findInConversation"), 1);
       }),
     ),
   );

@@ -25,6 +25,8 @@ import { PrDraftForm, WorkspaceBar } from "./chat/workspaceControls";
 import { clipContent, contentText, groupActivity, noticeItem, stopReasonText, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
+import { conversationMarkdown } from "./chat/exportMarkdown";
+import { TranscriptSearch } from "./chat/transcriptSearch";
 
 /** The transcript only lives here, so an entry that fails to render must not take the rest down with it. */
 function EntryBoundary({ items, children }: { items: readonly unknown[]; children: ReactNode }) {
@@ -57,6 +59,9 @@ function App() {
   const [history, setHistory] = useState<History>();
   /** The tab whose name is being edited in the sidebar. */
   const [renaming, setRenaming] = useState<number>();
+  /** Counts the requests for the find box; 0 while it is closed. */
+  const [findRequest, setFindRequest] = useState(0);
+  const [findMessagesOnly, setFindMessagesOnly] = useState(false);
   const messages = useRef<HTMLDivElement>(null);
   /** The active tab for callbacks registered once (drop, FileReader). */
   const activeRef = useRef(active);
@@ -333,6 +338,20 @@ function App() {
       case "focusComposer":
         showComposer();
         return composer.focus();
+      case "findInConversation":
+        if (!chatShown) return;
+        showComposer();
+        setHistory(undefined);
+        return setFindRequest((n) => n + 1);
+      case "exportConversation": {
+        const info = tabs.find((x) => x.id === msg.tab);
+        const markdown = conversationMarkdown(t, states[msg.tab]?.transcript.items ?? [], {
+          title: info?.title || t("chat.newTab"),
+          agent: agents.agents.find((x) => x.id === info?.agentId)?.name,
+          date: new Date().toLocaleString(),
+        });
+        return post({ type: "saveConversation", tab: msg.tab, markdown });
+      }
       case "sessionTotals":
         return update(tab, (s) => ({ ...s, totals: msg.totals ?? undefined }));
       case "renameTab":
@@ -434,6 +453,9 @@ function App() {
   // Switching tabs or sending a message always shows the end. Other new content does only while the view
   // follows the end, and never with auto-scroll off.
   const pinned = useRef(true);
+  const stopFollowing = useCallback(() => {
+    pinned.current = false;
+  }, []);
   const shownTabId = useRef(active);
   const lastItem = useRef<unknown>(undefined);
   useLayoutEffect(() => {
@@ -518,6 +540,20 @@ function App() {
             {agentsKnown && setup && !history && <AgentSetup catalog={catalog} doctor={setupDoctor} />}
             {chatShown && group && !history && (
               <GroupPanel group={group} members={tabs.filter((tab) => tab.group === group.id)} states={states} agents={agents.agents} onOpen={selectTab} />
+            )}
+            {chatShown && !group && !history && findRequest > 0 && (
+              <TranscriptSearch
+                root={messages}
+                resetKey={active}
+                request={findRequest}
+                messagesOnly={findMessagesOnly}
+                onMessagesOnlyChange={setFindMessagesOnly}
+                onReveal={stopFollowing}
+                onClose={() => {
+                  setFindRequest(0);
+                  composer.focus();
+                }}
+              />
             )}
             <div id="messages" ref={messages} hidden={!!history || !!group || !chatShown}>
               {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}

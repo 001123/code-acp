@@ -18,6 +18,7 @@ import { ChangeReview, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
 import { ComposerCommands } from "./composerCommands";
 import { DraftStore } from "./drafts";
 import { LastOptions } from "./lastOptions";
+import { saveConversation } from "./exportConversation";
 import { Follower } from "./follow";
 import { TabGroups } from "./groups";
 import { HistoryRequests, listHistory } from "./history";
@@ -670,6 +671,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "setConfig":
         yield* this.sessions.setConfig(tab, msg.configId, msg.value);
         break;
+      case "saveConversation":
+        yield* saveConversation(tab, msg.markdown);
+        break;
       case "killTerminal":
         if (tab.running && tab.sessionId) {
           yield* tab.running.agent.killTerminal(tab.sessionId, msg.terminalId);
@@ -711,6 +715,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   tabAction(id: number, action: TabAction) {
     return this.tabActions.run(id, action);
   }
+
+  /** Opens the find box above the transcript; the message follows the focus command, as in `focusComposer`. */
+  readonly findInConversation = this.focus.pipe(Effect.andThen(Effect.sync(() => this.post({ type: "findInConversation" }))));
+
+  /** Exports the active tab's conversation. Without a webview there is no transcript yet. */
+  readonly exportConversation = Effect.suspend(() => {
+    if (this.view) {
+      return this.tabActions.run(this.tabs.active.id, "export");
+    }
+    void vscode.window.showInformationMessage(t("chat.exportEmpty"));
+    return Effect.void;
+  });
 
   login() {
     return this.tabAgents.login();

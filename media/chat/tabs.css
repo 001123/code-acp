@@ -246,11 +246,17 @@
 .tab[data-waiting] .tab-dot {
   display: block;
 }
+/* Big enough to hit, and apart: a click that falls between them only selects the tab, it doesn't close it. */
 .tab-close,
 .tab-pin {
   flex: none;
   display: inline-flex;
-  padding: 2px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  padding: 0;
   border-radius: 4px;
   background: none;
   color: inherit;
@@ -273,8 +279,8 @@
 }
 .tab-close svg,
 .tab-pin svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 .tab[data-dragging] {
   opacity: 0.5;

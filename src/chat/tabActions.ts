@@ -31,7 +31,7 @@ export interface TabActionsHost {
 }
 
 /** A tab context menu action. */
-export type TabAction = "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeBelow" | "fork" | "worktree";
+export type TabAction = "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeBelow" | "fork" | "worktree" | "export";
 
 /** What the user does to tabs as a whole: opening, selecting, closing and the context menu. */
 export class TabActions {
@@ -197,6 +197,10 @@ export class TabActions {
         return;
       case "worktree":
         yield* tabWorktrees.pick(tab);
+        return;
+      case "export":
+        // Only the webview has the transcript; it answers with "saveConversation".
+        this.host.post({ type: "exportConversation", tab: tab.id });
         return;
       case "rename":
         // Edited in place in the tab sidebar, which answers with "renameTab".

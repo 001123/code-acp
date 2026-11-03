@@ -82,6 +82,21 @@
         "icon": "$(history)"
       },
       {
+        "command": "codeAcp.findInConversation",
+        "title": "%command.findInConversation%",
+        "category": "%command.category%",
+        "icon": "$(search)"
+      },
+      {
+        "command": "codeAcp.exportConversation",
+        "title": "%command.exportConversation%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "codeAcp.exportTab",
+        "title": "%command.exportTab%"
+      },
+      {
         "command": "codeAcp.cancel",
         "title": "%command.cancel%",
         "icon": "$(debug-stop)"
@@ -257,6 +272,11 @@
     "menus": {
       "view/title": [
         {
+          "command": "codeAcp.findInConversation",
+          "when": "view == codeAcp.chat",
+          "group": "navigation@0"
+        },
+        {
           "command": "codeAcp.history",
           "when": "view == codeAcp.chat",
           "group": "navigation@1"
@@ -280,6 +300,11 @@
           "command": "codeAcp.restart",
           "when": "view == codeAcp.chat",
           "group": "1_agent@3"
+        },
+        {
+          "command": "codeAcp.exportConversation",
+          "when": "view == codeAcp.chat",
+          "group": "2_tools@0"
         },
         {
           "command": "codeAcp.showLog",
@@ -393,6 +418,10 @@
           "when": "false"
         },
         {
+          "command": "codeAcp.exportTab",
+          "when": "false"
+        },
+        {
           "command": "codeAcp.forkTab",
           "when": "false"
         },
@@ -476,6 +505,11 @@
           "command": "codeAcp.tabWorktree",
           "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
           "group": "1_pin@4"
+        },
+        {
+          "command": "codeAcp.exportTab",
+          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "group": "1_pin@5"
         }
       ]
     },
@@ -829,6 +863,12 @@
         "command": "codeAcp.newSession",
         "key": "ctrl+alt+n",
         "mac": "cmd+alt+n",
+        "when": "focusedView == 'codeAcp.chat'"
+      },
+      {
+        "command": "codeAcp.findInConversation",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
         "when": "focusedView == 'codeAcp.chat'"
       },
       {

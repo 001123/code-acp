@@ -334,6 +334,24 @@ export function transcript(state: Transcript, action: Action): Transcript {
 }
 
 /** The line a finished turn leaves in the transcript; none when it ended the way the user expects. */
+/** A localized line as the user reads it. */
+export function renderText(t: Translate, text: Text): string {
+  return "raw" in text ? text.raw : t(text.key, ...(text.args ?? []));
+}
+
+/** The line saying how the agent's compaction went. */
+export function compactionLabel(t: Translate, item: CompactionItem): string {
+  return item.status === "in_progress"
+    ? t("chat.compaction.inProgress")
+    : item.status === "completed"
+      ? t("chat.compaction.completed")
+      : item.status === "failed"
+        ? t("chat.compaction.failed")
+        : item.status === "cancelled"
+          ? t("chat.compaction.cancelled")
+          : t("chat.compaction.other", item.status);
+}
+
 export function stopReasonText(stopReason: string): Text | undefined {
   switch (stopReason) {
     case "end_turn":

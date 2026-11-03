@@ -4,7 +4,7 @@ import type { SentAttachment } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { diffLines, hunks } from "../lineDiff";
 import { MarkdownView } from "../markdown";
-import { useL10n, type Translate } from "../l10n";
+import { useL10n } from "../l10n";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
 import circleCheckIcon from "@tabler/icons/outline/circle-check.svg";
 import circleDashedIcon from "@tabler/icons/outline/circle-dashed.svg";
@@ -23,7 +23,7 @@ import { ElicitationView, UrlElicitationView } from "./elicitation";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { TurnTraceView } from "./turnTrace";
-import { contentText, fileLinkTokens, permissionInput, type ActivityItem, type CompactionItem, type Item, type Text } from "./transcript";
+import { compactionLabel, contentText, fileLinkTokens, permissionInput, renderText, type ActivityItem, type CompactionItem, type Item } from "./transcript";
 import { TokenMark, type Token } from "./tokens";
 
 const HOVER_WIDTH = 240;
@@ -281,10 +281,6 @@ const TOOL_ICON: Record<string, string> = {
 };
 const PLAN_MARK: Record<string, string> = { pending: "☐", in_progress: "◐", completed: "☑" };
 
-function render(t: Translate, text: Text): string {
-  return "raw" in text ? text.raw : t(text.key, ...(text.args ?? []));
-}
-
 /** A run of thoughts and tool calls, collapsed under one "Thinking" summary. */
 export const ActivityView = memo(
   function ActivityView({ items }: { items: ActivityItem[] }) {
@@ -366,16 +362,7 @@ function UserText({ text, tokens }: { text: string; tokens: Token[] }) {
 /** The agent compacting the conversation: a line, which opens on the summary or the error when there is one. */
 function CompactionView({ item }: { item: CompactionItem }) {
   const { t } = useL10n();
-  const label =
-    item.status === "in_progress"
-      ? t("chat.compaction.inProgress")
-      : item.status === "completed"
-        ? t("chat.compaction.completed")
-        : item.status === "failed"
-          ? t("chat.compaction.failed")
-          : item.status === "cancelled"
-            ? t("chat.compaction.cancelled")
-            : t("chat.compaction.other", item.status);
+  const label = compactionLabel(t, item);
   if (!item.summary && !item.error) {
     return <div className="compaction">{label}</div>;
   }
@@ -497,7 +484,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
       return <CompactionView item={item} />;
     case "notice":
     case "error":
-      return <div className={item.kind}>{render(t, item.text)}</div>;
+      return <div className={item.kind}>{renderText(t, item.text)}</div>;
     case "trace":
       return <TurnTraceView trace={item.trace} />;
   }

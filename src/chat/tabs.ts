@@ -479,6 +479,7 @@ export class TabList {
       worktree: tab.worktree,
       worktreeOnSend: tab.worktreeOnSend,
       branch: tab.branch,
+      used: tab.used,
       canFork: !!tab.sessionId && !!tab.running && canFork(tab.running.agent),
       draft: tab.draft,
       group: tab.group?.id,

@@ -25,7 +25,12 @@
 .tab-toggle {
   flex: none;
   display: none;
-  padding: 2px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  padding: 0;
   border-radius: 4px;
   background: none;
   color: inherit;
@@ -38,8 +43,8 @@
   background: var(--vscode-toolbar-hoverBackground);
 }
 .tab-toggle svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 @media (prefers-reduced-motion: reduce) {
   .tab[data-member] {

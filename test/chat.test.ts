@@ -180,7 +180,7 @@ describe("TabList groups", () => {
 });
 
 describe("the sidebar's groups", () => {
-  const info = (id: number, group?: number): TabInfo => ({ id, group, named: false, pinned: false, cwd: "/", canFork: false });
+  const info = (id: number, group?: number): TabInfo => ({ id, group, named: false, pinned: false, cwd: "/", used: false, canFork: false });
   const group = (id: number): TabGroupInfo => ({ id, title: "g", prompt: "", createdAt: 0, collapsed: false });
 
   it("puts a group's tabs under one row, and stands alone what has no known group", () => {

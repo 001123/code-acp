@@ -98,6 +98,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.newSession", run(() => provider.newSession())),
     vscode.commands.registerCommand("codeAcp.history", run(() => provider.showHistory())),
     vscode.commands.registerCommand("codeAcp.cancel", run(() => provider.cancel())),
+    vscode.commands.registerCommand("codeAcp.findInConversation", run(() => provider.findInConversation)),
+    vscode.commands.registerCommand("codeAcp.exportConversation", run(() => provider.exportConversation)),
     vscode.commands.registerCommand(ChatViewProvider.showAttentionCommand, run(() => provider.showAttention())),
     vscode.commands.registerCommand("codeAcp.worktree", run(() => provider.pickWorktree())),
     vscode.commands.registerCommand("codeAcp.cleanWorktrees", run(() => provider.cleanWorktrees())),
@@ -188,6 +190,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ["codeAcp.closeTabsBelow", "closeBelow"],
         ["codeAcp.forkTab", "fork"],
         ["codeAcp.tabWorktree", "worktree"],
+        ["codeAcp.exportTab", "export"],
       ] as const
     ).map(([command, action]) =>
       // The tab's `data-vscode-context` (see TabSidebar in src/ui/chat/tabs.tsx).
