@@ -210,9 +210,36 @@
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-foreground);
 }
+/* Drawn from theme colors: the native box stays white on a dark theme. */
 #compare-toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: 14px;
+  height: 14px;
   margin: 0;
-  accent-color: var(--vscode-button-background);
+  border: 1px solid var(--vscode-checkbox-border, var(--vscode-descriptionForeground));
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+#compare-toggle input:checked {
+  border-color: var(--vscode-button-background);
+  background: var(--vscode-button-background);
+}
+#compare-toggle input:checked::before {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-button-foreground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+#compare-toggle input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
 }
 #compare-toggle:has(input:checked) {
   color: var(--vscode-foreground);
