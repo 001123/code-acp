@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { assert, beforeEach, describe, it } from "@effect/vitest";
-import { Deferred, Effect, Scope } from "effect";
+import { Deferred, Effect, Fiber, Scope } from "effect";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -79,7 +79,9 @@ const makeTurns = Effect.fnUntraced(function* (ensureSession: TurnsHost["ensureS
     send({ type: "send", tab: tab.id, parts: [text], ...options });
   const answer = (index: number, stopReason: acp.StopReason = "end_turn") =>
     Deferred.succeed(prompts[index]!.reply, { stopReason }).pipe(Effect.andThen(until(() => !tab.busy || prompts.length > index + 1)));
-  return { tab, tabs, turns, posted, statuses, finished, ended, prompts, send, say, answer, cancelled: () => cancelled };
+  // The fakes above need no services.
+  const ask = (text: string) => turns.ask(tab, text) as Effect.Effect<string | undefined, unknown>;
+  return { tab, tabs, turns, posted, statuses, finished, ended, prompts, send, say, ask, answer, cancelled: () => cancelled };
 });
 
 const ofType = (posted: ReadonlyArray<Record<string, unknown>>, type: string) => posted.filter((message) => message.type === type);
@@ -87,6 +89,42 @@ const ofType = (posted: ReadonlyArray<Record<string, unknown>>, type: string) =>
 beforeEach(() => __test.reset());
 
 describe("TabTurns", () => {
+  it.live("gives whoever asked the agent's last message once the turn finished, and shows the turn like any other", () =>
+    Effect.gen(function* () {
+      const { tab, ask, prompts, answer, posted } = yield* makeTurns();
+      const fiber = yield* Effect.forkChild(ask("write it"));
+      yield* until(() => prompts.length === 1);
+      assert.deepStrictEqual(prompts[0]!.texts, ["write it"]);
+      assert.strictEqual(ofType(posted, "userMessage").length, 1);
+      tab.reply!.text = "The reply";
+      yield* answer(0);
+      assert.strictEqual(yield* Fiber.join(fiber), "The reply");
+      assert.isUndefined(tab.reply);
+      assert.isFalse(tab.sending);
+    }),
+  );
+
+  it.live("gives nothing for a turn that was stopped, or a tab that is busy", () =>
+    Effect.gen(function* () {
+      const { ask, prompts, answer } = yield* makeTurns();
+      const fiber = yield* Effect.forkChild(ask("write it"));
+      yield* until(() => prompts.length === 1);
+      assert.isUndefined(yield* ask("another"));
+      assert.strictEqual(prompts.length, 1);
+      yield* answer(0, "cancelled");
+      assert.isUndefined(yield* Fiber.join(fiber));
+    }),
+  );
+
+  it.live("leaves the composer alone when there is no session to ask", () =>
+    Effect.gen(function* () {
+      const { ask, prompts, posted } = yield* makeTurns(() => Effect.undefined);
+      assert.isUndefined(yield* ask("write it"));
+      assert.strictEqual(prompts.length, 0);
+      assert.deepStrictEqual(ofType(posted, "loadComposer"), []);
+    }),
+  );
+
   it.live("posts the numbers of a finished turn only while tracing is on", () =>
     Effect.gen(function* () {
       const { say, answer, prompts, posted } = yield* makeTurns();

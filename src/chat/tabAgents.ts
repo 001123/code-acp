@@ -219,6 +219,13 @@ export class TabAgents {
   private onSessionUpdate(tab: Tab, n: acp.SessionNotification): void {
     const { update } = n;
     tab.turnStats?.onUpdate(update);
+    if (tab.reply) {
+      if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
+        tab.reply.text += update.content.text;
+      } else if (update.sessionUpdate === "tool_call") {
+        tab.reply.text = "";
+      }
+    }
     if (update.sessionUpdate === "session_info_update" && update.title !== undefined) {
       tab.title = update.title ?? undefined;
       this.host.postTabs();

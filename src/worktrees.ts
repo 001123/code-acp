@@ -26,6 +26,8 @@ const MANAGED_DIR = path.join(".code-acp", "worktrees");
 const SETUP_TIMEOUT_MINUTES = 10;
 /** How much of a failed setup command's output its error shows, from the end. */
 const SETUP_OUTPUT_TAIL = 2000;
+/** How long a push or a call to GitHub may run; a remote that doesn't answer would otherwise keep the user waiting for good. */
+const REMOTE_TIMEOUT_MINUTES = 10;
 
 /** The git worktree a tab runs in. */
 export const TabWorktree = Schema.Struct({
@@ -75,6 +77,38 @@ export interface AppliedWorktree {
   /** Files left with conflict markers in the base folder. */
   readonly conflicts: ReadonlyArray<string>;
 }
+
+export interface MergedWorktree {
+  /** Files left with conflict markers in the base folder, whose merge is still going on. */
+  readonly conflicts: ReadonlyArray<string>;
+}
+
+/** Where a pull request of a worktree's branch goes. */
+export interface PrTarget {
+  readonly remote: string;
+  /** The branch it would merge into; undefined leaves that to the repository's default branch. */
+  readonly base?: string;
+  /** The pull request that is already open for the branch. */
+  readonly existing?: string;
+}
+
+/** The title and description of a pull request. */
+export interface PrText {
+  readonly title: string;
+  readonly body: string;
+}
+
+/** What a worktree's branch holds, for describing it. */
+export interface PrSummary {
+  /** The commit it forked off. */
+  readonly fork: string;
+  /** Subjects of its commits, oldest first. */
+  readonly subjects: ReadonlyArray<string>;
+  /** `git diff --stat` against the fork. */
+  readonly stat: string;
+}
+
+const decodePrList = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Struct({ url: Schema.String }))));
 
 export class WorktreeError extends Schema.TaggedError<WorktreeError>()("WorktreeError", {
   message: Schema.String,
@@ -151,6 +185,24 @@ export const parseNumstat = (out: string): ReadonlyArray<WorktreeFileDiff> =>
     return [{ path: name.join("\t"), ...counts }];
   });
 
+/** The title and description in an agent's reply: its first line, then the rest; undefined when it has no text. */
+export function parsePrText(reply: string): PrText | undefined {
+  const text = reply
+    .trim()
+    .replace(/^```[^\n]*\n([\s\S]*?)\n?```$/, "$1")
+    .trim();
+  const [first = "", ...rest] = text.split("\n");
+  const title = first.replace(/^#+\s*/, "").trim();
+  return title === "" ? undefined : { title, body: rest.join("\n").trim() };
+}
+
+/** A title and description from what git knows, when no agent wrote them. */
+export function fallbackPrText({ subjects, stat }: PrSummary, title: string): PrText {
+  const list = subjects.map((subject) => `- ${subject}`).join("\n");
+  const files = stat.trim() === "" ? "" : `\`\`\`\n${stat.trimEnd()}\n\`\`\``;
+  return { title: subjects.length === 1 ? subjects[0]! : title, body: [list, files].filter(Boolean).join("\n\n") };
+}
+
 /** The git worktrees chat tabs run in. Listings come from git, so worktrees made outside the extension show up too. */
 export class Worktrees extends Context.Service<Worktrees, {
   /** Whether `folder` is in a git work tree. */
@@ -190,6 +242,25 @@ export class Worktrees extends Context.Service<Worktrees, {
    * as it is. Nothing is changed when the base folder's own changes are in the way.
    */
   apply(worktree: TabWorktree): Effect.Effect<AppliedWorktree, WorktreeError>;
+  /** Commits everything the worktree holds on its branch, untracked files included. */
+  commit(worktree: TabWorktree, message: string): Effect.Effect<void, WorktreeError>;
+  /** Whether the base folder has uncommitted changes to tracked files, which a merge shouldn't run into. */
+  isBaseDirty(worktree: TabWorktree): Effect.Effect<boolean, WorktreeError>;
+  /**
+   * Merges the worktree's branch into what its base folder has checked out, commits and all. It fails when the base
+   * folder isn't clean; with conflicts, the merge stays open there for the user to finish or abort.
+   */
+  merge(worktree: TabWorktree): Effect.Effect<MergedWorktree, WorktreeError>;
+  /** Gives up the merge going on in the worktree's base folder. */
+  abortMerge(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
+  /** Where a pull request of the worktree's branch goes; fails without a branch, a remote or a working `gh`. */
+  prTarget(worktree: TabWorktree): Effect.Effect<PrTarget, WorktreeError>;
+  /** What the worktree's branch holds. */
+  prSummary(worktree: TabWorktree): Effect.Effect<PrSummary, WorktreeError>;
+  /** Pushes the worktree's branch to `remote`, and tracks it there. */
+  push(worktree: TabWorktree, remote: string): Effect.Effect<void, WorktreeError>;
+  /** Opens a pull request of the worktree's pushed branch; its URL. */
+  createPr(worktree: TabWorktree, text: PrText, base?: string): Effect.Effect<string, WorktreeError>;
   /** Deletes a worktree the extension created, and its branch; others are left alone. */
   remove(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
 }>()("code-acp/Worktrees") {
@@ -224,6 +295,29 @@ export class Worktrees extends Context.Service<Worktrees, {
         }
         return out;
       });
+
+      /** Runs `gh` in `cwd`, without ever waiting for an answer from the user; fails unless it exits with code 0. */
+      const gh = Effect.fn("Worktrees.gh")(
+        function* (cwd: string, args: ReadonlyArray<string>, input?: string) {
+          const stdin = input === undefined ? undefined : Stream.make(new TextEncoder().encode(input));
+          const env = { GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1" };
+          const handle = yield* spawner.spawn(ChildProcess.make("gh", args, { cwd, env, extendEnv: true, stdin }));
+          const [out, err, code] = yield* Effect.all(
+            [Stream.mkString(Stream.decodeText(handle.stdout)), Stream.mkString(Stream.decodeText(handle.stderr)), handle.exitCode],
+            { concurrency: "unbounded" },
+          );
+          if (code !== 0) {
+            return yield* new WorktreeError({ message: t("worktree.ghFailed", err.trim() || code) });
+          }
+          return out;
+        },
+        Effect.scoped,
+        Effect.catchTag("PlatformError", () => Effect.fail(new WorktreeError({ message: t("worktree.ghMissing") }))),
+        Effect.timeoutOrElse({
+          duration: Duration.minutes(REMOTE_TIMEOUT_MINUTES),
+          orElse: () => Effect.fail(new WorktreeError({ message: t("worktree.remoteTimedOut", REMOTE_TIMEOUT_MINUTES) })),
+        }),
+      );
 
       const exists = (folder: string) => fs.exists(folder).pipe(Effect.orElseSucceed(() => false));
 
@@ -485,6 +579,93 @@ export class Worktrees extends Context.Service<Worktrees, {
         Effect.scoped,
       );
 
+      /** The worktree's branch; merging and pull requests need one. */
+      const branchIn = (worktree: TabWorktree) =>
+        worktree.branch === undefined
+          ? Effect.fail(new WorktreeError({ message: t("worktree.noBranch", path.basename(worktree.root)) }))
+          : Effect.succeed(worktree.branch);
+
+      const commit = Effect.fn("Worktrees.commit")(function* (worktree: TabWorktree, message: string) {
+        yield* git(worktree.root, ["add", "--all"]);
+        yield* git(worktree.root, ["commit", "--quiet", "-m", message]);
+      });
+
+      const baseTop = Effect.fnUntraced(function* (worktree: TabWorktree, command: string) {
+        const repo = yield* repoOf(worktree.base);
+        return Option.isSome(repo) ? repo.value.top : yield* failed(command, worktree.base);
+      });
+
+      const isBaseDirty = Effect.fn("Worktrees.isBaseDirty")(function* (worktree: TabWorktree) {
+        const top = yield* baseTop(worktree, "status");
+        // Untracked files are no reason to stop: git refuses by itself when the merge would overwrite one.
+        return (yield* git(top, ["status", "--porcelain", "--untracked-files=no"])).trim() !== "";
+      });
+
+      const merge = Effect.fn("Worktrees.merge")(function* (worktree: TabWorktree) {
+        const branch = yield* branchIn(worktree);
+        if (yield* isBaseDirty(worktree)) {
+          return yield* new WorktreeError({ message: t("worktree.baseDirty", path.basename(worktree.base)) });
+        }
+        const top = yield* baseTop(worktree, "merge");
+        const { err, out, code } = yield* exec(top, ["merge", "--no-edit", branch]);
+        if (code === 0) {
+          return { conflicts: [] };
+        }
+        const conflicts = (yield* git(top, ["diff", "--name-only", "--diff-filter=U"])).split("\n").filter(Boolean);
+        if (conflicts.length === 0) {
+          return yield* failed("merge", err || out.trim() || code);
+        }
+        return { conflicts };
+      });
+
+      const abortMerge = Effect.fn("Worktrees.abortMerge")(function* (worktree: TabWorktree) {
+        yield* git(yield* baseTop(worktree, "merge"), ["merge", "--abort"]);
+      });
+
+      const prTarget = Effect.fn("Worktrees.prTarget")(function* (worktree: TabWorktree) {
+        const branch = yield* branchIn(worktree);
+        const remotes = (yield* git(worktree.root, ["remote"])).split("\n").filter(Boolean);
+        const baseBranch = (yield* exec(worktree.base, ["symbolic-ref", "--short", "-q", "HEAD"])).out.trim();
+        const configured = (key: string) =>
+          baseBranch === "" ? Effect.succeed("") : exec(worktree.base, ["config", "--get", `branch.${baseBranch}.${key}`]).pipe(Effect.map(({ out }) => out.trim()));
+        const tracked = yield* configured("remote");
+        const merged = yield* configured("merge");
+        const remote = remotes.includes(tracked) ? tracked : remotes.includes("origin") ? "origin" : remotes[0];
+        if (remote === undefined) {
+          return yield* new WorktreeError({ message: t("worktree.noRemote") });
+        }
+        const listed = yield* gh(worktree.root, ["pr", "list", "--head", branch, "--state", "open", "--json", "url", "--limit", "1"]);
+        const existing = Option.getOrElse(decodePrList(listed), () => [])[0]?.url;
+        const base = remotes.includes(tracked) && merged.startsWith("refs/heads/") ? merged.slice("refs/heads/".length) : undefined;
+        return { remote, ...(base === undefined ? {} : { base }), ...(existing === undefined ? {} : { existing }) };
+      });
+
+      const prSummary = Effect.fn("Worktrees.prSummary")(function* (worktree: TabWorktree) {
+        const fork = yield* forkPoint(worktree);
+        const subjects = (yield* git(worktree.root, ["log", "--reverse", "--format=%s", `${fork}..HEAD`])).split("\n").filter(Boolean);
+        const stat = yield* git(worktree.root, ["diff", "--stat", "--no-color", "--no-ext-diff", fork, "HEAD"]);
+        return { fork, subjects, stat };
+      });
+
+      const push = Effect.fn("Worktrees.push")(
+        function* (worktree: TabWorktree, remote: string) {
+          const branch = yield* branchIn(worktree);
+          // With no terminal to ask in, a remote that wants credentials should fail, not hang.
+          yield* git(worktree.root, ["push", "--quiet", "--set-upstream", remote, branch], { GIT_TERMINAL_PROMPT: "0" });
+        },
+        Effect.timeoutOrElse({
+          duration: Duration.minutes(REMOTE_TIMEOUT_MINUTES),
+          orElse: () => Effect.fail(new WorktreeError({ message: t("worktree.remoteTimedOut", REMOTE_TIMEOUT_MINUTES) })),
+        }),
+      );
+
+      const createPr = Effect.fn("Worktrees.createPr")(function* (worktree: TabWorktree, { title, body }: PrText, base?: string) {
+        const branch = yield* branchIn(worktree);
+        const onto = base === undefined ? [] : ["--base", base];
+        const out = yield* gh(worktree.root, ["pr", "create", "--head", branch, "--title", title, "--body-file", "-", ...onto], body);
+        return out.trim().split("\n").at(-1) ?? "";
+      });
+
       const remove = Effect.fn("Worktrees.remove")(function* (worktree: TabWorktree) {
         if (!isManaged(worktree.root)) {
           return;
@@ -511,6 +692,14 @@ export class Worktrees extends Context.Service<Worktrees, {
         diff,
         original,
         apply,
+        commit,
+        isBaseDirty,
+        merge,
+        abortMerge,
+        prTarget,
+        prSummary,
+        push,
+        createPr,
         remove,
       });
     }),

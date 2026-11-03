@@ -123,9 +123,10 @@
   font-size: 0.9em;
   font-weight: 600;
 }
+/* On the view's background: a filled square would outshine the light sweeping around it. */
 .tab[data-active] .tab-initial {
-  background: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  background: var(--vscode-sideBar-background);
+  color: var(--vscode-badge-background);
 }
 /* A light sweeps around the initial while the agent works. A masked ring: the initial's background may be translucent. */
 @property --tab-angle {

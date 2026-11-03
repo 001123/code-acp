@@ -228,6 +228,15 @@ acp
           update: { sessionUpdate: "notice", severity: "warning", title: "Slow down", description: "Rate limited" },
         });
         return { stopReason: "end_turn" };
+      case "Write":
+        await say("Some thoughts first");
+        await client.notify(acp.methods.client.session.update, {
+          sessionId: params.sessionId,
+          update: { sessionUpdate: "tool_call", toolCallId: "log", title: "git log" },
+        });
+        await say("The drafted title\n\nThe drafted ");
+        await say("body");
+        return { stopReason: "end_turn" };
       case "refuse":
         return { stopReason: "refusal" };
       case "expired":

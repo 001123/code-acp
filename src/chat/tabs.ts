@@ -162,6 +162,10 @@ export interface Tab extends DraftHolder {
   attempt?: Attempt;
   /** Its worktree's changes were applied to the base folder. */
   applied?: boolean;
+  /** Its worktree holds work the base folder doesn't, as last read. */
+  finishable?: boolean;
+  /** What the agent has said in the running turn since its last tool call, when the turn's reply is wanted. */
+  reply?: { text: string };
   /** The model and effort its sessions start with, over those usual for the agent: what its group's comparison picked. */
   wanted?: typeof SavedWanted.Type;
   /** `wanted` by name. */
@@ -461,6 +465,7 @@ export class TabList {
       attempt: tab.attempt,
       attemptLabel: tab.attemptLabel,
       applied: tab.applied,
+      finishable: tab.finishable,
     }));
   }
 

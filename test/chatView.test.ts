@@ -1071,6 +1071,64 @@ describe("ChatViewProvider", () => {
       }).pipe(Effect.scoped),
     );
 
+    it.live("offers to finish a worktree with work in it, and has its agent draft the pull request", () =>
+      Effect.gen(function* () {
+        const { folder, root, ofType, say, send, tabsNow, idle } = yield* startInRepo;
+        __test.setSetting("codeAcp.worktreeForNewTabs", true);
+        send({ type: "newTab" });
+        yield* until(() => tabsNow().tabs.length === 2, "the new tab");
+        const added = tabsNow().active;
+        const info = () => tabsNow().tabs.find((each) => each.id === added)!;
+        yield* until(() => info().worktree !== undefined && ofType("session", added).length === 1, "its session");
+        say(added, "updates");
+        yield* until(() => ofType("turnEnd", added).length === 1, "the turn");
+        yield* idle(added);
+        yield* until(() => info().finishable === false, "the worktree to be read");
+
+        const { root: worktreeRoot, branch } = info().worktree!;
+        yield* Effect.promise(() => fs.writeFile(path.join(worktreeRoot, "new.txt"), "x\n"));
+        say(added, "updates");
+        yield* until(() => ofType("turnEnd", added).length === 2, "the second turn");
+        yield* idle(added);
+        yield* until(() => info().finishable === true, "the work to show");
+
+        const remote = path.join(root, "remote.git");
+        git(root, "init", "--quiet", "--bare", remote);
+        git(folder, "remote", "add", "origin", remote);
+        const bin = path.join(root, "bin");
+        yield* Effect.promise(async () => {
+          await fs.mkdir(bin);
+          await fs.writeFile(path.join(bin, "gh"), '#!/bin/sh\nif [ "$2" = "list" ]; then echo "[]"; exit 0; fi\ncat > /dev/null\necho https://example.test/pr/1\n', { mode: 0o755 });
+        });
+        const realPath = process.env.PATH;
+        process.env.PATH = `${bin}${path.delimiter}${realPath}`;
+        const { showInputBox, showQuickPick } = window;
+        window.showInputBox = async () => "add new";
+        window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "pr")) as typeof window.showQuickPick;
+        yield* Effect.gen(function* () {
+          send({ type: "finishWorktree", tab: added });
+          yield* until(() => ofType("prDraft", added).length === 1, "the draft");
+          const { draft } = ofType("prDraft", added)[0]!;
+          assert.strictEqual(draft.title, "The drafted title");
+          assert.strictEqual(draft.body, "The drafted body");
+          assert.strictEqual(ofType("userMessage", added).length, 3);
+          assert.notStrictEqual(git(worktreeRoot, "log", "--format=%s").split("\n")[0], "init");
+          assert.strictEqual(git(remote, "branch", "--list", branch!), "");
+          send({ type: "createPr", tab: added, title: "The title", body: "The body" });
+          yield* until(() => ofType("prDraft", added).some((message) => message.draft === undefined), "the draft to go");
+          assert.notStrictEqual(git(remote, "branch", "--list", branch!), "");
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              window.showInputBox = showInputBox;
+              window.showQuickPick = showQuickPick;
+              process.env.PATH = realPath;
+            }),
+          ),
+        );
+      }).pipe(Effect.scoped),
+    );
+
     it.live("puts the prompt back when no group comes of it", () =>
       Effect.gen(function* () {
         const { send, ofType, tab, tabsNow } = yield* startInRepo;

@@ -1,9 +1,10 @@
-import type { TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
+import type { PrDraft, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import folderIcon from "@tabler/icons/outline/folder.svg";
 import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
 import gitForkIcon from "@tabler/icons/outline/git-fork.svg";
+import gitMergeIcon from "@tabler/icons/outline/git-merge.svg";
 import { post } from "./post";
 
 /** Picks the workspace folder the tab's session runs in; shown in multi-root workspaces only. */
@@ -36,7 +37,7 @@ export function FolderSelect({ tab, folders }: { tab: TabInfo | undefined; folde
 }
 
 /** Under the composer: where the tab works, which opens the worktree picker, and what is checked out there. Shown in git folders only. */
-export function WorkspaceBar({ tab }: { tab: TabInfo | undefined }) {
+export function WorkspaceBar({ tab, busy }: { tab: TabInfo | undefined; busy: boolean }) {
   const { t } = useL10n();
   const branch = tab?.branch ?? tab?.worktree?.branch;
   if (!tab || (!tab.worktree && branch === undefined)) return null;
@@ -60,6 +61,47 @@ ${tab.cwd}`}
           <span>{branch}</span>
         </span>
       )}
+      {tab.worktree && tab.finishable && !busy && (
+        <button type="button" className="workspace-finish" title={t("worktree.finishHint")} onClick={() => post({ type: "finishWorktree", tab: tab.id })}>
+          <Icon svg={gitMergeIcon} />
+          <span>{t("worktree.finish")}</span>
+        </button>
+      )}
     </div>
+  );
+}
+
+/** Above the composer: the pull request the agent drafted, to change and agree to; nothing is pushed before that. */
+export function PrDraftForm({ tab, draft, onChange }: { tab: number; draft: PrDraft; onChange: (draft: PrDraft) => void }) {
+  const { t } = useL10n();
+  return (
+    <form
+      id="pr-draft"
+      onSubmit={(e) => {
+        e.preventDefault();
+        post({ type: "createPr", tab, title: draft.title, body: draft.body });
+      }}
+    >
+      <fieldset disabled={draft.pending}>
+        <div className="pr-draft-title">{t("worktree.prDraftTitle", draft.head, draft.base ?? t("worktree.prDefaultBase"))}</div>
+        <label>
+          {t("worktree.prTitleLabel")}
+          <input value={draft.title} onChange={(e) => onChange({ ...draft, title: e.target.value })} />
+        </label>
+        <label>
+          {t("worktree.prBodyLabel")}
+          <textarea rows={8} value={draft.body} onChange={(e) => onChange({ ...draft, body: e.target.value })} />
+        </label>
+        <div className="pr-draft-actions">
+          <button type="submit" disabled={draft.title.trim() === ""}>
+            {t("worktree.prCreate")}
+          </button>
+          <button type="button" className="secondary" onClick={() => post({ type: "dismissPr", tab })}>
+            {t("worktree.prDiscard")}
+          </button>
+          <span className="pr-draft-remote">{t("worktree.prRemote", draft.remote)}</span>
+        </div>
+      </fieldset>
+    </form>
   );
 }

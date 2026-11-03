@@ -42,6 +42,7 @@
   "command.forkTab": "Fork Conversation",
   "command.worktree": "Choose Tab Worktree…",
   "command.tabWorktree": "Worktree…",
+  "command.cleanWorktrees": "Clean Up Worktrees…",
   "config.worktreeForNewTabs": "Start each new chat in a git worktree of its own, on a new branch, so chats don't touch each other's files or your local checkout. Folders outside git are not affected.",
   "config.worktreeCopyFiles": "Ignored files to copy from your checkout into each new worktree, as gitignore patterns relative to the repository, such as .env or node_modules. Files git doesn't ignore are never copied.",
   "config.worktreeSetupCommand": "Shell command to run at the top of each new worktree, such as npm install. The agent starts once it finishes. It is read from user settings only, so a repository can't set it.",

@@ -131,6 +131,38 @@ export class TabTurns {
     );
   });
 
+  /**
+   * Runs a turn the editor asks for and shows like any other; the agent's last message when the turn finished, undefined
+   * when it didn't or the tab is busy. Nothing goes to the composer: the text isn't the user's.
+   */
+  readonly ask = Effect.fn("TabTurns.ask")(function* (this: TabTurns, tab: Tab, text: string) {
+    if (tab.busy || tab.sending) {
+      return undefined;
+    }
+    tab.sending = true;
+    const message: OutgoingMessage = { parts: [text] };
+    const reply = { text: "" };
+    const stopReason = yield* Effect.gen({ self: this }, function* () {
+      const prepared = yield* this.prepareTurn(tab, message);
+      if (!prepared) {
+        return undefined;
+      }
+      tab.reply = reply;
+      return yield* this.runTurn(tab, message, prepared);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          tab.sending = false;
+          tab.reply = undefined;
+        }),
+      ),
+    );
+    if (tab.steer || stopReason === "end_turn") {
+      this.sendQueued(tab);
+    }
+    return stopReason === "end_turn" ? reply.text : undefined;
+  });
+
   /** Sends the first queued message, when the tab is idle. */
   sendQueued(tab: Tab): void {
     tab.steer = false;

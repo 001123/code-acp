@@ -91,6 +91,11 @@
         "category": "%command.category%"
       },
       {
+        "command": "codeAcp.cleanWorktrees",
+        "title": "%command.cleanWorktrees%",
+        "category": "%command.category%"
+      },
+      {
         "command": "codeAcp.tabWorktree",
         "title": "%command.tabWorktree%"
       },
@@ -259,6 +264,11 @@
           "command": "codeAcp.worktree",
           "when": "view == codeAcp.chat",
           "group": "1_agent@5"
+        },
+        {
+          "command": "codeAcp.cleanWorktrees",
+          "when": "view == codeAcp.chat",
+          "group": "1_agent@6"
         },
         {
           "command": "codeAcp.login",

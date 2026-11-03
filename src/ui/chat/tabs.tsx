@@ -1,6 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import type { Attachment, ChangeHunk, ChangesMessage, QueuedInfo, TabGroupInfo, TabInfo, TerminalSnapshot, WorktreeDiff } from "../../chat/protocol";
+import type { Attachment, ChangeHunk, ChangesMessage, PrDraft, QueuedInfo, TabGroupInfo, TabInfo, TerminalSnapshot, WorktreeDiff } from "../../chat/protocol";
 import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
@@ -54,6 +54,8 @@ export interface TabState {
   editing?: number;
   /** What the tab's worktree changed, when it belongs to a group. */
   worktreeDiff?: WorktreeDiff;
+  /** The pull request the user is about to open. */
+  prDraft?: PrDraft;
 }
 
 export const NEW_TAB: TabState = {

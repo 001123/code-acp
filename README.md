@@ -31,7 +31,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 - Restore the files to a checkpoint from before any message.
 - Follow the agent in the editor: open the files it reads and edits, and highlight the lines it changes.
 - Send one prompt to several agents or models with the Compare checkbox (Best of N): each works in its own worktree under a group tab, where you compare their diffs and apply the best one, or discard them all.
-- Run each tab in a git worktree of its own, then apply its changes to your checkout as staged changes. New worktrees can get ignored files such as `.env` and `node_modules`, and run a setup command, your own or the project's after you allow it.
+- Run each tab in a git worktree of its own, then finish it from the button under the composer: merge it, open a pull request whose description its agent drafts (with the GitHub CLI), or apply its changes as staged changes. Clean up the worktrees you no longer use in one go. New worktrees can get ignored files such as `.env` and `node_modules`, and run a setup command, your own or the project's after you allow it.
 
 ### Agents
 

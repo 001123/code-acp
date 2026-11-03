@@ -18,7 +18,7 @@ import type { AgentChoices } from "./chat/agentPanel";
 import { ChatSettings } from "./chat/chatSettings";
 import { ConfigLoading, ConfigSelect, QuickConfig } from "./chat/sessionConfig";
 import { UsageMeter } from "./chat/usageMeter";
-import { WorkspaceBar } from "./chat/workspaceControls";
+import { PrDraftForm, WorkspaceBar } from "./chat/workspaceControls";
 import { clipContent, contentText, groupActivity, noticeItem, stopReasonText, transcript, type Action } from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
@@ -72,6 +72,7 @@ function App() {
     busySince,
     lastActivity,
     terminals: agentTerminals,
+    prDraft,
     changes,
     hunks,
     queue,
@@ -198,6 +199,10 @@ function App() {
         return update(tab, (s) => ({ ...s, hunks: { ...s.hunks, [msg.path]: msg.hunks } }));
       case "worktreeDiff":
         return update(tab, (s) => ({ ...s, worktreeDiff: msg.diff }));
+      case "prDraft":
+        return update(tab, (s) => ({ ...s, prDraft: msg.draft }));
+      case "prPending":
+        return update(tab, (s) => (s.prDraft ? { ...s, prDraft: { ...s.prDraft, pending: msg.pending } } : s));
       case "queue":
         return update(tab, (s) => ({ ...s, queue: msg.items }));
       case "loadComposer":
@@ -498,35 +503,38 @@ function App() {
               {busySince !== undefined && silent >= WAITING_AFTER_MS && (
                 <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
               )}
-        </div>
-        </div>
-        <TabSidebar
-          tabs={tabs}
-          groups={groups}
-          states={states}
-          active={active}
-          shownGroup={shownGroup}
-          agents={agents.agents}
-          showChanges={showChanges}
-          onSelect={selectTab}
-          onSelectGroup={selectGroup}
-          renaming={renaming}
-          onRename={setRenaming}
-        />
+            </div>
+            {!group && showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
+            {!group && active !== undefined && prDraft && (
+              <PrDraftForm tab={active} draft={prDraft} onChange={(draft) => update(active, (s) => ({ ...s, prDraft: draft }))} />
+            )}
+            {!group && (status.needsLogin || status.needsAgent) && (
+              <div id="status">
+                <span id="status-text">{status.text}</span>
+                {status.needsLogin && <button onClick={() => post({ type: "login" })}>{t("chat.login")}</button>}
+                {status.needsAgent && <button onClick={() => post({ type: "selectAgent" })}>{t("chat.installAgent")}</button>}
+              </div>
+            )}
+            {composer.element}
+            {!group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} busy={!!status.busy} />}
+          </div>
+          <TabSidebar
+            tabs={tabs}
+            groups={groups}
+            states={states}
+            active={active}
+            shownGroup={shownGroup}
+            agents={agents.agents}
+            showChanges={showChanges}
+            onSelect={selectTab}
+            onSelectGroup={selectGroup}
+            renaming={renaming}
+            onRename={setRenaming}
+          />
         </div>
         <div id="drop-overlay" className={composer.dragging ? "visible" : undefined}>
           {t("chat.dropHint")}
         </div>
-        {!group && showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
-        {!group && (status.needsLogin || status.needsAgent) && (
-          <div id="status">
-            <span id="status-text">{status.text}</span>
-            {status.needsLogin && <button onClick={() => post({ type: "login" })}>{t("chat.login")}</button>}
-            {status.needsAgent && <button onClick={() => post({ type: "selectAgent" })}>{t("chat.installAgent")}</button>}
-          </div>
-        )}
-        {composer.element}
-        {!group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} />}
         {preview && (
           <Lightbox
             key={preview.src}

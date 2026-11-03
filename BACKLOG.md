@@ -56,7 +56,7 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 
 - [x] **F6. Best of N.** Send one prompt to several agents, each in its own worktree, then compare the diffs and apply the best one.
 - [x] **F7. Richer sidebar.** Instead of a separate overview screen: each row shows the kind and number of pending requests and the changed lines next to the worktree, its tooltip has the rest, and a group's row adds up its tabs. A filter for the tabs that need the user is still open.
-- [ ] **F8. Finishing a worktree.** Merge, open a PR with a generated description, clean up old worktrees.
+- [x] **F8. Finishing a worktree.** Merge, open a PR with a generated description, clean up old worktrees.
 
 ### Small
 

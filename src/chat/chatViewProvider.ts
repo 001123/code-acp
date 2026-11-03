@@ -119,6 +119,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     status: (tab, key) => this.status(tab, key),
     confirmStartOver: (tab) => this.sessions.confirmStartOver(tab),
     startOver: (tab, change) => this.sessions.startOver(tab, change),
+    ask: (tab, text) =>
+      this.turns.ask(tab, text).pipe(
+        // The draft is made from the commits then.
+        Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(undefined))),
+      ),
   });
   private readonly history = new HistoryRequests();
   /** Attachments added before the webview was ready are delivered on "ready". */
@@ -197,6 +202,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         turnEnded: (tab) => {
           this.changes.post(tab);
           this.run(this.refreshBranch(tab), tab);
+          this.run(this.tabWorktrees.refreshFinishable(tab), tab);
           this.run(this.groups.turnEnded(tab), tab);
           if (tab.sessionId) {
             this.status(tab, "chat.ready");
@@ -350,6 +356,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.post({ type: "tabs", tabs: this.tabs.info, groups: this.tabs.groupsInfo, active: this.tabs.active.id, shownGroup: this.tabs.shownGroup?.id });
     // Answers with another post only when the branch changed.
     this.run(this.refreshBranch(this.tabs.active));
+    this.run(this.tabWorktrees.refreshFinishable(this.tabs.active));
     this.attention.refresh();
     this.indicators.update();
     this.saveTabs();
@@ -583,6 +590,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "pickWorktree":
         yield* this.tabWorktrees.pick(tab);
         break;
+      case "finishWorktree":
+        yield* this.tabWorktrees.finish(tab);
+        break;
+      case "createPr":
+        yield* this.tabWorktrees.createPr(tab, msg.title, msg.body);
+        break;
+      case "dismissPr":
+        this.tabWorktrees.clearDraft(tab);
+        break;
       case "setConfig":
         yield* this.sessions.setConfig(tab, msg.configId, msg.value);
         break;
@@ -599,6 +615,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /** Offers the worktrees the active tab can run in (command palette, view menu). */
   readonly pickWorktree = Effect.fn("ChatView.pickWorktree")(function* (this: ChatViewProvider) {
     yield* this.tabWorktrees.pick(this.tabs.active);
+  });
+
+  /** Offers to delete the worktrees no tab runs in (command palette, view menu). */
+  readonly cleanWorktrees = Effect.fn("ChatView.cleanWorktrees")(function* (this: ChatViewProvider) {
+    yield* this.tabWorktrees.cleanUp();
   });
 
   /** The agent the active tab runs on. */

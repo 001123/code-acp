@@ -261,6 +261,8 @@ export const workspace = {
   findFiles: async () => [],
 };
 
+export const ProgressLocation = { SourceControl: 1, Window: 10, Notification: 15 };
+
 export const window = {
   activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
   createOutputChannel(name: string) {
@@ -272,6 +274,8 @@ export const window = {
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   showErrorMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   showQuickPick: async <T>(_items: ReadonlyArray<T>, _options?: unknown): Promise<T | T[] | undefined> => undefined,
+  showInputBox: async (_options?: unknown): Promise<string | undefined> => undefined,
+  withProgress: async <R>(_options: unknown, task: (progress: { report(value: unknown): void }) => Thenable<R>): Promise<R> => task({ report: () => {} }),
   state: { focused: true },
   onDidChangeWindowState: () => noDisposable,
   onDidStartTerminalShellExecution: () => noDisposable,

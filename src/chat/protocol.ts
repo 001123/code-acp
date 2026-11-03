@@ -72,6 +72,12 @@ export type FromWebview =
   | { type: "setCwd"; tab: number; cwd: string }
   /** Offers the worktrees `tab` can run in, and what can be done with its own. */
   | { type: "pickWorktree"; tab: number }
+  /** Offers the ways to finish the work in the tab's worktree. */
+  | { type: "finishWorktree"; tab: number }
+  /** Pushes the branch of the tab's worktree and opens the pull request of its "prDraft". */
+  | { type: "createPr"; tab: number; title: string; body: string }
+  /** Drops the tab's "prDraft". */
+  | { type: "dismissPr"; tab: number }
   | { type: "manageAgents" }
   /** Opens the usage summary (clicking the context meter). */
   | { type: "showUsage" }
@@ -251,6 +257,17 @@ export interface TabGroupInfo {
   collapsed: boolean;
 }
 
+/** A pull request the user is about to open ("prDraft" message); `base` undefined means the repository's default branch. */
+export interface PrDraft {
+  title: string;
+  body: string;
+  head: string;
+  remote: string;
+  base?: string;
+  /** Being pushed and opened: the form waits. */
+  pending?: boolean;
+}
+
 /** What a tab's worktree changed ("worktreeDiff" message); `error` when that couldn't be read. */
 export interface WorktreeDiff {
   files: ReadonlyArray<WorktreeFileDiff>;
@@ -280,6 +297,8 @@ export interface TabInfo {
   attemptLabel?: string;
   /** Its worktree's changes were applied to the base folder. */
   applied?: boolean;
+  /** Its worktree holds work the base folder doesn't. */
+  finishable?: boolean;
   pinned: boolean;
   /** When the conversation started (epoch ms); undefined until the first message, or for sessions opened from history. */
   createdAt?: number;
