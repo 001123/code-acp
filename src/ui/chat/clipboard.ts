@@ -11,29 +11,44 @@ export interface CopiedImage {
   src: string;
 }
 
+/** An attachment and the token that stands for it in copied text. */
+export interface CopiedToken {
+  token: string;
+  attachment: Attachment;
+}
+
 /** The data attachment a `data:` URI holds, if it is a base64 image. */
 export function imageAttachment(name: string, src: string): Extract<Attachment, { kind: "data" }> | undefined {
   const m = /^data:(image\/[\w.+-]+);base64,(.*)$/s.exec(src);
   return m ? { kind: "data", name, mimeType: m[1]!, data: m[2]! } : undefined;
 }
 
+/** A token's name, without its sigil and the number that told it from another of the same name. */
+const tokenName = (token: string) => token.slice(1).replace(/ \(\d+\)$/, "");
+
+/** The images that can be read back as attachments. */
+export function imageTokens(images: readonly CopiedImage[]): CopiedToken[] {
+  return images.flatMap(({ token, src }) => {
+    const attachment = imageAttachment(tokenName(token), src);
+    return attachment ? [{ token, attachment }] : [];
+  });
+}
+
 /**
- * The composer content of a pasted message: `text` with its image tokens as attachments, each renamed like a new one
+ * The composer content of pasted text: `text` with the tokens of `copied` as attachments, each renamed like a new one
  * ("@image.png (2)") when `taken` already has it.
  */
 export function pastedContent(
   text: string,
-  images: readonly CopiedImage[],
+  copied: readonly CopiedToken[],
   taken: (token: string) => boolean,
-): { text: string; inline: Array<{ token: string; attachment: Attachment }> } {
-  const inline: Array<{ token: string; attachment: Attachment }> = [];
+): { text: string; inline: CopiedToken[] } {
+  const inline: CopiedToken[] = [];
   const names = new Map<string, string>();
   const used = (token: string) => taken(token) || inline.some((x) => x.token === token);
-  for (const { token, src } of images) {
+  for (const { token, attachment } of copied) {
     if (names.has(token) || !text.includes(token)) continue;
-    const name = token.slice(1).replace(/ \(\d+\)$/, "");
-    const attachment = imageAttachment(name, src);
-    if (!attachment) continue;
+    const name = tokenName(token);
     let next = `${token[0]}${name}`;
     for (let n = 2; used(next); n++) next = `${token[0]}${name} (${n})`;
     names.set(token, next);
@@ -131,6 +146,12 @@ export function copySelection(e: ClipboardEvent, within: Element): boolean {
   e.clipboardData.setData("text/html", copiedHtml(root));
   e.preventDefault();
   return true;
+}
+
+/** The tokens in HTML copied from the composer. */
+export function htmlTokens(html: string): string[] {
+  const marks = new DOMParser().parseFromString(html, "text/html").querySelectorAll<HTMLElement>("mark[data-token]");
+  return [...marks].map((mark) => mark.dataset.token!);
 }
 
 /** The images of a message copied by `copyMessage`, from the HTML on the clipboard; undefined for other HTML. */

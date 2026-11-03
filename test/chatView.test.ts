@@ -750,6 +750,32 @@ describe("ChatViewProvider", () => {
       }).pipe(Effect.scoped),
     );
 
+    it.live("lists the conversations without taking the focus, and tells the tabs' sessions", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_HISTORY: "1" };
+        const { ofType, send, tabsNow } = yield* startChat;
+        const focused: unknown[] = [];
+        const { executeCommand } = commands;
+        commands.executeCommand = async (...args) => void focused.push(args[0]);
+        yield* Effect.addFinalizer(() => Effect.sync(() => void (commands.executeCommand = executeCommand)));
+        send({ type: "history" });
+        yield* until(() => ofType("history").at(-1)?.sessions.length === 1, "the list");
+        assert.deepStrictEqual(focused, []);
+        assert.isString(tabsNow().tabs[0]!.sessionId);
+      }).pipe(Effect.scoped),
+    );
+
+    it.live("keeps a failure to list the conversations out of the conversation", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_LIST_FAIL: "1" };
+        const { ofType, send, tab } = yield* startChat;
+        send({ type: "history" });
+        yield* until(() => ofType("history").at(-1)?.error !== undefined, "the failure");
+        assert.deepStrictEqual(ofType("history").at(-1)!.sessions, []);
+        assert.deepStrictEqual(ofType("error", tab), []);
+      }).pipe(Effect.scoped),
+    );
+
     it.live("keeps the session of an open tab", () =>
       Effect.gen(function* () {
         agentEnv = { MOCK_HISTORY: "1" };

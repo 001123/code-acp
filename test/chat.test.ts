@@ -13,7 +13,8 @@ import { replayedParts } from "../src/chat/replay";
 import type { TabGroupInfo, TabInfo } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow } from "../src/ui/chat/compareAttempts";
-import { attemptStatus, diffTotals, dropIndex, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows } from "../src/ui/chat/tabRows";
+import { folderName, historyGroups, shortTime, type HistoryGroup, type HistorySort } from "../src/ui/chat/historyList";
+import { attemptStatus, collapsedRows, diffTotals, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, type ShownRow } from "../src/ui/chat/tabRows";
 import type { TabState } from "../src/ui/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
 import { transcript, EMPTY, fileLinkTokens, noticeItem, permissionInput, stopReasonText, type Action } from "../src/ui/chat/transcript";
@@ -367,6 +368,73 @@ describe("history search", () => {
     assert.isTrue(matchesSession(session, "lịch code-acp"));
     assert.isFalse(matchesSession(session, "tim tab"));
     assert.isTrue(matchesSession({ sessionId: "d", cwd: "/w", title: "Đổi tên" }, "doi"));
+  });
+});
+
+describe("sidebar history", () => {
+  const session = (sessionId: string, title: string | undefined, cwd: string, updatedAt: string): acp.SessionInfo => ({ sessionId, title, cwd, updatedAt });
+  const sessions = [
+    session("old", "Zebra", "/work/b", "2026-01-01T00:00:00Z"),
+    session("new", "Đổi tên", "/work/a", "2026-03-01T00:00:00Z"),
+    session("none", undefined, "/work/b", "2026-02-01T00:00:00Z"),
+    session("open", "Apple", "/work/a", "2026-04-01T00:00:00Z"),
+  ];
+  const ids = (groups: ReadonlyArray<HistoryGroup>) => groups.map((group) => group.sessions.map((s) => s.sessionId));
+  const list = (sort: HistorySort, query = "") => historyGroups(sessions, { openIds: new Set(["open"]), query, sort, lang: "en" });
+
+  it("leaves out conversations in tabs and sorts the rest", () => {
+    assert.deepStrictEqual(ids(list("updated")), [["new", "none", "old"]]);
+    assert.deepStrictEqual(ids(list("title")), [["new", "old", "none"]]);
+  });
+
+  it("groups by folder, the latest first in each", () => {
+    const groups = list("folder");
+    assert.deepStrictEqual(groups.map((group) => group.folder), ["/work/a", "/work/b"]);
+    assert.deepStrictEqual(ids(groups), [["new"], ["none", "old"]]);
+  });
+
+  it("filters by the query, ignoring diacritics, and lists no empty group", () => {
+    assert.deepStrictEqual(ids(list("folder", "doi")), [["new"]]);
+    assert.deepStrictEqual(list("updated", "nothing"), []);
+  });
+
+  it("labels the time in short, never with months", () => {
+    const now = Date.parse("2026-11-04T12:00:00Z");
+    const ago = (seconds: number) => shortTime("en", new Date(now - seconds * 1000).toISOString(), now);
+    assert.deepStrictEqual([ago(5), ago(5 * 60), ago(2 * 3600), ago(3 * 86400), ago(60 * 86400), ago(400 * 86400)], ["1m", "5m", "2h", "3d", "8w", "1y"]);
+    assert.strictEqual(shortTime("en", undefined, now), "");
+  });
+
+  it("names a folder by its last segment", () => {
+    assert.strictEqual(folderName("/work/code-acp/"), "code-acp");
+    assert.strictEqual(folderName("C:\\work\\code"), "code");
+  });
+});
+
+describe("sidebar rows", () => {
+  const tab = (id: number, title: string, group?: number) => ({ id, title, group, cwd: "/work", pinned: false, used: true, canFork: false }) as TabInfo;
+  const group = { id: 1, title: "Compare", prompt: "", collapsed: true } as unknown as TabGroupInfo;
+  const tabs = [tab(1, "Alpha"), tab(2, "Beta", 1), tab(3, "Gamma", 1), tab(4, "Delta")];
+  const rows = tabRows(tabs, [group]);
+  const titleOf = (each: TabInfo) => each.title ?? "";
+  const shown = (each: ReadonlyArray<ShownRow>) => each.map((row) => (row.kind === "tab" ? row.tab.id : row.shown.map((member) => member.id)));
+
+  it("finds tabs, and shows only the tabs of a group that match", () => {
+    assert.deepStrictEqual(shown(matchingRows(rows, "alpha", titleOf)), [1]);
+    assert.deepStrictEqual(shown(matchingRows(rows, "gamma", titleOf)), [[3]]);
+    assert.deepStrictEqual(shown(matchingRows(rows, "compare", titleOf)), [[2, 3]]);
+    assert.deepStrictEqual(shown(matchingRows(rows, "nothing", titleOf)), []);
+  });
+
+  it("keeps the whole group count when it shows only some of its tabs", () => {
+    const [row] = matchingRows(rows, "gamma", titleOf);
+    assert.deepStrictEqual(row?.kind === "group" ? row.members.map((member) => member.id) : [], [2, 3]);
+  });
+
+  it("collapses to the rows that matter", () => {
+    assert.deepStrictEqual(shown(collapsedRows(rows, (each) => each.id === 4, undefined)), [4]);
+    assert.deepStrictEqual(shown(collapsedRows(rows, (each) => each.id === 3, undefined)), [[2, 3]]);
+    assert.deepStrictEqual(shown(collapsedRows(rows, () => false, 1)), [[2, 3]]);
   });
 });
 

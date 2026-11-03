@@ -12,7 +12,7 @@ import { ChangesBar } from "./chat/changes";
 import { HoverPreview, OpenPreview, ShownTab, Terminals, type Hover, type Preview } from "./chat/context";
 import { useComposer } from "./chat/composer";
 import { GroupPanel } from "./chat/groupPanel";
-import { HistoryView, type History } from "./chat/history";
+import type { History } from "./chat/history";
 import { post } from "./chat/post";
 import { NEW_TAB, TabSidebar, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
@@ -38,6 +38,9 @@ function EntryBoundary({ items, children }: { items: readonly unknown[]; childre
   );
 }
 
+/** How long a hover over the sidebar doesn't list the conversations again. */
+const HISTORY_FRESH_MS = 30_000;
+
 function App() {
   const { t } = useL10n();
   const [tabs, setTabs] = useState<TabInfo[]>([]);
@@ -57,6 +60,17 @@ function App() {
   const [folders, setFolders] = useState<WorkspaceFolderInfo[]>([]);
   const [remote, setRemote] = useState(false);
   const [history, setHistory] = useState<History>();
+  /** When the history was last asked for; undefined until the sidebar first wants it. */
+  const historyAsked = useRef<number>(undefined);
+  /** Asks for the history, unless it was just read and nothing outdated it (`force`). The sidebar wants it at each hover. */
+  const loadHistory = useCallback((force?: boolean) => {
+    const now = Date.now();
+    if (force !== true && historyAsked.current !== undefined && now - historyAsked.current < HISTORY_FRESH_MS) return;
+    historyAsked.current = now;
+    post({ type: "history" });
+  }, []);
+  /** Counts the requests to go to the sidebar's search box. */
+  const [searchRequest, setSearchRequest] = useState(0);
   /** The tab whose name is being edited in the sidebar. */
   const [renaming, setRenaming] = useState<number>();
   /** Counts the requests for the find box; 0 while it is closed. */
@@ -263,7 +277,11 @@ function App() {
         dispatch(tab, { type: "endStream" });
         return update(tab, (s) => ({ ...s, config: msg.configOptions ?? [], configLoading: false }));
       case "history":
-        return setHistory(msg);
+        // A refresh leaves the list in place until the new one comes.
+        return setHistory((h) => (msg.loading && h?.sessions.length ? { ...h, loading: true } : msg));
+      case "searchConversations":
+        loadHistory(true);
+        return setSearchRequest((n) => n + 1);
       case "sessionDeleted":
         return setHistory((h) => h && { ...h, sessions: h.sessions.filter((s) => s.sessionId !== msg.sessionId) });
       case "notice":
@@ -341,7 +359,6 @@ function App() {
       case "findInConversation":
         if (!chatShown) return;
         showComposer();
-        setHistory(undefined);
         return setFindRequest((n) => n + 1);
       case "exportConversation": {
         const info = tabs.find((x) => x.id === msg.tab);
@@ -422,33 +439,28 @@ function App() {
     if (id === activeRef.current && shownGroupRef.current === undefined) return;
     setActive(id);
     setShownGroup(undefined);
-    setHistory(undefined);
     post({ type: "selectTab", tab: id });
   }
 
   function selectGroup(id: number): void {
     setShownGroup(id);
-    setHistory(undefined);
     post({ type: "selectGroup", group: id });
   }
 
 
-  // Reloads an open history list when the active tab switches agent; the list is per agent.
+  // The list is per agent and leaves out the conversations in tabs, so these changes outdate it. Only once it's wanted:
+  // the sidebar doesn't list anything before it first opens.
   const activeAgentId = tabs.find((x) => x.id === active)?.agentId;
-  const historyAgent = useRef(activeAgentId);
+  const openSessions = tabs.flatMap((x) => x.sessionId ?? []).sort().join();
+  const historySource = useRef({ agent: activeAgentId, sessions: openSessions });
   useEffect(() => {
-    if (history && historyAgent.current !== activeAgentId) post({ type: "history" });
-    historyAgent.current = activeAgentId;
-  }, [activeAgentId]);
-
-  useEffect(() => {
-    if (!history) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setHistory(undefined);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [!history]);
+    const { agent, sessions } = historySource.current;
+    if (agent === activeAgentId && sessions === openSessions) return;
+    historySource.current = { agent: activeAgentId, sessions: openSessions };
+    if (historyAsked.current === undefined) return;
+    if (agent !== activeAgentId) setHistory(undefined);
+    loadHistory(true);
+  }, [activeAgentId, openSessions]);
 
   // Switching tabs or sending a message always shows the end. Other new content does only while the view
   // follows the end, and never with auto-scroll off.
@@ -536,12 +548,11 @@ function App() {
       <Terminals.Provider value={agentTerminals}>
         <div id="chat-body">
           <div id="chat-main">
-            {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
-            {agentsKnown && setup && !history && <AgentSetup catalog={catalog} doctor={setupDoctor} />}
-            {chatShown && group && !history && (
+            {agentsKnown && setup && <AgentSetup catalog={catalog} doctor={setupDoctor} />}
+            {chatShown && group && (
               <GroupPanel group={group} members={tabs.filter((tab) => tab.group === group.id)} states={states} agents={agents.agents} onOpen={selectTab} />
             )}
-            {chatShown && !group && !history && findRequest > 0 && (
+            {chatShown && !group && findRequest > 0 && (
               <TranscriptSearch
                 root={messages}
                 resetKey={active}
@@ -555,7 +566,7 @@ function App() {
                 }}
               />
             )}
-            <div id="messages" ref={messages} hidden={!!history || !!group || !chatShown}>
+            <div id="messages" ref={messages} hidden={!!group || !chatShown}>
               {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
               {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map((entry) =>
                 Array.isArray(entry) ? (
@@ -599,6 +610,10 @@ function App() {
               onSelectGroup={selectGroup}
               renaming={renaming}
               onRename={setRenaming}
+              history={history}
+              onNeedHistory={loadHistory}
+              searchRequest={searchRequest}
+              onLeaveSearch={composer.focus}
             />
           )}
         </div>

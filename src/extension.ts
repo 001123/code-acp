@@ -96,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.openSettings", () => SettingsPanel.show(context, runtime, manager)),
     vscode.commands.registerCommand("codeAcp.showUsage", () => SettingsPanel.show(context, runtime, manager, "usage")),
     vscode.commands.registerCommand("codeAcp.newSession", run(() => provider.newSession())),
-    vscode.commands.registerCommand("codeAcp.history", run(() => provider.showHistory())),
+    vscode.commands.registerCommand("codeAcp.history", run(() => provider.showConversations)),
     vscode.commands.registerCommand("codeAcp.cancel", run(() => provider.cancel())),
     vscode.commands.registerCommand("codeAcp.findInConversation", run(() => provider.findInConversation)),
     vscode.commands.registerCommand("codeAcp.exportConversation", run(() => provider.exportConversation)),

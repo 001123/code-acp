@@ -4,12 +4,15 @@ import type * as acp from "@agentclientprotocol/sdk";
 const fold = (text: string) =>
   text.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase();
 
-/** Whether every word of `query` is in the session's title or folder. */
-export function matchesSession(session: acp.SessionInfo, query: string): boolean {
+/** Whether every word of `query` is in `text`. */
+export function matchesText(text: string, query: string): boolean {
   const words = fold(query).split(/\s+/).filter(Boolean);
-  const haystack = fold(`${session.title ?? ""} ${session.cwd}`);
+  const haystack = fold(text);
   return words.every((word) => haystack.includes(word));
 }
+
+/** Whether every word of `query` is in the session's title or folder. */
+export const matchesSession = (session: acp.SessionInfo, query: string): boolean => matchesText(`${session.title ?? ""} ${session.cwd}`, query);
 
 /** Most matches `findMatches`' callers keep track of; a one-letter query in a long chat would find far more. */
 export const MAX_MATCHES = 10_000;

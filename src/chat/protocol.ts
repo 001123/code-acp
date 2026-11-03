@@ -64,6 +64,7 @@ export type FromWebview =
   | { type: "draft"; tab: number; draft: Draft }
   /** The draft's text alone, when its attachments are the ones last sent with "draft". */
   | { type: "draftText"; tab: number; text: string }
+  /** Lists the conversations for the sidebar; answered with "history". */
   | { type: "history" }
   | { type: "openSession"; sessionId: string; cwd: string; title?: string }
   /** Deletes a past session, after asking; answered with "sessionDeleted". */
@@ -300,6 +301,8 @@ export interface TabInfo {
   /** Its worktree can be deleted: the extension made it and no other tab runs in it. */
   deletable?: boolean;
   pinned: boolean;
+  /** The conversation shown in it, also while its agent has yet to reopen it; the history leaves it out. */
+  sessionId?: string;
   /** When the conversation started (epoch ms); undefined until the first message, or for sessions opened from history. */
   createdAt?: number;
   /** The installed agent picked for the tab; undefined until it has one. */

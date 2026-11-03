@@ -13,7 +13,7 @@ if (process.env.MOCK_EXIT_EARLY === "1") {
 const record = (line) => process.env.MOCK_RECORD && appendFileSync(process.env.MOCK_RECORD, `${line}\n`);
 
 let sessions = 0;
-/** MOCK_HISTORY: what session/list gives; session/delete takes from it. */
+/** MOCK_HISTORY: what session/list gives; session/delete takes from it. MOCK_LIST_FAIL: session/list fails. */
 const past = new Set(["old"]);
 let mode = "ask";
 /** MOCK_MODELS: the model and effort picked, by session. */
@@ -52,7 +52,7 @@ acp
       loadSession: process.env.MOCK_LOAD === "1",
       sessionCapabilities: {
         ...(process.env.MOCK_FORK === "1" ? { fork: {} } : {}),
-        ...(process.env.MOCK_HISTORY === "1" ? { list: {}, delete: {} } : {}),
+        ...(process.env.MOCK_HISTORY === "1" || process.env.MOCK_LIST_FAIL === "1" ? { list: {}, delete: {} } : {}),
       },
       ...(process.env.MOCK_LOGOUT === "1" ? { auth: { logout: {} } } : {}),
     },
@@ -72,9 +72,12 @@ acp
     picks.set(params.sessionId, { ...pick, [params.configId]: params.value });
     return { configOptions: pickedOptions(params.sessionId) };
   })
-  .onRequest(acp.methods.agent.session.list, () => ({
-    sessions: [...past].map((sessionId) => ({ sessionId, cwd: process.cwd(), title: `Session ${sessionId}` })),
-  }))
+  .onRequest(acp.methods.agent.session.list, () => {
+    if (process.env.MOCK_LIST_FAIL === "1") {
+      throw acp.RequestError.internalError(undefined, "cannot list");
+    }
+    return { sessions: [...past].map((sessionId) => ({ sessionId, cwd: process.cwd(), title: `Session ${sessionId}` })) };
+  })
   .onRequest(acp.methods.agent.session.delete, ({ params }) => {
     record(`delete ${params.sessionId}`);
     if (!past.delete(params.sessionId)) {

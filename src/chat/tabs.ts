@@ -474,6 +474,7 @@ export class TabList {
       named: tab.name !== undefined,
       createdAt: tab.createdAt,
       pinned: tab.pinned,
+      sessionId: tab.sessionId ?? tab.reopen?.sessionId,
       agentId: tab.agentId,
       cwd: tab.cwd,
       worktree: tab.worktree,

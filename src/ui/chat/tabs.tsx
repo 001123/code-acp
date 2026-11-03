@@ -8,14 +8,20 @@ import archiveIcon from "@tabler/icons/outline/archive.svg";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import chevronRightIcon from "@tabler/icons/outline/chevron-right.svg";
 import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
+import undockIcon from "@tabler/icons/outline/layout-sidebar-right-collapse.svg";
+import dockIcon from "@tabler/icons/outline/layout-sidebar-right-expand.svg";
 import pinIcon from "@tabler/icons/outline/pin.svg";
 import pinFilledIcon from "@tabler/icons/filled/pin.svg";
 import plusIcon from "@tabler/icons/outline/plus.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
+import { HistoryList, HistorySortMenu, SidebarSearch, SidebarSection, type History } from "./history";
+import { historyGroups } from "./historyList";
+import { useClickMenu } from "./popupMenu";
 import { post } from "./post";
+import { useDockable, useSidebarPrefs } from "./sidebarPrefs";
 import type { Usage } from "./usageMeter";
 import type { AgentChoices } from "./agentPanel";
-import { dropIndex, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, type TabChanges } from "./tabRows";
+import { allRows, collapsedRows, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, type TabChanges } from "./tabRows";
 import { EMPTY, type Transcript } from "./transcript";
 
 export interface Status {
@@ -118,7 +124,11 @@ function ChangeCounts({ changes }: { changes: TabChanges }) {
 type Dragged = { readonly ids: ReadonlyArray<number>; readonly group?: number };
 type DropLine = { readonly key: string; readonly at: number; readonly after: boolean };
 
-/** The tabs as a rail beside the conversation that opens over it on hover (CSS); `data-open` holds it open while a tab is dragged or renamed. */
+/**
+ * The open tabs and the past conversations, as a rail beside the conversation that opens over it on hover (CSS);
+ * `data-open` holds it open while a tab is dragged or renamed, or a search is under way. Docked, it stays open and
+ * takes its room from the conversation. Everything past the rail's column is clipped while it is closed.
+ */
 export function TabSidebar({
   tabs,
   groups,
@@ -131,6 +141,10 @@ export function TabSidebar({
   onSelectGroup,
   renaming,
   onRename,
+  history,
+  onNeedHistory,
+  searchRequest,
+  onLeaveSearch,
 }: {
   tabs: TabInfo[];
   groups: TabGroupInfo[];
@@ -146,6 +160,13 @@ export function TabSidebar({
   /** The tab whose name is being edited; `onRename` starts or ends the edit. */
   renaming: number | undefined;
   onRename: (id: number | undefined) => void;
+  history: History | undefined;
+  /** The past conversations are about to be seen. */
+  onNeedHistory: () => void;
+  /** Counts the requests to go to the search box. */
+  searchRequest: number;
+  /** Escape left the search box. */
+  onLeaveSearch: () => void;
 }) {
   const { t, lang } = useL10n();
   const dateFormat = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" });
@@ -153,6 +174,32 @@ export function TabSidebar({
   const [dragged, setDragged] = useState<Dragged>();
   const [dropLine, setDropLine] = useState<DropLine>();
   const [renamingGroup, setRenamingGroup] = useState<number>();
+  const [query, setQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [prefs, setPrefs] = useSidebarPrefs();
+  const dockable = useDockable();
+  const sortMenu = useClickMenu();
+  const searchInput = useRef<HTMLInputElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const restTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const searching = query.trim() !== "";
+  const docked = prefs.docked && dockable;
+  const held = dragged !== undefined || renaming !== undefined || renamingGroup !== undefined || query !== "" || searchFocused || sortMenu.open || docked;
+  const heldRef = useRef(held);
+  heldRef.current = held;
+  const needHistory = () => {
+    if (searching || !prefs.historyCollapsed) onNeedHistory();
+  };
+  const titleOf = (tab: TabInfo, member: boolean) => (member ? memberTitle(tab, agents) : tab.title) || t("chat.newTab");
+  /** Results lead to a conversation, which ends the search. */
+  const select = (id: number) => {
+    setQuery("");
+    onSelect(id);
+  };
+  const selectGroup = (id: number) => {
+    setQuery("");
+    onSelectGroup(id);
+  };
   const endDrag = () => {
     setDragged(undefined);
     setDropLine(undefined);
@@ -194,13 +241,32 @@ export function TabSidebar({
   useEffect(() => {
     list.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" });
   }, [active, shownGroup, tabs.length]);
+  useEffect(() => {
+    if (docked || searching) needHistory();
+  }, [docked, searching]);
+  useEffect(() => {
+    if (searchRequest === 0) return;
+    searchInput.current?.focus();
+    if (scroller.current) scroller.current.scrollTop = 0;
+  }, [searchRequest]);
+  useEffect(() => () => clearTimeout(restTimer.current), []);
+  /** The closed rail shows tabs only, so it goes back to them from wherever the list was scrolled to. */
+  const backToTabs = () => {
+    clearTimeout(restTimer.current);
+    restTimer.current = setTimeout(() => {
+      if (heldRef.current) return;
+      const shown = list.current?.querySelector("[data-active]");
+      if (shown) shown.scrollIntoView({ block: "nearest" });
+      else if (scroller.current) scroller.current.scrollTop = 0;
+    }, 300);
+  };
 
   const tabRow = (tab: TabInfo, member: boolean) => {
     const state = states[tab.id];
     const requests = requestsLabel(openRequests(state), t);
     const waiting = requests !== undefined;
     const changed = tabChanges(state, showChanges);
-    const title = (member ? memberTitle(tab, agents) : tab.title) || t("chat.newTab");
+    const title = titleOf(tab, member);
     const tooltip = [
       waiting ? `${title} · ${requests}` : title,
       ...(!waiting && (state?.status.busy || tab.attempt === "running") ? [t("bestOf.running")] : []),
@@ -223,7 +289,7 @@ export function TabSidebar({
         key={key}
         className="tab"
         role="tab"
-        draggable={tab.id !== renaming}
+        draggable={!searching && tab.id !== renaming}
         aria-selected={tab.id === active && shownGroup === undefined}
         data-member={member || undefined}
         data-active={(tab.id === active && shownGroup === undefined) || undefined}
@@ -241,7 +307,7 @@ export function TabSidebar({
           tabCanFork: tab.canFork,
           preventDefaultContextMenuItems: true,
         })}
-        onClick={() => onSelect(tab.id)}
+        onClick={() => select(tab.id)}
         onDoubleClick={() => onRename(tab.id)}
         onAuxClick={(e) => {
           if (e.button === 1 && !tab.pinned) post({ type: "closeTab", tab: tab.id });
@@ -306,7 +372,7 @@ export function TabSidebar({
     );
   };
 
-  const groupRow = (group: TabGroupInfo, members: TabInfo[]) => {
+  const groupRow = (group: TabGroupInfo, members: TabInfo[], shown: TabInfo[]) => {
     const running = members.filter((tab) => states[tab.id]?.status.busy || tab.attempt === "running").length;
     const open = members.map((tab) => openRequests(states[tab.id]));
     const requests = requestsLabel(
@@ -325,7 +391,7 @@ export function TabSidebar({
         <div
           className="tab"
           role="tab"
-          draggable={group.id !== renamingGroup}
+          draggable={!searching && group.id !== renamingGroup}
           aria-selected={group.id === shownGroup}
           data-group
           data-active={group.id === shownGroup || undefined}
@@ -343,7 +409,7 @@ export function TabSidebar({
             ...(changed ? [t("chat.tabChanges", changed.files, changed.added, changed.removed)] : []),
           ].join("\n")}
           data-vscode-context={JSON.stringify({ webviewSection: "tabGroup", preventDefaultContextMenuItems: true })}
-          onClick={() => onSelectGroup(group.id)}
+          onClick={() => selectGroup(group.id)}
           onDoubleClick={() => setRenamingGroup(group.id)}
           onAuxClick={(e) => {
             if (e.button === 1 && !pinned) post({ type: "closeGroup", group: group.id });
@@ -410,23 +476,105 @@ export function TabSidebar({
             </button>
           )}
         </div>
-        {!group.collapsed && members.map((tab) => tabRow(tab, true))}
+        {(searching || !group.collapsed) && shown.map((tab) => tabRow(tab, true))}
       </div>
     );
   };
 
+  const rows = tabRows(tabs, groups);
+  /** What matters even with the section collapsed; keeping it in the rail too means that nothing moves as the panel opens. */
+  const keeps = (tab: TabInfo) => {
+    const state = states[tab.id];
+    return tab.id === active || tab.pinned || !!state?.status.busy || tab.attempt === "running" || requestsLabel(openRequests(state), t) !== undefined;
+  };
+  const shownRows = searching ? matchingRows(rows, query, titleOf) : prefs.openCollapsed ? collapsedRows(rows, keeps, shownGroup) : allRows(rows);
+  const past = historyGroups(history?.sessions ?? [], {
+    openIds: new Set(tabs.flatMap((tab) => tab.sessionId ?? [])),
+    query,
+    sort: prefs.sort,
+    lang,
+  });
+  const historyWaited = !history || (history.loading === true && history.sessions.length === 0);
+  const noMatch = searching && shownRows.length === 0 && past.length === 0;
+  const agentName = agents.find((each) => each.id === tabs.find((tab) => tab.id === active)?.agentId)?.name;
+  const dockLabel = t(docked ? "chat.undockSidebar" : "chat.dockSidebar");
+  const historySection = (
+    <>
+      {(!searching || past.length > 0) && (
+        <SidebarSection
+          label={t("chat.sidebarHistory")}
+          detail={agentName}
+          collapsed={!searching && prefs.historyCollapsed}
+          onToggle={() => {
+            if (prefs.historyCollapsed) onNeedHistory();
+            setPrefs({ historyCollapsed: !prefs.historyCollapsed });
+          }}
+        >
+          <HistorySortMenu menu={sortMenu} sort={prefs.sort} onSort={(sort) => setPrefs({ sort })} />
+        </SidebarSection>
+      )}
+      {(searching || !prefs.historyCollapsed) && <HistoryList history={history} groups={past} searching={searching} onOpened={() => setQuery("")} />}
+    </>
+  );
   return (
-    <div id="tabs" role="tablist" data-open={dragged !== undefined || renaming !== undefined || renamingGroup !== undefined || undefined}>
+    <div
+      id="tabs"
+      data-open={held || undefined}
+      data-docked={docked || undefined}
+      onMouseEnter={() => {
+        clearTimeout(restTimer.current);
+        needHistory();
+      }}
+      onMouseLeave={backToTabs}
+      onFocus={needHistory}
+    >
       <div id="tab-panel">
-        <button id="new-tab" title={t("chat.newTab")} aria-label={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
-          <span className="tab-marker" aria-hidden="true">
-            <Icon svg={plusIcon} />
-          </span>
-          <span className="tab-title">{t("chat.newTab")}</span>
-        </button>
-        <div id="tab-list" ref={list}>
-          {tabRows(tabs, groups).map((row) => (row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members)))}
+        <div id="tab-top">
+          <button id="new-tab" title={t("chat.newTab")} aria-label={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
+            <span className="tab-marker" aria-hidden="true">
+              <Icon svg={plusIcon} />
+            </span>
+            <span className="tab-title">{t("chat.newTab")}</span>
+          </button>
+          {dockable && (
+            <button
+              className="icon-btn small"
+              id="tab-dock"
+              title={dockLabel}
+              aria-label={dockLabel}
+              aria-pressed={docked}
+              onClick={() => setPrefs({ docked: !prefs.docked })}
+            >
+              <Icon svg={docked ? undockIcon : dockIcon} />
+            </button>
+          )}
         </div>
+        <SidebarSearch
+          input={searchInput}
+          query={query}
+          onQuery={setQuery}
+          onFocusChange={setSearchFocused}
+          onLeave={() => {
+            searchInput.current?.blur();
+            onLeaveSearch();
+          }}
+        />
+        <div id="tab-scroll" ref={scroller}>
+          {(!searching || shownRows.length > 0) && (
+            <SidebarSection
+              label={t("chat.sidebarOpen")}
+              detail={String(tabs.length)}
+              collapsed={!searching && prefs.openCollapsed}
+              onToggle={() => setPrefs({ openCollapsed: !prefs.openCollapsed })}
+            />
+          )}
+          <div id="tab-list" role="tablist" ref={list}>
+            {shownRows.map((row) => (row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members, row.shown)))}
+          </div>
+          {searching && historySection}
+          {noMatch && <div className="history-message">{t(historyWaited ? "chat.historyLoading" : "chat.historyNoMatch")}</div>}
+        </div>
+        {!searching && <div id="tab-history">{historySection}</div>}
       </div>
     </div>
   );

@@ -13,10 +13,14 @@
 #tabs {
   --tabs-rail: 40px;
   --tabs-gap: 6px;
-  --tabs-open: min(220px, calc(100vw - 48px));
+  --tabs-open: min(280px, calc(100vw - 48px));
   position: relative;
   flex: none;
   width: calc(var(--tabs-rail) + var(--tabs-gap));
+}
+/* Takes its room from the conversation; `data-open` has it open. */
+#tabs[data-docked] {
+  width: calc(var(--tabs-open) + var(--tabs-gap));
 }
 /* `clip` rather than `hidden`: rows keep the open width, and scrollIntoView can't scroll them sideways. */
 #tab-panel {
@@ -53,18 +57,41 @@
   transition-duration: 0.08s;
   transition-delay: 0.06s;
 }
+#tabs[data-docked] > #tab-panel {
+  box-shadow: none;
+}
 @media (prefers-reduced-motion: reduce) {
   #tab-panel {
     transition: none;
   }
 }
 /* The open width less the panel's borders. */
-#new-tab,
-#tab-list {
-  flex: none;
+#tab-top,
+#tab-scroll,
+#tab-history {
   width: calc(var(--tabs-open) - 2px);
 }
+#tab-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+#tab-dock {
+  flex: none;
+  margin-right: 8px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+}
+#tab-dock:hover,
+#tab-dock[aria-pressed="true"] {
+  color: var(--vscode-foreground);
+}
+#tab-dock:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
 #new-tab {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   height: 32px;
@@ -81,11 +108,20 @@
   width: 16px;
   height: 16px;
 }
-#tab-list {
-  flex: 1;
-  min-height: 0;
+/* The tabs, and the search's matches of both tabs and history. Keeps room for its heading and a tab in a short view. */
+#tab-scroll {
+  flex: 1 1 0;
+  min-height: 64px;
   overflow-y: auto;
   scrollbar-width: none;
+}
+/* Stays at the bottom whatever the tabs do, keeping its room in the closed rail so that no tab moves as the panel opens.
+   It gives way first in a short view. Not clipped: the sort menu may open over the tabs. */
+#tab-history {
+  flex: 0 1 auto;
+  min-height: 24px;
+  display: flex;
+  flex-direction: column;
 }
 .tab {
   display: flex;
@@ -95,6 +131,8 @@
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
   user-select: none;
+  /* Clear of the sticky section heading. */
+  scroll-margin-top: 24px;
 }
 .tab:hover {
   color: var(--vscode-foreground);
@@ -124,6 +162,10 @@
 #new-tab:hover::before,
 .tab:hover::before {
   background: var(--vscode-list-hoverBackground);
+}
+/* Leaves the dock button its own highlight. */
+#tab-top:has(#tab-dock) #new-tab::before {
+  width: calc(100cqw - 38px);
 }
 .tab[data-active]::before {
   background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-toolbar-hoverBackground));

@@ -8,7 +8,7 @@ import arrowUpIcon from "@tabler/icons/outline/arrow-up.svg";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
 import { AgentPanel, type AgentChoices } from "./agentPanel";
 import { imageSrc } from "./attachments";
-import { copiedImages, pastedContent } from "./clipboard";
+import { copiedImages, htmlTokens, imageTokens, pastedContent, type CopiedToken } from "./clipboard";
 import { useCompare } from "./compare";
 import { addToken, pruneTokens, tokenInfos } from "./composerContent";
 import { useComposerDrafts } from "./composerDrafts";
@@ -17,7 +17,7 @@ import { takeTransfer } from "./composerFiles";
 import { AttachmentChips, EditingBar, QueuedMessages } from "./composerParts";
 import { SuggestionList, useSuggestions } from "./composerSuggestions";
 import type { Hover, Preview } from "./context";
-import { composerExtensions, flatText, offsetAt, replaceText, setCaret, textOf, tokensIn } from "./editor";
+import { clipboardText, composerExtensions, flatText, offsetAt, replaceText, setCaret, textOf, tokensIn } from "./editor";
 import { useFileDrop } from "./fileDrop";
 import { post } from "./post";
 import type { Trigger } from "./suggestions";
@@ -70,9 +70,16 @@ export function useComposer(options: ComposerOptions) {
   const activeTab = tabs.find((x) => x.id === active);
   const compare = useCompare({ agentId: activeTab?.agentId ?? agents.activeId, agents: agents.agents, config, editing: editing !== undefined });
   /** Handlers of the latest render, for the editor's callbacks, which are registered once. */
-  const handlers = useRef<{ update(): void; select(): void; blur(): void; keyDown(e: KeyboardEvent): boolean; paste(e: ClipboardEvent): boolean }>(undefined);
+  const handlers = useRef<{ update(): void; select(): void; blur(): void; keyDown(e: KeyboardEvent): boolean; copy(): void; paste(e: ClipboardEvent): boolean }>(undefined);
+  /** What was last copied from the composer, for a paste in any tab: the clipboard has the tokens but not what they stand for. */
+  const lastCopy = useRef<{ text: string; tokens: CopiedToken[] }>(undefined);
   const placeholder = useRef(t("chat.placeholder"));
   placeholder.current = t("chat.placeholder");
+  /** The editor still does the copying. */
+  const onCopy = () => {
+    handlers.current?.copy();
+    return false;
+  };
   const editor = useEditor({
     extensions: composerExtensions(() => placeholder.current),
     immediatelyRender: true,
@@ -83,9 +90,13 @@ export function useComposer(options: ComposerOptions) {
       handleKeyDown: (_, e) => handlers.current?.keyDown(e) ?? false,
       handlePaste: (_, e) => handlers.current?.paste(e) ?? false,
       // Copies keep the lines as typed; the default puts a blank line between paragraphs.
-      clipboardTextSerializer: (slice) => slice.content.textBetween(0, slice.content.size, "\n", (leaf) => leaf.attrs.token ?? ""),
-      // Drops are handled for the whole view, by useFileDrop.
-      handleDOMEvents: { drop: () => true },
+      clipboardTextSerializer: clipboardText,
+      handleDOMEvents: {
+        // Drops are handled for the whole view, by useFileDrop.
+        drop: () => true,
+        copy: onCopy,
+        cut: onCopy,
+      },
     },
     onUpdate: () => handlers.current?.update(),
     onSelectionUpdate: () => handlers.current?.select(),
@@ -162,14 +173,51 @@ export function useComposer(options: ComposerOptions) {
     const dt = e.clipboardData;
     if (!dt) return false;
     // A message copied from the chat brings its images back as tokens, not as the single PNG beside it.
-    if (pasteMessage(dt)) return true;
+    if (pasteMessage(dt) || pasteComposerCopy(dt)) return true;
     // Files (e.g. screenshots) become attachments.
     if (Array.from(dt.items).some((it) => it.kind === "file") && takeTransfer(dt, intake)) return true;
-    // Copies from the composer keep their tokens; anything else goes in as the Markdown it is.
-    if (dt.getData("text/html").includes("data-pm-slice")) return false;
+    // Other copies from the composer (another window, before a reload) keep only the tokens this tab has: one standing
+    // for nothing would look attached but send as text. Anything else goes in as the Markdown it is.
+    const html = dt.getData("text/html");
+    const tab = activeRef.current;
+    if (html.includes("data-pm-slice") && htmlTokens(html).every((token) => tab !== undefined && drafts.inlineOf(tab).has(token))) return false;
     const text = dt.getData("text/plain");
     if (!text) return false;
     insertText(text);
+    return true;
+  }
+
+  /** Remembers the selection and its attachments, as it is copied. */
+  function rememberCopy(): void {
+    const tab = activeRef.current;
+    if (tab === undefined) return;
+    const slice = editor.state.selection.content();
+    const inline = drafts.inlineOf(tab);
+    const tokens = [...tokensIn(slice.content)].flatMap((token) => {
+      const attachment = inline.get(token);
+      return attachment ? [{ token, attachment }] : [];
+    });
+    lastCopy.current = { text: clipboardText(slice), tokens };
+  }
+
+  /** Puts `text` at the caret with the attachments of `copied`, which `tab` may already have tokens of. */
+  function pasteTokens(tab: number, text: string, copied: readonly CopiedToken[]): void {
+    const tokens = drafts.inlineOf(tab);
+    pruneTokens(tokens, tokensIn(editor.state.doc));
+    const pasted = pastedContent(text, copied, (token) => tokens.has(token));
+    for (const { token, attachment } of pasted.inline) tokens.set(token, attachment);
+    const { from, to } = selected();
+    replaceText(editor.view, from, to, pasted.text, tokenInfos(new Map(pasted.inline.map((x) => [x.token, x.attachment]))));
+  }
+
+  /** Pastes what was last copied from the composer with its attachments. True when the clipboard held it. */
+  function pasteComposerCopy(dt: DataTransfer): boolean {
+    const tab = activeRef.current;
+    const copy = lastCopy.current;
+    if (tab === undefined || !copy || !dt.getData("text/html").includes("data-pm-slice")) return false;
+    const text = dt.getData("text/plain").replace(/\r\n?/g, "\n");
+    if (!text || text !== copy.text) return false;
+    pasteTokens(tab, text, copy.tokens);
     return true;
   }
 
@@ -179,12 +227,7 @@ export function useComposer(options: ComposerOptions) {
     const images = copiedImages(dt.getData("text/html"));
     const text = dt.getData("text/plain").replace(/\r\n?/g, "\n");
     if (tab === undefined || !images?.length || !text) return false;
-    const tokens = drafts.inlineOf(tab);
-    pruneTokens(tokens, tokensIn(editor.state.doc));
-    const pasted = pastedContent(text, images, (token) => tokens.has(token));
-    for (const { token, attachment } of pasted.inline) tokens.set(token, attachment);
-    const { from, to } = selected();
-    replaceText(editor.view, from, to, pasted.text, tokenInfos(new Map(pasted.inline.map((x) => [x.token, x.attachment]))));
+    pasteTokens(tab, text, imageTokens(images));
     return true;
   }
 
@@ -237,6 +280,7 @@ export function useComposer(options: ComposerOptions) {
     select: suggest.refresh,
     blur: suggest.close,
     keyDown: onKeyDown,
+    copy: rememberCopy,
     paste: onPaste,
   };
 

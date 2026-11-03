@@ -198,12 +198,17 @@ export function textOf(doc: PmNode): string {
 }
 
 /** The tokens drawn in the editor. */
-export function tokensIn(doc: PmNode): Set<string> {
+export function tokensIn(content: Pick<PmNode, "descendants">): Set<string> {
   const tokens = new Set<string>();
-  doc.descendants((node) => {
+  content.descendants((node) => {
     if (node.type.name === "token") tokens.add(node.attrs.token);
   });
   return tokens;
+}
+
+/** `slice` as plain text for the clipboard, its tokens as they read. */
+export function clipboardText(slice: Slice): string {
+  return slice.content.textBetween(0, slice.content.size, "\n", (leaf) => leaf.attrs.token ?? "");
 }
 
 /** The editor text with each token as one `TOKEN_CHAR`: offsets in it convert to positions with `posAt`. */

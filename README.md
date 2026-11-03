@@ -26,7 +26,7 @@ The walkthrough (`Code ACP: Get Started`) takes you through these steps:
 ### Chat
 
 - Keep chats in an expandable sidebar of tabs you can pin, rename and reorder. Each row shows the requests waiting for you and the lines changed.
-- Reopen past conversations from a searchable history, and delete the ones you no longer need.
+- Search, sort and reopen past conversations from the sidebar, and delete the ones you no longer need.
 - Find text in a conversation, and export it to Markdown.
 - Queue messages while the agent works, edit and resend earlier ones, retry, or fork a conversation into a new tab.
 - Write in a composer with live Markdown preview; drafts survive reloads. Use `/` for agent commands and `$` for skills.

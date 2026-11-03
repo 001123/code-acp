@@ -512,7 +512,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.onGroupMessage(msg);
         break;
       case "history":
-        yield* this.showHistory();
+        yield* this.listConversations();
         break;
       case "catalogLoad":
       case "catalogRefresh":
@@ -769,9 +769,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     ];
   }
 
-  /** Shows the active tab's agent's past sessions in the workspace folders, in the chat view. */
-  readonly showHistory = Effect.fn("ChatView.showHistory")(function* (this: ChatViewProvider) {
-    yield* this.focus;
+  /** Takes the user to the conversations in the sidebar; the message follows the focus command, as in `focusComposer`. */
+  readonly showConversations = this.focus.pipe(Effect.andThen(Effect.sync(() => this.post({ type: "searchConversations" }))));
+
+  /**
+   * Lists the active tab's agent's past sessions in the workspace folders. The sidebar asks when it opens, on hover:
+   * this takes no focus, and a failure stays in the list rather than in the conversation.
+   */
+  private readonly listConversations = Effect.fn("ChatView.listConversations")(function* (this: ChatViewProvider) {
     const latest = this.history.next();
     const post = (message: object) => {
       if (latest()) {
@@ -779,6 +784,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }
     };
     post({ loading: true, sessions: [] });
+    const listed = yield* this.readConversations().pipe(Effect.catch((err) => Effect.succeed({ error: err.message, sessions: [] })));
+    post(listed);
+  });
+
+  private readonly readConversations = Effect.fn("ChatView.readConversations")(function* (this: ChatViewProvider) {
     const running = yield* this.tabAgents.getAgent(this.tabs.active).pipe(Effect.catchTag("NoAgentError", () => Effect.undefined));
     const worktrees = yield* Worktrees;
     const roots = workspaceFolders().map((f) => f.path);
@@ -786,19 +796,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     const folders = new Set([...roots, ...kept.flat().map((placed) => placed.cwd), this.tabs.active.cwd]);
     const listing = running ? yield* listHistory(running.agent, [...folders]) : undefined;
     if (!listing || listing.unsupported) {
-      post({ unsupported: true, sessions: [] });
-      return;
+      return { unsupported: true, sessions: [] };
     }
-    post({
-      sessions: listing.sessions,
-      currentId: this.tabs.active.sessionId,
-      openIds: this.tabs.all.flatMap((tab) => {
-        const id = tab.sessionId ?? tab.reopen?.sessionId;
-        return id ? [id] : [];
-      }),
-      canOpen: listing.canOpen,
-      canDelete: listing.canDelete,
-    });
+    return { sessions: listing.sessions, canOpen: listing.canOpen, canDelete: listing.canDelete };
   });
 
   /** Deletes a session of the history; a failure can't go in the transcript, which the history covers. */
