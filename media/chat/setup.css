@@ -1,0 +1,75 @@
+/* The first-run panel: shown instead of the conversation and the composer until an agent is installed. */
+#agent-setup {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 14px;
+  overflow-y: auto;
+}
+#agent-setup h2 {
+  margin: 0;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+.setup-desc {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+}
+.setup-error {
+  color: var(--vscode-errorForeground);
+}
+.setup-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.setup-agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  border-radius: 6px;
+  cursor: pointer;
+}
+.setup-agent:hover,
+.setup-agent:has(input:checked) {
+  background: var(--vscode-list-hoverBackground);
+}
+.setup-agent:has(input:checked) {
+  border-color: var(--vscode-button-background);
+}
+.setup-agent:has(input:disabled) {
+  cursor: default;
+}
+.setup-agent-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.setup-agent-name {
+  font-weight: 600;
+}
+.setup-agent-desc {
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.88em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.setup-agent .svg-icon {
+  flex: none;
+}
+.setup-agent .setup-busy svg {
+  animation: tool-spin 1s linear infinite;
+}
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

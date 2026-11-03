@@ -1,5 +1,6 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import type { CatalogState } from "../agentCatalog";
 import type { TabGroupInfo, TabInfo, TerminalSnapshot, WorkspaceFolderInfo } from "../chat/protocol";
 import { ErrorBoundary } from "./errorBoundary";
 import { Lightbox } from "./lightbox";
@@ -17,6 +18,7 @@ import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
 import type { AgentChoices } from "./chat/agentPanel";
 import { ChatSettings } from "./chat/chatSettings";
 import { ConfigLoading, ConfigSelect, quickConfig } from "./chat/sessionConfig";
+import { AgentSetup, needsSetup } from "./chat/agentSetup";
 import { UsageMeter } from "./chat/usageMeter";
 import { PrDraftForm, WorkspaceBar } from "./chat/workspaceControls";
 import { clipContent, contentText, groupActivity, noticeItem, stopReasonText, transcript, type Action } from "./chat/transcript";
@@ -42,6 +44,12 @@ function App() {
   const [shownGroup, setShownGroup] = useState<number>();
   const [states, dispatchTabs] = useReducer(tabStates, {});
   const [agents, setAgents] = useState<AgentChoices>({ agents: [] });
+  /** The host told which agents there are, so an empty list means none. */
+  const [agentsKnown, setAgentsKnown] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogState>({ agents: [], loading: true });
+  const setup = needsSetup(agents.agents, catalog);
+  /** The conversation and the composer; they wait for an agent. */
+  const chatShown = agentsKnown && !setup;
   const [folders, setFolders] = useState<WorkspaceFolderInfo[]>([]);
   const [remote, setRemote] = useState(false);
   const [history, setHistory] = useState<History>();
@@ -174,7 +182,7 @@ function App() {
       )),
     quickConfig: active !== undefined && !configLoading && quickConfig(config),
     config,
-    hidden: group !== undefined,
+    hidden: group !== undefined || !chatShown,
   });
 
   /** Back to the active tab, for what lands in its composer while a group's comparison is shown. */
@@ -301,7 +309,10 @@ function App() {
         update(tab, (s) => ({ ...s, configLoading: false }));
         return dispatch(tab, { type: "add", item: { kind: "error", text: { raw: msg.text } } });
       case "agent":
+        setAgentsKnown(true);
         return setAgents({ agents: msg.agents, activeId: msg.activeId });
+      case "catalog":
+        return setCatalog(msg.catalog);
       case "folders":
         return setFolders(msg.folders);
       case "environment":
@@ -500,10 +511,11 @@ function App() {
         <div id="chat-body">
           <div id="chat-main">
             {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
-            {group && !history && (
+            {agentsKnown && setup && !history && <AgentSetup catalog={catalog} />}
+            {chatShown && group && !history && (
               <GroupPanel group={group} members={tabs.filter((tab) => tab.group === group.id)} states={states} agents={agents.agents} onOpen={selectTab} />
             )}
-            <div id="messages" ref={messages} hidden={!!history || !!group}>
+            <div id="messages" ref={messages} hidden={!!history || !!group || !chatShown}>
               {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
               {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map((entry) =>
                 Array.isArray(entry) ? (
@@ -520,11 +532,11 @@ function App() {
                 <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
               )}
             </div>
-            {!group && showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
-            {!group && active !== undefined && prDraft && (
+            {chatShown && !group && showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
+            {chatShown && !group && active !== undefined && prDraft && (
               <PrDraftForm tab={active} draft={prDraft} onChange={(draft) => update(active, (s) => ({ ...s, prDraft: draft }))} />
             )}
-            {!group && (status.needsLogin || status.needsAgent) && (
+            {chatShown && !group && (status.needsLogin || status.needsAgent) && (
               <div id="status">
                 <span id="status-text">{status.text}</span>
                 {status.needsLogin && <button onClick={() => post({ type: "login" })}>{t("chat.login")}</button>}
@@ -532,23 +544,25 @@ function App() {
               </div>
             )}
             {composer.element}
-            {!group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} busy={!!status.busy} comparing={composer.comparing} editing={editing !== undefined} />}
+            {chatShown && !group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} busy={!!status.busy} comparing={composer.comparing} editing={editing !== undefined} />}
           </div>
-          <TabSidebar
-            tabs={tabs}
-            groups={groups}
-            states={states}
-            active={active}
-            shownGroup={shownGroup}
-            agents={agents.agents}
-            showChanges={showChanges}
-            onSelect={selectTab}
-            onSelectGroup={selectGroup}
-            renaming={renaming}
-            onRename={setRenaming}
-          />
+          {chatShown && (
+            <TabSidebar
+              tabs={tabs}
+              groups={groups}
+              states={states}
+              active={active}
+              shownGroup={shownGroup}
+              agents={agents.agents}
+              showChanges={showChanges}
+              onSelect={selectTab}
+              onSelectGroup={selectGroup}
+              renaming={renaming}
+              onRename={setRenaming}
+            />
+          )}
         </div>
-        <div id="drop-overlay" className={composer.dragging ? "visible" : undefined}>
+        <div id="drop-overlay" className={composer.dragging && chatShown ? "visible" : undefined}>
           {t("chat.dropHint")}
         </div>
         {preview && (

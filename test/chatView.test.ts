@@ -30,13 +30,15 @@ const memento = (values = new Map<string, unknown>()) =>
 let agentEnv: Record<string, string> = {};
 let installed = true;
 let agentList = [{ id: "mock", name: "Mock" }];
+let activeAgent: string | undefined = "mock";
+const managerChanged = new EventEmitter<void>();
 
 const manager = {
-  onDidChange: new EventEmitter<void>().event,
+  onDidChange: managerChanged.event,
   agents: Effect.sync(() => agentList),
   has: (id: string) => Effect.sync(() => installed && agentList.some((agent) => agent.id === id)),
   command: () => Effect.sync(() => ({ command: process.execPath, args: [MOCK_AGENT], env: { ...process.env, MOCK_FORK: "1", ...agentEnv } })),
-  activeId: Effect.succeed("mock"),
+  activeId: Effect.sync(() => activeAgent),
   setActive: () => Effect.void,
 } as unknown as AgentManager["Service"];
 
@@ -130,9 +132,30 @@ beforeEach(() => {
   agentEnv = {};
   installed = true;
   agentList = [{ id: "mock", name: "Mock" }];
+  activeAgent = "mock";
 });
 
 describe("ChatViewProvider", () => {
+  it.live("starts the session of the tab waiting for an agent once one is installed", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        agentList = [];
+        activeAgent = undefined;
+        const { posted, send } = yield* openChat;
+        const ofType = (type: string) => posted.filter((m) => m.type === type);
+        send({ type: "ready" });
+        yield* until(() => ofType("status").at(-1)?.needsAgent === true, "the tab to ask for an agent");
+        assert.deepStrictEqual(ofType("agent").at(-1)?.agents, []);
+
+        agentList = [{ id: "mock", name: "Mock" }];
+        activeAgent = "mock";
+        managerChanged.fire();
+        yield* until(() => ofType("session").length === 1, "the session");
+        assert.isUndefined(ofType("status").at(-1)?.needsAgent);
+      }),
+    ),
+  );
+
   describe("saving tabs", () => {
     const savedText = (context: vscode.ExtensionContext) => JSON.stringify(context.workspaceState.get("codeAcp.tabs") ?? null);
 

@@ -215,7 +215,8 @@
   color: var(--vscode-foreground);
 }
 /* Drawn from theme colors: the native box stays white on a dark theme. */
-.composer-toggle input {
+.composer-toggle input,
+.setup-agent input {
   appearance: none;
   -webkit-appearance: none;
   flex: none;
@@ -229,11 +230,13 @@
   background: transparent;
   cursor: pointer;
 }
-.composer-toggle input:checked {
+.composer-toggle input:checked,
+.setup-agent input:checked {
   border-color: var(--vscode-button-background);
   background: var(--vscode-button-background);
 }
-.composer-toggle input:checked::before {
+.composer-toggle input:checked::before,
+.setup-agent input:checked::before {
   content: "";
   width: 4px;
   height: 8px;
@@ -241,7 +244,8 @@
   border-width: 0 1.5px 1.5px 0;
   transform: translateY(-1px) rotate(45deg);
 }
-.composer-toggle input:focus-visible {
+.composer-toggle input:focus-visible,
+.setup-agent input:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: 1px;
 }

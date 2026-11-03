@@ -52,6 +52,7 @@
         {
           "id": "codeAcp.drop",
           "name": "%view.drop%",
+          "when": "codeAcp.hasAgent",
           "icon": "media/icon.svg",
           "initialSize": 1
         }

@@ -2,6 +2,7 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { Effect } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { AgentCatalog } from "../agentCatalog";
 import type { AgentManager } from "../agentManager";
 import type { AgentUpdate, AgentUpdates } from "../agentUpdates";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
@@ -143,6 +144,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly focusComposer = this.focus.pipe(Effect.andThen(Effect.sync(() => this.post({ type: "focusComposer" }))));
   /** What VS Code's commands add to the composer. */
   readonly composer = new ComposerCommands(this.attachments, this.focusComposer);
+  /** The first-run panel's agents; an install can outlast the view. */
+  private readonly catalog: AgentCatalog;
   private readonly viewMessages = new ViewMessages({
     post: (message) => this.post(message),
     attachments: this.attachments,
@@ -168,6 +171,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     manager: AgentManager["Service"],
     updates: AgentUpdates["Service"],
   ) {
+    this.catalog = new AgentCatalog(manager, (catalog) => this.post({ type: "catalog", catalog }));
     const saved = context.workspaceState.get(TABS_KEY);
     this.tabs = new TabList(saved, defaultCwd);
     if (saved === undefined) {
@@ -268,6 +272,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             this.indicators.update();
             yield* this.tabAgents.postAgent;
             yield* this.tabAgents.restartRemoved();
+            yield* this.startWaitingTab;
           }),
         ),
       ),
@@ -395,6 +400,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.postTab(tab, { type: "status", text: t(key), busy: tab.busy, ...extra });
   }
 
+  /** The active tab was told to install an agent and now has one; other tabs start when selected. */
+  private get startWaitingTab() {
+    return Effect.gen({ self: this }, function* () {
+      const tab = this.tabs.active;
+      if (tab.lastStatus?.extra.needsAgent && (yield* this.tabAgents.agentIdOf(tab))) {
+        yield* this.sessions.ensureSession(tab);
+      }
+    });
+  }
+
   /** Re-posts the last status, e.g. after `busy` changed or the language did. */
   private refreshStatus(tab: Tab): void {
     if (tab.lastStatus) {
@@ -490,6 +505,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "history":
         yield* this.showHistory();
+        break;
+      case "catalogLoad":
+      case "catalogRefresh":
+      case "catalogInstall":
+        yield* this.catalog.onMessage(msg);
         break;
       case "openSession":
         yield* this.sessions.openSession(msg.sessionId, msg.cwd, msg.title);
