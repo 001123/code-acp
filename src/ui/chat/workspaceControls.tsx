@@ -128,9 +128,17 @@ function FinishState({ tab, busy }: { tab: TabInfo; busy: boolean }) {
 }
 
 /** In the composer: whether the tab's next message moves it to a new worktree. Shown in git folders only, while the tab isn't in a worktree yet; then the bar under the composer tells. */
-export function WorktreeToggle({ tab }: { tab: TabInfo | undefined }) {
+export function WorktreeToggle({ tab, comparing }: { tab: TabInfo | undefined; comparing: boolean }) {
   const { t } = useL10n();
   if (!tab || tab.worktree || tab.branch === undefined) return null;
+  // A comparison makes its own worktrees, whatever the tab's choice, which stays for when it is turned off.
+  if (comparing) {
+    return (
+      <div id="worktree">
+        <ComposerCheckbox label={t("worktree.label")} title={t("worktree.toggleCompare")} checked disabled onToggle={() => {}} />
+      </div>
+    );
+  }
   const hint = t(tab.worktreeOnSend ? "worktree.toggleCancel" : "worktree.toggleOn");
   return (
     <div id="worktree">

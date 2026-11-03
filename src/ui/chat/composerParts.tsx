@@ -10,12 +10,13 @@ import type { Preview } from "./context";
 import { post } from "./post";
 
 /** A checkbox in the composer's row of actions. */
-export function ComposerCheckbox({ label, title, checked, onToggle }: { label: string; title: string; checked: boolean; onToggle: () => void }) {
+export function ComposerCheckbox({ label, title, checked, disabled, onToggle }: { label: string; title: string; checked: boolean; disabled?: boolean; onToggle: () => void }) {
   return (
     <label className="composer-toggle" title={title}>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={onToggle}
         onKeyDown={(e) => {
           // In a form, Enter on a checkbox would send the message.

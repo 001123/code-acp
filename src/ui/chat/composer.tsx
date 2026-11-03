@@ -315,8 +315,8 @@ export function useComposer(options: ComposerOptions) {
         </AgentPanel>
         <FolderSelect tab={activeTab} folders={folders} />
         <span className="spacer" />
-        {/* A comparison makes its own worktrees; an edit stays in the conversation it changes. */}
-        {!compare.on && editing === undefined && <WorktreeToggle tab={activeTab} />}
+        {/* An edit stays in the conversation it changes. */}
+        {editing === undefined && <WorktreeToggle tab={activeTab} comparing={compare.on} />}
         {compare.element}
         {settings}
         <button

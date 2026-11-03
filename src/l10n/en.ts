@@ -26,6 +26,7 @@ const en = {
   "worktree.label": "Worktree",
   "worktree.toggleOn": "Your next message goes to a new worktree, on its own branch, in a new session.",
   "worktree.toggleCancel": "Stay in the current checkout. No worktree has been created yet.",
+  "worktree.toggleCompare": "Compare always runs each attempt in its own new worktree.",
   "chat.tabBranch": "Branch: {0}",
   "worktree.current": "Current",
   "worktree.new": "New worktree",

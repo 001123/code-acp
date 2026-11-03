@@ -258,6 +258,16 @@
 .composer-toggle:has(input:checked) {
   color: var(--vscode-foreground);
 }
+.composer-toggle:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+.composer-toggle:has(input:disabled):hover {
+  background: none;
+}
+.composer-toggle input:disabled {
+  cursor: default;
+}
 #compare-count {
   display: inline-flex;
   align-items: center;

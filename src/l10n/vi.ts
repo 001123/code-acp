@@ -27,6 +27,7 @@ const vi: Record<MessageKey, string> = {
   "worktree.label": "Worktree",
   "worktree.toggleOn": "Tin nhắn tiếp theo sẽ đi vào một worktree mới, trên nhánh riêng, trong một phiên mới.",
   "worktree.toggleCancel": "Ở lại bản checkout hiện tại. Worktree vẫn chưa được tạo.",
+  "worktree.toggleCompare": "So sánh luôn chạy mỗi lượt thử trong một worktree mới của riêng nó.",
   "chat.tabBranch": "Nhánh: {0}",
   "worktree.current": "Hiện tại",
   "worktree.new": "Worktree mới",
