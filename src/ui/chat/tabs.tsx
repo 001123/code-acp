@@ -86,7 +86,11 @@ export const TAB_DRAG_TYPE = "application/x-code-acp-tab";
 
 export const isTabDrag = (e: { dataTransfer: DataTransfer | null }) => e.dataTransfer?.types.includes(TAB_DRAG_TYPE) ?? false;
 
-export function TabStrip({
+/** Tells tabs apart in the collapsed rail. */
+const tabInitial = (title: string) => Array.from(title.trim())[0]?.toUpperCase() ?? "";
+
+/** The tabs as a rail beside the conversation that opens over it on hover (CSS); `data-open` holds it open while a tab is dragged or renamed. */
+export function TabSidebar({
   tabs,
   states,
   active,
@@ -104,7 +108,7 @@ export function TabStrip({
 }) {
   const { t, lang } = useL10n();
   const dateFormat = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" });
-  const strip = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const [dragged, setDragged] = useState<number>();
   const [dropAt, setDropAt] = useState<{ id: number; after: boolean }>();
   const endDrag = () => {
@@ -120,126 +124,133 @@ export function TabStrip({
     if (index !== from) post({ type: "moveTab", tab: dragged, index });
   };
   useEffect(() => {
-    strip.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    list.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" });
   }, [active, tabs.length]);
   return (
-    <div id="tabs" role="tablist">
-      <div
-        id="tab-list"
-        ref={strip}
-        // A vertical wheel scrolls the single row sideways.
-        onWheel={(e) => {
-          if (e.deltaX === 0) e.currentTarget.scrollLeft += e.deltaY;
-        }}
-      >
-        {tabs.map((tab) => {
-          const state = states[tab.id];
-          const waiting = state?.transcript.items.some((i) => openRequest(i) !== undefined);
-          const title = tab.title || t("chat.newTab");
-          const tooltip = [
-            waiting ? `${title} · ${t("chat.tabWaiting")}` : title,
-            ...(tab.createdAt === undefined ? [] : [t("chat.tabCreated", dateFormat.format(tab.createdAt))]),
-            ...(tab.worktree ? [t("chat.tabWorktree", tab.worktree.branch ?? tab.worktree.root)] : []),
-          ].join("\n");
-          const pinLabel = t(tab.pinned ? "chat.unpinTab" : "chat.pinTab");
-          return (
-            <div
-              key={tab.id}
-              className="tab"
-              role="tab"
-              draggable={tab.id !== renaming}
-              aria-selected={tab.id === active}
-              data-active={tab.id === active || undefined}
-              data-busy={state?.status.busy || undefined}
-              data-waiting={waiting || undefined}
-              data-pinned={tab.pinned || undefined}
-              data-dragging={tab.id === dragged || undefined}
-              data-drop={dropAt?.id === tab.id ? (dropAt.after ? "after" : "before") : undefined}
-              title={tooltip}
-              // Native context menu: the `webview/context` tab commands in package.json.
-              data-vscode-context={JSON.stringify({
-                webviewSection: "tab",
-                tab: tab.id,
-                tabPinned: tab.pinned,
-                tabCanFork: tab.canFork,
-                preventDefaultContextMenuItems: true,
-              })}
-              onClick={() => onSelect(tab.id)}
-              onDoubleClick={() => onRename(tab.id)}
-              onAuxClick={(e) => {
-                if (e.button === 1 && !tab.pinned) post({ type: "closeTab", tab: tab.id });
-              }}
-              onDragStart={(e) => {
-                e.dataTransfer.setData(TAB_DRAG_TYPE, String(tab.id));
-                e.dataTransfer.effectAllowed = "move";
-                setDragged(tab.id);
-              }}
-              onDragEnd={endDrag}
-              onDragOver={(e) => {
-                if (!isTabDrag(e)) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                const box = e.currentTarget.getBoundingClientRect();
-                const after = e.clientX > box.left + box.width / 2;
-                if (dropAt?.id !== tab.id || dropAt.after !== after) setDropAt({ id: tab.id, after });
-              }}
-              onDrop={(e) => {
-                if (!isTabDrag(e)) return;
-                e.preventDefault();
-                if (dropAt) drop(dropAt);
-                endDrag();
-              }}
-            >
-              <span className="tab-dot" />
-              {tab.worktree && (
-                <span className="tab-worktree" aria-hidden="true">
-                  <Icon svg={gitBranchIcon} />
-                </span>
-              )}
-              {tab.id === renaming ? (
-                <TabNameInput
-                  // What the strip shows: the user's name, else the title. Clearing it drops the name.
-                  initial={tab.title ?? ""}
-                  onDone={(name) => {
-                    onRename(undefined);
-                    if (name !== undefined && name !== (tab.title ?? "")) post({ type: "renameTab", tab: tab.id, title: name });
-                  }}
-                />
-              ) : (
-                <span className="tab-title">{title}</span>
-              )}
-              <button
-                className="tab-pin"
-                title={pinLabel}
-                aria-label={pinLabel}
-                aria-pressed={tab.pinned}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  post({ type: "pinTab", tab: tab.id, pinned: !tab.pinned });
+    <div id="tabs" role="tablist" data-open={dragged !== undefined || renaming !== undefined || undefined}>
+      <div id="tab-panel">
+        <button id="new-tab" title={t("chat.newTab")} aria-label={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
+          <span className="tab-marker" aria-hidden="true">
+            <Icon svg={plusIcon} />
+          </span>
+          <span className="tab-title">{t("chat.newTab")}</span>
+        </button>
+        <div id="tab-list" ref={list}>
+          {tabs.map((tab) => {
+            const state = states[tab.id];
+            const waiting = state?.transcript.items.some((i) => openRequest(i) !== undefined);
+            const title = tab.title || t("chat.newTab");
+            const tooltip = [
+              waiting ? `${title} · ${t("chat.tabWaiting")}` : title,
+              ...(tab.createdAt === undefined ? [] : [t("chat.tabCreated", dateFormat.format(tab.createdAt))]),
+              ...(tab.worktree ? [t("chat.tabWorktree", tab.worktree.branch ?? tab.worktree.root)] : []),
+            ].join("\n");
+            const meta = waiting
+              ? t("chat.tabWaiting")
+              : (tab.worktree?.branch ?? tab.worktree?.root ?? (tab.createdAt === undefined ? undefined : dateFormat.format(tab.createdAt)));
+            const pinLabel = t(tab.pinned ? "chat.unpinTab" : "chat.pinTab");
+            return (
+              <div
+                key={tab.id}
+                className="tab"
+                role="tab"
+                draggable={tab.id !== renaming}
+                aria-selected={tab.id === active}
+                data-active={tab.id === active || undefined}
+                data-busy={state?.status.busy || undefined}
+                data-waiting={waiting || undefined}
+                data-pinned={tab.pinned || undefined}
+                data-dragging={tab.id === dragged || undefined}
+                data-drop={dropAt?.id === tab.id ? (dropAt.after ? "after" : "before") : undefined}
+                title={tooltip}
+                // Native context menu: the `webview/context` tab commands in package.json.
+                data-vscode-context={JSON.stringify({
+                  webviewSection: "tab",
+                  tab: tab.id,
+                  tabPinned: tab.pinned,
+                  tabCanFork: tab.canFork,
+                  preventDefaultContextMenuItems: true,
+                })}
+                onClick={() => onSelect(tab.id)}
+                onDoubleClick={() => onRename(tab.id)}
+                onAuxClick={(e) => {
+                  if (e.button === 1 && !tab.pinned) post({ type: "closeTab", tab: tab.id });
+                }}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(TAB_DRAG_TYPE, String(tab.id));
+                  e.dataTransfer.effectAllowed = "move";
+                  setDragged(tab.id);
+                }}
+                onDragEnd={endDrag}
+                onDragOver={(e) => {
+                  if (!isTabDrag(e)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  const box = e.currentTarget.getBoundingClientRect();
+                  const after = e.clientY > box.top + box.height / 2;
+                  if (dropAt?.id !== tab.id || dropAt.after !== after) setDropAt({ id: tab.id, after });
+                }}
+                onDrop={(e) => {
+                  if (!isTabDrag(e)) return;
+                  e.preventDefault();
+                  if (dropAt) drop(dropAt);
+                  endDrag();
                 }}
               >
-                <Icon svg={tab.pinned ? pinFilledIcon : pinIcon} />
-              </button>
-              {!tab.pinned && (
+                <span className="tab-marker" aria-hidden="true">
+                  <span className="tab-initial">{tabInitial(title)}</span>
+                  <span className="tab-dot" />
+                </span>
+                <span className="tab-text">
+                  {tab.id === renaming ? (
+                    <TabNameInput
+                      // What the sidebar shows: the user's name, else the title. Clearing it drops the name.
+                      initial={tab.title ?? ""}
+                      onDone={(name) => {
+                        onRename(undefined);
+                        if (name !== undefined && name !== (tab.title ?? "")) post({ type: "renameTab", tab: tab.id, title: name });
+                      }}
+                    />
+                  ) : (
+                    <span className="tab-title">{title}</span>
+                  )}
+                  {meta !== undefined && (
+                    <span className="tab-meta">
+                      {tab.worktree && !waiting && <Icon svg={gitBranchIcon} />}
+                      <span className="tab-meta-text">{meta}</span>
+                    </span>
+                  )}
+                </span>
                 <button
-                  className="tab-close"
-                  title={t("chat.closeTab")}
-                  aria-label={t("chat.closeTab")}
+                  className="tab-pin"
+                  title={pinLabel}
+                  aria-label={pinLabel}
+                  aria-pressed={tab.pinned}
                   onClick={(e) => {
                     e.stopPropagation();
-                    post({ type: "closeTab", tab: tab.id });
+                    post({ type: "pinTab", tab: tab.id, pinned: !tab.pinned });
                   }}
                 >
-                  <Icon svg={xIcon} />
+                  <Icon svg={tab.pinned ? pinFilledIcon : pinIcon} />
                 </button>
-              )}
-            </div>
-          );
-        })}
+                {!tab.pinned && (
+                  <button
+                    className="tab-close"
+                    title={t("chat.closeTab")}
+                    aria-label={t("chat.closeTab")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      post({ type: "closeTab", tab: tab.id });
+                    }}
+                  >
+                    <Icon svg={xIcon} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
       </div>
-      <button className="icon-btn" id="new-tab" title={t("chat.newTab")} aria-label={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
-        <Icon svg={plusIcon} />
-      </button>
+      </div>
     </div>
   );
 }

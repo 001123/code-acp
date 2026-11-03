@@ -16,6 +16,34 @@ body {
   flex-direction: column;
 }
 
+/* VS Code's webview styles set scrollbar-color here, and Chromium ignores the rules below while it is set. */
+html {
+  scrollbar-color: auto;
+}
+/* A slim thumb on a clear track; the transparent border insets it, and it fills out under the pointer. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 5px;
+  background-clip: padding-box;
+  background-color: var(--vscode-scrollbarSlider-background);
+}
+::-webkit-scrollbar-thumb:hover {
+  border-width: 2px;
+  background-color: var(--vscode-scrollbarSlider-hoverBackground);
+}
+::-webkit-scrollbar-thumb:active {
+  border-width: 2px;
+  background-color: var(--vscode-scrollbarSlider-activeBackground);
+}
+
 .spacer {
   flex: 1;
 }

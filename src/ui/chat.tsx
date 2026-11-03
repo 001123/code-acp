@@ -11,7 +11,7 @@ import { HoverPreview, OpenPreview, ShownTab, Terminals, type Hover, type Previe
 import { useComposer } from "./chat/composer";
 import { HistoryView, type History } from "./chat/history";
 import { post } from "./chat/post";
-import { NEW_TAB, TabStrip, tabStates, type TabState } from "./chat/tabs";
+import { NEW_TAB, TabSidebar, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
 import type { AgentChoices } from "./chat/agentPanel";
 import { ChatSettings } from "./chat/chatSettings";
@@ -41,7 +41,7 @@ function App() {
   const [folders, setFolders] = useState<WorkspaceFolderInfo[]>([]);
   const [remote, setRemote] = useState(false);
   const [history, setHistory] = useState<History>();
-  /** The tab whose name is being edited in the strip. */
+  /** The tab whose name is being edited in the sidebar. */
   const [renaming, setRenaming] = useState<number>();
   const messages = useRef<HTMLDivElement>(null);
   /** The active tab for callbacks registered once (drop, FileReader). */
@@ -446,24 +446,28 @@ function App() {
       <HoverPreview.Provider value={setHover}>
       <ShownTab.Provider value={shownTab}>
       <Terminals.Provider value={agentTerminals}>
-        <TabStrip tabs={tabs} states={states} active={active} onSelect={selectTab} renaming={renaming} onRename={setRenaming} />
-        {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
-        <div id="messages" ref={messages} hidden={!!history}>
-          {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
-          {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map((entry) =>
-            Array.isArray(entry) ? (
-              <EntryBoundary key={entry[0]!.id} items={entry}>
-                <ActivityView items={entry} />
-              </EntryBoundary>
-            ) : (
-              <EntryBoundary key={entry.id} items={[entry]}>
-                <ItemView item={entry} />
-              </EntryBoundary>
-            ),
-          )}
-          {busySince !== undefined && silent >= WAITING_AFTER_MS && (
-            <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
-          )}
+        <div id="chat-body">
+          <div id="chat-main">
+            {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
+            <div id="messages" ref={messages} hidden={!!history}>
+              {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
+              {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map((entry) =>
+                Array.isArray(entry) ? (
+                  <EntryBoundary key={entry[0]!.id} items={entry}>
+                    <ActivityView items={entry} />
+                  </EntryBoundary>
+                ) : (
+                  <EntryBoundary key={entry.id} items={[entry]}>
+                    <ItemView item={entry} />
+                  </EntryBoundary>
+                ),
+              )}
+              {busySince !== undefined && silent >= WAITING_AFTER_MS && (
+                <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
+              )}
+        </div>
+        </div>
+        <TabSidebar tabs={tabs} states={states} active={active} onSelect={selectTab} renaming={renaming} onRename={setRenaming} />
         </div>
         <div id="drop-overlay" className={composer.dragging ? "visible" : undefined}>
           {t("chat.dropHint")}

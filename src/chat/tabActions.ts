@@ -116,7 +116,7 @@ export class TabActions {
         yield* tabWorktrees.pick(tab);
         return;
       case "rename":
-        // Edited in place in the tab strip, which answers with "renameTab".
+        // Edited in place in the tab sidebar, which answers with "renameTab".
         this.host.post({ type: "renameTab", tab: tab.id });
         return;
       case "close":

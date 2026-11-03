@@ -8,7 +8,7 @@ import type { Tab } from "./tabs";
 export interface ChatUi {
   /** Posts a message that belongs to one tab's conversation. */
   postTab(tab: Tab, message: Record<string, unknown>): void;
-  /** Shows the tab strip and saves it. */
+  /** Shows the tab sidebar and saves it. */
   postTabs(): void;
   status(tab: Tab, key: MessageKey, extra?: Record<string, unknown>): void;
   /** Re-posts the last status, e.g. after `busy` changed. */

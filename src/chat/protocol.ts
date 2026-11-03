@@ -214,7 +214,7 @@ export interface WorkspaceFolderInfo {
   path: string;
 }
 
-/** A chat tab as the webview shows it in the tab strip. */
+/** A chat tab as the webview shows it in the tab sidebar. */
 export interface TabInfo {
   id: number;
   /** The user's name for the tab, else its title; undefined until the first message or the agent names the session. */

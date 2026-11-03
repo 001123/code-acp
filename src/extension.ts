@@ -173,7 +173,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ["codeAcp.tabWorktree", "worktree"],
       ] as const
     ).map(([command, action]) =>
-      // The tab's `data-vscode-context` (see TabStrip in src/ui/chat.tsx).
+      // The tab's `data-vscode-context` (see TabSidebar in src/ui/chat/tabs.tsx).
       vscode.commands.registerCommand(
         command,
         run((context?: { tab?: unknown }) => (typeof context?.tab === "number" ? provider.tabAction(context.tab, action) : Effect.void)),

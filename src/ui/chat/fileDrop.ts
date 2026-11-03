@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTabDrag } from "./tabs";
 
-/** Takes drops anywhere in the view, leaving tab drags to the tab strip. Gives whether something is dragged over it. */
+/** Takes drops anywhere in the view, leaving tab drags to the tab sidebar. Gives whether something is dragged over it. */
 export function useFileDrop(onDrop: (dt: DataTransfer) => void): boolean {
   const [dragging, setDragging] = useState(false);
   /** For the listeners, registered once. */
