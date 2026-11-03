@@ -9,6 +9,7 @@ export interface State {
   /** Which settings `values` are, and those that can't be changed there. */
   scope: SettingsScope;
   hasWorkspace: boolean;
+  workspaceName?: string;
   locked: ReadonlyArray<SettingKey>;
   agents: AgentChoice[];
   activeId?: string;

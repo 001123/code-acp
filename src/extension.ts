@@ -8,7 +8,6 @@ import { ChatViewProvider } from "./chat/chatViewProvider";
 import { CommitMessage } from "./commitMessage";
 import { DropViewProvider } from "./dropView";
 import { t } from "./i18n";
-import { ManagerPanel } from "./managerPanel";
 import { FixProblemsActions } from "./problems";
 import { makeRuntime, runIn, thenable, type AppServices } from "./runtime";
 import { SettingsPanel } from "./settingsPanel";
@@ -29,6 +28,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const provider = new ChatViewProvider(context, runtime, manager, updates);
   const dropView = new DropViewProvider(run((uris: ReadonlyArray<vscode.Uri>) => provider.composer.attach(uris)));
 
+  const manageAgents = () => SettingsPanel.show(context, runtime, manager, "agent", "manage");
+
   const selectAgent = Effect.fn("selectAgent")(function* () {
     const manage = { label: t("agent.manage"), id: undefined as string | undefined };
     const activeId = yield* provider.activeAgentId;
@@ -40,7 +41,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
     const picked = yield* thenable(() => vscode.window.showQuickPick([...items, manage], { title: t("agent.pickTitle") }));
     if (picked === manage) {
-      ManagerPanel.show(context, runtime, manager);
+      manageAgents();
     } else if (picked?.id) {
       yield* provider.setAgent(picked.id);
     }
@@ -58,7 +59,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (picked === update) {
       yield* provider.updateAgents(due);
     } else if (picked === manage) {
-      ManagerPanel.show(context, runtime, manager);
+      manageAgents();
     } else if (picked === disable) {
       yield* thenable(() =>
         vscode.workspace.getConfiguration("codeAcp").update("checkAgentUpdates", false, vscode.ConfigurationTarget.Global),
@@ -81,7 +82,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       treeDataProvider: dropView,
       dragAndDropController: dropView,
     }),
-    vscode.commands.registerCommand("codeAcp.manageAgents", () => ManagerPanel.show(context, runtime, manager)),
+    vscode.commands.registerCommand("codeAcp.manageAgents", manageAgents),
     vscode.commands.registerCommand("codeAcp.selectAgent", run(selectAgent)),
     vscode.commands.registerCommand("codeAcp.openSettings", () => SettingsPanel.show(context, runtime, manager)),
     vscode.commands.registerCommand("codeAcp.showUsage", () => SettingsPanel.show(context, runtime, manager, "usage")),

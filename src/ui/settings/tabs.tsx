@@ -9,14 +9,14 @@ import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
 import commitIcon from "@tabler/icons/outline/git-commit.svg";
 import plugIcon from "@tabler/icons/outline/plug-connected.svg";
-import terminalIcon from "@tabler/icons/outline/terminal-2.svg";
 import chartIcon from "@tabler/icons/outline/chart-bar.svg";
 import linkIcon from "@tabler/icons/outline/link.svg";
+import activityIcon from "@tabler/icons/outline/activity.svg";
 
-export type Tab = "general" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "custom" | "links" | "usage";
+export type Tab = "general" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "links" | "tracing" | "usage";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions", "tracing"] },
+  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions"] },
   { id: "notifications", label: "settings.notificationsTab", desc: "settings.notificationsTabDesc", icon: bellIcon, keys: ["notifications", "notifyFinished"] },
   { id: "permissions", label: "settings.permissions", desc: "settings.permissionsDesc", icon: shieldIcon, keys: ["autoApprove"] },
   { id: "worktree", label: "settings.worktree", desc: "settings.worktreeDesc", icon: branchIcon, keys: ["worktreeForNewTabs", "worktreeCopyFiles", "worktreeSetupCommand", "worktreeProjectSetupCommand"] },
@@ -25,7 +25,7 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     label: "settings.agent",
     desc: "settings.agentDesc",
     icon: robotIcon,
-    keys: ["checkAgentUpdates", "nodePath", "ccusagePath", "env"],
+    keys: ["sessionDefaults", "checkAgentUpdates", "nodePath", "ccusagePath", "env", "customAgents"],
   },
   {
     id: "commit",
@@ -35,16 +35,58 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     keys: ["commitMessage.agent", "commitMessage.model", "commitMessage.effort", "commitMessage.fastMode", "commitMessage.instructions"],
   },
   { id: "mcp", label: "settings.mcp", desc: "settings.mcpDesc", icon: plugIcon, keys: ["mcpServers"] },
-  {
-    id: "custom",
-    label: "settings.custom",
-    desc: "settings.customDesc",
-    icon: terminalIcon,
-    keys: ["customAgents"],
-  },
   { id: "links", label: "settings.links", desc: "settings.linksDesc", icon: linkIcon, keys: ["allowedHttpHosts"] },
+  { id: "tracing", label: "settings.tracing", desc: "settings.tracingTabDesc", icon: activityIcon, keys: ["tracing"] },
   { id: "usage", label: "settings.usage", desc: "settings.usageDesc", icon: chartIcon, keys: [] },
 ];
+
+/** Tabs inside a section's panel, for what would be too much on one page. */
+export function SubTabs<T extends string>(props: {
+  label: string;
+  active: T;
+  tabs: ReadonlyArray<{ id: T; label: string; badge?: ReactNode }>;
+  onSelect: (id: T) => void;
+}) {
+  const refs = useRef<Partial<Record<T, HTMLButtonElement | null>>>({});
+  const move = (delta: number) => {
+    const i = props.tabs.findIndex((tab) => tab.id === props.active);
+    const next = props.tabs[(i + delta + props.tabs.length) % props.tabs.length].id;
+    props.onSelect(next);
+    refs.current[next]?.focus();
+  };
+  return (
+    <div
+      className="subtabs"
+      role="tablist"
+      aria-label={props.label}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") move(1);
+        else if (e.key === "ArrowLeft") move(-1);
+        else return;
+        e.preventDefault();
+      }}
+    >
+      {props.tabs.map((tab) => (
+        <button
+          key={tab.id}
+          ref={(el) => {
+            refs.current[tab.id] = el;
+          }}
+          id={`subtab-${tab.id}`}
+          role="tab"
+          className="subtab"
+          aria-selected={props.active === tab.id}
+          aria-controls="subpanel"
+          tabIndex={props.active === tab.id ? 0 : -1}
+          onClick={() => props.onSelect(tab.id)}
+        >
+          {tab.label}
+          {tab.badge}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function Tabs(props: { active: Tab; onSelect: (tab: Tab) => void; badge: (tab: Tab) => ReactNode }) {
   const { t } = useL10n();

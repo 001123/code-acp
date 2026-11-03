@@ -591,6 +591,31 @@
           "default": true,
           "description": "%config.rememberSessionOptions%"
         },
+        "codeAcp.sessionDefaults": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "effort": {
+                "type": "string"
+              },
+              "fastMode": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "on",
+                  "off"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "%config.sessionDefaults%"
+        },
         "codeAcp.worktreeForNewTabs": {
           "type": "boolean",
           "default": false,

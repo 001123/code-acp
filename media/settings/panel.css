@@ -11,6 +11,37 @@ h2 {
   margin: 0 0 2px;
 }
 
+.subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.subtab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: -1px;
+  padding: 6px 10px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+.subtab:hover {
+  background: none;
+  color: var(--vscode-foreground);
+}
+.subtab[aria-selected="true"] {
+  color: var(--vscode-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+.subtab:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

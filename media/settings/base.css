@@ -31,13 +31,13 @@ header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 10px 16px;
   padding: 20px 0 14px;
 }
 h1 {
   font-size: 1.5em;
   font-weight: 600;
-  margin: 0 auto 0 0;
+  margin: 0;
 }
 /* Fallback of the root error boundary (src/ui/mount.tsx). */
 .crashed {

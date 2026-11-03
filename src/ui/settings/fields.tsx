@@ -121,6 +121,8 @@ export function Text(props: {
 /** Buttons of which one is picked, for a short list of choices. */
 export function Segmented(props: {
   id: string;
+  /** Added to the group's class, for a variant. */
+  className?: string;
   /** Names the group when no label points at it. */
   label?: string;
   value: string | undefined;
@@ -129,7 +131,7 @@ export function Segmented(props: {
   disabled?: boolean;
 }) {
   return (
-    <div id={props.id} className="segmented" role="radiogroup" aria-label={props.label}>
+    <div id={props.id} className={props.className ? `segmented ${props.className}` : "segmented"} role="radiogroup" aria-label={props.label}>
       {props.options.map((o) => (
         <button
           key={o.value}

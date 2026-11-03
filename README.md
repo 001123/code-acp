@@ -16,7 +16,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 - Write in a composer with live Markdown preview; drafts survive reloads. Use `/` for agent commands and `$` for skills.
 - Answer the agent's permission requests and form questions in the chat, and follow its plans, tools, subagents and terminals.
 - Let rules answer permission requests for you, for all projects or one workspace, or everything in worktree chats.
-- Pick the model, effort and fast mode per tab, and start from your last choices for each agent.
+- Pick the model, effort and fast mode per tab, and start from your last choices or the defaults you set for each agent.
 
 ### Context
 
@@ -34,7 +34,7 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 
 ### Agents
 
-- Install, update and switch agents from the **ACP Agents** page, with update checks on startup.
+- Install, update and switch agents from **Settings → Agent → Manage agents**, with update checks on startup.
 - Add your own agents from local commands, and pass extra MCP servers and environment variables to agents.
 
 ### Git, usage and status

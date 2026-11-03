@@ -33,6 +33,17 @@ export interface Wanted {
   readonly fastMode: FastMode;
 }
 
+/** What a session starts with: the agent's `defaults`, and `remembered` for what they leave open; undefined when neither sets anything. */
+export const startingOptions = (defaults: Partial<Wanted> | undefined, remembered: Wanted | undefined): Wanted | undefined => {
+  if (!defaults && !remembered) return undefined;
+  const fastMode = defaults?.fastMode ?? "default";
+  return {
+    model: defaults?.model?.trim() || (remembered?.model ?? ""),
+    effort: defaults?.effort?.trim() || (remembered?.effort ?? ""),
+    fastMode: fastMode === "default" ? (remembered?.fastMode ?? "default") : fastMode,
+  };
+};
+
 type Options = ReadonlyArray<acp.SessionConfigOption> | null | undefined;
 type Select = acp.SessionConfigOption & { type: "select" };
 

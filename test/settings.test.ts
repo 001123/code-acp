@@ -32,12 +32,20 @@ describe("readSettings", () => {
     assert.isTrue(s.notifications);
     assert.isTrue(s.notifyFinished);
     assert.isTrue(s.rememberSessionOptions);
+    assert.deepStrictEqual(s.sessionDefaults, {});
     assert.isFalse(s.worktreeForNewTabs);
     assert.deepStrictEqual(s.worktreeCopyFiles, []);
     assert.strictEqual(s.worktreeSetupCommand, "");
     assert.strictEqual(s.worktreeProjectSetupCommand, "");
     assert.deepStrictEqual(s.allowedHttpHosts, []);
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
+  });
+
+  it("reads session defaults by agent, and falls back on invalid ones", () => {
+    __test.setSetting("codeAcp.sessionDefaults", { claude: { model: "opus", effort: "high", fastMode: "on" } });
+    assert.deepStrictEqual(readSettings().sessionDefaults, { claude: { model: "opus", effort: "high", fastMode: "on" } });
+    __test.setSetting("codeAcp.sessionDefaults", { claude: { fastMode: "maybe" } });
+    assert.deepStrictEqual(readSettings().sessionDefaults, {});
   });
 
   it("reads valid values", () => {

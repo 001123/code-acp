@@ -1,0 +1,219 @@
+/* The Manage agents section of the Agent tab. */
+.catalog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding-bottom: 12px;
+  background: var(--vscode-editor-background);
+}
+@media (min-width: 601px) {
+  /* The narrow view's section strip already holds the top. */
+  .catalog-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+}
+.catalog-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 140px;
+  min-width: 140px;
+  max-width: 280px;
+}
+.catalog-search .svg-icon svg {
+  position: absolute;
+  left: 8px;
+  width: 14px;
+  height: 14px;
+  color: var(--vscode-descriptionForeground);
+  pointer-events: none;
+}
+.catalog-search input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 8px 5px 28px;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--border));
+  border-radius: 4px;
+}
+.catalog-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.catalog-filter input {
+  margin: 0;
+  accent-color: var(--vscode-button-background);
+}
+.catalog-count {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+button.catalog-refresh {
+  margin-left: auto;
+  white-space: nowrap;
+}
+button.catalog-refresh.loading:disabled {
+  opacity: 1;
+}
+.catalog-refresh.loading svg,
+.catalog-status.busy svg {
+  animation: catalog-spin 1s linear infinite;
+}
+@keyframes catalog-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.catalog-error {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  color: var(--vscode-errorForeground);
+  background: var(--vscode-inputValidation-errorBackground, transparent);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  border-radius: var(--radius);
+}
+
+.catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.catalog-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.catalog-card:hover {
+  background: var(--surface-hover);
+}
+.catalog-card.active {
+  border-color: var(--vscode-button-background);
+  background: color-mix(in srgb, var(--vscode-button-background) 8%, transparent);
+}
+.catalog-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: var(--surface-hover);
+}
+/* The registry SVGs are monochrome; masking lets them follow the theme color. */
+.catalog-icon {
+  width: 24px;
+  height: 24px;
+  background-color: var(--vscode-foreground);
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+.catalog-body {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.catalog-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.catalog-name {
+  font-weight: 600;
+}
+.catalog-version {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+.catalog-badge {
+  font-size: 0.75em;
+  line-height: 1.6;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--vscode-descriptionForeground);
+}
+.catalog-badge.active {
+  border-color: transparent;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+.catalog-desc {
+  margin: 4px 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.catalog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+.catalog-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.catalog-meta-item svg {
+  width: 13px;
+  height: 13px;
+}
+.catalog-meta a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+.catalog-meta a:hover .catalog-link {
+  text-decoration: underline;
+}
+.catalog-link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.catalog-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.92em;
+}
+.catalog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 0;
+  color: var(--vscode-descriptionForeground);
+}
+.catalog-empty svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.6;
+}

@@ -43,6 +43,14 @@ export type ApprovalRules = typeof ApprovalRules.Type;
 
 const FastModeSetting = Schema.Literals(["default", "on", "off"]);
 
+/** One entry of codeAcp.sessionDefaults: what new sessions of an agent start with; what is left out stays open. */
+export const SessionDefaults = Schema.Struct({
+  model: Schema.optional(Schema.String),
+  effort: Schema.optional(Schema.String),
+  fastMode: Schema.optional(FastModeSetting),
+});
+export type SessionDefaults = typeof SessionDefaults.Type;
+
 /** Schemas of the codeAcp.* settings; keep in sync with `contributes.configuration` in package.json. */
 export const Settings = Schema.Struct({
   language: Schema.Literals(["auto", "en", "vi"]),
@@ -68,6 +76,8 @@ export const Settings = Schema.Struct({
   notifyFinished: Schema.Boolean,
   /** Start new chat sessions with the model, effort and fast mode last picked for their agent. */
   rememberSessionOptions: Schema.Boolean,
+  /** The model, effort and fast mode to start sessions with, by agent id; these win over the last picked. */
+  sessionDefaults: Schema.Record(Schema.String, SessionDefaults),
   /** Run each new chat tab in a git worktree of its own, on a new branch. */
   worktreeForNewTabs: Schema.Boolean,
   /** Ignored files to copy from the base checkout into a new worktree, as gitignore patterns. */
@@ -109,6 +119,7 @@ export const SETTING_KEYS = [
   "notifications",
   "notifyFinished",
   "rememberSessionOptions",
+  "sessionDefaults",
   "worktreeForNewTabs",
   "worktreeCopyFiles",
   "worktreeSetupCommand",
@@ -141,6 +152,7 @@ const DEFAULTS: Settings = {
   notifications: true,
   notifyFinished: true,
   rememberSessionOptions: true,
+  sessionDefaults: {},
   worktreeForNewTabs: false,
   worktreeCopyFiles: [],
   worktreeSetupCommand: "",
@@ -182,6 +194,7 @@ export function readSettings(): Settings {
     notifications: read("notifications"),
     notifyFinished: read("notifyFinished"),
     rememberSessionOptions: read("rememberSessionOptions"),
+    sessionDefaults: read("sessionDefaults"),
     worktreeForNewTabs: read("worktreeForNewTabs"),
     worktreeCopyFiles: read("worktreeCopyFiles"),
     worktreeSetupCommand: read("worktreeSetupCommand"),

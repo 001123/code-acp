@@ -2,7 +2,7 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 import type { AcpAgent } from "../src/acpClient";
-import { agentOptions, configureSession } from "../src/sessionOptions";
+import { agentOptions, configureSession, startingOptions } from "../src/sessionOptions";
 
 const select = (id: string, category: string | undefined, currentValue: string, values: string[]): acp.SessionConfigOption =>
   ({ id, name: id, category, type: "select", currentValue, options: values.map((value) => ({ value, name: value.toUpperCase() })) }) as acp.SessionConfigOption;
@@ -67,5 +67,27 @@ describe("agentOptions", () => {
     assert.isTrue(options.fastMode);
     assert.isFalse(options.defaultFastMode);
     assert.deepStrictEqual(agentOptions(undefined), { models: [], efforts: [], fastMode: false });
+  });
+});
+
+describe("startingOptions", () => {
+  const remembered = { model: "small", effort: "low", fastMode: "on" } as const;
+
+  it("is undefined when nothing is set", () => {
+    assert.isUndefined(startingOptions(undefined, undefined));
+  });
+
+  it("follows what was last picked without defaults", () => {
+    assert.deepStrictEqual(startingOptions(undefined, remembered), remembered);
+  });
+
+  it("prefers the defaults, and takes what they leave open from what was last picked", () => {
+    assert.deepStrictEqual(startingOptions({ model: "big" }, remembered), { model: "big", effort: "low", fastMode: "on" });
+    assert.deepStrictEqual(startingOptions({ effort: " ", fastMode: "default" }, remembered), remembered);
+    assert.deepStrictEqual(startingOptions({ fastMode: "off" }, remembered), { model: "small", effort: "low", fastMode: "off" });
+  });
+
+  it("applies defaults when nothing was picked", () => {
+    assert.deepStrictEqual(startingOptions({ model: "big" }, undefined), { model: "big", effort: "", fastMode: "default" });
   });
 });

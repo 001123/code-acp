@@ -7,7 +7,7 @@ import type { ShadowGit } from "../checkpoints";
 import { ChangeSet } from "../fileChanges";
 import { t } from "../i18n";
 import { thenable, type ExtensionCtx, type Output } from "../runtime";
-import { configureSession } from "../sessionOptions";
+import { configureSession, startingOptions } from "../sessionOptions";
 import { readSettings } from "../settings";
 import { folderOf, defaultCwd, isWorkspaceFolder, workspaceFolders } from "../workspace";
 import { Worktrees } from "../worktrees";
@@ -87,11 +87,14 @@ export class TabSessions {
   });
 
   /**
-   * Sets the model, effort and fast mode last picked for the agent on a session just started or reopened (reopening
-   * gives the agent's defaults too), keeping the defaults for what it no longer offers. Gives the session's options.
+   * Sets the model, effort and fast mode chosen for the agent in settings, else those last picked for it, on a session
+   * just started or reopened (reopening gives the agent's defaults too), keeping the defaults for what it no longer
+   * offers. Gives the session's options.
    */
   private restoreOptions(running: RunningAgent, session: acp.NewSessionResponse) {
-    const wanted = readSettings().rememberSessionOptions ? this.host.lastOptions.wanted(running.agentId) : undefined;
+    const settings = readSettings();
+    const remembered = settings.rememberSessionOptions ? this.host.lastOptions.wanted(running.agentId) : undefined;
+    const wanted = startingOptions(settings.sessionDefaults[running.agentId], remembered);
     return wanted
       ? configureSession(running.agent, session, wanted).pipe(
           Effect.tapError((err) => Effect.logWarning(`Restoring the session options failed: ${err.message}`)),

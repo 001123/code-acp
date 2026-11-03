@@ -1,12 +1,12 @@
 import { Effect, Option, Predicate, Schema } from "effect";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { AgentCatalog, CATALOG_IMG_SRC, type CatalogMessage, type CatalogState } from "./agentCatalog";
 import type { AgentManager } from "./agentManager";
 import { Ccusage, isCcusageSource } from "./ccusage";
 import { AutoApprove } from "./chat/autoApprove";
 import { CommitMessage } from "./commitMessage";
 import { onDidChangeLocale, t, webviewL10n } from "./i18n";
-import { ManagerPanel } from "./managerPanel";
 import { runIn, thenable, type AppRuntime, type AppServices } from "./runtime";
 import { LOWEST_EFFORT } from "./sessionOptions";
 import { ApprovalRules, DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, lockedSettings, SETTING_KEYS, WORKSPACE_ONLY_SETTINGS, type SettingKey, type SettingsScope } from "./settings";
@@ -14,6 +14,7 @@ import { UsageLedger, type SessionQuery, type UsageSummary } from "./usageLedger
 import { webviewHtml, webviewRoots } from "./webview";
 
 export type FromWebview =
+  | CatalogMessage
   | { type: "ready" }
   | { type: "set"; key: SettingKey; value: unknown }
   /** The rules of this workspace for answering permission requests, which are no setting. */
@@ -21,7 +22,6 @@ export type FromWebview =
   /** Which settings the page reads and writes from now on. */
   | { type: "scope"; scope: SettingsScope }
   | { type: "use"; id: string }
-  | { type: "manageAgents" }
   | { type: "openNative" }
   | { type: "clearUsage" }
   /** The sessions the Usage tab lists: those matching `text`, the `limit` most recent. */
@@ -108,17 +108,24 @@ export class SettingsPanel {
   private static current?: SettingsPanel;
 
   private readonly disposables: vscode.Disposable[] = [];
+  private readonly catalog: AgentCatalog;
   /** The tab to show once the page is ready. */
-  private pendingTab?: string;
+  private pendingSelect?: { type: "selectTab"; tab: string; section?: string };
   private usageQuery: SessionQuery = { text: "", limit: USAGE_PAGE };
   private pickedScope: SettingsScope = "user";
 
-  /** Opens the page, on `tab` when given (e.g. "usage"). */
-  static show(context: vscode.ExtensionContext, runtime: AppRuntime, manager: AgentManager["Service"], tab?: string): void {
-    if (SettingsPanel.current) {
-      SettingsPanel.current.panel.reveal();
-      if (tab) {
-        void SettingsPanel.current.panel.webview.postMessage({ type: "selectTab", tab });
+  /** Opens the page, on `tab` (e.g. "usage") and its `section` when given. */
+  static show(context: vscode.ExtensionContext, runtime: AppRuntime, manager: AgentManager["Service"], tab?: string, section?: string): void {
+    const select = tab ? ({ type: "selectTab", tab, section } as const) : undefined;
+    const current = SettingsPanel.current;
+    if (current) {
+      // A hidden page reloads when revealed, so it can only be told once it is ready again.
+      const visible = current.panel.visible;
+      current.panel.reveal();
+      if (!visible) {
+        current.pendingSelect = select;
+      } else if (select) {
+        void current.panel.webview.postMessage(select);
       }
       return;
     }
@@ -127,7 +134,7 @@ export class SettingsPanel {
       localResourceRoots: webviewRoots(context.extensionUri),
     });
     SettingsPanel.current = new SettingsPanel(panel, context, runtime, manager);
-    SettingsPanel.current.pendingTab = tab;
+    SettingsPanel.current.pendingSelect = select;
   }
 
   private constructor(
@@ -137,7 +144,13 @@ export class SettingsPanel {
     private readonly manager: AgentManager["Service"],
   ) {
     panel.iconPath = vscode.Uri.joinPath(context.extensionUri, "media", "icon.svg");
-    panel.webview.html = webviewHtml(panel.webview, context.extensionUri, "settings");
+    panel.webview.html = webviewHtml(panel.webview, context.extensionUri, "settings", CATALOG_IMG_SRC);
+    // An install can outlast the page.
+    this.catalog = new AgentCatalog(manager, (catalog: CatalogState) => {
+      if (SettingsPanel.current === this) {
+        void panel.webview.postMessage({ type: "catalog", catalog });
+      }
+    });
     this.disposables.push(
       panel.webview.onDidReceiveMessage((msg: FromWebview) => this.run(this.onMessage(msg))),
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -147,7 +160,7 @@ export class SettingsPanel {
         panel.title = t("settings.title");
         void panel.webview.postMessage(webviewL10n());
       }),
-      manager.onDidChange(() => this.run(Effect.andThen(this.render, this.renderUsage))),
+      manager.onDidChange(() => this.run(Effect.all([this.render, this.renderUsage, this.catalog.render], { discard: true }))),
       panel.onDidDispose(() => this.dispose()),
     );
     this.run(
@@ -172,9 +185,9 @@ export class SettingsPanel {
   private readonly onMessage = Effect.fn("SettingsPanel.onMessage")(function* (this: SettingsPanel, msg: FromWebview) {
     switch (msg.type) {
       case "ready":
-        if (this.pendingTab) {
-          void this.panel.webview.postMessage({ type: "selectTab", tab: this.pendingTab });
-          this.pendingTab = undefined;
+        if (this.pendingSelect) {
+          void this.panel.webview.postMessage(this.pendingSelect);
+          this.pendingSelect = undefined;
         }
         yield* this.render;
         yield* this.renderUsage;
@@ -229,8 +242,12 @@ export class SettingsPanel {
           yield* this.manager.setActive(msg.id);
         }
         break;
-      case "manageAgents":
-        ManagerPanel.show(this.context, this.runtime, this.manager);
+      case "catalogLoad":
+      case "catalogRefresh":
+      case "catalogInstall":
+      case "catalogUninstall":
+      case "catalogOpen":
+        yield* this.catalog.onMessage(msg);
         break;
       case "loadModels": {
         const result = yield* CommitMessage.use((commit) => commit.options(msg.agentId, msg.model)).pipe(
@@ -272,6 +289,7 @@ export class SettingsPanel {
         workspaceAutoApprove,
         scope,
         hasWorkspace: this.hasWorkspace,
+        workspaceName: vscode.workspace.name,
         locked: lockedSettings(scope),
         agents: yield* this.manager.agents,
         activeId: yield* this.manager.activeId,

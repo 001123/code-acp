@@ -1,8 +1,8 @@
 import { useState } from "react";
-import type { ApprovalRules, SettingKey } from "../../settings";
+import type { ApprovalRules, SessionDefaults, SettingKey } from "../../settings";
 import { Icon } from "../icon";
 import { useL10n, type MessageKey } from "../l10n";
-import { AgentModelFields } from "./agentModel";
+import { AgentModelFields, SessionOptionFields } from "./agentModel";
 import { Field, Segmented, Text, Toggle } from "./fields";
 import { parseHosts } from "./hosts";
 import { formatPairs, parsePairs } from "./pairs";
@@ -57,15 +57,6 @@ export function GeneralTab({ state }: { state: State }) {
         inline
       >
         <Toggle id="showChanges" checked={v.showChanges !== false} onChange={(checked) => set("showChanges", checked)} />
-      </Field>
-      <Field
-        id="tracing"
-        label="settings.tracing"
-        desc="settings.tracingDesc"
-        overridden={overridden("tracing")}
-        inline
-      >
-        <Toggle id="tracing" checked={v.tracing === true} onChange={(checked) => set("tracing", checked)} />
       </Field>
       <Field
         id="rememberSessionOptions"
@@ -238,35 +229,59 @@ export function WorktreeTab({ state }: { state: State }) {
   );
 }
 
-export function AgentTab({ state }: { state: State }) {
+export function AgentTab({ state, loaded, load }: { state: State; loaded: LoadedOptions; load: (agentId: string, model: string) => void }) {
   const { t } = useL10n();
   const [envError, setEnvError] = useState<string>();
   const v = state.values;
   const overridden = isOverridden(state);
   const locked = isLocked(state);
   const env = formatPairs(v.env as Record<string, string> | undefined);
+  const agentId = state.activeId;
+  const defaults = (v.sessionDefaults ?? {}) as Record<string, SessionDefaults>;
+  const chosen = agentId ? defaults[agentId] : undefined;
+  const choose = (patch: SessionDefaults) => {
+    if (!agentId) return;
+    const { [agentId]: _, ...others } = defaults;
+    // What is back on the agent's default isn't kept, nor an agent left without any choice.
+    const kept = Object.fromEntries(Object.entries({ ...chosen, ...patch }).filter(([, value]) => value && value !== "default"));
+    set("sessionDefaults", Object.keys(kept).length ? { ...others, [agentId]: kept } : others);
+  };
   return (
     <section className="card">
       <Field id="active-agent" label="settings.activeAgent" desc="settings.activeAgentDesc">
-        <div className="row">
-          <select
-            id="active-agent"
-            disabled={!state.agents.length}
-            value={state.activeId ?? ""}
-            onChange={(e) => post({ type: "use", id: e.target.value })}
-          >
-            {!state.agents.length && <option value="">{t("settings.noAgents")}</option>}
-            {state.agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.version ? `${a.name} ${a.version}` : a.name}
-              </option>
-            ))}
-          </select>
-          <button className="secondary" onClick={() => post({ type: "manageAgents" })}>
-            {t("settings.manageAgents")}
-          </button>
-        </div>
+        <select
+          id="active-agent"
+          disabled={!state.agents.length}
+          value={state.activeId ?? ""}
+          onChange={(e) => post({ type: "use", id: e.target.value })}
+        >
+          {!state.agents.length && <option value="">{t("settings.noAgents")}</option>}
+          {state.agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.version ? `${a.name} ${a.version}` : a.name}
+            </option>
+          ))}
+        </select>
       </Field>
+      {agentId && (
+        <SessionOptionFields
+          id="default"
+          agent={agentId}
+          ready
+          model={chosen?.model ?? ""}
+          effort={chosen?.effort ?? ""}
+          fastMode={chosen?.fastMode ?? "default"}
+          onModel={(model) => choose({ model })}
+          onEffort={(effort) => choose({ effort })}
+          onFastMode={(fastMode) => choose({ fastMode })}
+          clearableEffort
+          modelDesc="settings.defaultModelDesc"
+          effortDesc="settings.defaultEffortDesc"
+          overridden={overridden("sessionDefaults")}
+          loaded={loaded}
+          load={load}
+        />
+      )}
       <Field
         id="checkAgentUpdates"
         label="settings.checkUpdates"
@@ -334,6 +349,29 @@ export function AgentTab({ state }: { state: State }) {
         />
       </Field>
     </section>
+  );
+}
+
+export function TracingTab({ state }: { state: State }) {
+  const { t } = useL10n();
+  return (
+    <>
+      <section className="card">
+        <Field
+          id="tracing"
+          label="settings.tracingEnabled"
+          desc="settings.tracingDesc"
+          overridden={isOverridden(state)("tracing")}
+          inline
+        >
+          <Toggle id="tracing" checked={state.values.tracing === true} onChange={(checked) => set("tracing", checked)} />
+        </Field>
+      </section>
+      <div className="note warning">
+        <Icon svg={warningIcon} />
+        {t("settings.tracingPrivacy")}
+      </div>
+    </>
   );
 }
 
