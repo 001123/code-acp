@@ -47,7 +47,7 @@ Code ACP needs VS Code ≥ 1.123. There is no release yet, so build it from sour
 
 - Run a tab, or every new chat, in a git worktree of its own, on a branch named after the first prompt.
 - Compare attempts with the Compare checkbox (Best of N): send one prompt to several agents, models and efforts. Each works in its own worktree under a group tab, where you compare their diffs and apply the best one, or discard them all.
-- Finish a worktree from the button under the composer: merge it, open a pull request whose description its agent drafts (with the GitHub CLI), or apply its changes as staged changes.
+- Finish a worktree from the button under the composer: merge it, create a pull request whose description its agent drafts (with the GitHub CLI), or copy its changes as staged changes. The bar then shows where the work went, a merge's conflicts, and the way to delete the worktree.
 - Clean up the worktrees you no longer use in one go.
 - Give new worktrees ignored files such as `.env` and `node_modules`, and run a setup command, your own or the project's after you allow it.
 

@@ -153,7 +153,7 @@ export class TabGroups {
       return;
     }
     tab.applied = true;
-    this.host.postTabs();
+    yield* this.host.tabWorktrees.settle(tab, worktree, "applied", path.basename(worktree.base));
     const close = t("bestOf.closeAndDelete");
     const name = worktree.branch ?? path.basename(worktree.root);
     const picked = yield* thenable(() => vscode.window.showInformationMessage(t("worktree.applied", name, path.basename(worktree.base)), close));

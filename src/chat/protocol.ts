@@ -3,12 +3,12 @@ import type { TerminalSnapshot } from "../agentTerminals";
 import type { ChangedFile } from "../fileChanges";
 import type { ProblemScope } from "../problems";
 import type { ChangeBlock } from "../ui/lineDiff";
-import type { TabWorktree, WorktreeFileDiff } from "../worktrees";
+import type { TabWorktree, WorktreeFileDiff, WorktreeSettled } from "../worktrees";
 
 /** One change in a file, to keep or undo on its own. */
 export type ChangeHunk = ChangeBlock;
 
-export type { ChangedFile, TerminalSnapshot, WorktreeFileDiff };
+export type { ChangedFile, TerminalSnapshot, WorktreeFileDiff, WorktreeSettled };
 
 export type FromWebview =
   | { type: "ready" }
@@ -74,6 +74,16 @@ export type FromWebview =
   | { type: "pickWorktree"; tab: number }
   /** Offers the ways to finish the work in the tab's worktree. */
   | { type: "finishWorktree"; tab: number }
+  /** Deletes the tab's worktree, going back to its base folder, after asking. */
+  | { type: "deleteWorktree"; tab: number }
+  /** Reads again what state the tab's worktree is in: a merge's conflicts get solved outside the chat. */
+  | { type: "refreshWorktree"; tab: number }
+  /** Gives up the merge of the tab's worktree, after asking. */
+  | { type: "abortWorktreeMerge"; tab: number }
+  /** Shows the conflicts of the merge of the tab's worktree. */
+  | { type: "showWorktreeConflicts"; tab: number }
+  /** Opens the pull request the work of the tab's worktree went to. */
+  | { type: "openWorktreePr"; tab: number }
   /** Pushes the branch of the tab's worktree and opens the pull request of its "prDraft". */
   | { type: "createPr"; tab: number; title: string; body: string }
   /** Drops the tab's "prDraft". */
@@ -297,8 +307,14 @@ export interface TabInfo {
   attemptLabel?: string;
   /** Its worktree's changes were applied to the base folder. */
   applied?: boolean;
-  /** Its worktree holds work the base folder doesn't. */
+  /** Its worktree holds work that hasn't gone anywhere yet. */
   finishable?: boolean;
+  /** Where the work of its worktree went. */
+  settled?: WorktreeSettled;
+  /** What its worktree's branch is being merged into while that merge has conflicts. */
+  conflict?: string;
+  /** Its worktree can be deleted: the extension made it and no other tab runs in it. */
+  deletable?: boolean;
   pinned: boolean;
   /** When the conversation started (epoch ms); undefined until the first message, or for sessions opened from history. */
   createdAt?: number;

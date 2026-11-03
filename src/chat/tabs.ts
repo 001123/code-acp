@@ -4,7 +4,7 @@ import { Option, Schema, Scope, Semaphore } from "effect";
 import { canFork, type AcpAgent } from "../acpClient";
 import { ChangeSet, SavedChanges } from "../fileChanges";
 import type { MessageKey } from "../i18n";
-import { TabWorktree } from "../worktrees";
+import { isManaged, TabWorktree, WorktreeSettled } from "../worktrees";
 import { SavedDraft, type DraftHolder } from "./drafts";
 import type { Attempt, PromptPart, TabGroupInfo, TabInfo } from "./protocol";
 
@@ -80,6 +80,7 @@ export const SavedTabs = Schema.Struct({
       worktree: Schema.optional(TabWorktree),
       group: Schema.optional(Schema.Int),
       applied: Schema.optional(Schema.Boolean),
+      settled: Schema.optional(WorktreeSettled),
       wanted: Schema.optional(SavedWanted),
       attemptLabel: Schema.optional(Schema.String),
     }),
@@ -162,8 +163,12 @@ export interface Tab extends DraftHolder {
   attempt?: Attempt;
   /** Its worktree's changes were applied to the base folder. */
   applied?: boolean;
-  /** Its worktree holds work the base folder doesn't, as last read. */
+  /** Its worktree holds work that hasn't gone anywhere yet, as last read. */
   finishable?: boolean;
+  /** Where the work of its worktree went. */
+  settled?: WorktreeSettled;
+  /** The merge of its worktree's branch while that has conflicts, as last read: what the branch is being merged into. */
+  conflict?: { readonly root: string; readonly target: string };
   /** What the agent has said in the running turn since its last tool call, when the turn's reply is wanted. */
   reply?: { text: string };
   /** The model and effort its sessions start with, over those usual for the agent: what its group's comparison picked. */
@@ -233,6 +238,7 @@ export class TabList {
       tab.worktree = entry.worktree;
       tab.group = entry.group === undefined ? undefined : groups.get(entry.group);
       tab.applied = entry.applied;
+      tab.settled = entry.settled;
       tab.wanted = entry.wanted;
       tab.attemptLabel = entry.attemptLabel;
       if (entry.sessionId) {
@@ -466,6 +472,9 @@ export class TabList {
       attemptLabel: tab.attemptLabel,
       applied: tab.applied,
       finishable: tab.finishable,
+      settled: tab.settled?.root === tab.worktree?.root ? tab.settled : undefined,
+      conflict: tab.conflict?.root === tab.worktree?.root ? tab.conflict?.target : undefined,
+      deletable: tab.worktree !== undefined && isManaged(tab.worktree.root) && !this.all.some((other) => other !== tab && other.worktree?.root === tab.worktree?.root),
     }));
   }
 
@@ -487,20 +496,20 @@ export class TabList {
       groups: this.tabGroups.map(({ id, title, name, prompt, createdAt, collapsed }) => ({ id, title, name, prompt, createdAt, collapsed })),
       shownGroup: this.shown?.id,
       tabs: this.tabs.map((tab) => {
-        const { pinned, name, savedDraft: draft, title, createdAt, worktree, applied, wanted, attemptLabel } = tab;
+        const { pinned, name, savedDraft: draft, title, createdAt, worktree, applied, settled, wanted, attemptLabel } = tab;
         const changes = tab.changes.saved;
         const group = tab.group?.id;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, wanted, attemptLabel };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, settled, wanted, attemptLabel };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, wanted, attemptLabel };
+          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, worktree, group, applied, settled, wanted, attemptLabel };
         }
-        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, group, applied, wanted, attemptLabel };
+        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, group, applied, settled, wanted, attemptLabel };
       }),
     };
   }

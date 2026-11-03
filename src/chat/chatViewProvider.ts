@@ -297,6 +297,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         // A checkout made in another window or a terminal.
         if (state.focused) {
           this.run(this.refreshBranch(this.tabs.active));
+          this.run(this.tabWorktrees.refreshOnFocus(this.tabs.active));
         }
       }),
       // Edits the user saves change the counts.
@@ -593,6 +594,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "finishWorktree":
         yield* this.tabWorktrees.finish(tab);
+        break;
+      case "deleteWorktree":
+        yield* this.tabWorktrees.deleteWorktree(tab);
+        break;
+      case "refreshWorktree":
+        yield* this.tabWorktrees.refreshFinishable(tab);
+        break;
+      case "abortWorktreeMerge":
+        yield* this.tabWorktrees.abortMerge(tab);
+        break;
+      case "showWorktreeConflicts":
+        yield* thenable(() => vscode.commands.executeCommand("workbench.view.scm"));
+        break;
+      case "openWorktreePr":
+        this.tabWorktrees.openPr(tab);
         break;
       case "createPr":
         yield* this.tabWorktrees.createPr(tab, msg.title, msg.body);

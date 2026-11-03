@@ -42,8 +42,9 @@
 }
 #workspace-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 2px 12px;
   min-width: 0;
   /* Sits close under the composer, whose bottom margin it shares. */
   margin: -6px 14px 6px;
@@ -77,12 +78,53 @@
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-foreground);
 }
+/* Where the worktree's work went, and what can be done next. */
+.workspace-state {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-width: 0;
+  margin-left: auto;
+}
+.workspace-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+button.workspace-status {
+  cursor: pointer;
+}
+button.workspace-status:hover,
+.workspace-action:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+.workspace-state[data-conflict] .workspace-status svg {
+  color: var(--vscode-editorWarning-foreground);
+}
+.workspace-action {
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
 .workspace-finish {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   gap: 5px;
-  margin-left: auto;
   padding: 2px 6px;
   border: 1px solid var(--vscode-focusBorder);
   border-radius: 4px;

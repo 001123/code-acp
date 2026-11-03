@@ -261,6 +261,8 @@ export const workspace = {
   findFiles: async () => [],
 };
 
+export const QuickPickItemKind = { Separator: -1, Default: 0 };
+
 export const ProgressLocation = { SourceControl: 1, Window: 10, Notification: 15 };
 
 export const window = {

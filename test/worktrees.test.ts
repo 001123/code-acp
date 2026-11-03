@@ -949,23 +949,191 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
       }).pipe(Effect.provide(layer)),
     );
 
-    it.effect("merges through the dialogs: commits what is pending, then offers to delete the worktree", () =>
+    const pickFinish = (kind: string) => {
+      vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === kind)) as never;
+    };
+
+    it.effect("merges after just the commit message, says so, and deletes the worktree after one question", () =>
       Effect.gen(function* () {
         const repo = makeRepo();
         const { worktree, cwd } = yield* created(repo);
-        const { controller, tab, asked } = makeController("Merge");
+        const { controller, tab, asked } = makeController("Delete Worktree");
+        tab.worktree = worktree;
+        tab.cwd = cwd;
+        tab.used = true;
+        fs.writeFileSync(path.join(worktree.root, "new.txt"), "x\n");
+        vscode.window.showInputBox = (async () => "add new") as never;
+        let title = "";
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>, options: { title: string }) => {
+          title = options.title;
+          return items.find((item) => item.choice?.kind === "merge");
+        }) as never;
+        yield* withoutHost(controller.finish(tab));
+        assert.include(title, `1 uncommitted file(s) · 0 commit(s) · ${worktree.branch}`);
+        assert.deepStrictEqual(asked, []);
+        assert.strictEqual(git(repo, "log", "-1", "--format=%s"), "add new\n");
+        assert.isTrue(fs.existsSync(path.join(repo, "new.txt")));
+        assert.strictEqual(tab.settled?.how, "merged");
+        assert.isFalse(tab.finishable);
+        assert.isTrue(fs.existsSync(worktree.root));
+
+        yield* withoutHost(controller.deleteWorktree(tab));
+        assert.lengthOf(asked, 1);
+        assert.include(asked[0]!, "No work is lost");
+        assert.include(asked[0]!, "conversation closes");
+        assert.isFalse(fs.existsSync(worktree.root));
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("reads what a worktree holds when deleting: work added since it was merged isn't taken for gone", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { worktree, cwd } = yield* created(repo);
+        const { controller, tab, asked } = makeController();
         tab.worktree = worktree;
         tab.cwd = cwd;
         fs.writeFileSync(path.join(worktree.root, "new.txt"), "x\n");
-        vscode.window.showInputBox = (async () => "add new") as never;
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "merge")) as never;
-        vscode.window.showInformationMessage = (async () => "Delete Worktree") as never;
+        yield* (yield* Worktrees).commit(worktree, "add new");
+        pickFinish("merge");
         yield* withoutHost(controller.finish(tab));
-        assert.lengthOf(asked, 1);
+        assert.strictEqual(tab.settled?.how, "merged");
+
+        fs.writeFileSync(path.join(worktree.root, "more.txt"), "y\n");
+        yield* withoutHost(controller.deleteWorktree(tab));
         assert.include(asked[0]!, "1 uncommitted file(s)");
-        assert.strictEqual(git(repo, "log", "-1", "--format=%s"), "add new\n");
-        assert.isTrue(fs.existsSync(path.join(repo, "new.txt")));
-        assert.isFalse(fs.existsSync(worktree.root));
+        assert.isTrue(fs.existsSync(path.join(worktree.root, "more.txt")));
+
+        yield* controller.refreshFinishable(tab);
+        assert.isUndefined(tab.settled);
+        assert.isTrue(tab.finishable);
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("keeps a merge with conflicts in the tab's state until it is solved outside the chat", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { worktree } = yield* created(repo);
+        const { controller, tab } = makeController();
+        tab.worktree = worktree;
+        fs.writeFileSync(path.join(worktree.root, "a.txt"), "theirs\n");
+        yield* (yield* Worktrees).commit(worktree, "theirs");
+        fs.writeFileSync(path.join(repo, "a.txt"), "ours\n");
+        git(repo, "commit", "--quiet", "-am", "ours");
+        pickFinish("merge");
+        yield* withoutHost(controller.finish(tab));
+        assert.isDefined(tab.conflict);
+        assert.isFalse(tab.finishable);
+
+        // Not "the base folder is dirty": the bar has the way out.
+        let picked = 0;
+        vscode.window.showQuickPick = (async () => void picked++) as never;
+        yield* withoutHost(controller.finish(tab));
+        assert.strictEqual(picked, 0);
+        yield* controller.refreshFinishable(tab);
+        assert.isDefined(tab.conflict);
+
+        fs.writeFileSync(path.join(repo, "a.txt"), "both\n");
+        git(repo, "add", "--all");
+        git(repo, "commit", "--quiet", "--no-edit");
+        yield* controller.refreshFinishable(tab);
+        assert.isUndefined(tab.conflict);
+        assert.strictEqual(tab.settled?.how, "merged");
+        assert.isFalse(tab.finishable);
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("gives up a merge with conflicts after asking, and doesn't try when it is over", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { worktree } = yield* created(repo);
+        const { controller, tab, asked } = makeController("Abort Merge");
+        tab.worktree = worktree;
+        fs.writeFileSync(path.join(worktree.root, "a.txt"), "theirs\n");
+        yield* (yield* Worktrees).commit(worktree, "theirs");
+        fs.writeFileSync(path.join(repo, "a.txt"), "ours\n");
+        git(repo, "commit", "--quiet", "-am", "ours");
+        pickFinish("merge");
+        yield* withoutHost(controller.finish(tab));
+        asked.length = 0;
+
+        yield* withoutHost(controller.abortMerge(tab));
+        assert.lengthOf(asked, 1);
+        assert.strictEqual(git(repo, "status", "--porcelain"), "");
+        assert.isUndefined(tab.conflict);
+        assert.isTrue(tab.finishable);
+
+        yield* withoutHost(controller.abortMerge(tab));
+        assert.lengthOf(asked, 1);
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("copies changes without asking twice, won't while an agent works, and closing then loses nothing", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { worktree } = yield* created(repo);
+        const { controller, tab, asked } = makeController();
+        tab.worktree = worktree;
+        fs.writeFileSync(path.join(worktree.root, "new.txt"), "x\n");
+        pickFinish("apply");
+        const told: string[] = [];
+        vscode.window.showInformationMessage = (async (message: string) => void told.push(message)) as never;
+
+        tab.busy = true;
+        yield* withoutHost(controller.finish(tab));
+        assert.lengthOf(told, 1);
+        assert.isFalse(fs.existsSync(path.join(repo, "new.txt")));
+        tab.busy = false;
+
+        yield* withoutHost(controller.finish(tab));
+        assert.deepStrictEqual(asked, []);
+        assert.include(git(repo, "status", "--porcelain"), "A  new.txt");
+        assert.strictEqual(tab.settled?.how, "applied");
+        yield* controller.refreshFinishable(tab);
+        assert.isFalse(tab.finishable);
+        assert.strictEqual(yield* controller.askRelease(tab), "delete");
+        assert.deepStrictEqual(asked, []);
+
+        // Editing a file that is already uncommitted is new work too.
+        fs.writeFileSync(path.join(worktree.root, "new.txt"), "changed\n");
+        yield* controller.refreshFinishable(tab);
+        assert.isUndefined(tab.settled);
+        assert.isTrue(tab.finishable);
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("says which of the base folder's own changes are in the way of copying", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { worktree } = yield* created(repo);
+        const worktrees = yield* Worktrees;
+        fs.writeFileSync(path.join(worktree.root, "a.txt"), "theirs\n");
+        fs.writeFileSync(path.join(repo, "a.txt"), "mine\n");
+        const error = yield* Effect.flip(worktrees.apply(worktree));
+        assert.include(error.message, "own uncommitted changes to: a.txt");
+        assert.strictEqual(fs.readFileSync(path.join(repo, "a.txt"), "utf8"), "mine\n");
+        // Changes to other files are no reason to stop.
+        git(repo, "checkout", "--", "a.txt");
+        fs.writeFileSync(path.join(repo, "other.txt"), "mine\n");
+        assert.deepStrictEqual(yield* worktrees.apply(worktree), { applied: true, conflicts: [] });
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("keeps the ways to finish a worktree out of the picker of where the tab works", () =>
+      Effect.gen(function* () {
+        const repo = makeRepo();
+        const { worktree } = yield* created(repo);
+        const { controller, tab } = makeController();
+        tab.worktree = worktree;
+        let kinds: Array<string | undefined> = [];
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => {
+          kinds = items.map((item) => item.choice?.kind);
+          return undefined;
+        }) as never;
+        yield* withoutHost(controller.pick(tab));
+        for (const kind of ["merge", "pr", "apply", "delete"]) {
+          assert.notInclude(kinds, kind);
+        }
+        assert.includeMembers(kinds, ["local", "new", "window", "terminal"]);
       }).pipe(Effect.provide(layer)),
     );
 
@@ -1041,16 +1209,22 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         assert.strictEqual(git(remote, "branch", "--list", worktree.branch!), "");
         assert.notInclude(gh.read(), "pr create");
 
-        const told: string[] = [];
-        vscode.window.showInformationMessage = (async (message: string) => void told.push(message)) as never;
         yield* controller.createPr(tab, "Better title", "Better body");
         assert.notStrictEqual(git(remote, "branch", "--list", worktree.branch!), "");
         assert.include(gh.read(), `pr create --head ${worktree.branch} --title Better title --body-file - --base main`);
         assert.include(gh.read(), "Better body");
         assert.deepInclude(posted, { type: "prDraft" });
-        assert.include(told[0]!, "https://example.test/pr/1");
+        assert.strictEqual(tab.settled?.how, "pr");
+        assert.strictEqual(tab.settled?.target, "https://example.test/pr/1");
         // The worktree stays: a review may ask for more.
         assert.isTrue(fs.existsSync(worktree.root));
+        yield* controller.refreshFinishable(tab);
+        assert.isFalse(tab.finishable);
+        // More work goes to the same pull request, which the bar keeps showing.
+        fs.writeFileSync(path.join(worktree.root, "more.txt"), "y\n");
+        yield* controller.refreshFinishable(tab);
+        assert.isTrue(tab.finishable);
+        assert.strictEqual(tab.settled?.how, "pr");
       }).pipe(Effect.provide(layer)),
     );
 
@@ -1087,7 +1261,7 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
     it.effect("pushes to the pull request that is already open, without a new draft", () =>
       Effect.gen(function* () {
         const { remote, worktree } = yield* makeRemoteRepo();
-        const gh = fakeGh(`[{"url":"https://example.test/pr/7"}]`);
+        const gh = fakeGh(`[{"url":"https://example.test/pr/7","state":"OPEN","headRefOid":"older"}]`);
         const { controller, tab, posted, asked } = makeController("Push");
         tab.worktree = worktree;
         vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "pr")) as never;
@@ -1096,6 +1270,31 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         assert.notStrictEqual(git(remote, "branch", "--list", worktree.branch!), "");
         assert.notInclude(gh.read(), "pr create");
         assert.isUndefined(posted.find((message) => message.type === "prDraft"));
+        assert.strictEqual(tab.settled?.target, "https://example.test/pr/7");
+      }).pipe(Effect.provide(layer)),
+    );
+
+    it.effect("doesn't push to an open pull request that has it all, or draft another for one that was merged", () =>
+      Effect.gen(function* () {
+        const { remote, worktree } = yield* makeRemoteRepo();
+        const head = git(worktree.root, "rev-parse", "HEAD").trim();
+        fakeGh(`[{"url":"https://example.test/pr/7","state":"OPEN","headRefOid":"${head}"}]`);
+        const { controller, tab, posted, asked } = makeController();
+        tab.worktree = worktree;
+        pickFinish("pr");
+        yield* withoutHost(controller.finish(tab));
+        assert.deepStrictEqual(asked, []);
+        assert.strictEqual(git(remote, "branch", "--list", worktree.branch!), "");
+        assert.strictEqual(tab.settled?.how, "pr");
+
+        // Squashed on the website: the branch still has its commits.
+        fakeGh(`[{"url":"https://example.test/pr/7","state":"MERGED","headRefOid":"${head}"}]`);
+        yield* withoutHost(controller.refreshOnFocus(tab));
+        assert.strictEqual(tab.settled?.how, "prMerged");
+        assert.isUndefined(posted.find((message) => message.type === "prDraft"));
+        yield* controller.refreshFinishable(tab);
+        assert.isFalse(tab.finishable);
+        assert.strictEqual(yield* controller.askRelease(tab), "delete");
       }).pipe(Effect.provide(layer)),
     );
 

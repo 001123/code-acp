@@ -1,10 +1,14 @@
 import type { PrDraft, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
+import { useEffect } from "react";
+import alertIcon from "@tabler/icons/outline/alert-triangle.svg";
+import checkIcon from "@tabler/icons/outline/check.svg";
 import folderIcon from "@tabler/icons/outline/folder.svg";
 import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
 import gitForkIcon from "@tabler/icons/outline/git-fork.svg";
 import gitMergeIcon from "@tabler/icons/outline/git-merge.svg";
+import gitPullRequestIcon from "@tabler/icons/outline/git-pull-request.svg";
 import { post } from "./post";
 
 /** Picks the workspace folder the tab's session runs in; shown in multi-root workspaces only. */
@@ -36,6 +40,91 @@ export function FolderSelect({ tab, folders }: { tab: TabInfo | undefined; folde
   );
 }
 
+/** How often the state of a merge with conflicts is read: they get solved outside the chat, which says nothing about it. */
+const CONFLICT_POLL_MS = 3000;
+
+/** What the bar says of a pull request: its number, when its URL ends in one. */
+function prNumber(url: string): string {
+  return /\/(\d+)\/?$/.exec(url)?.[1] ?? "";
+}
+
+/** The work of the tab's worktree: where it went or why it is stuck, and what can be done next. */
+function FinishState({ tab, busy }: { tab: TabInfo; busy: boolean }) {
+  const { t } = useL10n();
+  const { conflict, settled, deletable, finishable } = tab;
+  const merging = conflict !== undefined;
+  useEffect(() => {
+    if (!merging) return;
+    const timer = setInterval(() => post({ type: "refreshWorktree", tab: tab.id }), CONFLICT_POLL_MS);
+    return () => clearInterval(timer);
+  }, [merging, tab.id]);
+  if (merging) {
+    return (
+      <span className="workspace-state" data-conflict>
+        <span className="workspace-status">
+          <Icon svg={alertIcon} />
+          <span>{t("worktree.conflict", conflict)}</span>
+        </span>
+        <button type="button" className="workspace-action" onClick={() => post({ type: "showWorktreeConflicts", tab: tab.id })}>
+          {t("worktree.openChanges")}
+        </button>
+        <button type="button" className="workspace-action" onClick={() => post({ type: "abortWorktreeMerge", tab: tab.id })}>
+          {t("worktree.abortMerge")}
+        </button>
+      </span>
+    );
+  }
+  const finish = () => post({ type: "finishWorktree", tab: tab.id });
+  const number = settled && prNumber(settled.target);
+  const label =
+    settled?.how === "merged"
+      ? t("worktree.doneMerged", settled.target)
+      : settled?.how === "applied"
+        ? t("worktree.doneApplied", settled.target)
+        : settled?.how === "pr"
+          ? t("worktree.donePr", number ? `#${number}` : "")
+          : settled?.how === "prMerged"
+            ? t("worktree.donePrMerged", number ? `#${number}` : "")
+            : undefined;
+  const isPr = settled?.how === "pr" || settled?.how === "prMerged";
+  // Merged, nothing is left to bring anywhere; anything else can still take another way.
+  const canRedo = settled !== undefined && settled.how !== "merged" && !finishable;
+  const status = (
+    <>
+      <Icon svg={isPr ? gitPullRequestIcon : checkIcon} />
+      <span>{label?.replace(/\s+/g, " ").trim()}</span>
+    </>
+  );
+  return (
+    <span className="workspace-state">
+      {settled &&
+        (canRedo && !busy ? (
+          <button type="button" className="workspace-status" title={t("worktree.doneHint")} onClick={finish}>
+            {status}
+          </button>
+        ) : (
+          <span className="workspace-status">{status}</span>
+        ))}
+      {isPr && (
+        <button type="button" className="workspace-action" onClick={() => post({ type: "openWorktreePr", tab: tab.id })}>
+          {t("worktree.prOpen")}
+        </button>
+      )}
+      {settled && deletable && !finishable && !busy && (
+        <button type="button" className="workspace-action" onClick={() => post({ type: "deleteWorktree", tab: tab.id })}>
+          {t("worktree.delete")}
+        </button>
+      )}
+      {finishable && !busy && (
+        <button type="button" className="workspace-finish" title={t("worktree.finishHint")} onClick={finish}>
+          <Icon svg={gitMergeIcon} />
+          <span>{t("worktree.finish")}</span>
+        </button>
+      )}
+    </span>
+  );
+}
+
 /** Under the composer: where the tab works, which opens the worktree picker, and what is checked out there. Shown in git folders only. */
 export function WorkspaceBar({ tab, busy }: { tab: TabInfo | undefined; busy: boolean }) {
   const { t } = useL10n();
@@ -61,12 +150,7 @@ ${tab.cwd}`}
           <span>{branch}</span>
         </span>
       )}
-      {tab.worktree && tab.finishable && !busy && (
-        <button type="button" className="workspace-finish" title={t("worktree.finishHint")} onClick={() => post({ type: "finishWorktree", tab: tab.id })}>
-          <Icon svg={gitMergeIcon} />
-          <span>{t("worktree.finish")}</span>
-        </button>
-      )}
+      {tab.worktree && <FinishState tab={tab} busy={busy} />}
     </div>
   );
 }

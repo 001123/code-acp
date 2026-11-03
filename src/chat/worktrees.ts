@@ -8,7 +8,7 @@ import { t, type MessageKey } from "../i18n";
 import { thenable, type ExtensionCtx, type Output, type VscodeError } from "../runtime";
 import type { UsageLedger } from "../usageLedger";
 import { folderOf, workspaceFolders } from "../workspace";
-import { attemptBranchName, fallbackPrText, intoWorktree, isManaged, parsePrText, Worktrees, type PlacedWorktree, type ProjectCommand, type TabWorktree, type WorktreeError } from "../worktrees";
+import { attemptBranchName, fallbackPrText, intoWorktree, isManaged, parsePrText, Worktrees, type PlacedWorktree, type ProjectCommand, type TabWorktree, type WorktreeError, type WorktreeSettled } from "../worktrees";
 import { confirm } from "./changes";
 import type { Attachment, PrDraft } from "./protocol";
 import type { Tab, TabGroup, TabList } from "./tabs";
@@ -66,12 +66,12 @@ const withProgress = <A, E, R>(title: string, effect: Effect.Effect<A, E, R>) =>
     return yield* effect.pipe(Effect.ensuring(Deferred.succeed(done, undefined)));
   });
 
-/** Tells the user about a pull request, with a way to open it. */
-const announcePr = (message: string, url: string) => {
-  const open = t("worktree.prOpen");
-  void vscode.window.showInformationMessage(message, open).then((picked) => {
+/** Warns about something to sort out in the base folder, with a way to get there. */
+const warnWithSourceControl = (message: string) => {
+  const open = t("worktree.openChanges");
+  void vscode.window.showWarningMessage(message, open).then((picked) => {
     if (picked === open) {
-      void vscode.env.openExternal(vscode.Uri.parse(url));
+      void vscode.commands.executeCommand("workbench.view.scm");
     }
   });
 };
@@ -86,6 +86,8 @@ export class TabWorktrees {
   private readonly drafts = new WeakMap<Tab, OpenDraft>();
   /** Tabs getting a pull request ready; another request in that time is dropped. */
   private readonly preparing = new WeakSet<Tab>();
+  /** Per tab: the latest read of its worktree's state, which is the one that counts. */
+  private readonly reads = new WeakMap<Tab, number>();
 
   constructor(private readonly host: WorktreesHost) {}
 
@@ -108,8 +110,8 @@ export class TabWorktrees {
     const separator = (label: string): Item => ({ label, kind: vscode.QuickPickItemKind.Separator });
     const items: Item[] = [
       {
-        label: `$(folder) ${t("worktree.local")}`,
-        description: current ? baseName : `${baseName} · ${t("worktree.current")}`,
+        label: current ? `$(arrow-left) ${t("worktree.back", baseName)}` : `$(folder) ${t("worktree.local")}`,
+        description: current ? undefined : `${baseName} · ${t("worktree.current")}`,
         choice: { kind: current ? "local" : "current" },
       },
       { label: `$(add) ${t("worktree.new")}`, description: t("worktree.newDesc"), choice: { kind: "new" } },
@@ -130,7 +132,6 @@ export class TabWorktrees {
     if (current) {
       items.push(
         separator(t("worktree.thisOne")),
-        ...(yield* this.finishItems(tab, current)),
         { label: `$(empty-window) ${t("worktree.openWindow")}`, choice: { kind: "window" } },
         { label: `$(terminal) ${t("worktree.openTerminal")}`, choice: { kind: "terminal" } },
       );
@@ -149,14 +150,6 @@ export class TabWorktrees {
       case "existing":
         yield* this.switchTo(tab, base, picked.choice);
         return;
-      case "merge":
-      case "pr":
-      case "apply":
-      case "delete":
-        if (current) {
-          yield* this.finishWith(tab, current, picked.choice.kind);
-        }
-        return;
       case "clean":
         yield* this.cleanUp();
         return;
@@ -173,56 +166,111 @@ export class TabWorktrees {
     }
   });
 
-  /** The ways to finish the work in the tab's worktree. */
+  /** The ways to finish the work in the tab's worktree, and where a merge would go. */
   private readonly finishItems = Effect.fn("TabWorktrees.finishItems")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+    const worktrees = yield* Worktrees;
     const baseName = path.basename(worktree.base);
-    const target = (yield* (yield* Worktrees).branchOf(worktree.base)) ?? baseName;
+    const target = (yield* worktrees.branchOf(worktree.base)) ?? baseName;
+    const baseDirty = worktree.branch !== undefined && (yield* worktrees.isBaseDirty(worktree));
+    const hasPr = tab.settled?.how === "pr" && tab.settled.root === worktree.root;
     const items: Item[] = [
       ...(worktree.branch === undefined
         ? []
         : [
-            { label: `$(git-merge) ${t("worktree.merge", target)}`, description: t("worktree.mergeDesc"), choice: { kind: "merge" } },
-            { label: `$(git-pull-request) ${t("worktree.pr")}`, description: t("worktree.prDesc"), choice: { kind: "pr" } },
+            {
+              label: `$(git-merge) ${t("worktree.merge", target)}`,
+              description: baseDirty ? `$(warning) ${t("worktree.mergeBaseDirty", baseName)}` : t("worktree.mergeDesc"),
+              choice: { kind: "merge" },
+            },
+            { label: `$(git-pull-request) ${t(hasPr ? "worktree.prPush" : "worktree.pr")}`, description: t(hasPr ? "worktree.prPushDesc" : "worktree.prDesc"), choice: { kind: "pr" } },
           ] satisfies Item[]),
       { label: `$(diff-added) ${t("worktree.apply", baseName)}`, description: t("worktree.applyDesc"), choice: { kind: "apply" } },
     ];
     if (isManaged(worktree.root) && !this.shared(tab, worktree)) {
       items.push({ label: `$(trash) ${t("worktree.delete")}`, choice: { kind: "delete" } });
     }
-    return items;
+    return { items, target };
   });
 
-  /** Offers the ways to finish the work in the tab's worktree. */
+  /** Offers the ways to finish the work in the tab's worktree, with what it holds and where that would go. */
   readonly finish = Effect.fn("TabWorktrees.finish")(function* (this: TabWorktrees, tab: Tab) {
     const { worktree } = tab;
     if (!worktree) {
       return;
     }
-    const items = yield* this.finishItems(tab, worktree);
-    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("worktree.finishTitle", nameOf(worktree)) }));
-    const kind = picked?.choice?.kind;
-    if (kind === "merge" || kind === "pr" || kind === "apply" || kind === "delete") {
-      yield* this.finishWith(tab, worktree, kind);
+    const worktrees = yield* Worktrees;
+    // The merge has to end first: the bar under the composer says how.
+    if (yield* worktrees.isMerging(worktree)) {
+      yield* this.refreshFinishable(tab);
+      return;
     }
-  });
-
-  private readonly finishWith = Effect.fn("TabWorktrees.finishWith")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree, how: Finish) {
-    switch (how) {
+    const status = yield* worktrees.status(worktree);
+    const { items, target } = yield* this.finishItems(tab, worktree);
+    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("worktree.finishTitle", status.changed, status.commits, nameOf(worktree), target) }));
+    switch (picked?.choice?.kind) {
       case "merge":
         yield* this.merge(tab, worktree);
         return;
       case "pr":
-        yield* this.openPr(tab, worktree);
+        yield* this.preparePrOnce(tab, worktree);
         return;
       case "apply":
         yield* this.apply(tab, worktree);
         return;
       case "delete":
-        // The question is the same as when going back to the local checkout, but "keep" here means no change.
-        if ((yield* this.askRelease(tab)) === "delete") {
-          yield* this.switchTo(tab, worktree.base, { kind: "local" }, "delete");
-        }
+        yield* this.deleteWorktree(tab);
         return;
+    }
+  });
+
+  /** Says where the work of the worktree went, for the tabs running in it; newer work starts over. */
+  readonly settle = Effect.fn("TabWorktrees.settle")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree, how: WorktreeSettled["how"], target: string) {
+    const content = yield* (yield* Worktrees).contentId(worktree);
+    const settled: WorktreeSettled = { how, root: worktree.root, target, content };
+    for (const other of this.host.tabs().all) {
+      if (other.worktree?.root === worktree.root) {
+        other.settled = settled;
+        other.conflict = undefined;
+        other.finishable = false;
+      }
+    }
+    this.reads.set(tab, (this.reads.get(tab) ?? 0) + 1);
+    this.host.postTabs();
+  });
+
+  /** Where the work of the tab's worktree went, if the worktree still holds just that. */
+  private readonly settledNow = Effect.fnUntraced(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+    const { settled } = tab;
+    if (settled?.root !== worktree.root) {
+      return undefined;
+    }
+    const content = yield* (yield* Worktrees).contentId(worktree).pipe(Effect.option);
+    return Option.isSome(content) && content.value === settled.content ? settled : undefined;
+  });
+
+  /**
+   * Deletes the tab's worktree after one question, or none when an unused tab loses nothing, and takes the tab back to
+   * its base folder. What it says is read now: the work may have gone on since the button showed.
+   */
+  readonly deleteWorktree = Effect.fn("TabWorktrees.deleteWorktree")(function* (this: TabWorktrees, tab: Tab) {
+    const { worktree } = tab;
+    if (!worktree || !isManaged(worktree.root) || this.shared(tab, worktree) || this.isBusy(worktree)) {
+      return;
+    }
+    const name = nameOf(worktree);
+    const status = yield* (yield* Worktrees).status(worktree).pipe(Effect.option);
+    const safe = Option.isSome(status) && ((status.value.changed === 0 && status.value.commits === 0) || (yield* this.settledNow(tab, worktree)) !== undefined);
+    const holds = Option.isNone(status)
+      ? t("worktree.deleteConfirmUnknown", name)
+      : safe
+        ? t("worktree.deleteConfirmSafe", name)
+        : t("worktree.deleteConfirm", name, status.value.changed, status.value.commits, path.basename(worktree.base));
+    if ((!safe || tab.used) && !(yield* confirm(`${holds} ${t("worktree.deleteClosesChat")}`, t("worktree.deleteAction")))) {
+      return;
+    }
+    // Asking took a while.
+    if (tab.worktree?.root === worktree.root && this.host.tabs().has(tab) && !this.isBusy(worktree)) {
+      yield* this.switchTo(tab, worktree.base, { kind: "local" }, "delete");
     }
   });
 
@@ -235,20 +283,82 @@ export class TabWorktrees {
     return busy;
   }
 
-  /** Reads whether the tab's worktree holds anything to finish, which shows the button for it. */
+  /** Reads what state the tab's worktree is in, which decides what the bar under the composer offers. */
   readonly refreshFinishable = Effect.fn("TabWorktrees.refreshFinishable")(function* (this: TabWorktrees, tab: Tab) {
     const { worktree } = tab;
-    if (!worktree || tab.busy) {
+    if (!worktree) {
+      tab.settled = undefined;
+      tab.conflict = undefined;
       return;
     }
-    const status = yield* (yield* Worktrees).status(worktree).pipe(Effect.option);
-    const finishable = Option.isSome(status) && (status.value.changed > 0 || status.value.commits > 0);
-    // The tab may have moved on while git ran.
-    if (tab.worktree?.root === worktree.root && tab.finishable !== finishable) {
+    if (tab.busy) {
+      return;
+    }
+    const read = (this.reads.get(tab) ?? 0) + 1;
+    this.reads.set(tab, read);
+    const worktrees = yield* Worktrees;
+    const status = yield* worktrees.status(worktree).pipe(Effect.option);
+    const merging = yield* worktrees.isMerging(worktree).pipe(Effect.orElseSucceed(() => false));
+    const target = merging ? ((yield* worktrees.branchOf(worktree.base)) ?? path.basename(worktree.base)) : undefined;
+    const wasMerging = tab.conflict?.root === worktree.root ? tab.conflict.target : undefined;
+    // It hashes what isn't committed: only when there is something to compare it with.
+    const content = tab.settled?.root === worktree.root || wasMerging !== undefined ? yield* worktrees.contentId(worktree).pipe(Effect.option) : Option.none<string>();
+    // The tab may have moved on while git ran, or something newer may have happened to it.
+    if (tab.worktree?.root !== worktree.root || this.reads.get(tab) !== read) {
+      return;
+    }
+    const hasWork = Option.isSome(status) && (status.value.changed > 0 || status.value.commits > 0);
+    let settled = tab.settled?.root === worktree.root ? tab.settled : undefined;
+    // The conflicts got solved and the merge committed, outside the chat.
+    if (wasMerging !== undefined && !merging && !hasWork && Option.isSome(status) && Option.isSome(content)) {
+      settled = { how: "merged", root: worktree.root, target: wasMerging, content: content.value };
+    }
+    const current = settled !== undefined && (Option.isNone(content) || content.value === settled.content);
+    // A pull request takes newer work too; anything else was about the work that went.
+    const kept = current || settled?.how === "pr" ? settled : undefined;
+    const finishable = hasWork && !merging && !current;
+    if (tab.finishable !== finishable || tab.settled !== kept || wasMerging !== target) {
       tab.finishable = finishable;
+      tab.settled = kept;
+      tab.conflict = target === undefined ? undefined : { root: worktree.root, target };
       this.host.postTabs();
     }
   });
+
+  /** When the user comes back: the merge may be done in another window, and the pull request on its website. */
+  readonly refreshOnFocus = Effect.fn("TabWorktrees.refreshOnFocus")(function* (this: TabWorktrees, tab: Tab) {
+    yield* this.refreshFinishable(tab);
+    const { worktree } = tab;
+    if (!worktree || tab.busy || tab.settled?.how !== "pr" || (yield* this.settledNow(tab, worktree)) === undefined) {
+      return;
+    }
+    const target = yield* (yield* Worktrees).prTarget(worktree).pipe(Effect.option);
+    if (Option.isSome(target) && target.value.mergedAs !== undefined && tab.worktree?.root === worktree.root) {
+      yield* this.settle(tab, worktree, "prMerged", target.value.mergedAs);
+    }
+  });
+
+  /** Gives up the merge of the tab's worktree, after asking; solved conflicts go with it. */
+  readonly abortMerge = Effect.fn("TabWorktrees.abortMerge")(function* (this: TabWorktrees, tab: Tab) {
+    const { worktree } = tab;
+    if (!worktree) {
+      return;
+    }
+    const worktrees = yield* Worktrees;
+    // The merge may have ended while the button showed.
+    if ((yield* worktrees.isMerging(worktree)) && (yield* confirm(t("worktree.abortConfirm"), t("worktree.abortMerge"))) && (yield* worktrees.isMerging(worktree))) {
+      yield* worktrees.abortMerge(worktree);
+    }
+    yield* this.refreshFinishable(tab);
+  });
+
+  /** Opens the pull request the work of the tab's worktree went to. */
+  openPr(tab: Tab): void {
+    const { settled } = tab;
+    if (settled?.how === "pr" || settled?.how === "prMerged") {
+      void vscode.env.openExternal(vscode.Uri.parse(settled.target));
+    }
+  }
 
   /** Asks for a commit message and commits what isn't committed yet; false when the user backs out. */
   private readonly commitPending = Effect.fn("TabWorktrees.commitPending")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree, changed: number) {
@@ -271,7 +381,7 @@ export class TabWorktrees {
     return true;
   });
 
-  /** Merges the worktree's branch into its base folder, after asking, and offers to delete it when that went cleanly. */
+  /** Merges the worktree's branch into its base folder; the bar under the composer shows how that went. */
   private readonly merge = Effect.fn("TabWorktrees.merge")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
     if (this.isBusy(worktree)) {
       return;
@@ -286,34 +396,30 @@ export class TabWorktrees {
     }
     // Before anything is asked or committed: this is for the user to sort out, and no stash should hide their work.
     if (yield* worktrees.isBaseDirty(worktree)) {
-      void vscode.window.showWarningMessage(t("worktree.baseDirty", baseName));
+      warnWithSourceControl(t("worktree.baseDirty", baseName));
       return;
     }
     const target = (yield* worktrees.branchOf(worktree.base)) ?? baseName;
-    if (!(yield* confirm(t("worktree.mergeConfirm", status.changed, status.commits, name, target), t("worktree.mergeAction")))) {
-      return;
-    }
     if (!(yield* this.commitPending(tab, worktree, status.changed))) {
       return;
     }
     const { conflicts } = yield* withProgress(t("worktree.merging"), worktrees.merge(worktree));
-    this.host.postTabs();
     if (conflicts.length > 0) {
-      const openChanges = t("worktree.openChanges");
-      const abort = t("worktree.abortMerge");
-      const picked = yield* thenable(() => vscode.window.showWarningMessage(t("worktree.mergeConflicts", name, target, conflicts.join(", ")), openChanges, abort));
-      if (picked === openChanges) {
-        yield* thenable(() => vscode.commands.executeCommand("workbench.view.scm"));
-      } else if (picked === abort) {
-        yield* worktrees.abortMerge(worktree);
+      for (const other of this.host.tabs().all) {
+        if (other.worktree?.root === worktree.root) {
+          other.conflict = { root: worktree.root, target };
+          other.finishable = false;
+        }
       }
+      this.host.postTabs();
+      void vscode.window.showWarningMessage(t("worktree.mergeConflicts", name, target, conflicts.join(", ")));
       return;
     }
-    yield* this.offerDelete(tab, worktree, t("worktree.merged", name, target));
+    yield* this.settle(tab, worktree, "merged", target);
   });
 
   /** Gets a pull request of the worktree's branch ready; another request while one is on its way is dropped. */
-  private readonly openPr = Effect.fn("TabWorktrees.openPr")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  private readonly preparePrOnce = Effect.fn("TabWorktrees.preparePrOnce")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
     if (this.preparing.has(tab) || this.isBusy(worktree)) {
       return;
     }
@@ -327,8 +433,16 @@ export class TabWorktrees {
     const name = nameOf(worktree);
     const target = yield* withProgress(t("worktree.prChecking"), worktrees.prTarget(worktree));
     const status = yield* worktrees.status(worktree);
-    const { existing } = target;
+    const { existing, mergedAs } = target;
+    if (mergedAs !== undefined && status.changed === 0) {
+      yield* this.settle(tab, worktree, "prMerged", mergedAs);
+      return;
+    }
     if (existing !== undefined) {
+      if (target.pushed && status.changed === 0) {
+        yield* this.settle(tab, worktree, "pr", existing);
+        return;
+      }
       if (
         !(yield* confirm(t("worktree.prUpdateConfirm", name, existing), t("worktree.prUpdateAction"))) ||
         !(yield* this.commitPending(tab, worktree, status.changed))
@@ -336,8 +450,7 @@ export class TabWorktrees {
         return;
       }
       yield* withProgress(t("worktree.prPushing"), worktrees.push(worktree, target.remote));
-      this.host.postTabs();
-      announcePr(t("worktree.prUpdated", existing), existing);
+      yield* this.settle(tab, worktree, "pr", existing);
       return;
     }
     if (status.changed === 0 && status.commits === 0) {
@@ -383,8 +496,7 @@ export class TabWorktrees {
       worktrees.push(draft.worktree, draft.remote).pipe(Effect.andThen(worktrees.createPr(draft.worktree, { title: title.trim(), body }, draft.base))),
     ).pipe(Effect.ensuring(setPending(false)));
     this.clearDraft(tab);
-    this.host.postTabs();
-    announcePr(t("worktree.prCreated", url), url);
+    yield* this.settle(tab, draft.worktree, "pr", url);
   });
 
   /** Drops the tab's draft of a pull request. */
@@ -441,8 +553,8 @@ export class TabWorktrees {
   });
 
   /**
-   * Moves the tab to `target`, starting over in a fresh session there. Its worktree goes as `fate` says, asking
-   * the user when it isn't given.
+   * Moves the tab to `target`, starting over in a fresh session there. Its worktree goes as `fate` says; when that isn't
+   * given, the user is asked about both.
    */
   private readonly switchTo = Effect.fn("TabWorktrees.switchTo")(function* (
     this: TabWorktrees,
@@ -451,7 +563,7 @@ export class TabWorktrees {
     target: Target,
     fate?: Fate,
   ) {
-    if (!(yield* this.host.confirmStartOver(tab))) {
+    if (fate === undefined && !(yield* this.host.confirmStartOver(tab))) {
       return;
     }
     this.clearDraft(tab);
@@ -684,10 +796,17 @@ export class TabWorktrees {
     if (Option.isSome(status) && status.value.changed === 0 && status.value.commits === 0) {
       return "delete" as Fate;
     }
+    const settled = yield* this.settledNow(tab, worktree);
+    // Merged or applied, it is all in the base folder; a pull request still under review may want this worktree again.
+    if (settled !== undefined && settled.how !== "pr") {
+      return "delete" as Fate;
+    }
     const name = nameOf(worktree);
-    const message = Option.isSome(status)
-      ? t("worktree.deleteConfirm", name, status.value.changed, status.value.commits, path.basename(worktree.base))
-      : t("worktree.deleteConfirmUnknown", name);
+    const message = settled !== undefined
+      ? t("worktree.deleteConfirmPr", name, settled.target)
+      : Option.isSome(status)
+        ? t("worktree.deleteConfirm", name, status.value.changed, status.value.commits, path.basename(worktree.base))
+        : t("worktree.deleteConfirmUnknown", name);
     const remove = t("worktree.deleteAction");
     const keep = t("worktree.keepAction");
     const picked = yield* thenable(() => vscode.window.showWarningMessage(message, { modal: true }, remove, keep));
@@ -723,52 +842,39 @@ export class TabWorktrees {
     }
   });
 
-  /** Brings what the worktree holds into its base folder, after asking; true when that went cleanly. */
-  readonly applyChanges = Effect.fn("TabWorktrees.applyChanges")(function* (this: TabWorktrees, worktree: TabWorktree) {
-    const worktrees = yield* Worktrees;
+  /** Brings what the worktree holds into its base folder; true when that went cleanly. */
+  private readonly bringOver = Effect.fn("TabWorktrees.bringOver")(function* (this: TabWorktrees, worktree: TabWorktree) {
     const name = nameOf(worktree);
-    const baseName = path.basename(worktree.base);
-    const status = yield* worktrees.status(worktree);
-    if (status.changed === 0 && status.commits === 0) {
-      void vscode.window.showInformationMessage(t("worktree.nothingToApply", name));
-      return false;
-    }
-    const message = t("worktree.applyConfirm", status.changed, status.commits, name, baseName);
-    if (!(yield* confirm(message, t("worktree.applyAction")))) {
-      return false;
-    }
-    const applied = yield* worktrees.apply(worktree);
+    const applied = yield* (yield* Worktrees).apply(worktree);
     if (!applied.applied) {
       void vscode.window.showInformationMessage(t("worktree.nothingToApply", name));
       return false;
     }
     if (applied.conflicts.length > 0) {
-      void vscode.window.showWarningMessage(t("worktree.appliedConflicts", name, baseName, applied.conflicts.join(", ")));
+      warnWithSourceControl(t("worktree.appliedConflicts", name, path.basename(worktree.base), applied.conflicts.join(", ")));
       return false;
     }
     return true;
   });
 
-  /** Brings what the worktree holds into its base folder, and offers to delete it when that went cleanly. */
-  private readonly apply = Effect.fn("TabWorktrees.apply")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
-    if (!(yield* this.applyChanges(worktree))) {
-      return;
+  /** Brings what the worktree holds into its base folder, after asking; true when that went cleanly. */
+  readonly applyChanges = Effect.fn("TabWorktrees.applyChanges")(function* (this: TabWorktrees, worktree: TabWorktree) {
+    const name = nameOf(worktree);
+    const status = yield* (yield* Worktrees).status(worktree);
+    if (status.changed === 0 && status.commits === 0) {
+      void vscode.window.showInformationMessage(t("worktree.nothingToApply", name));
+      return false;
     }
-    yield* this.offerDelete(tab, worktree, t("worktree.applied", nameOf(worktree), path.basename(worktree.base)));
+    const message = t("worktree.applyConfirm", status.changed, status.commits, name, path.basename(worktree.base));
+    return (yield* confirm(message, t("worktree.applyAction"))) && (yield* this.bringOver(worktree));
   });
 
-  /** Says the worktree's work has arrived, with a way to delete the worktree when that is possible. */
-  private readonly offerDelete = Effect.fn("TabWorktrees.offerDelete")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree, message: string) {
-    if (!isManaged(worktree.root) || this.shared(tab, worktree)) {
-      void vscode.window.showInformationMessage(message);
+  /** Brings what the worktree holds into its base folder; the bar under the composer shows how that went. */
+  private readonly apply = Effect.fn("TabWorktrees.apply")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+    if (this.isBusy(worktree) || !(yield* this.bringOver(worktree))) {
       return;
     }
-    const remove = t("worktree.deleteAction");
-    const picked = yield* thenable(() => vscode.window.showInformationMessage(message, remove));
-    // The tab may have moved on while the message was up.
-    if (picked === remove && tab.worktree?.root === worktree.root && this.host.tabs().has(tab)) {
-      yield* this.switchTo(tab, worktree.base, { kind: "local" }, "delete");
-    }
+    yield* this.settle(tab, worktree, "applied", path.basename(worktree.base));
   });
 
   /**

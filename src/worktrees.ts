@@ -40,6 +40,18 @@ export const TabWorktree = Schema.Struct({
 });
 export type TabWorktree = typeof TabWorktree.Type;
 
+/** Where the work of a worktree went, and what the worktree held then: newer work hasn't gone there. */
+export const WorktreeSettled = Schema.Struct({
+  how: Schema.Literals(["merged", "applied", "pr", "prMerged"]),
+  /** The worktree it is about. */
+  root: Schema.String,
+  /** The branch or folder it went to; the URL of a pull request. */
+  target: Schema.String,
+  /** The worktree's `contentId` then. */
+  content: Schema.String,
+});
+export type WorktreeSettled = typeof WorktreeSettled.Type;
+
 /** The setup command a project asks for; it only runs once the user allows it. */
 export interface ProjectCommand {
   readonly command: string;
@@ -90,6 +102,10 @@ export interface PrTarget {
   readonly base?: string;
   /** The pull request that is already open for the branch. */
   readonly existing?: string;
+  /** Whether that pull request already has the worktree's last commit. */
+  readonly pushed: boolean;
+  /** The pull request that was merged with the worktree's last commit: a squash leaves those commits on the branch. */
+  readonly mergedAs?: string;
 }
 
 /** The title and description of a pull request. */
@@ -108,7 +124,7 @@ export interface PrSummary {
   readonly stat: string;
 }
 
-const decodePrList = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Struct({ url: Schema.String }))));
+const decodePrList = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Struct({ url: Schema.String, state: Schema.String, headRefOid: Schema.String }))));
 
 export class WorktreeError extends Schema.TaggedError<WorktreeError>()("WorktreeError", {
   message: Schema.String,
@@ -235,13 +251,15 @@ export class Worktrees extends Context.Service<Worktrees, {
   /** Puts a missing worktree the extension created back on its branch; false when it can't be. */
   restore(worktree: TabWorktree): Effect.Effect<boolean>;
   status(worktree: TabWorktree): Effect.Effect<WorktreeStatus, WorktreeError>;
+  /** Stands for everything the worktree holds, committed or not; it changes with what it holds. */
+  contentId(worktree: TabWorktree): Effect.Effect<string, WorktreeError>;
   /** The files the worktree holds differently from the commit it forked off, committed or not. */
   diff(worktree: TabWorktree): Effect.Effect<ReadonlyArray<WorktreeFileDiff>, WorktreeError>;
   /** What `file` (from the top of the worktree) held in the commit the worktree forked off; null when it didn't exist. */
   original(worktree: TabWorktree, file: string): Effect.Effect<string | null, WorktreeError>;
   /**
    * Brings what the worktree holds, committed or not, into its base folder as staged changes. The worktree stays
-   * as it is. Nothing is changed when the base folder's own changes are in the way.
+   * as it is. It fails, changing nothing, when the base folder's own changes to those files are in the way.
    */
   apply(worktree: TabWorktree): Effect.Effect<AppliedWorktree, WorktreeError>;
   /** Commits everything the worktree holds on its branch, untracked files included. */
@@ -253,6 +271,8 @@ export class Worktrees extends Context.Service<Worktrees, {
    * folder isn't clean; with conflicts, the merge stays open there for the user to finish or abort.
    */
   merge(worktree: TabWorktree): Effect.Effect<MergedWorktree, WorktreeError>;
+  /** Whether a merge of the worktree's branch is still open in its base folder, with its conflicts. */
+  isMerging(worktree: TabWorktree): Effect.Effect<boolean, WorktreeError>;
   /** Gives up the merge going on in the worktree's base folder. */
   abortMerge(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
   /** Where a pull request of the worktree's branch goes; fails without a branch, a remote or a working `gh`. */
@@ -565,6 +585,16 @@ export class Worktrees extends Context.Service<Worktrees, {
         Effect.scoped,
       );
 
+      const contentId = Effect.fn("Worktrees.contentId")(
+        function* (worktree: TabWorktree) {
+          const head = (yield* git(worktree.root, ["rev-parse", "HEAD"])).trim();
+          // Hashing the files is only worth it when some aren't committed.
+          const dirty = (yield* git(worktree.root, ["status", "--porcelain"])).trim() !== "";
+          return dirty ? `${head}+${(yield* snapshot(worktree)).tree}` : head;
+        },
+        Effect.scoped,
+      );
+
       const original = Effect.fn("Worktrees.original")(function* (worktree: TabWorktree, file: string) {
         const fork = yield* forkPoint(worktree);
         const { out, code } = yield* exec(worktree.root, ["show", `${fork}:${file}`]);
@@ -585,6 +615,17 @@ export class Worktrees extends Context.Service<Worktrees, {
           const info = yield* fs.stat(patch).pipe(Effect.mapError((err) => failed("apply", err.message)));
           if (Number(info.size) === 0) {
             return { applied: false, conflicts: [] };
+          }
+          // Git would refuse these with a message about its index.
+          const names = (out: string) => out.split("\0").filter(Boolean);
+          const touched = new Set(names(yield* git(worktree.root, ["diff", "--name-only", "-z", "--no-renames", fork, tree])));
+          const own = [
+            ...names(yield* git(repo.value.top, ["diff", "--name-only", "-z"])),
+            ...names(yield* git(repo.value.top, ["ls-files", "--others", "--exclude-standard", "-z"])),
+          ];
+          const blocking = own.filter((file) => touched.has(file));
+          if (blocking.length > 0) {
+            return yield* new WorktreeError({ message: t("worktree.applyBlocked", path.basename(worktree.base), blocking.join(", ")) });
           }
           const { err, code } = yield* exec(repo.value.top, ["apply", "--3way", "--whitespace=nowarn", patch]);
           if (code === 0) {
@@ -638,6 +679,12 @@ export class Worktrees extends Context.Service<Worktrees, {
         return { conflicts };
       });
 
+      const isMerging = Effect.fn("Worktrees.isMerging")(function* (worktree: TabWorktree) {
+        const top = yield* baseTop(worktree, "merge");
+        const merging = (yield* exec(top, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])).out.trim();
+        return merging !== "" && merging === (yield* git(worktree.root, ["rev-parse", "HEAD"])).trim();
+      });
+
       const abortMerge = Effect.fn("Worktrees.abortMerge")(function* (worktree: TabWorktree) {
         yield* git(yield* baseTop(worktree, "merge"), ["merge", "--abort"]);
       });
@@ -654,10 +701,20 @@ export class Worktrees extends Context.Service<Worktrees, {
         if (remote === undefined) {
           return yield* new WorktreeError({ message: t("worktree.noRemote") });
         }
-        const listed = yield* gh(worktree.root, ["pr", "list", "--head", branch, "--state", "open", "--json", "url", "--limit", "1"]);
-        const existing = Option.getOrElse(decodePrList(listed), () => [])[0]?.url;
+        // The latest one of any state: a merged one isn't a reason to open another for the same commits.
+        const listed = yield* gh(worktree.root, ["pr", "list", "--head", branch, "--state", "all", "--json", "url,state,headRefOid", "--limit", "1"]);
+        const latest = Option.getOrElse(decodePrList(listed), () => [])[0];
+        const head = (yield* git(worktree.root, ["rev-parse", "HEAD"])).trim();
+        const existing = latest?.state === "OPEN" ? latest.url : undefined;
+        const mergedAs = latest?.state === "MERGED" && latest.headRefOid === head ? latest.url : undefined;
         const base = remotes.includes(tracked) && merged.startsWith("refs/heads/") ? merged.slice("refs/heads/".length) : undefined;
-        return { remote, ...(base === undefined ? {} : { base }), ...(existing === undefined ? {} : { existing }) };
+        return {
+          remote,
+          ...(base === undefined ? {} : { base }),
+          ...(existing === undefined ? {} : { existing }),
+          pushed: existing !== undefined && latest?.headRefOid === head,
+          ...(mergedAs === undefined ? {} : { mergedAs }),
+        };
       });
 
       const prSummary = Effect.fn("Worktrees.prSummary")(function* (worktree: TabWorktree) {
@@ -709,12 +766,14 @@ export class Worktrees extends Context.Service<Worktrees, {
         exists,
         restore,
         status,
+        contentId,
         diff,
         original,
         apply,
         commit,
         isBaseDirty,
         merge,
+        isMerging,
         abortMerge,
         prTarget,
         prSummary,
