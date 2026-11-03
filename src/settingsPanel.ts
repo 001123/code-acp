@@ -6,6 +6,7 @@ import type { AgentManager } from "./agentManager";
 import { Ccusage, isCcusageSource } from "./ccusage";
 import { AutoApprove } from "./chat/autoApprove";
 import { CommitMessage } from "./commitMessage";
+import { DoctorPage, LOGIN_AGENT_COMMAND, type DoctorMessage, type DoctorState } from "./doctor";
 import { onDidChangeLocale, t, webviewL10n } from "./i18n";
 import { runIn, thenable, type AppRuntime, type AppServices } from "./runtime";
 import { LOWEST_EFFORT } from "./sessionOptions";
@@ -15,6 +16,7 @@ import { webviewHtml, webviewRoots } from "./webview";
 
 export type FromWebview =
   | CatalogMessage
+  | DoctorMessage
   | { type: "ready" }
   | { type: "set"; key: SettingKey; value: unknown }
   /** The rules of this workspace for answering permission requests, which are no setting. */
@@ -109,6 +111,7 @@ export class SettingsPanel {
 
   private readonly disposables: vscode.Disposable[] = [];
   private readonly catalog: AgentCatalog;
+  private readonly doctor: DoctorPage;
   /** The tab to show once the page is ready. */
   private pendingSelect?: { type: "selectTab"; tab: string; section?: string };
   private usageQuery: SessionQuery = { text: "", limit: USAGE_PAGE };
@@ -151,6 +154,12 @@ export class SettingsPanel {
         void panel.webview.postMessage({ type: "catalog", catalog });
       }
     });
+    // Stopped when the page closes; meanwhile hiding the page leaves it running.
+    this.doctor = new DoctorPage((doctor: DoctorState) => {
+      if (SettingsPanel.current === this) {
+        void panel.webview.postMessage({ type: "doctor", doctor });
+      }
+    });
     this.disposables.push(
       panel.webview.onDidReceiveMessage((msg: FromWebview) => this.run(this.onMessage(msg))),
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -191,6 +200,7 @@ export class SettingsPanel {
         }
         yield* this.render;
         yield* this.renderUsage;
+        yield* this.doctor.render;
         break;
       case "usageQuery":
         this.usageQuery = { text: msg.text, limit: Math.max(USAGE_PAGE, msg.limit) };
@@ -249,6 +259,30 @@ export class SettingsPanel {
       case "catalogOpen":
         yield* this.catalog.onMessage(msg);
         break;
+      case "doctorRun":
+        yield* this.doctor.run();
+        break;
+      case "doctorStop":
+        yield* this.doctor.stop;
+        break;
+      case "doctorFix": {
+        const fix = this.doctor.fixOf(msg.id);
+        switch (fix?.type) {
+          case "open":
+            yield* thenable(() => vscode.env.openExternal(vscode.Uri.parse(fix.url)));
+            break;
+          case "manageAgents":
+            void this.panel.webview.postMessage({ type: "selectTab", tab: "agent", section: "manage" });
+            break;
+          case "login":
+            yield* thenable(() => vscode.commands.executeCommand(LOGIN_AGENT_COMMAND, fix.agentId));
+            break;
+          case "showLog":
+            yield* thenable(() => vscode.commands.executeCommand("codeAcp.showLog"));
+            break;
+        }
+        break;
+      }
       case "loadModels": {
         const result = yield* CommitMessage.use((commit) => commit.options(msg.agentId, msg.model)).pipe(
           Effect.map((options) => ({ options })),
@@ -316,6 +350,7 @@ export class SettingsPanel {
 
   private dispose(): void {
     SettingsPanel.current = undefined;
+    this.run(this.doctor.stop);
     for (const d of this.disposables) {
       d.dispose();
     }

@@ -17,3 +17,4 @@ release/**
 test/**
 vitest.config.mts
 media/**/*.css
+mise.toml

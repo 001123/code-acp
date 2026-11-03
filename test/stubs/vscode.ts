@@ -34,6 +34,8 @@ export const __test = {
   openedExternal: [] as unknown[],
   /** What `env.openExternal` answers: false when the user turned it down. */
   openExternalResult: true,
+  /** The webview panels created: what each posted, and how to send it a message or close it. */
+  panels: [] as Array<{ posted: Array<Record<string, any>>; receive(message: unknown): void; close(): void }>,
   /** The terminals created. */
   terminals: [] as Array<{ options: unknown }>,
   /** As if the user closed the terminal. */
@@ -49,6 +51,7 @@ export const __test = {
     __test.outputChannels.clear();
     __test.openedDocuments.length = 0;
     __test.terminals.length = 0;
+    __test.panels.length = 0;
     __test.openedExternal.length = 0;
     __test.openExternalResult = true;
     env.language = "en";
@@ -261,6 +264,8 @@ export const workspace = {
   findFiles: async () => [],
 };
 
+export const ViewColumn = { Active: -1 };
+
 export const QuickPickItemKind = { Separator: -1, Default: 0 };
 
 export const ProgressLocation = { SourceControl: 1, Window: 10, Notification: 15 };
@@ -276,6 +281,29 @@ export const window = {
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   showErrorMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   showQuickPick: async <T>(_items: ReadonlyArray<T>, _options?: unknown): Promise<T | T[] | undefined> => undefined,
+  createWebviewPanel: () => {
+    const received = new EventEmitter<unknown>();
+    const disposed = new EventEmitter<void>();
+    const posted: Array<Record<string, any>> = [];
+    __test.panels.push({ posted, receive: (message) => received.fire(message), close: () => disposed.fire() });
+    return {
+      visible: true,
+      title: "",
+      iconPath: undefined as unknown,
+      reveal: () => {},
+      onDidDispose: disposed.event,
+      webview: {
+        html: "",
+        cspSource: "test",
+        asWebviewUri: (uri: Uri) => uri,
+        onDidReceiveMessage: received.event,
+        postMessage: async (message: Record<string, any>) => {
+          posted.push(message);
+          return true;
+        },
+      },
+    };
+  },
   showInputBox: async (_options?: unknown): Promise<string | undefined> => undefined,
   withProgress: async <R>(_options: unknown, task: (progress: { report(value: unknown): void }) => Thenable<R>): Promise<R> => task({ report: () => {} }),
   state: { focused: true },

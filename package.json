@@ -125,6 +125,16 @@
         "category": "%command.category%"
       },
       {
+        "command": "codeAcp.doctor",
+        "title": "%command.doctor%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "codeAcp.openWalkthrough",
+        "title": "%command.openWalkthrough%",
+        "category": "%command.category%"
+      },
+      {
         "command": "codeAcp.attach",
         "title": "%command.attach%",
         "icon": "$(attach)"
@@ -299,6 +309,16 @@
           "command": "codeAcp.showTrace",
           "when": "view == codeAcp.chat && config.codeAcp.tracing",
           "group": "2_info@3"
+        },
+        {
+          "command": "codeAcp.doctor",
+          "when": "view == codeAcp.chat",
+          "group": "2_info@4"
+        },
+        {
+          "command": "codeAcp.openWalkthrough",
+          "when": "view == codeAcp.chat",
+          "group": "2_info@5"
         },
         {
           "command": "codeAcp.openSettings",
@@ -771,6 +791,63 @@
         }
       }
     },
+    "walkthroughs": [
+      {
+        "id": "gettingStarted",
+        "title": "%walkthrough.title%",
+        "description": "%walkthrough.description%",
+        "steps": [
+          {
+            "id": "install",
+            "title": "%walkthrough.install.title%",
+            "description": "%walkthrough.install.description%",
+            "media": {
+              "svg": "media/walkthrough/install.svg",
+              "altText": "%walkthrough.install.alt%"
+            },
+            "completionEvents": [
+              "onContext:codeAcp.hasAgent"
+            ]
+          },
+          {
+            "id": "doctor",
+            "title": "%walkthrough.doctor.title%",
+            "description": "%walkthrough.doctor.description%",
+            "media": {
+              "svg": "media/walkthrough/doctor.svg",
+              "altText": "%walkthrough.doctor.alt%"
+            },
+            "completionEvents": [
+              "onCommand:codeAcp.doctor"
+            ]
+          },
+          {
+            "id": "chat",
+            "title": "%walkthrough.chat.title%",
+            "description": "%walkthrough.chat.description%",
+            "media": {
+              "svg": "media/walkthrough/chat.svg",
+              "altText": "%walkthrough.chat.alt%"
+            },
+            "completionEvents": [
+              "onView:codeAcp.chat"
+            ]
+          },
+          {
+            "id": "parallel",
+            "title": "%walkthrough.parallel.title%",
+            "description": "%walkthrough.parallel.description%",
+            "media": {
+              "svg": "media/walkthrough/parallel.svg",
+              "altText": "%walkthrough.parallel.alt%"
+            },
+            "completionEvents": [
+              "onCommand:codeAcp.openSettings"
+            ]
+          }
+        ]
+      }
+    ],
     "keybindings": [
       {
         "command": "codeAcp.chat.focus",

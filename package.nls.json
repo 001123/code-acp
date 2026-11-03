@@ -74,5 +74,21 @@
   "config.notifications": "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
   "config.notifyFinished": "Also notify when a conversation you aren't looking at finishes. Approval requests and questions from the agent still notify. Has no effect while codeAcp.notifications is off.",
   "command.showUsage": "Show Usage",
-  "command.showAttention": "Code ACP: Show Conversation That Needs You"
+  "command.showAttention": "Code ACP: Show Conversation That Needs You",
+  "command.doctor": "Doctor",
+  "command.openWalkthrough": "Get Started",
+  "walkthrough.title": "Get started with Code ACP",
+  "walkthrough.description": "Install a coding agent, check your machine and start chatting.",
+  "walkthrough.install.title": "Install an agent",
+  "walkthrough.install.description": "Code ACP talks to coding agents over the Agent Client Protocol. Install one from the ACP Registry, such as Claude, Codex or OpenCode. You can also add your own from a local command in Settings.\n[Manage Agents](command:codeAcp.manageAgents)",
+  "walkthrough.install.alt": "A grid of agents, one of them being installed.",
+  "walkthrough.doctor.title": "Check your setup",
+  "walkthrough.doctor.description": "Agents installed with npm need Node.js, uvx agents need uv, and worktrees need git. Doctor checks these, starts each agent and tells you which ones need a login. It only starts them and sends no prompts.\n[Run Doctor](command:codeAcp.doctor)",
+  "walkthrough.doctor.alt": "A checklist with one row needing attention.",
+  "walkthrough.chat.title": "Open the chat",
+  "walkthrough.chat.description": "The chat lives in the secondary side bar. Open it with Ctrl+Alt+A (Cmd+Alt+A on macOS). If the agent asks you to sign in, use the Log in button there.\n[Open Chat](command:codeAcp.chat.focus)",
+  "walkthrough.chat.alt": "An editor with the chat in the side bar next to it.",
+  "walkthrough.parallel.title": "Work in parallel",
+  "walkthrough.parallel.description": "Run a chat in a git worktree of its own, or tick Compare in the composer to send one prompt to several agents and apply the best result. Choose what agents may do without asking on the Permissions page of Settings.\n[Open Settings](command:codeAcp.openSettings)",
+  "walkthrough.parallel.alt": "Three branches leaving one commit, the best of them marked."
 }

@@ -1,12 +1,16 @@
 // A mock ACP agent speaking ndjson on stdio. Scenarios are picked by env vars and by the prompt text.
 // The unstable entry: the stable API and session/fork.
 import * as acp from "@agentclientprotocol/sdk/unstable";
+import { appendFileSync } from "node:fs";
 import { Readable, Writable } from "node:stream";
 
 if (process.env.MOCK_EXIT_EARLY === "1") {
   process.stderr.write("mock agent: boot failure\n");
   process.exit(3);
 }
+
+/** MOCK_RECORD: a file to note the session requests in, one per line. */
+const record = (line) => process.env.MOCK_RECORD && appendFileSync(process.env.MOCK_RECORD, `${line}\n`);
 
 let sessions = 0;
 /** MOCK_HISTORY: what session/list gives; session/delete takes from it. */
@@ -60,6 +64,7 @@ acp
       throw acp.RequestError.authRequired();
     }
     const sessionId = `s${++sessions}`;
+    record(`new ${sessionId} ${params.cwd}`);
     return { sessionId, ...sessionOptions(), ...(process.env.MOCK_MODELS ? { configOptions: pickedOptions(sessionId) } : {}), _meta: { cwd: params.cwd, mcpServers: params.mcpServers } };
   })
   .onRequest(acp.methods.agent.session.setConfigOption, ({ params }) => {
@@ -71,6 +76,7 @@ acp
     sessions: [...past].map((sessionId) => ({ sessionId, cwd: process.cwd(), title: `Session ${sessionId}` })),
   }))
   .onRequest(acp.methods.agent.session.delete, ({ params }) => {
+    record(`delete ${params.sessionId}`);
     if (!past.delete(params.sessionId)) {
       throw acp.RequestError.invalidParams(undefined, `no session ${params.sessionId}`);
     }

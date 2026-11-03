@@ -634,6 +634,34 @@ describe("ChatViewProvider", () => {
       }).pipe(Effect.scoped),
     );
 
+    it.live("logs in to another agent in a new tab, leaving the active one alone", () =>
+      Effect.gen(function* () {
+        agentList = [{ id: "mock", name: "Mock" }, { id: "other", name: "Other" }];
+        const { runtime, provider, tabsNow, tab } = yield* startChat;
+        agentEnv = { MOCK_AUTH: "1", MOCK_TERMINAL_AUTH: "1" };
+        const login = runtime.runPromise(provider.loginTo("other"));
+        yield* until(() => __test.terminals.length === 1, "the login terminal");
+        const { active, tabs } = tabsNow();
+        assert.notStrictEqual(active, tab);
+        assert.lengthOf(tabs, 2);
+        assert.strictEqual(tabs.find((info) => info.id === active)?.agentId, "other");
+        __test.closeTerminal(__test.terminals[0]);
+        yield* Effect.promise(() => login);
+      }),
+    );
+
+    it.live("logs in to the active tab's agent without opening a tab", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_TERMINAL_AUTH: "1" };
+        const { runtime, provider, tabsNow } = yield* startChat;
+        const login = runtime.runPromise(provider.loginTo("mock"));
+        yield* until(() => __test.terminals.length === 1, "the login terminal");
+        assert.lengthOf(tabsNow().tabs, 1);
+        __test.closeTerminal(__test.terminals[0]);
+        yield* Effect.promise(() => login);
+      }),
+    );
+
     it.live("logs out and restarts the agent, whose tabs then need a login", () =>
       Effect.gen(function* () {
         agentEnv = { MOCK_LOGOUT: "1" };

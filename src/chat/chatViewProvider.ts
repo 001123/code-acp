@@ -665,6 +665,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     return this.tabAgents.login();
   }
 
+  /** Logs in to `agentId`, in the active tab when it runs on that agent, else in a new tab. */
+  readonly loginTo = Effect.fn("ChatView.loginTo")(function* (this: ChatViewProvider, agentId: string) {
+    if ((yield* this.activeAgentId) === agentId) {
+      yield* this.focus;
+    } else {
+      yield* this.tabActions.newSession(agentId);
+    }
+    yield* this.tabAgents.login();
+  });
+
   logout() {
     return this.tabAgents.logout();
   }

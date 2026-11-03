@@ -74,5 +74,21 @@
   "config.notifications": "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
   "config.notifyFinished": "Thông báo cả khi một cuộc trò chuyện bạn không xem đã xong. Yêu cầu cho phép và câu hỏi của agent vẫn được thông báo. Không có tác dụng khi codeAcp.notifications đang tắt.",
   "command.showUsage": "Xem mức sử dụng",
-  "command.showAttention": "Code ACP: Mở cuộc trò chuyện đang cần bạn"
+  "command.showAttention": "Code ACP: Mở cuộc trò chuyện đang cần bạn",
+  "command.doctor": "Kiểm tra môi trường (Doctor)",
+  "command.openWalkthrough": "Bắt đầu",
+  "walkthrough.title": "Bắt đầu với Code ACP",
+  "walkthrough.description": "Cài một coding agent, kiểm tra máy của bạn rồi bắt đầu chat.",
+  "walkthrough.install.title": "Cài một agent",
+  "walkthrough.install.description": "Code ACP làm việc với các coding agent qua Agent Client Protocol. Hãy cài một agent từ ACP Registry, như Claude, Codex hay OpenCode. Bạn cũng có thể thêm agent của riêng mình từ một lệnh trên máy trong phần Cài đặt.\n[Quản lý agent](command:codeAcp.manageAgents)",
+  "walkthrough.install.alt": "Một lưới các agent, trong đó có một agent đang được cài.",
+  "walkthrough.doctor.title": "Kiểm tra môi trường",
+  "walkthrough.doctor.description": "Agent cài qua npm cần Node.js, agent uvx cần uv, còn worktree cần git. Doctor kiểm tra những thứ này, khởi động từng agent và cho biết agent nào cần đăng nhập. Doctor chỉ khởi động agent, không gửi prompt nào.\n[Chạy Doctor](command:codeAcp.doctor)",
+  "walkthrough.doctor.alt": "Một danh sách kiểm tra có một dòng cần chú ý.",
+  "walkthrough.chat.title": "Mở khung chat",
+  "walkthrough.chat.description": "Khung chat nằm ở thanh bên phụ. Mở bằng Ctrl+Alt+A (Cmd+Alt+A trên macOS). Nếu agent yêu cầu đăng nhập, hãy dùng nút Đăng nhập ở đó.\n[Mở chat](command:codeAcp.chat.focus)",
+  "walkthrough.chat.alt": "Một trình soạn thảo với khung chat ở thanh bên cạnh.",
+  "walkthrough.parallel.title": "Làm việc song song",
+  "walkthrough.parallel.description": "Chạy một cuộc chat trong worktree git riêng, hoặc đánh dấu So sánh ở ô nhập tin nhắn để gửi một prompt đến nhiều agent rồi áp dụng kết quả tốt nhất. Chọn những gì agent được làm mà không cần hỏi ở trang Quyền trong Cài đặt.\n[Mở cài đặt](command:codeAcp.openSettings)",
+  "walkthrough.parallel.alt": "Ba nhánh rẽ ra từ một commit, nhánh tốt nhất được đánh dấu."
 }

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" role="img">
+  <style>
+    .branch { fill: none; stroke: var(--vscode-foreground, #ccc); stroke-opacity: .4; stroke-width: 3; stroke-linecap: round; }
+    .best { fill: none; stroke: var(--vscode-testing-iconPassed, #73c991); stroke-width: 3.5; stroke-linecap: round; }
+    .commit { fill: var(--vscode-button-background, #0e639c); }
+    .card { fill: var(--vscode-editorWidget-background, #252526); stroke: var(--vscode-widget-border, #454545); stroke-width: 1.5; }
+    .picked { stroke: var(--vscode-testing-iconPassed, #73c991); stroke-width: 2.5; }
+    .add { fill: var(--vscode-testing-iconPassed, #73c991); opacity: .75; }
+    .del { fill: var(--vscode-editorError-foreground, #f14c4c); opacity: .65; }
+    .pass { fill: var(--vscode-testing-iconPassed, #73c991); }
+    .glyph { fill: none; stroke: var(--vscode-editor-background, #1e1e1e); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <path class="branch" d="M70 150C130 150 130 60 200 60M70 150C130 150 130 240 200 240"/>
+  <path class="best" d="M70 150H200"/>
+  <circle class="commit" cx="70" cy="150" r="14"/>
+  <rect class="card" x="200" y="30" width="230" height="60" rx="8"/>
+  <rect class="add" x="218" y="48" width="96" height="8" rx="4"/><rect class="del" x="218" y="64" width="150" height="8" rx="4"/>
+  <rect class="card picked" x="200" y="120" width="230" height="60" rx="8"/>
+  <rect class="add" x="218" y="138" width="130" height="8" rx="4"/><rect class="del" x="218" y="154" width="44" height="8" rx="4"/>
+  <circle class="pass" cx="400" cy="150" r="13"/><path class="glyph" d="m393 150 5 5 9-10"/>
+  <rect class="card" x="200" y="210" width="230" height="60" rx="8"/>
+  <rect class="add" x="218" y="228" width="170" height="8" rx="4"/><rect class="del" x="218" y="244" width="110" height="8" rx="4"/>
+</svg>

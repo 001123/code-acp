@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { CatalogState } from "../agentCatalog";
+import type { DoctorState } from "../doctor";
 import type { SettingKey } from "../settings";
 import type { UsageView } from "../settingsPanel";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
 import { AgentCatalogTab } from "./settings/catalog";
+import { DoctorTab } from "./settings/doctor";
 import { EntryList, serversOf } from "./settings/entries";
 import { ScopeContext, Segmented } from "./settings/fields";
 import { AgentTab, CommitTab, GeneralTab, LinksTab, NotificationsTab, PermissionsTab, TracingTab, WorktreeTab } from "./settings/panels";
@@ -49,6 +51,7 @@ function App() {
   const [tab, setTab] = useState(savedTab);
   const [agentSection, setAgentSection] = useState(savedAgentSection);
   const [catalog, setCatalog] = useState<CatalogState>({ agents: [], loading: true });
+  const [doctor, setDoctor] = useState<DoctorState>({ rows: [], running: false });
   const [usage, setUsage] = useState<UsageView>();
   const [usageSource, setUsageSource] = useState(savedUsageSource);
   const select = (next: Tab) => {
@@ -64,10 +67,12 @@ function App() {
     if (msg.type === "state") setState(msg);
     if (msg.type === "usage") setUsage(msg.usage);
     if (msg.type === "catalog") setCatalog(msg.catalog);
+    if (msg.type === "doctor") setDoctor(msg.doctor);
     if (msg.type === "selectTab" && TABS.some((x) => x.id === msg.tab)) {
       select(msg.tab);
       const section = agentSectionOf(msg.section);
       if (section) selectAgentSection(section);
+      if (msg.tab === "doctor" && msg.section === "run") post({ type: "doctorRun" });
     }
     // Answers for an agent no longer selected are dropped.
     if (msg.type === "models") setLoaded((l) => ({ ...l, [optionsKey(msg.agentId, msg.model)]: msg }));
@@ -94,7 +99,7 @@ function App() {
     return null;
   };
   const current = TABS.find((x) => x.id === tab)!;
-  // Usage and the installed agents are no settings.
+  // Usage, Doctor and the installed agents are no settings.
   const scoped = current.keys.length > 0 && !onCatalog;
   const panelDesc = tab !== "agent" || agentSection === "general" ? current.desc : agentSection === "manage" ? "settings.manageDesc" : "settings.customDesc";
   const workspaceLabel = state.workspaceName ? t("settings.scopeWorkspaceNamed", state.workspaceName) : t("settings.scopeWorkspace");
@@ -195,6 +200,8 @@ function App() {
               onQuery={(text, limit) => post({ type: "usageQuery", text, limit })}
               onCcusage={(source, refresh) => post({ type: "ccusage", source, refresh })}
             />}
+
+          {tab === "doctor" && <DoctorTab doctor={doctor} />}
         </main>
       </div>
     </ScopeContext.Provider>

@@ -37,11 +37,11 @@ export type TabAction = "pin" | "unpin" | "rename" | "close" | "closeOthers" | "
 export class TabActions {
   constructor(private readonly host: TabActionsHost) {}
 
-  /** Opens a new tab with a fresh session, in the active editor's folder or else the active tab's. */
-  readonly newSession = Effect.fn("TabActions.newSession")(function* (this: TabActions) {
+  /** Opens a new tab with a fresh session, on `agentId` or else the default agent, in the active editor's folder or else the active tab's. */
+  readonly newSession = Effect.fn("TabActions.newSession")(function* (this: TabActions, agentId?: string) {
     const { tabs, manager, sessions } = this.host;
     const tab = tabs.add(cwdForNewTab(tabs.length ? (tabs.active.worktree?.base ?? tabs.active.cwd) : undefined));
-    tab.agentId = yield* manager.activeId;
+    tab.agentId = agentId ?? (yield* manager.activeId);
     tab.wantsWorktree = readSettings().worktreeForNewTabs;
     tabs.active = tab;
     this.host.postTabs();

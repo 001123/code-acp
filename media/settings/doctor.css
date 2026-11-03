@@ -1,0 +1,77 @@
+/* The Doctor tab. */
+.doctor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 16px;
+}
+.doctor-summary {
+  color: var(--vscode-descriptionForeground);
+}
+.doctor-group + .doctor-group {
+  margin-top: 16px;
+}
+.doctor-group h3 {
+  margin: 0 0 6px;
+  font-size: 1em;
+  font-weight: 600;
+}
+.doctor-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+}
+.doctor-row + .doctor-row {
+  border-top: 1px solid var(--border);
+}
+.doctor-status {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+}
+.doctor-status svg {
+  width: 16px;
+  height: 16px;
+}
+.doctor-row.ok .doctor-status {
+  color: var(--vscode-testing-iconPassed);
+}
+.doctor-row.warning .doctor-status {
+  color: var(--vscode-editorWarning-foreground);
+}
+.doctor-row.error .doctor-status {
+  color: var(--vscode-errorForeground);
+}
+.doctor-row.pending .doctor-status,
+.doctor-row.skipped .doctor-status {
+  color: var(--vscode-descriptionForeground);
+}
+.doctor-row.pending .doctor-status svg {
+  animation: catalog-spin 1s linear infinite;
+}
+.doctor-body {
+  flex: 1;
+  min-width: 0;
+}
+.doctor-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+.doctor-name {
+  font-weight: 600;
+}
+.doctor-version,
+.doctor-detail {
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+.doctor-detail {
+  margin-top: 2px;
+}
+.doctor-row button {
+  flex: none;
+}

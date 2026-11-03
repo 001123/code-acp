@@ -6,6 +6,7 @@ import { AgentUpdates } from "./agentUpdates";
 import { ASKS, AskAgentActions } from "./askAgent";
 import { ChatViewProvider } from "./chat/chatViewProvider";
 import { CommitMessage } from "./commitMessage";
+import { LOGIN_AGENT_COMMAND } from "./doctor";
 import { DropViewProvider } from "./dropView";
 import { t } from "./i18n";
 import { FixProblemsActions } from "./problems";
@@ -47,6 +48,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   });
 
+  /** Completes the walkthrough's install step. */
+  const updateHasAgent = Effect.fn("updateHasAgent")(function* () {
+    const agents = yield* manager.agents;
+    yield* thenable(() => vscode.commands.executeCommand("setContext", "codeAcp.hasAgent", agents.length > 0));
+  });
+  void run(updateHasAgent)();
+
   /** Offers to install the updates a background check found. */
   const offerUpdates = Effect.fn("offerUpdates")(function* () {
     const due = yield* updates.due;
@@ -72,6 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     log,
+    manager.onDidChange(run(updateHasAgent)),
     { dispose: () => clearInterval(updateTimer) },
     provider,
     dropView,
@@ -97,6 +106,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.restart", run(() => provider.restart())),
     vscode.commands.registerCommand("codeAcp.showLog", () => log.show()),
     vscode.commands.registerCommand("codeAcp.showTrace", run(() => AcpTrace.use((trace) => trace.show))),
+    // "run": a command asks for the checks; merely opening the tab does not start the agents.
+    vscode.commands.registerCommand("codeAcp.doctor", () => SettingsPanel.show(context, runtime, manager, "doctor", "run")),
+    vscode.commands.registerCommand(LOGIN_AGENT_COMMAND, run((agentId: string) => provider.loginTo(agentId))),
+    vscode.commands.registerCommand(
+      "codeAcp.openWalkthrough",
+      run(() => thenable(() => vscode.commands.executeCommand("workbench.action.openWalkthrough", `${context.extension.id}#gettingStarted`))),
+    ),
     // scm/title passes the SourceControl; the palette passes nothing.
     vscode.commands.registerCommand(
       "codeAcp.generateCommitMessage",

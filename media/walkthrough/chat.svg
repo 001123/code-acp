@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" role="img">
+  <style>
+    .window { fill: var(--vscode-editor-background, #1e1e1e); stroke: var(--vscode-widget-border, #454545); stroke-width: 1.5; }
+    .side { fill: var(--vscode-sideBar-background, #252526); stroke: var(--vscode-widget-border, #454545); stroke-width: 1.5; }
+    .line { fill: var(--vscode-foreground, #ccc); opacity: .22; }
+    .mine { fill: var(--vscode-button-background, #0e639c); }
+    .reply { fill: var(--vscode-foreground, #ccc); opacity: .3; }
+    .box { fill: var(--vscode-input-background, #3c3c3c); stroke: var(--vscode-focusBorder, #007fd4); stroke-width: 1.5; }
+  </style>
+  <rect class="window" x="30" y="30" width="420" height="240" rx="8"/>
+  <rect class="line" x="52" y="58" width="140" height="8" rx="4"/><rect class="line" x="52" y="78" width="190" height="8" rx="4"/><rect class="line" x="68" y="98" width="150" height="8" rx="4"/><rect class="line" x="68" y="118" width="170" height="8" rx="4"/><rect class="line" x="52" y="138" width="110" height="8" rx="4"/><rect class="line" x="52" y="178" width="180" height="8" rx="4"/><rect class="line" x="68" y="198" width="130" height="8" rx="4"/>
+  <path class="side" d="M270 30h172a8 8 0 0 1 8 8v224a8 8 0 0 1-8 8H270z"/>
+  <rect class="mine" x="340" y="52" width="94" height="26" rx="10"/>
+  <rect class="reply" x="286" y="94" width="140" height="8" rx="4"/><rect class="reply" x="286" y="110" width="118" height="8" rx="4"/><rect class="reply" x="286" y="126" width="132" height="8" rx="4"/>
+  <rect class="mine" x="370" y="152" width="64" height="22" rx="10"/>
+  <rect class="box" x="284" y="214" width="152" height="42" rx="8"/><rect class="reply" x="296" y="231" width="70" height="8" rx="4"/>
+</svg>

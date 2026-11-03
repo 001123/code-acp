@@ -11,10 +11,13 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 
 Code ACP needs VS Code ≥ 1.123. There is no release yet, so build it from source with `npm install && npm run reinstall`.
 
+The walkthrough (`Code ACP: Get Started`) takes you through these steps:
+
 1. Run `Code ACP: Manage Agents` and install an agent.
-2. Open the chat in the secondary side bar with `Ctrl+Alt+A` (`Cmd+Alt+A` on macOS).
-3. If the agent asks you to sign in, use the **Log in** button.
-4. Start chatting.
+2. Run `Code ACP: Doctor` to check your setup.
+3. Open the chat in the secondary side bar with `Ctrl+Alt+A` (`Cmd+Alt+A` on macOS).
+4. If the agent asks you to sign in, use the **Log in** button.
+5. Start chatting.
 
 `npx` agents need Node.js, `uvx` agents need [uv](https://docs.astral.sh/uv/). Settings are under `Code ACP: Open Settings`, for your user or the current workspace. Known limitations: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
@@ -56,6 +59,7 @@ Code ACP needs VS Code ≥ 1.123. There is no release yet, so build it from sour
 - Install, update and switch agents from **Settings → Agent → Manage agents**, with update checks on startup.
 - Add your own agents from local commands, and pass extra MCP servers and environment variables to agents.
 - Log in to and out of an agent, or restart it, from the chat view's menu.
+- Check your setup on the **Doctor** page of Settings: Node.js, npm, uv and git, and whether each agent starts and needs a login. It sends no prompts, and offers a fix for what it finds.
 
 ### Git, usage and status
 

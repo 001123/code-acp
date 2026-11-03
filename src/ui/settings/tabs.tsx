@@ -12,8 +12,9 @@ import plugIcon from "@tabler/icons/outline/plug-connected.svg";
 import chartIcon from "@tabler/icons/outline/chart-bar.svg";
 import linkIcon from "@tabler/icons/outline/link.svg";
 import activityIcon from "@tabler/icons/outline/activity.svg";
+import stethoscopeIcon from "@tabler/icons/outline/stethoscope.svg";
 
-export type Tab = "general" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "links" | "tracing" | "usage";
+export type Tab = "general" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "links" | "tracing" | "usage" | "doctor";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
   { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["language", "followAgent", "autoScroll", "showChanges", "rememberSessionOptions"] },
@@ -38,6 +39,7 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
   { id: "links", label: "settings.links", desc: "settings.linksDesc", icon: linkIcon, keys: ["allowedHttpHosts"] },
   { id: "tracing", label: "settings.tracing", desc: "settings.tracingTabDesc", icon: activityIcon, keys: ["tracing"] },
   { id: "usage", label: "settings.usage", desc: "settings.usageDesc", icon: chartIcon, keys: [] },
+  { id: "doctor", label: "settings.doctor", desc: "settings.doctorDesc", icon: stethoscopeIcon, keys: [] },
 ];
 
 /** Tabs inside a section's panel, for what would be too much on one page. */

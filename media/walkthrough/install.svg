@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" role="img">
+  <style>
+    .card { fill: var(--vscode-editorWidget-background, #252526); stroke: var(--vscode-widget-border, #454545); stroke-width: 1.5; }
+    .picked { stroke: var(--vscode-focusBorder, #007fd4); stroke-width: 2.5; }
+    .icon { fill: var(--vscode-foreground, #ccc); opacity: .35; }
+    .line { fill: var(--vscode-foreground, #ccc); opacity: .25; }
+    .accent { fill: var(--vscode-button-background, #0e639c); }
+    .glyph { fill: none; stroke: var(--vscode-button-foreground, #fff); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <rect class="card" x="30" y="40" width="130" height="100" rx="8"/>
+  <circle class="icon" cx="62" cy="72" r="16"/><rect class="line" x="48" y="102" width="94" height="8" rx="4"/><rect class="line" x="48" y="118" width="60" height="8" rx="4"/>
+  <rect class="card picked" x="175" y="40" width="130" height="100" rx="8"/>
+  <circle class="icon" cx="207" cy="72" r="16"/><rect class="line" x="193" y="102" width="94" height="8" rx="4"/>
+  <circle class="accent" cx="279" cy="72" r="16"/><path class="glyph" d="M279 64v14m-6-6 6 6 6-6"/>
+  <rect class="card" x="320" y="40" width="130" height="100" rx="8"/>
+  <circle class="icon" cx="352" cy="72" r="16"/><rect class="line" x="338" y="102" width="94" height="8" rx="4"/><rect class="line" x="338" y="118" width="48" height="8" rx="4"/>
+  <rect class="card" x="30" y="160" width="130" height="100" rx="8"/>
+  <circle class="icon" cx="62" cy="192" r="16"/><rect class="line" x="48" y="222" width="94" height="8" rx="4"/><rect class="line" x="48" y="238" width="70" height="8" rx="4"/>
+  <rect class="card" x="175" y="160" width="130" height="100" rx="8"/>
+  <circle class="icon" cx="207" cy="192" r="16"/><rect class="line" x="193" y="222" width="94" height="8" rx="4"/><rect class="line" x="193" y="238" width="54" height="8" rx="4"/>
+  <rect class="card" x="320" y="160" width="130" height="100" rx="8"/>
+  <circle class="icon" cx="352" cy="192" r="16"/><rect class="line" x="338" y="222" width="94" height="8" rx="4"/><rect class="line" x="338" y="238" width="64" height="8" rx="4"/>
+</svg>

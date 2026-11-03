@@ -13,6 +13,7 @@ import { ShadowGit } from "./checkpoints";
 import { ClaudeSettings } from "./claudeSettings";
 import { CommitMessage } from "./commitMessage";
 import { Completions } from "./completions";
+import { Doctor } from "./doctor";
 import { Problems } from "./problems";
 import { AcpRegistry } from "./registry";
 import { TerminalContext } from "./terminalContext";
@@ -67,7 +68,7 @@ const appLayer = (context: vscode.ExtensionContext, channel: vscode.OutputChanne
     AcpTrace.layer,
   );
   const services = Layer.mergeAll(AgentManager.layer, AutoApprove.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer, Problems.layer, TerminalContext.layer, ShadowGit.layer, Worktrees.layer, UsageLedger.layer, Ccusage.layer).pipe(Layer.provideMerge(base));
-  return Layer.mergeAll(CommitMessage.layer, AgentUpdates.layer).pipe(Layer.provideMerge(services));
+  return Layer.mergeAll(CommitMessage.layer, AgentUpdates.layer, Doctor.layer).pipe(Layer.provideMerge(services));
 };
 
 export type AppServices = Layer.Success<ReturnType<typeof appLayer>>;

@@ -65,7 +65,7 @@ From the project review of 2026-11-02. Check an item when it is done; line numbe
 - [ ] **F11.** Export a conversation to Markdown, and search inside the transcript.
 - [ ] **F12.** Client-side history for agents without `session/list`.
 - [ ] **F13.** Budget alerts from the usage ledger.
-- [ ] **F14.** Getting-started walkthrough, and a "Doctor" command checking node, uv and login.
+- [x] **F14.** Getting-started walkthrough, and a "Doctor" command checking node, uv and login.
 
 ## Watching
 
