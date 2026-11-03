@@ -55,6 +55,8 @@ interface Tool {
   readonly url: string;
   /** Agents of this kind can't run without the tool, which makes its absence an error. */
   readonly neededBy?: InstallKind;
+  /** Installing the agents suggested at first run takes it, which makes its absence an error there. */
+  readonly neededAtSetup?: boolean;
   readonly missing: string;
 }
 
@@ -62,6 +64,8 @@ interface Tool {
 export class Doctor extends Context.Service<Doctor, {
   /** One check per tool and agent, not started yet, so the page can show each as it finishes. */
   readonly checks: Effect.Effect<ReadonlyArray<DoctorCheck>>;
+  /** The tools alone, for the first run, when there is no agent to start yet. */
+  readonly setupChecks: Effect.Effect<ReadonlyArray<DoctorCheck>>;
 }>()("code-acp/Doctor") {
   static readonly layer = Layer.effect(
     Doctor,
@@ -96,7 +100,7 @@ export class Doctor extends Context.Service<Doctor, {
           Effect.catch((err) => Effect.logInfo(`[doctor] ${command}: ${err.message}`).pipe(Effect.as(Option.none<string>()))),
         );
 
-      const toolCheck = (tool: Tool, kinds: ReadonlySet<InstallKind>): DoctorCheck => ({
+      const toolCheck = (tool: Tool, needed: boolean): DoctorCheck => ({
         id: tool.id,
         group: "tools",
         label: tool.label,
@@ -104,7 +108,7 @@ export class Doctor extends Context.Service<Doctor, {
           Effect.map((version: Option.Option<string>) =>
             Option.match(version, {
               onNone: (): DoctorResult => ({
-                status: tool.neededBy && kinds.has(tool.neededBy) ? "error" : "warning",
+                status: needed ? "error" : "warning",
                 detail: tool.missing,
                 fix: { type: "open", url: tool.url },
               }),
@@ -171,19 +175,23 @@ export class Doctor extends Context.Service<Doctor, {
         ),
       });
 
+      const tools = Effect.sync((): ReadonlyArray<Tool> => {
+        const node = readSettings().nodePath || "node";
+        return [
+          { id: "node", label: "Node.js", command: node, url: NODE_URL, neededBy: "npx", neededAtSetup: true, missing: t("doctor.node.missing", node) },
+          { id: "npm", label: "npm", command: "npm", url: NODE_URL, neededAtSetup: true, missing: t("doctor.npm.missing") },
+          { id: "uv", label: "uv", command: "uvx", url: UV_URL, neededBy: "uvx", missing: t("doctor.uv.missing") },
+          { id: "git", label: "git", command: "git", url: GIT_URL, missing: t("doctor.git.missing") },
+        ];
+      });
+
       return Doctor.of({
+        setupChecks: Effect.map(tools, (each) => each.map((tool) => toolCheck(tool, !!tool.neededAtSetup))),
         checks: Effect.gen(function* () {
           const kinds = new Set((yield* manager.list).map((agent) => agent.kind));
-          const node = readSettings().nodePath || "node";
-          const tools: ReadonlyArray<Tool> = [
-            { id: "node", label: "Node.js", command: node, url: NODE_URL, neededBy: "npx", missing: t("doctor.node.missing", node) },
-            { id: "npm", label: "npm", command: "npm", url: NODE_URL, missing: t("doctor.npm.missing") },
-            { id: "uv", label: "uv", command: "uvx", url: UV_URL, neededBy: "uvx", missing: t("doctor.uv.missing") },
-            { id: "git", label: "git", command: "git", url: GIT_URL, missing: t("doctor.git.missing") },
-          ];
           const agents = yield* manager.agents;
           return [
-            ...tools.map((tool) => toolCheck(tool, kinds)),
+            ...(yield* tools).map((tool) => toolCheck(tool, !!tool.neededBy && kinds.has(tool.neededBy))),
             ...(agents.length
               ? agents.map(agentCheck)
               : [
@@ -226,7 +234,10 @@ export class DoctorPage {
   private readonly results = new Map<string, DoctorResult>();
   private stopRequest?: Deferred.Deferred<void>;
 
-  constructor(private readonly post: (state: DoctorState) => void) {}
+  constructor(
+    private readonly post: (state: DoctorState) => void,
+    private readonly loadChecks: Effect.Effect<ReadonlyArray<DoctorCheck>, never, Doctor> = Doctor.use((doctor) => doctor.checks),
+  ) {}
 
   /** The fix of the check `id`'s result, if any. */
   fixOf(id: string): DoctorFix | undefined {
@@ -252,7 +263,7 @@ export class DoctorPage {
     const stop = yield* Deferred.make<void>();
     this.stopRequest = stop;
     this.results.clear();
-    this.checks = yield* Doctor.use((doctor) => doctor.checks);
+    this.checks = yield* this.loadChecks;
     this.publish();
     const checks = Effect.forEach(
       this.checks,

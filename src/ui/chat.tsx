@@ -1,6 +1,7 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import type { CatalogState } from "../agentCatalog";
+import type { DoctorState } from "../doctor";
 import type { TabGroupInfo, TabInfo, TerminalSnapshot, WorkspaceFolderInfo } from "../chat/protocol";
 import { ErrorBoundary } from "./errorBoundary";
 import { Lightbox } from "./lightbox";
@@ -47,6 +48,7 @@ function App() {
   /** The host told which agents there are, so an empty list means none. */
   const [agentsKnown, setAgentsKnown] = useState(false);
   const [catalog, setCatalog] = useState<CatalogState>({ agents: [], loading: true });
+  const [setupDoctor, setSetupDoctor] = useState<DoctorState>({ rows: [], running: false });
   const setup = needsSetup(agents.agents, catalog);
   /** The conversation and the composer; they wait for an agent. */
   const chatShown = agentsKnown && !setup;
@@ -313,6 +315,8 @@ function App() {
         return setAgents({ agents: msg.agents, activeId: msg.activeId });
       case "catalog":
         return setCatalog(msg.catalog);
+      case "doctor":
+        return setSetupDoctor(msg.doctor);
       case "folders":
         return setFolders(msg.folders);
       case "environment":
@@ -511,7 +515,7 @@ function App() {
         <div id="chat-body">
           <div id="chat-main">
             {history && <HistoryView history={history} onClose={() => setHistory(undefined)} />}
-            {agentsKnown && setup && !history && <AgentSetup catalog={catalog} />}
+            {agentsKnown && setup && !history && <AgentSetup catalog={catalog} doctor={setupDoctor} />}
             {chatShown && group && !history && (
               <GroupPanel group={group} members={tabs.filter((tab) => tab.group === group.id)} states={states} agents={agents.agents} onOpen={selectTab} />
             )}

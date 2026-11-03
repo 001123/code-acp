@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CatalogAgent, CatalogState } from "../../agentCatalog";
+import type { DoctorRow, DoctorState } from "../../doctor";
+import { DOCTOR_STATUS } from "../doctorStatus";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import checkIcon from "@tabler/icons/outline/check.svg";
@@ -20,8 +22,8 @@ export function needsSetup(agents: AgentChoices["agents"], catalog: CatalogState
   return agents.length === 0 || catalog.agents.some((agent) => agent.busy);
 }
 
-/** Shown until an agent is installed: suggested agents to pick from, and the way to all the others. */
-export function AgentSetup({ catalog }: { catalog: CatalogState }) {
+/** Suggested agents to pick from, and the way to all the others. */
+export function AgentPicker({ catalog }: { catalog: CatalogState }) {
   const { t } = useL10n();
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => post({ type: "catalogLoad" }), []);
@@ -84,4 +86,76 @@ export function AgentSetup({ catalog }: { catalog: CatalogState }) {
       </div>
     </div>
   );
+}
+
+/**
+ * Where the check of the tools stands: "failed" when a tool the suggested agents need is missing, "warned" when only
+ * optional ones are.
+ */
+export function checkOutcome({ rows, running }: DoctorState): "checking" | "failed" | "warned" | "passed" {
+  if (running || !rows.length || rows.some((row) => !row.result)) return "checking";
+  if (rows.some((row) => row.result?.status === "error")) return "failed";
+  return rows.some((row) => row.result?.status === "warning") ? "warned" : "passed";
+}
+
+function CheckRow({ row }: { row: DoctorRow }) {
+  const { t } = useL10n();
+  const { result } = row;
+  const status = result?.status ?? "pending";
+  const { icon, label } = DOCTOR_STATUS[status];
+  return (
+    <div className={`setup-check ${status}`}>
+      <span className="setup-check-status" role="img" aria-label={t(label)} title={t(label)}>
+        <Icon svg={icon} />
+      </span>
+      <span className="setup-agent-text">
+        <span className="setup-agent-name">{row.label}</span>
+        <span className="setup-check-detail">{result?.detail ?? result?.description}</span>
+      </span>
+      {result?.fix?.type === "open" && (
+        <button type="button" className="secondary" onClick={() => post({ type: "doctorFix", id: row.id })}>
+          {t("doctor.fix.open")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** The result of the check of the tools; the way on is only open when nothing needed is missing. */
+function SetupChecks({ doctor, onContinue }: { doctor: DoctorState; onContinue: () => void }) {
+  const { t } = useL10n();
+  const outcome = checkOutcome(doctor);
+  const message = { checking: "doctor.checking", failed: "chat.setup.checkFailed", warned: "chat.setup.checkWarned", passed: "doctor.allGood" } as const;
+  return (
+    <div id="agent-setup">
+      <h2>{t("chat.setup.checkTitle")}</h2>
+      <p className="setup-desc" role="status">
+        {t(message[outcome])}
+      </p>
+      <div className="setup-agents">
+        {doctor.rows.map((row) => (
+          <CheckRow key={row.id} row={row} />
+        ))}
+      </div>
+      <div className="setup-actions">
+        {outcome === "warned" && (
+          <button type="button" onClick={onContinue}>
+            {t("chat.setup.next")}
+          </button>
+        )}
+        {(outcome === "failed" || outcome === "warned") && (
+          <button type="button" className={outcome === "warned" ? "secondary" : undefined} onClick={() => post({ type: "doctorRun" })}>
+            {t("doctor.runAgain")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Shown until an agent is installed: checks the tools, and offers agents once that passes. */
+export function AgentSetup({ catalog, doctor }: { catalog: CatalogState; doctor: DoctorState }) {
+  const [continued, setContinued] = useState(false);
+  useEffect(() => post({ type: "doctorRun" }), []);
+  return continued || checkOutcome(doctor) === "passed" ? <AgentPicker catalog={catalog} /> : <SetupChecks doctor={doctor} onContinue={() => setContinued(true)} />;
 }

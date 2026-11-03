@@ -17,7 +17,7 @@ First public version; nothing has been released yet.
 - Model, effort and fast mode per tab, remembered for each agent, and modes for agents that only offer those.
 - Compact a conversation from the context window panel, for agents that offer `/compact`.
 - Log out of an agent.
-- A first-run panel in the chat: pick from suggested agents or see more, and the chat box appears once one is installed.
+- A first-run panel in the chat: it checks the tools agents need, then offers suggested agents or more, and the chat box appears once one is installed.
 - A getting-started walkthrough, and a Doctor page in Settings (`Code ACP: Doctor`), which checks Node.js, npm, uv and git, starts each agent and offers to fix what it finds, such as a missing login.
 - Attach files, folders, images, problems, terminals and selections as context, and annotate images.
 - **Explain**, **Refactor**, **Write Tests** and **Fix with Code ACP** actions.

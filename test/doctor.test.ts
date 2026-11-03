@@ -163,13 +163,62 @@ const check = (id: string, group: DoctorCheck["group"], run: Effect.Effect<Docto
   run,
 });
 
+describe("Doctor.setupChecks", () => {
+  const runSetupChecks = Effect.gen(function* () {
+    const checks = yield* Doctor.use((doctor) => doctor.setupChecks);
+    return new Map(yield* Effect.forEach(checks, (check) => check.run.pipe(Effect.map((result) => [check.id, result] as const))));
+  }).pipe(Effect.provide(doctorLayer(managerWith([]))));
+
+  it.live("checks the tools alone: there is no agent to start yet", () =>
+    Effect.gen(function* () {
+      onPath("node", "npm", "uvx", "git");
+      const results = yield* runSetupChecks;
+      assert.deepStrictEqual([...results.keys()], ["node", "npm", "uv", "git"]);
+      assert.isTrue([...results.values()].every((result) => result.status === "ok"));
+    }),
+  );
+
+  it.live("fails without Node.js or npm, which installing the suggested agents takes", () =>
+    Effect.gen(function* () {
+      onPath("uvx", "git");
+      const results = yield* runSetupChecks;
+      assert.strictEqual(results.get("node")?.status, "error");
+      assert.strictEqual(results.get("npm")?.status, "error");
+      assert.strictEqual(results.get("npm")?.fix?.type, "open");
+    }),
+  );
+
+  it.live("only warns without uv or git", () =>
+    Effect.gen(function* () {
+      onPath("node", "npm");
+      const results = yield* runSetupChecks;
+      assert.strictEqual(results.get("node")?.status, "ok");
+      assert.strictEqual(results.get("uv")?.status, "warning");
+      assert.strictEqual(results.get("git")?.status, "warning");
+    }),
+  );
+});
+
 describe("DoctorPage", () => {
-  const withChecks = (checks: ReadonlyArray<DoctorCheck>) => Layer.succeed(Doctor, Doctor.of({ checks: Effect.succeed(checks) }));
+  const withChecks = (checks: ReadonlyArray<DoctorCheck>) => Layer.succeed(Doctor, Doctor.of({ checks: Effect.succeed(checks), setupChecks: Effect.succeed([]) }));
   const fix = { type: "showLog" } as const;
   const makePage = () => {
     const states: Array<DoctorState> = [];
     return { states, page: new DoctorPage((state) => void states.push(state)) };
   };
+
+  it.live("runs the checks it was given instead of all of them", () =>
+    Effect.gen(function* () {
+      const states: Array<DoctorState> = [];
+      const page = new DoctorPage(
+        (state) => void states.push(state),
+        Doctor.use((doctor) => doctor.setupChecks),
+      );
+      const setup = Layer.succeed(Doctor, Doctor.of({ checks: Effect.succeed([]), setupChecks: Effect.succeed([check("node", "tools", Effect.succeed({ status: "ok" }))]) }));
+      yield* page.run().pipe(Effect.provide(setup));
+      assert.deepStrictEqual(states.at(-1)?.rows.map((row) => row.id), ["node"]);
+    }),
+  );
 
   it.live("shows each result as it comes, then that it finished", () =>
     Effect.gen(function* () {

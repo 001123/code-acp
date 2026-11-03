@@ -73,3 +73,41 @@
   align-items: center;
   gap: 8px;
 }
+.setup-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+}
+.setup-check-status {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+}
+.setup-check-status svg {
+  width: 16px;
+  height: 16px;
+}
+.setup-check.ok .setup-check-status {
+  color: var(--vscode-testing-iconPassed);
+}
+.setup-check.warning .setup-check-status {
+  color: var(--vscode-editorWarning-foreground);
+}
+.setup-check.error .setup-check-status {
+  color: var(--vscode-errorForeground);
+}
+.setup-check.pending .setup-check-status {
+  color: var(--vscode-descriptionForeground);
+}
+.setup-check.pending .setup-check-status svg {
+  animation: tool-spin 1s linear infinite;
+}
+.setup-check-detail {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+.setup-check button {
+  flex: none;
+}

@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import { AgentCatalog } from "../agentCatalog";
 import type { AgentManager } from "../agentManager";
 import type { AgentUpdate, AgentUpdates } from "../agentUpdates";
+import { Doctor, DoctorPage } from "../doctor";
 import { onDidChangeLocale, t, webviewL10n, type MessageKey } from "../i18n";
 import { runIn, thenable, type AppRuntime, type AppServices } from "../runtime";
 import { readSettings } from "../settings";
@@ -146,6 +147,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   readonly composer = new ComposerCommands(this.attachments, this.focusComposer);
   /** The first-run panel's agents; an install can outlast the view. */
   private readonly catalog: AgentCatalog;
+  /** The first-run panel's check of the tools. */
+  private readonly setupDoctor: DoctorPage;
   private readonly viewMessages = new ViewMessages({
     post: (message) => this.post(message),
     attachments: this.attachments,
@@ -172,6 +175,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     updates: AgentUpdates["Service"],
   ) {
     this.catalog = new AgentCatalog(manager, (catalog) => this.post({ type: "catalog", catalog }));
+    this.setupDoctor = new DoctorPage(
+      (doctor) => this.post({ type: "doctor", doctor }),
+      Doctor.use((doctor) => doctor.setupChecks),
+    );
     const saved = context.workspaceState.get(TABS_KEY);
     this.tabs = new TabList(saved, defaultCwd);
     if (saved === undefined) {
@@ -511,6 +518,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "catalogInstall":
         yield* this.catalog.onMessage(msg);
         break;
+      case "doctorRun":
+        yield* this.setupDoctor.run();
+        break;
+      case "doctorFix": {
+        const fix = this.setupDoctor.fixOf(msg.id);
+        if (fix?.type === "open") {
+          yield* thenable(() => vscode.env.openExternal(vscode.Uri.parse(fix.url)));
+        }
+        break;
+      }
       case "openSession":
         yield* this.sessions.openSession(msg.sessionId, msg.cwd, msg.title);
         break;

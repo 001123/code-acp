@@ -1,25 +1,11 @@
-import type { DoctorFix, DoctorRow, DoctorState, DoctorStatus } from "../../doctor";
+import type { DoctorFix, DoctorRow, DoctorState } from "../../doctor";
+import { DOCTOR_STATUS, type DoctorRowStatus } from "../doctorStatus";
 import { Icon } from "../icon";
 import { useL10n, type MessageKey } from "../l10n";
 import { post } from "./post";
-import warningIcon from "@tabler/icons/outline/alert-triangle.svg";
-import okIcon from "@tabler/icons/outline/circle-check.svg";
-import skippedIcon from "@tabler/icons/outline/circle-dashed.svg";
-import errorIcon from "@tabler/icons/outline/circle-x.svg";
-import loaderIcon from "@tabler/icons/outline/loader-2.svg";
 import playIcon from "@tabler/icons/outline/player-play.svg";
 import stopIcon from "@tabler/icons/outline/player-stop.svg";
 import refreshIcon from "@tabler/icons/outline/refresh.svg";
-
-type RowStatus = DoctorStatus | "pending" | "skipped";
-
-const STATUS: Record<RowStatus, { readonly icon: string; readonly label: MessageKey }> = {
-  ok: { icon: okIcon, label: "doctor.status.ok" },
-  warning: { icon: warningIcon, label: "doctor.status.warning" },
-  error: { icon: errorIcon, label: "doctor.status.error" },
-  pending: { icon: loaderIcon, label: "doctor.status.pending" },
-  skipped: { icon: skippedIcon, label: "doctor.status.skipped" },
-};
 
 const FIX_LABEL: Record<DoctorFix["type"], MessageKey> = {
   open: "doctor.fix.open",
@@ -36,8 +22,8 @@ const GROUPS: ReadonlyArray<{ readonly id: DoctorRow["group"]; readonly label: M
 function Row({ row, running }: { row: DoctorRow; running: boolean }) {
   const { t } = useL10n();
   const { result } = row;
-  const status: RowStatus = result?.status ?? (running ? "pending" : "skipped");
-  const { icon, label } = STATUS[status];
+  const status: DoctorRowStatus = result?.status ?? (running ? "pending" : "skipped");
+  const { icon, label } = DOCTOR_STATUS[status];
   return (
     <div className={`doctor-row ${status}`}>
       <span className="doctor-status" role="img" aria-label={t(label)} title={t(label)}>

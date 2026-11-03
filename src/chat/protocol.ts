@@ -1,6 +1,7 @@
 // Messages and shapes shared by the chat view's host (src/chat/*) and its webview (src/ui/chat/*).
 import type { CatalogMessage } from "../agentCatalog";
 import type { TerminalSnapshot } from "../agentTerminals";
+import type { DoctorMessage } from "../doctor";
 import type { ChangedFile } from "../fileChanges";
 import type { ProblemScope } from "../problems";
 import type { ChangeBlock } from "../ui/lineDiff";
@@ -95,6 +96,8 @@ export type FromWebview =
   | { type: "manageAgents" }
   /** The first-run panel: the registry's agents, answered with "catalog", and installing them. */
   | Extract<CatalogMessage, { type: "catalogLoad" | "catalogRefresh" | "catalogInstall" }>
+  /** The first-run panel: checks the tools before offering agents, answered with "doctor", and opens where to get a missing one. */
+  | Extract<DoctorMessage, { type: "doctorRun" | "doctorFix" }>
   /** Opens the usage summary (clicking the context meter). */
   | { type: "showUsage" }
   /** Opens the log of the messages exchanged with agents. */

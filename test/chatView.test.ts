@@ -136,6 +136,25 @@ beforeEach(() => {
 });
 
 describe("ChatViewProvider", () => {
+  it.live("checks the tools for the first-run panel and opens where to get a missing one", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { posted, send } = yield* openChat;
+        const saved = process.env.PATH;
+        process.env.PATH = "";
+        yield* Effect.addFinalizer(() => Effect.sync(() => void (process.env.PATH = saved)));
+        const last = () => posted.filter((m) => m.type === "doctor").at(-1)?.doctor;
+        send({ type: "doctorRun" });
+        yield* until(() => last()?.rows.length > 0 && !last().running, "the check to end");
+        assert.deepStrictEqual(last().rows.map((row: Posted) => row.id), ["node", "npm", "uv", "git"]);
+        assert.strictEqual(last().rows[1].result.status, "error");
+
+        send({ type: "doctorFix", id: "npm" });
+        yield* until(() => __test.openedExternal.length === 1, "the download page");
+      }),
+    ),
+  );
+
   it.live("starts the session of the tab waiting for an agent once one is installed", () =>
     Effect.scoped(
       Effect.gen(function* () {
