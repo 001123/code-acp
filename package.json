@@ -204,8 +204,8 @@
         "title": "%command.closeOtherTabs%"
       },
       {
-        "command": "codeAcp.closeTabsToRight",
-        "title": "%command.closeTabsToRight%"
+        "command": "codeAcp.closeTabsBelow",
+        "title": "%command.closeTabsBelow%"
       },
       {
         "command": "codeAcp.forkTab",
@@ -267,59 +267,24 @@
           "group": "navigation@2"
         },
         {
-          "command": "codeAcp.selectAgent",
+          "command": "codeAcp.login",
           "when": "view == codeAcp.chat",
           "group": "1_agent@1"
         },
         {
-          "command": "codeAcp.worktree",
-          "when": "view == codeAcp.chat",
-          "group": "1_agent@5"
-        },
-        {
-          "command": "codeAcp.cleanWorktrees",
-          "when": "view == codeAcp.chat",
-          "group": "1_agent@6"
-        },
-        {
-          "command": "codeAcp.login",
+          "command": "codeAcp.logout",
           "when": "view == codeAcp.chat",
           "group": "1_agent@2"
         },
         {
-          "command": "codeAcp.logout",
+          "command": "codeAcp.restart",
           "when": "view == codeAcp.chat",
           "group": "1_agent@3"
         },
         {
-          "command": "codeAcp.restart",
-          "when": "view == codeAcp.chat",
-          "group": "1_agent@4"
-        },
-        {
-          "command": "codeAcp.showUsage",
-          "when": "view == codeAcp.chat",
-          "group": "2_info@1"
-        },
-        {
           "command": "codeAcp.showLog",
           "when": "view == codeAcp.chat",
-          "group": "2_info@2"
-        },
-        {
-          "command": "codeAcp.showTrace",
-          "when": "view == codeAcp.chat && config.codeAcp.tracing",
-          "group": "2_info@3"
-        },
-        {
-          "command": "codeAcp.doctor",
-          "when": "view == codeAcp.chat",
-          "group": "2_info@4"
-        },
-        {
-          "command": "codeAcp.openWalkthrough",
-          "when": "view == codeAcp.chat",
-          "group": "2_info@5"
+          "group": "2_tools@1"
         },
         {
           "command": "codeAcp.openSettings",
@@ -424,7 +389,7 @@
           "when": "false"
         },
         {
-          "command": "codeAcp.closeTabsToRight",
+          "command": "codeAcp.closeTabsBelow",
           "when": "false"
         },
         {
@@ -498,7 +463,7 @@
           "group": "2_close@2"
         },
         {
-          "command": "codeAcp.closeTabsToRight",
+          "command": "codeAcp.closeTabsBelow",
           "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
           "group": "2_close@3"
         },

@@ -185,7 +185,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ["codeAcp.renameTab", "rename"],
         ["codeAcp.closeTab", "close"],
         ["codeAcp.closeOtherTabs", "closeOthers"],
-        ["codeAcp.closeTabsToRight", "closeToRight"],
+        ["codeAcp.closeTabsBelow", "closeBelow"],
         ["codeAcp.forkTab", "fork"],
         ["codeAcp.tabWorktree", "worktree"],
       ] as const

@@ -39,7 +39,7 @@
   "command.renameTab": "Đổi tên",
   "command.closeTab": "Đóng",
   "command.closeOtherTabs": "Đóng các tab khác",
-  "command.closeTabsToRight": "Đóng các tab bên phải",
+  "command.closeTabsBelow": "Đóng các tab bên dưới",
   "command.forkTab": "Tách nhánh cuộc trò chuyện",
   "command.worktree": "Chọn worktree cho tab…",
   "command.tabWorktree": "Worktree…",

@@ -31,7 +31,7 @@ export interface TabActionsHost {
 }
 
 /** A tab context menu action. */
-export type TabAction = "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeToRight" | "fork" | "worktree";
+export type TabAction = "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeBelow" | "fork" | "worktree";
 
 /** What the user does to tabs as a whole: opening, selecting, closing and the context menu. */
 export class TabActions {
@@ -208,7 +208,7 @@ export class TabActions {
         }
         return;
       case "closeOthers":
-      case "closeToRight": {
+      case "closeBelow": {
         // A group counts as one: its tabs stay with `tab`, or close with one question.
         const siblings = tab.group ? tabs.members(tab.group) : [tab];
         const last = tabs.indexOf(siblings.at(-1)!);
