@@ -29,19 +29,23 @@
   width: var(--tabs-rail);
   overflow: clip;
   /* Not the panel border: themes may make it a strong accent, and this line runs the full height. */
-  border-left: 1px solid color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+  border: 1px solid transparent;
+  border-left-color: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
   box-sizing: border-box;
   /* Waits a moment before closing, so that leaving by a few pixels doesn't drop the panel. */
   transition:
     width 0.14s ease 0.2s,
     background-color 0.14s ease 0.2s,
+    border-color 0.14s ease 0.2s,
     box-shadow 0.14s ease 0.2s;
 }
 /* Opens after a short pause, so that crossing the rail on the way to the scrollbar doesn't cover the text. */
 #tabs:is(:hover, :has(:focus-visible), [data-open]) > #tab-panel {
   width: var(--tabs-open);
+  border-color: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
+  border-radius: 8px;
   background: var(--vscode-sideBar-background);
-  box-shadow: -4px 0 12px var(--vscode-widget-shadow);
+  box-shadow: -2px 0 5px -2px var(--vscode-widget-shadow);
   transition-delay: 0.12s;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -49,10 +53,11 @@
     transition: none;
   }
 }
+/* The open width less the panel's borders. */
 #new-tab,
 #tab-list {
   flex: none;
-  width: var(--tabs-open);
+  width: calc(var(--tabs-open) - 2px);
 }
 #new-tab {
   display: flex;
@@ -97,14 +102,14 @@
   border-left-color: var(--vscode-focusBorder);
   color: var(--vscode-foreground);
 }
-/* The column that stays in view when the panel is closed: the rail less the row's left border and the panel's. */
+/* The column that stays in view when the panel is closed: the rail less the row's left border and the panel's two. */
 .tab-marker {
   position: relative;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--tabs-rail) - 3px);
+  width: calc(var(--tabs-rail) - 4px);
 }
 .tab-initial {
   display: flex;
