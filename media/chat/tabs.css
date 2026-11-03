@@ -185,6 +185,13 @@
   width: 11px;
   height: 11px;
 }
+.tab-changes {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.tab-meta-text + .tab-changes {
+  margin-left: 3px;
+}
 .tab-name {
   box-sizing: border-box;
   min-width: 0;

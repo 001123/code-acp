@@ -14,8 +14,8 @@ import xIcon from "@tabler/icons/outline/x.svg";
 import { post } from "./post";
 import type { Usage } from "./usageMeter";
 import type { AgentChoices } from "./agentPanel";
-import { diffTotals, dropIndex, memberTitle, tabRows } from "./tabRows";
-import { EMPTY, openRequest, type Transcript } from "./transcript";
+import { dropIndex, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, type TabChanges } from "./tabRows";
+import { EMPTY, type Transcript } from "./transcript";
 
 export interface Status {
   text: string;
@@ -95,8 +95,21 @@ export const isTabDrag = (e: { dataTransfer: DataTransfer | null }) => e.dataTra
 /** Tells tabs apart in the collapsed rail. */
 const tabInitial = (title: string) => Array.from(title.trim())[0]?.toUpperCase() ?? "";
 
-/** Whether the tab's conversation waits for the user to answer. */
-const isWaiting = (state: TabState | undefined) => state?.transcript.items.some((i) => openRequest(i) !== undefined) ?? false;
+/** The lines changed, or the files when only binary ones changed. */
+function ChangeCounts({ changes }: { changes: TabChanges }) {
+  const { t } = useL10n();
+  return (
+    <span className="tab-changes">
+      {changes.added + changes.removed === 0 ? (
+        t("bestOf.files", changes.files)
+      ) : (
+        <>
+          <span className="diff-added">+{changes.added}</span> <span className="diff-removed">−{changes.removed}</span>
+        </>
+      )}
+    </span>
+  );
+}
 
 /** What is being dragged, and the line it would drop at. */
 type Dragged = { readonly ids: ReadonlyArray<number>; readonly group?: number };
@@ -110,6 +123,7 @@ export function TabSidebar({
   active,
   shownGroup,
   agents,
+  showChanges,
   onSelect,
   onSelectGroup,
   renaming,
@@ -122,6 +136,8 @@ export function TabSidebar({
   /** The group whose comparison is shown, instead of the active tab. */
   shownGroup: number | undefined;
   agents: AgentChoices["agents"];
+  /** codeAcp.showChanges: counts the files awaiting review too. */
+  showChanges: boolean;
   onSelect: (id: number) => void;
   onSelectGroup: (id: number) => void;
   /** The tab whose name is being edited; `onRename` starts or ends the edit. */
@@ -178,20 +194,23 @@ export function TabSidebar({
 
   const tabRow = (tab: TabInfo, member: boolean) => {
     const state = states[tab.id];
-    const waiting = isWaiting(state);
-    const diff = state?.worktreeDiff;
+    const requests = requestsLabel(openRequests(state), t);
+    const waiting = requests !== undefined;
+    const changed = tabChanges(state, showChanges);
     const title = (member ? memberTitle(tab, agents) : tab.title) || t("chat.newTab");
     const tooltip = [
-      waiting ? `${title} · ${t("chat.tabWaiting")}` : title,
+      waiting ? `${title} · ${requests}` : title,
+      ...(!waiting && (state?.status.busy || tab.attempt === "running") ? [t("bestOf.running")] : []),
       ...(tab.createdAt === undefined ? [] : [t("chat.tabCreated", dateFormat.format(tab.createdAt))]),
       ...(tab.worktree ? [t("chat.tabWorktree", tab.worktree.branch ?? tab.worktree.root)] : []),
+      ...(changed ? [t("chat.tabChanges", changed.files, changed.added, changed.removed)] : []),
     ].join("\n");
-    const changed = member && diff && !diff.error ? diffTotals(diff) : undefined;
-    const meta = waiting
-      ? t("chat.tabWaiting")
-      : changed
-        ? `+${changed.added} −${changed.removed}`
-        : (tab.worktree?.branch ?? tab.worktree?.root ?? (tab.createdAt === undefined ? undefined : dateFormat.format(tab.createdAt)));
+    // The counts have their own place in the row, so the date only shows without them.
+    const meta =
+      requests ??
+      tab.worktree?.branch ??
+      tab.worktree?.root ??
+      (changed || tab.createdAt === undefined ? undefined : dateFormat.format(tab.createdAt));
     const pinLabel = t(tab.pinned ? "chat.unpinTab" : "chat.pinTab");
     const key = `tab-${tab.id}`;
     return (
@@ -242,10 +261,11 @@ export function TabSidebar({
           ) : (
             <span className="tab-title">{title}</span>
           )}
-          {meta !== undefined && (
+          {(meta !== undefined || changed) && (
             <span className="tab-meta">
-              {tab.worktree && !waiting && !changed && <Icon svg={gitBranchIcon} />}
-              <span className="tab-meta-text">{meta}</span>
+              {tab.worktree && !waiting && <Icon svg={gitBranchIcon} />}
+              {meta !== undefined && <span className="tab-meta-text">{meta}</span>}
+              {changed && <ChangeCounts changes={changed} />}
             </span>
           )}
         </span>
@@ -283,7 +303,13 @@ export function TabSidebar({
 
   const groupRow = (group: TabGroupInfo, members: TabInfo[]) => {
     const running = members.filter((tab) => states[tab.id]?.status.busy || tab.attempt === "running").length;
-    const waiting = members.some((tab) => isWaiting(states[tab.id]));
+    const open = members.map((tab) => openRequests(states[tab.id]));
+    const requests = requestsLabel(
+      { permissions: open.reduce((sum, each) => sum + each.permissions, 0), questions: open.reduce((sum, each) => sum + each.questions, 0) },
+      t,
+    );
+    const waiting = requests !== undefined;
+    const changed = sumChanges(members.flatMap((tab) => tabChanges(states[tab.id], showChanges) ?? []));
     const pinned = members[0]!.pinned;
     const key = `group-${group.id}`;
     const pinLabel = t(pinned ? "bestOf.unpinGroup" : "bestOf.pinGroup");
@@ -305,7 +331,12 @@ export function TabSidebar({
           data-pinned={pinned || undefined}
           data-dragging={dragged?.group === group.id || undefined}
           data-drop={dropOf(key)}
-          title={[group.title, waiting ? t("chat.tabWaiting") : progress].join("\n")}
+          title={[
+            group.title,
+            progress,
+            ...(requests === undefined ? [] : [requests]),
+            ...(changed ? [t("chat.tabChanges", changed.files, changed.added, changed.removed)] : []),
+          ].join("\n")}
           data-vscode-context={JSON.stringify({ webviewSection: "tabGroup", preventDefaultContextMenuItems: true })}
           onClick={() => onSelectGroup(group.id)}
           onDoubleClick={() => setRenamingGroup(group.id)}
@@ -332,7 +363,8 @@ export function TabSidebar({
               <span className="tab-title">{group.title}</span>
             )}
             <span className="tab-meta">
-              <span className="tab-meta-text">{waiting ? t("chat.tabWaiting") : progress}</span>
+              <span className="tab-meta-text">{requests ?? progress}</span>
+              {changed && <ChangeCounts changes={changed} />}
             </span>
           </span>
           <button

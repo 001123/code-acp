@@ -44,6 +44,54 @@ export function diffTotals(diff: WorktreeDiff): { added: number; removed: number
   };
 }
 
+/** The requests a tab's conversation waits on the user for, by kind. */
+export interface OpenRequests {
+  permissions: number;
+  questions: number;
+}
+
+export function openRequests(state: TabState | undefined): OpenRequests {
+  const open = state?.transcript.items.filter((item) => openRequest(item) !== undefined) ?? [];
+  const permissions = open.filter((item) => item.kind === "permission").length;
+  return { permissions, questions: open.length - permissions };
+}
+
+/** What the user is waited on for, in a few words; `undefined` when nothing is open. */
+export function requestsLabel({ permissions, questions }: OpenRequests, t: Translate): string | undefined {
+  const parts = [
+    ...(permissions === 0 ? [] : [permissions === 1 ? t("chat.tabPermission") : t("chat.tabPermissions", permissions)]),
+    ...(questions === 0 ? [] : [questions === 1 ? t("chat.tabQuestion") : t("chat.tabQuestions", questions)]),
+  ];
+  return parts.length === 0 ? undefined : parts.join(" · ");
+}
+
+/** How many files a tab changed, and the lines in them. */
+export interface TabChanges {
+  files: number;
+  added: number;
+  removed: number;
+}
+
+/**
+ * What a tab changed: its worktree's diff when it belongs to a group, else the files awaiting review, which
+ * codeAcp.showChanges can hide. `undefined` when there is nothing to show.
+ */
+export function tabChanges(state: TabState | undefined, showChanges: boolean): TabChanges | undefined {
+  const diff = state?.worktreeDiff;
+  const files = diff && !diff.error ? diff.files : showChanges ? state?.changes?.files : undefined;
+  return files?.length ? { files: files.length, ...diffTotals({ files }) } : undefined;
+}
+
+/** All of `changes` together; `undefined` when there are none. */
+export function sumChanges(changes: ReadonlyArray<TabChanges>): TabChanges | undefined {
+  if (changes.length === 0) return undefined;
+  return {
+    files: changes.reduce((sum, each) => sum + each.files, 0),
+    added: changes.reduce((sum, each) => sum + each.added, 0),
+    removed: changes.reduce((sum, each) => sum + each.removed, 0),
+  };
+}
+
 /** Where one tab of a group stands, in the words of the comparison. */
 export function attemptStatus(tab: TabInfo, state: TabState | undefined): Parameters<Translate>[0] {
   if (state?.transcript.items.some((item) => openRequest(item) !== undefined)) return "bestOf.waiting";

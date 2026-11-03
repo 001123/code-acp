@@ -13,7 +13,7 @@ import { replayedParts } from "../src/chat/replay";
 import type { TabGroupInfo, TabInfo } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow } from "../src/ui/chat/compareAttempts";
-import { attemptStatus, diffTotals, dropIndex, memberTitle, tabRows } from "../src/ui/chat/tabRows";
+import { attemptStatus, diffTotals, dropIndex, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows } from "../src/ui/chat/tabRows";
 import type { TabState } from "../src/ui/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
 import { transcript, EMPTY, fileLinkTokens, noticeItem, permissionInput, stopReasonText, type Action } from "../src/ui/chat/transcript";
@@ -221,6 +221,49 @@ describe("the sidebar's groups", () => {
     assert.strictEqual(attemptStatus({ ...info(1), attempt: "done", applied: true }, state(false)), "bestOf.applied");
     assert.strictEqual(attemptStatus({ ...info(1), attempt: "failed" }, state(false)), "bestOf.failed");
     assert.strictEqual(attemptStatus(info(1), state(false)), "bestOf.done");
+  });
+
+  describe("what a row says", () => {
+    const withItems = (...items: unknown[]) => ({ transcript: { ...EMPTY, items } }) as unknown as TabState;
+    const permission = (done: boolean) => ({ kind: "permission", requestId: 1, toolCall: { toolCallId: "t" }, done });
+    const question = (outcome?: string) => ({ kind: "elicitation", requestId: 2, message: "?", outcome });
+    const t = (key: string, ...args: unknown[]) => [key, ...args].join(" ");
+
+    it("counts the requests still open, by kind", () => {
+      assert.deepStrictEqual(openRequests(undefined), { permissions: 0, questions: 0 });
+      assert.deepStrictEqual(openRequests(withItems(permission(true), question("accept"))), { permissions: 0, questions: 0 });
+      assert.deepStrictEqual(openRequests(withItems(permission(false), permission(false), permission(true), question())), { permissions: 2, questions: 1 });
+    });
+
+    it("names one request, counts several and says nothing without any", () => {
+      assert.strictEqual(requestsLabel({ permissions: 0, questions: 0 }, t), undefined);
+      assert.strictEqual(requestsLabel({ permissions: 1, questions: 0 }, t), "chat.tabPermission");
+      assert.strictEqual(requestsLabel({ permissions: 0, questions: 1 }, t), "chat.tabQuestion");
+      assert.strictEqual(requestsLabel({ permissions: 3, questions: 2 }, t), "chat.tabPermissions 3 · chat.tabQuestions 2");
+    });
+
+    const file = (added: number, removed: number) => ({ path: "a", name: "a", added, removed, created: false, deleted: false, binary: false });
+
+    it("counts the files awaiting review unless the setting hides them", () => {
+      const state = { changes: { files: [file(2, 1), file(0, 4)], turns: [] } } as unknown as TabState;
+      assert.deepStrictEqual(tabChanges(state, true), { files: 2, added: 2, removed: 5 });
+      assert.strictEqual(tabChanges(state, false), undefined);
+      assert.strictEqual(tabChanges({ changes: { files: [], turns: [] } } as unknown as TabState, true), undefined);
+      assert.strictEqual(tabChanges(undefined, true), undefined);
+    });
+
+    it("prefers a worktree's diff, whatever the setting, unless it couldn't be read", () => {
+      const changes = { files: [file(9, 9)], turns: [] };
+      const diff = { files: [{ path: "b", added: 1, removed: 0 }, { path: "c" }] };
+      assert.deepStrictEqual(tabChanges({ changes, worktreeDiff: diff } as unknown as TabState, false), { files: 2, added: 1, removed: 0 });
+      assert.strictEqual(tabChanges({ changes, worktreeDiff: { files: [] } } as unknown as TabState, true), undefined);
+      assert.deepStrictEqual(tabChanges({ changes, worktreeDiff: { files: [], error: "no" } } as unknown as TabState, true), { files: 1, added: 9, removed: 9 });
+    });
+
+    it("adds up a group's changes", () => {
+      assert.strictEqual(sumChanges([]), undefined);
+      assert.deepStrictEqual(sumChanges([{ files: 1, added: 2, removed: 3 }, { files: 4, added: 5, removed: 6 }]), { files: 5, added: 7, removed: 9 });
+    });
   });
 });
 

@@ -507,6 +507,7 @@ function App() {
           active={active}
           shownGroup={shownGroup}
           agents={agents.agents}
+          showChanges={showChanges}
           onSelect={selectTab}
           onSelectGroup={selectGroup}
           renaming={renaming}
