@@ -130,3 +130,16 @@ export const configureSession = Effect.fn("configureSession")(function* (
   }
   return options;
 });
+
+/** Sets on a new session the selections of the one it replaces, as far as it offers them. Gives its options as set. */
+export const carryOptions = Effect.fn("carryOptions")(function* (agent: AcpAgent, sessionId: string, current: Options, previous: Options) {
+  let options = current;
+  // One by one, in the agent's order: a model may come with its own levels.
+  for (const { id, type, currentValue } of previous ?? []) {
+    const option = type === "select" ? findSelect(options, (o) => o.id === id) : undefined;
+    if (option && option.currentValue !== currentValue && choicesOf(option).some((c) => c.value === currentValue)) {
+      options = (yield* agent.setConfigOption(sessionId, id, String(currentValue))).configOptions ?? options;
+    }
+  }
+  return options;
+});

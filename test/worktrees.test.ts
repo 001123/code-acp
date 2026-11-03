@@ -9,7 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import * as vscode from "vscode";
-import { TabList } from "../src/chat/tabs";
+import { TabList, type Tab } from "../src/chat/tabs";
 import { TabWorktrees } from "../src/chat/worktrees";
 import { ShadowGit } from "../src/checkpoints";
 import { ExtensionCtx } from "../src/runtime";
@@ -134,17 +134,18 @@ describe("branch names", () => {
 });
 
 describe("Worktrees", () => {
-  it.effect("names a new worktree's branch after the prompt, keeping its folder", () =>
+  it.effect("names a new worktree's branch and folder after the prompt", () =>
     Effect.gen(function* () {
       const dir = makeRepo();
       const { worktree, cwd } = yield* created(dir);
       assert.match(worktree.branch!, /^code-acp\/[0-9a-f]{6}$/);
-      const named = yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "Sửa lỗi đăng nhập"));
+      const named = yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "Sửa lỗi đăng nhập", true));
       assert.strictEqual(named.branch, "code-acp/sua-loi-dang-nhap");
-      assert.strictEqual(named.root, worktree.root);
-      assert.strictEqual(git(cwd, "symbolic-ref", "--short", "HEAD").trim(), named.branch);
+      assert.strictEqual(path.basename(named.root), "sua-loi-dang-nhap");
+      assert.isFalse(fs.existsSync(cwd));
+      assert.strictEqual(git(named.root, "symbolic-ref", "--short", "HEAD").trim(), named.branch);
       // Named once; a later prompt doesn't change it.
-      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(named, "something else")), named);
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(named, "something else", true)), named);
       yield* Worktrees.use((worktrees) => worktrees.remove(named));
       assert.notInclude(git(dir, "branch"), "sua-loi");
     }).pipe(Effect.provide(layer)),
@@ -153,9 +154,41 @@ describe("Worktrees", () => {
   it.effect("numbers the branch when the name is taken", () =>
     Effect.gen(function* () {
       const dir = makeRepo();
-      const nameNew = created(dir).pipe(Effect.flatMap(({ worktree }) => Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it"))));
-      assert.strictEqual((yield* nameNew).branch, "code-acp/fix-it");
-      assert.strictEqual((yield* nameNew).branch, "code-acp/fix-it-2");
+      const nameNew = created(dir).pipe(Effect.flatMap(({ worktree }) => Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true))));
+      const first = yield* nameNew;
+      const second = yield* nameNew;
+      assert.strictEqual(first.branch, "code-acp/fix-it");
+      assert.strictEqual(second.branch, "code-acp/fix-it-2");
+      assert.strictEqual(path.basename(second.root), "fix-it-2");
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("keeps the folder when asked to, or when a setup command ran in it", () =>
+    Effect.gen(function* () {
+      const dir = makeRepo();
+      const { worktree } = yield* created(dir);
+      const shared = yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", false));
+      assert.strictEqual(shared.branch, "code-acp/fix-it");
+      assert.strictEqual(shared.root, worktree.root);
+      const other = (yield* created(dir)).worktree;
+      yield* Effect.acquireUseRelease(
+        Effect.sync(() => __test.setSetting("codeAcp.worktreeSetupCommand", "true")),
+        () =>
+          Effect.gen(function* () {
+            const named = yield* Worktrees.use((worktrees) => worktrees.nameAfter(other, "fix more", true));
+            assert.strictEqual(named.branch, "code-acp/fix-more");
+            assert.strictEqual(named.root, other.root);
+          }),
+        () => Effect.sync(() => __test.setSetting("codeAcp.worktreeSetupCommand", "")),
+      );
+    }).pipe(Effect.provide(layer)),
+  );
+
+  it.effect("names a comparison's folder after its branch", () =>
+    Effect.gen(function* () {
+      const dir = makeRepo();
+      const { worktree } = yield* Worktrees.use((worktrees) => worktrees.create(dir, "compare/fix-gemini")).pipe(Effect.map(Option.getOrThrow));
+      assert.strictEqual(path.basename(worktree.root), "fix-gemini");
     }).pipe(Effect.provide(layer)),
   );
 
@@ -163,11 +196,11 @@ describe("Worktrees", () => {
     Effect.gen(function* () {
       const dir = makeRepo();
       const { worktree, cwd } = yield* created(dir);
-      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "🎉")), worktree);
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "🎉", true)), worktree);
       fs.writeFileSync(path.join(cwd, "new.txt"), "x\n");
       git(cwd, "add", "--all");
       git(cwd, "commit", "--quiet", "-m", "work");
-      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it")), worktree);
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true)), worktree);
     }).pipe(Effect.provide(layer)),
   );
 
@@ -177,7 +210,7 @@ describe("Worktrees", () => {
       const root = path.join(scratch, `own-${count++}`);
       git(dir, "worktree", "add", "--quiet", "-b", "code-acp/abc123", root);
       const worktree = { root: fs.realpathSync(root), branch: "code-acp/abc123", base: dir };
-      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it")), worktree);
+      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true)), worktree);
     }).pipe(Effect.provide(layer)),
   );
 
@@ -576,6 +609,7 @@ describe("TabWorktrees", () => {
       return reply;
     }) as never;
     const tabs = new TabList(undefined, () => "/w");
+    const restarted: Array<string> = [];
     const stored = new Map<string, unknown>();
     const globalState = {
       keys: () => [...stored.keys()],
@@ -590,10 +624,28 @@ describe("TabWorktrees", () => {
       status: () => {},
       confirmStartOver: () => Effect.succeed(true),
       startOver: () => Effect.void,
+      restartSession: (tab) => Effect.sync(() => void restarted.push(tab.cwd)),
       ask: () => Effect.succeed(askReply),
     });
-    return { asked, posted, tabs, controller, tab: tabs.active };
+    return { asked, posted, restarted, tabs, controller, tab: tabs.active };
   };
+
+  /** The agent's services only matter to `restartSession`, stubbed here. */
+  const nameAfter = (controller: TabWorktrees, tab: Tab, text: string) => controller.nameAfter(tab, text) as Effect.Effect<void, never, Worktrees>;
+
+  it.effect("moves the folder of a tab alone in its worktree, and starts its session there", () =>
+    Effect.gen(function* () {
+      const { worktree, cwd } = yield* created(makeRepo());
+      const { controller, tab, restarted } = makeController();
+      tab.worktree = worktree;
+      tab.cwd = cwd;
+      yield* nameAfter(controller, tab, "fix it");
+      assert.strictEqual(path.basename(tab.worktree.root), "fix-it");
+      assert.strictEqual(tab.cwd, tab.worktree.root);
+      assert.isTrue(fs.existsSync(tab.cwd));
+      assert.deepStrictEqual(restarted, [tab.cwd]);
+    }).pipe(Effect.provide(layer)),
+  );
 
   it.effect("names the branch for every tab in the worktree, and doesn't stop the turn when git fails", () =>
     Effect.gen(function* () {
@@ -604,7 +656,7 @@ describe("TabWorktrees", () => {
       tab.worktree = worktree;
       tab.branch = worktree.branch;
       fork.worktree = worktree;
-      yield* controller.nameAfter(tab, "fix it");
+      yield* nameAfter(controller, tab, "fix it");
       assert.strictEqual(tab.worktree.branch, "code-acp/fix-it");
       assert.strictEqual(tab.branch, "code-acp/fix-it");
       assert.strictEqual(fork.worktree.branch, "code-acp/fix-it");
@@ -612,7 +664,7 @@ describe("TabWorktrees", () => {
 
       const lost = { root: path.join(os.homedir(), ".code-acp", "worktrees", "gone", "abc123"), branch: "code-acp/abc123", base: path.join(scratch, "gone") };
       tab.worktree = lost;
-      yield* controller.nameAfter(tab, "fix it");
+      yield* nameAfter(controller, tab, "fix it");
       assert.deepStrictEqual(tab.worktree, lost);
     }).pipe(Effect.provide(layer)),
   );

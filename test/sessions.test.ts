@@ -61,7 +61,9 @@ const makeSessions = Effect.fnUntraced(function* (
     status: (_tab, key) => void statuses.push(key),
     refreshStatus: () => {},
     saveTabs: () => {},
-    setConfigOptions: () => {},
+    setConfigOptions: (tab, options) => {
+      tab.configOptions = options ?? tab.configOptions;
+    },
     run: (effect) => runFork(effect),
   };
   const tabs = new TabList(undefined, () => "/w");
@@ -113,6 +115,30 @@ describe("TabSessions", () => {
       assert.deepStrictEqual(created, ["new-1"]);
       assert.strictEqual(tab.sessionId, "new-1");
       assert.strictEqual(statuses.at(-1), "chat.ready");
+    }),
+  );
+
+  it.effect("starts a moved tab's session again, keeping what was picked in it", () =>
+    Effect.gen(function* () {
+      const select = (value: string): Array<acp.SessionConfigOption> => [
+        { id: "model", name: "Model", type: "select", currentValue: value, options: [{ value: "small", name: "Small" }, { value: "big", name: "Big" }] },
+      ];
+      const set: Array<string> = [];
+      let starts = 0;
+      const { tab, sessions, closed, run } = yield* makeSessions({
+        newSession: () => Effect.sync(() => ({ sessionId: `new-${++starts}`, configOptions: select("small") })),
+        setConfigOption: (_sessionId: string, _configId: string, value: string) =>
+          Effect.sync(() => {
+            set.push(value);
+            return { configOptions: select(value) };
+          }),
+      });
+      yield* run(sessions.ensureSession(tab));
+      tab.configOptions = select("big");
+      yield* run(sessions.restartSession(tab));
+      assert.strictEqual(tab.sessionId, "new-2");
+      assert.deepStrictEqual(closed, ["new-1"]);
+      assert.deepStrictEqual(set, ["big"]);
     }),
   );
 

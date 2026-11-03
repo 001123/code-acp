@@ -49,6 +49,8 @@ export interface WorktreesHost {
   status(tab: Tab, key: MessageKey): void;
   confirmStartOver(tab: Tab): Effect.Effect<boolean, VscodeError>;
   startOver(tab: Tab, change: (tab: Tab) => void): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
+  /** Starts the session of an unused tab again, in the folder it moved to. */
+  restartSession(tab: Tab): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
   /** Runs a turn on the tab's agent; its last message, or undefined when there is none to use. */
   ask(tab: Tab, text: string): Effect.Effect<string | undefined, never, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit | FileSystem.FileSystem | UsageLedger>;
 }
@@ -605,29 +607,36 @@ export class TabWorktrees {
     return true;
   });
 
-  /** Names the branch of the tab's worktree after its first prompt; on failure it just keeps its random name. */
-  readonly nameAfter = Effect.fn("TabWorktrees.nameAfter")(
-    function* (this: TabWorktrees, tab: Tab, text: string) {
-      const { worktree } = tab;
-      if (!worktree) {
-        return;
+  /**
+   * Names the worktree of a tab after its first prompt, before the agent gets it (it may run git in there). A folder
+   * only one tab runs in follows, and its session with it; on failure the worktree just keeps its random name.
+   */
+  readonly nameAfter = Effect.fn("TabWorktrees.nameAfter")(function* (this: TabWorktrees, tab: Tab, text: string) {
+    const { worktree } = tab;
+    if (!worktree) {
+      return;
+    }
+    const worktrees = yield* Worktrees;
+    const named = yield* Semaphore.withPermits(this.creating, 1)(worktrees.nameAfter(worktree, text, !this.shared(tab, worktree))).pipe(
+      Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(worktree))),
+    );
+    if (named.branch === worktree.branch) {
+      return;
+    }
+    // Forks run in it too, and deleting or restoring it goes by the branch.
+    for (const other of this.host.tabs().all) {
+      if (other.worktree?.root === worktree.root) {
+        other.worktree = { ...other.worktree, branch: named.branch, root: named.root };
+        other.branch = other.branch === worktree.branch ? named.branch : other.branch;
       }
-      const worktrees = yield* Worktrees;
-      const { branch } = yield* Semaphore.withPermits(this.creating, 1)(worktrees.nameAfter(worktree, text));
-      if (branch === worktree.branch) {
-        return;
-      }
-      // Forks run in it too, and deleting or restoring it goes by the branch.
-      for (const other of this.host.tabs().all) {
-        if (other.worktree?.root === worktree.root) {
-          other.worktree = { ...other.worktree, branch };
-          other.branch = other.branch === worktree.branch ? branch : other.branch;
-        }
-      }
+    }
+    if (named.root !== worktree.root) {
+      tab.cwd = path.join(named.root, path.relative(worktree.root, tab.cwd));
       this.host.postTabs();
-    },
-    Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`)),
-  );
+      yield* this.host.restartSession(tab);
+    }
+    this.host.postTabs();
+  });
 
   /** Before the tab's session starts: brings its worktree back if it went missing, else returns the tab to its base folder. */
   readonly ensure = Effect.fn("TabWorktrees.ensure")(function* (this: TabWorktrees, tab: Tab) {

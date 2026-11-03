@@ -216,9 +216,11 @@ export class Worktrees extends Context.Service<Worktrees, {
   create(folder: string, name?: string): Effect.Effect<Option.Option<PlacedWorktree>, WorktreeError>;
   /**
    * The worktree with its branch named after `text`. Only a branch the extension created and that still has its random
-   * name and no commits changes; the worktree's folder stays, as sessions run in it.
+   * name and no commits changes. With `move`, its folder follows, as VS Code shows repositories by their folder's name;
+   * no session may run there then. A folder stays where a setup command may have left its path in what it installed,
+   * or where git can't move it.
    */
-  nameAfter(worktree: TabWorktree, text: string): Effect.Effect<TabWorktree, WorktreeError>;
+  nameAfter(worktree: TabWorktree, text: string, move: boolean): Effect.Effect<TabWorktree, WorktreeError>;
   /**
    * Readies a new worktree as the settings say: copies ignored files from its base checkout, then runs a setup
    * command at its top: the project's if `approve` allows it (without `approve` it doesn't run), else the user's.
@@ -345,6 +347,12 @@ export class Worktrees extends Context.Service<Worktrees, {
         return `${BRANCH_PREFIX}${freeBranchName(name, new Set(taken))}`;
       });
 
+      /** The folder beside `parent`'s others for a worktree on `branch`. */
+      const freeFolder = Effect.fnUntraced(function* (parent: string, branch: string) {
+        const taken = yield* fs.readDirectory(parent).pipe(Effect.mapError((err) => failed("worktree", err.message)));
+        return path.join(parent, freeBranchName(path.basename(branch), new Set(taken)));
+      });
+
       const create = Effect.fn("Worktrees.create")(function* (folder: string, name?: string) {
         const repo = yield* repoOf(folder);
         if (Option.isNone(repo)) {
@@ -353,9 +361,10 @@ export class Worktrees extends Context.Service<Worktrees, {
         const { top, prefix } = repo.value;
         const slug = randomBytes(3).toString("hex");
         const repoDir = `${path.basename(top)}-${createHash("sha256").update(top).digest("hex").slice(0, 8)}`;
-        const dir = path.join(os.homedir(), MANAGED_DIR, repoDir, slug);
+        const parent = path.join(os.homedir(), MANAGED_DIR, repoDir);
         const branch = name === undefined ? `${BRANCH_PREFIX}${slug}` : yield* freeBranch(folder, name);
-        yield* fs.makeDirectory(path.dirname(dir), { recursive: true }).pipe(Effect.mapError((err) => failed("worktree", err.message)));
+        yield* fs.makeDirectory(parent, { recursive: true }).pipe(Effect.mapError((err) => failed("worktree", err.message)));
+        const dir = yield* freeFolder(parent, branch);
         yield* git(folder, ["worktree", "add", "--quiet", "-b", branch, dir, "HEAD"]);
         // As git reports it, with symbolic links resolved, to match its listings.
         const root = (yield* git(dir, ["rev-parse", "--show-toplevel"])).trim();
@@ -515,7 +524,17 @@ export class Worktrees extends Context.Service<Worktrees, {
         return { changed, commits: yield* commitsSinceFork(worktree) };
       });
 
-      const nameAfter = Effect.fn("Worktrees.nameAfter")(function* (worktree: TabWorktree, text: string) {
+      /** Moves the worktree to a folder named after `branch`; where it is when that can't be, e.g. with submodules. */
+      const moveFolder = Effect.fnUntraced(
+        function* (worktree: TabWorktree, branch: string) {
+          const root = yield* freeFolder(path.dirname(worktree.root), branch);
+          yield* git(worktree.base, ["worktree", "move", worktree.root, root]);
+          return root;
+        },
+        (effect, worktree) => effect.pipe(Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(worktree.root)))),
+      );
+
+      const nameAfter = Effect.fn("Worktrees.nameAfter")(function* (worktree: TabWorktree, text: string, move: boolean) {
         const { branch } = worktree;
         const slug = branchSlug(text);
         if (slug === undefined || branch === undefined || !UNNAMED_BRANCH.test(branch) || !isManaged(worktree.root) || (yield* commitsSinceFork(worktree)) > 0) {
@@ -523,7 +542,8 @@ export class Worktrees extends Context.Service<Worktrees, {
         }
         const named = yield* freeBranch(worktree.base, slug);
         yield* git(worktree.base, ["branch", "-m", branch, named]);
-        return { ...worktree, branch: named };
+        const keepFolder = !move || readSettings().worktreeSetupCommand !== "" || projectSetupCommand(worktree.base) !== "";
+        return { ...worktree, branch: named, root: keepFolder ? worktree.root : yield* moveFolder(worktree, named) };
       });
 
       /** The tree of everything the worktree holds, on a scratch index so that what it has staged stays as it is. */

@@ -7,7 +7,7 @@ import type { ShadowGit } from "../checkpoints";
 import { ChangeSet } from "../fileChanges";
 import { t } from "../i18n";
 import { thenable, type ExtensionCtx, type Output } from "../runtime";
-import { configureSession, modelOption, startingOptions, thoughtOption } from "../sessionOptions";
+import { carryOptions, configureSession, modelOption, startingOptions, thoughtOption } from "../sessionOptions";
 import { readSettings } from "../settings";
 import { folderOf, defaultCwd, isWorkspaceFolder, workspaceFolders } from "../workspace";
 import { Worktrees } from "../worktrees";
@@ -247,6 +247,24 @@ export class TabSessions {
     this.host.postTabs();
     yield* this.stopIdleAgents;
     yield* this.ensureSession(tab);
+  });
+
+  /** Starts an unused tab's session again in its new folder, as a session can't change folders; what was picked in it stays. */
+  readonly restartSession = Effect.fn("TabSessions.restartSession")(function* (this: TabSessions, tab: Tab) {
+    const { running, sessionId, configOptions: picked } = tab;
+    if (running && sessionId) {
+      yield* this.closeSessionOnAgent(running, sessionId);
+    }
+    tab.sessionId = undefined;
+    const restarted = yield* this.ensureSession(tab);
+    if (restarted && tab.running) {
+      const configOptions = yield* carryOptions(tab.running.agent, restarted, tab.configOptions, picked).pipe(
+        Effect.tapError((err) => Effect.logWarning(`Keeping the session options failed: ${err.message}`)),
+        Effect.orElseSucceed(() => tab.configOptions),
+      );
+      this.host.setConfigOptions(tab, configOptions);
+      this.host.postTab(tab, { type: "configOptions", configOptions });
+    }
   });
 
   /**

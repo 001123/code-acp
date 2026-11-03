@@ -119,6 +119,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     status: (tab, key) => this.status(tab, key),
     confirmStartOver: (tab) => this.sessions.confirmStartOver(tab),
     startOver: (tab, change) => this.sessions.startOver(tab, change),
+    restartSession: (tab) => this.sessions.restartSession(tab),
     ask: (tab, text) =>
       this.turns.ask(tab, text).pipe(
         // The draft is made from the commits then.
