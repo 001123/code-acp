@@ -93,7 +93,7 @@
 /* The tabs take the room the bottom sections leave, with the new chat button right below them. Keeps room for a tab and the button in a short view. */
 #tab-main {
   flex: 1 1 0;
-  min-height: 84px;
+  min-height: 82px;
   display: flex;
   flex-direction: column;
 }
@@ -104,24 +104,49 @@
   overflow-y: auto;
   scrollbar-width: none;
 }
+/* Measures the panel, so that the button stays centred as it opens and closes. */
+#new-tab-row {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 100cqw;
+  padding: 6px 0 4px;
+}
 #new-tab {
   flex: none;
   display: flex;
   align-items: center;
-  height: 36px;
-  margin-top: 4px;
-  padding: 0;
-  border-radius: 0;
-  background: none;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
   color: var(--vscode-foreground);
-  text-align: left;
 }
 #new-tab:hover {
-  background: none;
+  background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+}
+#new-tab:active {
+  background: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
 }
 #new-tab svg {
-  width: 16px;
-  height: 16px;
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+#new-tab-label {
+  white-space: nowrap;
+}
+/* Just the plus in the closed rail. */
+@container (max-width: 120px) {
+  #new-tab {
+    justify-content: center;
+    width: 28px;
+    padding: 0;
+  }
+  #new-tab-label {
+    display: none;
+  }
 }
 #tab-list {
   padding-top: 4px;
@@ -175,12 +200,10 @@
   color: var(--vscode-foreground);
 }
 /* A row's highlight, inside the island on all sides. Rows keep the open width so that their text doesn't reflow, so it measures the panel instead. */
-#new-tab,
 .tab {
   position: relative;
   isolation: isolate;
 }
-#new-tab::before,
 .tab::before {
   content: "";
   position: absolute;
@@ -195,16 +218,6 @@
 }
 .tab:hover::before {
   background: var(--vscode-list-hoverBackground);
-}
-/* A button at rest, unlike the rows, and quieter than the active tab's outline just above it. */
-#new-tab::before {
-  background: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
-}
-#new-tab:hover::before {
-  background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
-}
-#new-tab:active::before {
-  background: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
 }
 .tab[data-active]::before {
   background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-toolbar-hoverBackground));

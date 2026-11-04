@@ -576,12 +576,12 @@ export function TabSidebar({
             {noMatch && <div className="history-message">{t(historyWaited ? "chat.historyLoading" : "chat.historyNoMatch")}</div>}
           </div>
           {!searching && (
-            <button id="new-tab" title={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
-              <span className="tab-marker" aria-hidden="true">
+            <div id="new-tab-row">
+              <button id="new-tab" title={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
                 <Icon svg={plusIcon} />
-              </span>
-              <span className="tab-title">{t("chat.newTab")}</span>
-            </button>
+                <span id="new-tab-label">{t("chat.newTab")}</span>
+              </button>
+            </div>
           )}
         </div>
         {workingRows.length > 0 && (
