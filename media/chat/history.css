@@ -1,4 +1,4 @@
-/* The sidebar's search box: it starts past the rail, so the closed rail hides it. */
+/* The sidebar's search box: its icon sits in the rail's column; the closed rail shows only that. */
 #tab-search {
   flex: 1;
   min-width: 0;
@@ -23,7 +23,7 @@
   display: flex;
   align-items: center;
   height: 26px;
-  margin-right: 8px;
+  margin: 0 8px 0 3px;
   padding: 0 2px 0 8px;
   border-radius: 7px;
   border: 1px solid color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
@@ -48,6 +48,16 @@
   background: none;
   color: var(--vscode-input-foreground);
   font: inherit;
+}
+/* As the panel finishes closing, like the past conversations. */
+#tabs:not(:hover, :has(:focus-visible), [data-open]) #tab-search-box {
+  border-color: transparent;
+  background: none;
+  transition: border-color 0s 0.34s, background-color 0s 0.34s;
+}
+#tabs:not(:hover, :has(:focus-visible), [data-open]) #tab-search-box input {
+  opacity: 0;
+  transition: opacity 0s 0.34s;
 }
 #tab-search-box input::placeholder {
   color: var(--vscode-input-placeholderForeground);

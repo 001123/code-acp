@@ -67,7 +67,7 @@
 }
 /* The open width less the panel's borders. */
 #tab-top,
-#tab-scroll,
+#tab-main,
 #tab-working,
 #tab-history {
   width: calc(var(--tabs-open) - 2px);
@@ -90,15 +90,31 @@
 #tab-dock:hover {
   background: var(--vscode-toolbar-hoverBackground);
 }
+/* The tabs take the room the bottom sections leave, with the new chat button right below them. Keeps room for a tab and the button in a short view. */
+#tab-main {
+  flex: 1 1 0;
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+}
+/* The tabs, and the search's matches of both tabs and history. */
+#tab-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
 #new-tab {
   flex: none;
   display: flex;
   align-items: center;
-  height: 32px;
+  height: 36px;
+  margin-top: 4px;
   padding: 0;
   border-radius: 0;
   background: none;
   color: var(--vscode-foreground);
+  text-align: left;
 }
 #new-tab:hover {
   background: none;
@@ -106,13 +122,6 @@
 #new-tab svg {
   width: 16px;
   height: 16px;
-}
-/* The tabs, and the search's matches of both tabs and history. Keeps room for a tab in a short view. */
-#tab-scroll {
-  flex: 1 1 0;
-  min-height: 44px;
-  overflow-y: auto;
-  scrollbar-width: none;
 }
 #tab-list {
   padding-top: 4px;
@@ -184,13 +193,18 @@
   border-radius: 7px;
   box-sizing: border-box;
 }
-#new-tab:hover::before,
 .tab:hover::before {
   background: var(--vscode-list-hoverBackground);
 }
-/* Stays in the rail's column, beside the search box. */
+/* A button at rest, unlike the rows, and quieter than the active tab's outline just above it. */
 #new-tab::before {
-  width: calc(var(--tabs-rail) - 8px);
+  background: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
+}
+#new-tab:hover::before {
+  background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+}
+#new-tab:active::before {
+  background: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
 }
 .tab[data-active]::before {
   background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-toolbar-hoverBackground));

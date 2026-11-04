@@ -544,11 +544,6 @@ export function TabSidebar({
     >
       <div id="tab-panel" ref={panel}>
         <div id="tab-top">
-          <button id="new-tab" title={t("chat.newTab")} aria-label={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
-            <span className="tab-marker" aria-hidden="true">
-              <Icon svg={plusIcon} />
-            </span>
-          </button>
           <SidebarSearch
             input={searchInput}
             query={query}
@@ -572,12 +567,22 @@ export function TabSidebar({
             </button>
           )}
         </div>
-        <div id="tab-scroll" ref={scroller}>
-          <div id="tab-list" role="tablist">
-            {shownRows.filter((row) => !isWorkingRow(row)).map(shownRow)}
+        <div id="tab-main">
+          <div id="tab-scroll" ref={scroller}>
+            <div id="tab-list" role="tablist">
+              {shownRows.filter((row) => !isWorkingRow(row)).map(shownRow)}
+            </div>
+            {searching && historySection}
+            {noMatch && <div className="history-message">{t(historyWaited ? "chat.historyLoading" : "chat.historyNoMatch")}</div>}
           </div>
-          {searching && historySection}
-          {noMatch && <div className="history-message">{t(historyWaited ? "chat.historyLoading" : "chat.historyNoMatch")}</div>}
+          {!searching && (
+            <button id="new-tab" title={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
+              <span className="tab-marker" aria-hidden="true">
+                <Icon svg={plusIcon} />
+              </span>
+              <span className="tab-title">{t("chat.newTab")}</span>
+            </button>
+          )}
         </div>
         {workingRows.length > 0 && (
           <div id="tab-working">
