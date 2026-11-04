@@ -68,6 +68,7 @@
 /* The open width less the panel's borders. */
 #tab-top,
 #tab-scroll,
+#tab-working,
 #tab-history {
   width: calc(var(--tabs-open) - 2px);
 }
@@ -90,16 +91,14 @@
   background: var(--vscode-toolbar-hoverBackground);
 }
 #new-tab {
-  flex: 1;
-  min-width: 0;
+  flex: none;
   display: flex;
   align-items: center;
   height: 32px;
-  padding: 0 8px 0 0;
+  padding: 0;
   border-radius: 0;
   background: none;
   color: var(--vscode-foreground);
-  text-align: left;
 }
 #new-tab:hover {
   background: none;
@@ -108,20 +107,48 @@
   width: 16px;
   height: 16px;
 }
-/* The tabs, and the search's matches of both tabs and history. Keeps room for its heading and a tab in a short view. */
+/* The tabs, and the search's matches of both tabs and history. Keeps room for a tab in a short view. */
 #tab-scroll {
   flex: 1 1 0;
-  min-height: 64px;
+  min-height: 44px;
   overflow-y: auto;
   scrollbar-width: none;
+}
+#tab-list {
+  padding-top: 4px;
+}
+/* A line between the bottom sections and what is above them. */
+#tab-working,
+#tab-history {
+  border-top: 1px solid color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
+/* The tabs with a turn under way, below the others; a short list, with its own scroll. */
+#tab-working {
+  flex: none;
+  max-height: 40%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+/* Clear of the sticky section heading. */
+#tab-working .tab {
+  scroll-margin-top: 26px;
 }
 /* Stays at the bottom whatever the tabs do, keeping its room in the closed rail so that no tab moves as the panel opens.
    It gives way first in a short view. Not clipped: the sort menu may open over the tabs. */
 #tab-history {
   flex: 0 1 auto;
-  min-height: 24px;
+  min-height: 26px;
   display: flex;
   flex-direction: column;
+}
+/* The past conversations start at the panel's edge, so the closed rail would cut them: they go as it finishes closing, and come back as it opens. */
+#tab-history > :not(.tabs-section) {
+  visibility: hidden;
+  transition: visibility 0s 0.34s;
+}
+#tabs:is(:hover, :has(:focus-visible), [data-open]) #tab-history > :not(.tabs-section) {
+  visibility: visible;
+  transition-delay: 0s;
 }
 .tab {
   display: flex;
@@ -131,8 +158,6 @@
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
   user-select: none;
-  /* Clear of the sticky section heading. */
-  scroll-margin-top: 24px;
 }
 .tab:hover {
   color: var(--vscode-foreground);
@@ -163,9 +188,9 @@
 .tab:hover::before {
   background: var(--vscode-list-hoverBackground);
 }
-/* Leaves the dock button its own highlight. */
-#tab-top:has(#tab-dock) #new-tab::before {
-  width: calc(100cqw - 38px);
+/* Stays in the rail's column, beside the search box. */
+#new-tab::before {
+  width: calc(var(--tabs-rail) - 8px);
 }
 .tab[data-active]::before {
   background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-toolbar-hoverBackground));

@@ -1,22 +1,21 @@
-/* The sidebar's search box: its icon stays in the closed rail, and the box starts past it. */
+/* The sidebar's search box: it starts past the rail, so the closed rail hides it. */
 #tab-search {
-  flex: none;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  width: calc(var(--tabs-open) - 2px);
   height: 32px;
+}
+#tab-search-icon {
+  flex: none;
+  display: flex;
+  margin-right: 6px;
   color: var(--vscode-descriptionForeground);
+  cursor: text;
 }
-#tab-search .tab-marker {
-  height: 100%;
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  color: inherit;
-}
-#tab-search .tab-marker svg {
-  width: 15px;
-  height: 15px;
+#tab-search-icon svg {
+  width: 14px;
+  height: 14px;
 }
 #tab-search-box {
   flex: 1;
@@ -30,6 +29,10 @@
   border: 1px solid color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
   background: var(--vscode-input-background);
   transition: border-color 0.15s, box-shadow 0.15s;
+}
+/* Leaves the dock button its margin. */
+#tab-top:has(#tab-dock) #tab-search-box {
+  margin-right: 4px;
 }
 #tab-search-box:focus-within {
   border-color: var(--vscode-focusBorder);
@@ -52,7 +55,7 @@
 #tab-search-box input::-webkit-search-cancel-button {
   display: none;
 }
-/* Sticks while its section scrolls by. Its text starts past the rail, like the tabs' titles. */
+/* Sticks while its section scrolls by. Its icon sits in the rail's column and its text starts past it, like the tabs'; the right side keeps room for the chevron. */
 .tabs-section {
   position: sticky;
   z-index: 2;
@@ -60,8 +63,8 @@
   flex: none;
   display: flex;
   align-items: center;
-  height: 24px;
-  padding: 0 6px 0 calc(var(--tabs-rail) - 2px - 16px);
+  height: 26px;
+  padding: 0 28px 0 0;
   color: var(--vscode-descriptionForeground);
 }
 #tabs:is(:hover, :has(:focus-visible), [data-open]) .tabs-section {
@@ -72,7 +75,6 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 2px;
   height: 100%;
   padding: 0;
   border-radius: 0;
@@ -85,19 +87,29 @@
   background: none;
   color: var(--vscode-foreground);
 }
-/* Hangs in the rail's column, so it only shows with the panel open. */
-.tabs-section-toggle svg {
-  flex: none;
+/* At the end of the row, past what the section adds to it; part of the button, so a click on it toggles too. */
+.tabs-section-toggle .tab-marker svg {
   width: 14px;
   height: 14px;
-  visibility: hidden;
 }
-#tabs:is(:hover, :has(:focus-visible), [data-open]) .tabs-section-toggle svg {
-  visibility: visible;
+.tabs-section-chevron svg {
+  position: absolute;
+  top: 6px;
+  right: 9px;
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+  transition: rotate 0.12s ease;
+}
+.tabs-section-toggle:hover .tabs-section-chevron svg {
+  opacity: 1;
+}
+.tabs-section-toggle[aria-expanded="false"] .tabs-section-chevron svg {
+  rotate: -90deg;
 }
 .tabs-section-label {
   flex: none;
-  font-weight: 600;
+  font-weight: 500;
 }
 .tabs-section-detail {
   min-width: 0;
@@ -105,12 +117,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 400;
+  opacity: 0.7;
 }
+/* Comes up with the pointer on the heading, to keep it quiet. */
 .history-sort {
   position: relative;
   flex: none;
   display: flex;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.tabs-section:hover .history-sort,
+.history-sort:focus-within,
+.history-sort:has(.popup-menu) {
+  opacity: 1;
 }
 .history-sort .icon-btn {
   background: none;
@@ -160,7 +180,7 @@
 }
 .history-message {
   flex: none;
-  padding: 4px 8px 4px calc(var(--tabs-rail) - 2px);
+  padding: 4px 8px 4px 12px;
   color: var(--vscode-descriptionForeground);
   font-size: 0.9em;
 }
@@ -175,10 +195,28 @@
   min-height: 0;
   max-height: calc(28px * 7.5);
   overflow-y: auto;
+  transition:
+    max-height 0.14s ease,
+    opacity 0.14s ease,
+    visibility 0s 0.34s;
+}
+/* Unfolds as its heading opens it. */
+@starting-style {
+  #history-list:not([data-searching]) {
+    max-height: 0;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabs-section-chevron svg,
+  .history-sort,
+  #history-list:not([data-searching]) {
+    transition: none;
+  }
 }
 .history-folder {
   overflow: hidden;
-  padding: 6px 8px 2px calc(var(--tabs-rail) - 5px);
+  padding: 6px 8px 2px 9px;
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
   text-overflow: ellipsis;
@@ -194,7 +232,7 @@
   gap: 8px;
   width: 100%;
   height: 28px;
-  padding: 0 8px 0 calc(var(--tabs-rail) - 5px);
+  padding: 0 8px 0 9px;
   border-radius: 7px;
   background: none;
   color: var(--vscode-descriptionForeground);

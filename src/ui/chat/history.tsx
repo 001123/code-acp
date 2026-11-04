@@ -5,7 +5,6 @@ import { useL10n, type Translate } from "../l10n";
 import sortIcon from "@tabler/icons/outline/arrows-sort.svg";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
-import chevronRightIcon from "@tabler/icons/outline/chevron-right.svg";
 import searchIcon from "@tabler/icons/outline/search.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
@@ -28,14 +27,16 @@ const SORT_LABELS = {
   folder: "chat.historySortFolder",
 } as const;
 
-/** A heading of the sidebar that collapses what is below it; its text starts past the rail, so the closed rail hides it. */
+/** A heading of the sidebar that collapses what is below it; the closed rail keeps only its icon. */
 export function SidebarSection({
+  icon,
   label,
   detail,
   collapsed,
   onToggle,
   children,
 }: {
+  icon: string;
   label: string;
   detail?: string;
   collapsed: boolean;
@@ -51,16 +52,21 @@ export function SidebarSection({
         aria-expanded={!collapsed}
         onClick={onToggle}
       >
-        <Icon svg={collapsed ? chevronRightIcon : chevronDownIcon} />
+        <span className="tab-marker" aria-hidden="true">
+          <Icon svg={icon} />
+        </span>
         <span className="tabs-section-label">{label}</span>
         {detail && <span className="tabs-section-detail">{detail}</span>}
+        <span className="tabs-section-chevron">
+          <Icon svg={chevronDownIcon} />
+        </span>
       </button>
       {children}
     </div>
   );
 }
 
-/** The search box at the top of the sidebar: its icon stays in the closed rail. */
+/** The search box at the top of the sidebar, past the rail: the closed rail hides it. */
 export function SidebarSearch({
   input,
   query,
@@ -78,10 +84,10 @@ export function SidebarSearch({
   const { t } = useL10n();
   return (
     <div id="tab-search">
-      <button className="tab-marker" tabIndex={-1} aria-hidden="true" onClick={() => input.current?.focus()}>
-        <Icon svg={searchIcon} />
-      </button>
       <div id="tab-search-box">
+        <span id="tab-search-icon" aria-hidden="true" onClick={() => input.current?.focus()}>
+          <Icon svg={searchIcon} />
+        </span>
         <input
           ref={input}
           type="search"

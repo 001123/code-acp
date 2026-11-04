@@ -169,7 +169,7 @@ export class TabSessions {
     tab.cwd = cwd;
     tab.used = true;
     tab.busy = true;
-    this.host.status(tab, "chat.loadingSession");
+    this.host.status(tab, "chat.loadingSession", { loading: true });
     this.host.postTabs();
     const res = yield* (
       caps?.loadSession

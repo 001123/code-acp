@@ -4,10 +4,12 @@ import type { Attachment, ChangeHunk, ChangesMessage, PrDraft, QueuedInfo, TabGr
 import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
+import activityIcon from "@tabler/icons/outline/activity.svg";
 import archiveIcon from "@tabler/icons/outline/archive.svg";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import chevronRightIcon from "@tabler/icons/outline/chevron-right.svg";
 import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
+import historyIcon from "@tabler/icons/outline/history.svg";
 import undockIcon from "@tabler/icons/outline/layout-sidebar-right-collapse.svg";
 import dockIcon from "@tabler/icons/outline/layout-sidebar-right-expand.svg";
 import pinIcon from "@tabler/icons/outline/pin.svg";
@@ -21,12 +23,14 @@ import { post } from "./post";
 import { useDockable, useSidebarPrefs } from "./sidebarPrefs";
 import type { Usage } from "./usageMeter";
 import type { AgentChoices } from "./agentPanel";
-import { allRows, collapsedRows, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, type TabChanges } from "./tabRows";
+import { allRows, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, rowKey, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow, type TabChanges } from "./tabRows";
 import { EMPTY, type Transcript } from "./transcript";
 
 export interface Status {
   text: string;
   busy?: boolean;
+  /** Busy reopening the session, not with a turn. */
+  loading?: boolean;
   needsLogin?: boolean;
   needsAgent?: boolean;
 }
@@ -170,7 +174,7 @@ export function TabSidebar({
 }) {
   const { t, lang } = useL10n();
   const dateFormat = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" });
-  const list = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const [dragged, setDragged] = useState<Dragged>();
   const [dropLine, setDropLine] = useState<DropLine>();
   const [renamingGroup, setRenamingGroup] = useState<number>();
@@ -182,6 +186,7 @@ export function TabSidebar({
   const searchInput = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const restTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const workingKeys = useRef<ReadonlySet<string>>(new Set());
   const searching = query.trim() !== "";
   const docked = prefs.docked && dockable;
   const held = dragged !== undefined || renaming !== undefined || renamingGroup !== undefined || query !== "" || searchFocused || sortMenu.open || docked;
@@ -239,9 +244,6 @@ export function TabSidebar({
   };
   const dropOf = (key: string) => (dropLine?.key === key ? (dropLine.after ? "after" : "before") : undefined);
   useEffect(() => {
-    list.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" });
-  }, [active, shownGroup, tabs.length]);
-  useEffect(() => {
     if (docked || searching) needHistory();
   }, [docked, searching]);
   useEffect(() => {
@@ -255,9 +257,9 @@ export function TabSidebar({
     clearTimeout(restTimer.current);
     restTimer.current = setTimeout(() => {
       if (heldRef.current) return;
-      const shown = list.current?.querySelector("[data-active]");
-      if (shown) shown.scrollIntoView({ block: "nearest" });
-      else if (scroller.current) scroller.current.scrollTop = 0;
+      const shown = panel.current?.querySelector("[data-active]") ?? null;
+      if (scroller.current && !scroller.current.contains(shown)) scroller.current.scrollTop = 0;
+      shown?.scrollIntoView({ block: "nearest" });
     }, 300);
   };
 
@@ -482,12 +484,23 @@ export function TabSidebar({
   };
 
   const rows = tabRows(tabs, groups);
-  /** What matters even with the section collapsed; keeping it in the rail too means that nothing moves as the panel opens. */
-  const keeps = (tab: TabInfo) => {
-    const state = states[tab.id];
-    return tab.id === active || tab.pinned || !!state?.status.busy || tab.attempt === "running" || requestsLabel(openRequests(state), t) !== undefined;
-  };
-  const shownRows = searching ? matchingRows(rows, query, titleOf) : prefs.openCollapsed ? collapsedRows(rows, keeps, shownGroup) : allRows(rows);
+  // A row keeps its section during a drag or a rename: moving it would end them.
+  if (dragged === undefined && renaming === undefined && renamingGroup === undefined) {
+    workingKeys.current = workingRowKeys(
+      rows,
+      (tab) => tabWorking(tab, states[tab.id]),
+      (tab) => requestsLabel(openRequests(states[tab.id]), t) !== undefined,
+    );
+  }
+  const shownRows = searching ? matchingRows(rows, query, titleOf) : allRows(rows);
+  const isWorkingRow = (row: ShownRow) => !searching && workingKeys.current.has(rowKey(row));
+  const workingRows = shownRows.filter(isWorkingRow);
+  /** The section stays out of the way when collapsed, but the conversation on screen stays in the sidebar. */
+  const isOnScreen = (row: ShownRow) => (row.kind === "tab" ? row.tab.id === active : row.group.id === shownGroup || row.members.some((tab) => tab.id === active));
+  const shownRow = (row: ShownRow) => (row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members, row.shown));
+  useEffect(() => {
+    panel.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" });
+  }, [active, shownGroup, tabs.length, workingRows.length]);
   const past = historyGroups(history?.sessions ?? [], {
     openIds: new Set(tabs.flatMap((tab) => tab.sessionId ?? [])),
     query,
@@ -502,6 +515,7 @@ export function TabSidebar({
     <>
       {(!searching || past.length > 0) && (
         <SidebarSection
+          icon={historyIcon}
           label={t("chat.sidebarHistory")}
           detail={agentName}
           collapsed={!searching && prefs.historyCollapsed}
@@ -528,14 +542,23 @@ export function TabSidebar({
       onMouseLeave={backToTabs}
       onFocus={needHistory}
     >
-      <div id="tab-panel">
+      <div id="tab-panel" ref={panel}>
         <div id="tab-top">
           <button id="new-tab" title={t("chat.newTab")} aria-label={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
             <span className="tab-marker" aria-hidden="true">
               <Icon svg={plusIcon} />
             </span>
-            <span className="tab-title">{t("chat.newTab")}</span>
           </button>
+          <SidebarSearch
+            input={searchInput}
+            query={query}
+            onQuery={setQuery}
+            onFocusChange={setSearchFocused}
+            onLeave={() => {
+              searchInput.current?.blur();
+              onLeaveSearch();
+            }}
+          />
           {dockable && (
             <button
               className="icon-btn small"
@@ -549,31 +572,25 @@ export function TabSidebar({
             </button>
           )}
         </div>
-        <SidebarSearch
-          input={searchInput}
-          query={query}
-          onQuery={setQuery}
-          onFocusChange={setSearchFocused}
-          onLeave={() => {
-            searchInput.current?.blur();
-            onLeaveSearch();
-          }}
-        />
         <div id="tab-scroll" ref={scroller}>
-          {(!searching || shownRows.length > 0) && (
-            <SidebarSection
-              label={t("chat.sidebarOpen")}
-              detail={String(tabs.length)}
-              collapsed={!searching && prefs.openCollapsed}
-              onToggle={() => setPrefs({ openCollapsed: !prefs.openCollapsed })}
-            />
-          )}
-          <div id="tab-list" role="tablist" ref={list}>
-            {shownRows.map((row) => (row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members, row.shown)))}
+          <div id="tab-list" role="tablist">
+            {shownRows.filter((row) => !isWorkingRow(row)).map(shownRow)}
           </div>
           {searching && historySection}
           {noMatch && <div className="history-message">{t(historyWaited ? "chat.historyLoading" : "chat.historyNoMatch")}</div>}
         </div>
+        {workingRows.length > 0 && (
+          <div id="tab-working">
+            <SidebarSection
+              icon={activityIcon}
+              label={t("chat.sidebarWorking")}
+              detail={String(workingRows.length)}
+              collapsed={prefs.workingCollapsed}
+              onToggle={() => setPrefs({ workingCollapsed: !prefs.workingCollapsed })}
+            />
+            <div role="tablist">{(prefs.workingCollapsed ? workingRows.filter(isOnScreen) : workingRows).map(shownRow)}</div>
+          </div>
+        )}
         {!searching && <div id="tab-history">{historySection}</div>}
       </div>
     </div>

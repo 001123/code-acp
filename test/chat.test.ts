@@ -14,7 +14,7 @@ import type { TabGroupInfo, TabInfo } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow } from "../src/ui/chat/compareAttempts";
 import { folderName, historyGroups, shortTime, type HistoryGroup, type HistorySort } from "../src/ui/chat/historyList";
-import { attemptStatus, collapsedRows, diffTotals, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, type ShownRow } from "../src/ui/chat/tabRows";
+import { attemptStatus, diffTotals, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow } from "../src/ui/chat/tabRows";
 import type { TabState } from "../src/ui/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
 import { transcript, EMPTY, fileLinkTokens, noticeItem, permissionInput, stopReasonText, type Action } from "../src/ui/chat/transcript";
@@ -431,10 +431,31 @@ describe("sidebar rows", () => {
     assert.deepStrictEqual(row?.kind === "group" ? row.members.map((member) => member.id) : [], [2, 3]);
   });
 
-  it("collapses to the rows that matter", () => {
-    assert.deepStrictEqual(shown(collapsedRows(rows, (each) => each.id === 4, undefined)), [4]);
-    assert.deepStrictEqual(shown(collapsedRows(rows, (each) => each.id === 3, undefined)), [[2, 3]]);
-    assert.deepStrictEqual(shown(collapsedRows(rows, () => false, 1)), [[2, 3]]);
+  describe("working section", () => {
+    const keys = (working: number[], waiting: number[] = [], list = rows) =>
+      [...workingRowKeys(list, (each) => working.includes(each.id), (each) => waiting.includes(each.id))];
+
+    it("takes the tabs and groups with something running", () => {
+      assert.deepStrictEqual(keys([1, 3]), ["tab-1", "group-1"]);
+      assert.deepStrictEqual(keys([]), []);
+    });
+
+    it("leaves what waits on the user, or a whole group when one of its tabs does", () => {
+      assert.deepStrictEqual(keys([1], [1]), []);
+      assert.deepStrictEqual(keys([2, 3], [3]), []);
+    });
+
+    it("leaves pinned tabs where they are", () => {
+      assert.deepStrictEqual(keys([1], [], tabRows([{ ...tab(1, "Alpha"), pinned: true }], [])), []);
+    });
+
+    it("counts a running turn or attempt, not a session being reopened", () => {
+      const status = (status: TabState["status"]) => ({ status }) as TabState;
+      assert.isTrue(tabWorking(tab(1, "Alpha"), status({ text: "", busy: true })));
+      assert.isFalse(tabWorking(tab(1, "Alpha"), status({ text: "", busy: true, loading: true })));
+      assert.isFalse(tabWorking(tab(1, "Alpha"), undefined));
+      assert.isTrue(tabWorking({ ...tab(1, "Alpha"), attempt: "running" }, undefined));
+    });
   });
 });
 

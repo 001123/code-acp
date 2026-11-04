@@ -7,8 +7,8 @@ export interface SidebarPrefs {
   /** Beside the conversation instead of over it on hover. */
   docked: boolean;
   sort: HistorySort;
-  openCollapsed: boolean;
   historyCollapsed: boolean;
+  workingCollapsed: boolean;
 }
 
 const read = (): SidebarPrefs => {
@@ -16,8 +16,8 @@ const read = (): SidebarPrefs => {
   return {
     docked: saved.docked === true,
     sort: HISTORY_SORTS.find((sort) => sort === saved.sort) ?? "updated",
-    openCollapsed: saved.openCollapsed === true,
     historyCollapsed: saved.historyCollapsed === true,
+    workingCollapsed: saved.workingCollapsed === true,
   };
 };
 

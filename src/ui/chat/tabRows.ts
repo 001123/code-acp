@@ -27,6 +27,17 @@ export type ShownRow = { kind: "tab"; tab: TabInfo } | { kind: "group"; group: T
 /** The rows as they are. */
 export const allRows = (rows: ReadonlyArray<TabRow>): ShownRow[] => rows.map((row) => (row.kind === "tab" ? row : { ...row, shown: row.members }));
 
+export const rowKey = (row: TabRow | ShownRow) => (row.kind === "tab" ? `tab-${row.tab.id}` : `group-${row.group.id}`);
+
+/** A turn is under way in the tab; reopening its session doesn't count. */
+export const tabWorking = (tab: TabInfo, state: TabState | undefined) => (!!state?.status.busy && !state.status.loading) || tab.attempt === "running";
+
+/** The rows of the sidebar's working section: something runs in them, and they are neither pinned nor waiting on the user. */
+export function workingRowKeys(rows: ReadonlyArray<TabRow>, working: (tab: TabInfo) => boolean, waiting: (tab: TabInfo) => boolean): Set<string> {
+  const isWorking = (members: ReadonlyArray<TabInfo>) => members.some(working) && !members.some((tab) => tab.pinned || waiting(tab));
+  return new Set(rows.filter((row) => isWorking(row.kind === "tab" ? [row.tab] : row.members)).map(rowKey));
+}
+
 /** The rows matching `query`: a group whose title doesn't match shows just the tabs that do. `titleOf` names a tab, `member` when in a group. */
 export function matchingRows(rows: ReadonlyArray<TabRow>, query: string, titleOf: (tab: TabInfo, member: boolean) => string): ShownRow[] {
   const matches = (tab: TabInfo, member: boolean) => matchesText(`${titleOf(tab, member)} ${tab.cwd}`, query);
@@ -37,10 +48,6 @@ export function matchingRows(rows: ReadonlyArray<TabRow>, query: string, titleOf
   });
 }
 
-/** The rows that stay while the section of open tabs is collapsed: those `keeps` says matter now, and the group on screen. */
-export function collapsedRows(rows: ReadonlyArray<TabRow>, keeps: (tab: TabInfo) => boolean, shownGroup: number | undefined): ShownRow[] {
-  return allRows(rows).filter((row) => (row.kind === "tab" ? keeps(row.tab) : row.group.id === shownGroup || row.members.some(keeps)));
-}
 
 /** Where tabs being moved end up, for a drop line at position `at` of the tabs as they are. */
 export function dropIndex(tabs: ReadonlyArray<TabInfo>, moved: ReadonlyArray<number>, at: number): number | undefined {
