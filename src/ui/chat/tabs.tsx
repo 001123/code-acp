@@ -1,5 +1,5 @@
 import type * as acp from "@agentclientprotocol/sdk";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import type { Attachment, ChangeHunk, ChangesMessage, PrDraft, QueuedInfo, TabGroupInfo, TabInfo, TerminalSnapshot, WorktreeDiff } from "../../chat/protocol";
 import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
@@ -23,7 +23,7 @@ import { post } from "./post";
 import { useDockable, useSidebarPrefs } from "./sidebarPrefs";
 import type { Usage } from "./usageMeter";
 import type { AgentChoices } from "./agentPanel";
-import { allRows, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, rowKey, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow, type TabChanges } from "./tabRows";
+import { allRows, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, rowKey, rowsInHand, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow, type TabChanges } from "./tabRows";
 import { EMPTY, type Transcript } from "./transcript";
 
 export interface Status {
@@ -189,7 +189,8 @@ export function TabSidebar({
   const workingKeys = useRef<ReadonlySet<string>>(new Set());
   const searching = query.trim() !== "";
   const docked = prefs.docked && dockable;
-  const held = dragged !== undefined || renaming !== undefined || renamingGroup !== undefined || query !== "" || searchFocused || sortMenu.open || docked;
+  const inHand = rowsInHand(tabs, groups, { dragged: dragged?.ids, renaming, renamingGroup });
+  const held = inHand || query !== "" || searchFocused || sortMenu.open || docked;
   const heldRef = useRef(held);
   heldRef.current = held;
   const needHistory = () => {
@@ -217,6 +218,10 @@ export function TabSidebar({
     else post({ type: "moveTab", tab: dragged.ids[0]!, index });
   };
   /** What a row needs to be dragged and dropped on; `ids` are the tabs it stands for. */
+  /** A double click on a row's button is two clicks on that button: when they close rows, the next row is under the second. */
+  const onRowDoubleClick = (rename: () => void) => (e: MouseEvent) => {
+    if (!(e.target as Element).closest("button")) rename();
+  };
   const dragProps = (key: string, ids: ReadonlyArray<number>, group: number | undefined) => {
     const first = tabs.findIndex((tab) => tab.id === ids[0]);
     return {
@@ -310,7 +315,7 @@ export function TabSidebar({
           preventDefaultContextMenuItems: true,
         })}
         onClick={() => select(tab.id)}
-        onDoubleClick={() => onRename(tab.id)}
+        onDoubleClick={onRowDoubleClick(() => onRename(tab.id))}
         onAuxClick={(e) => {
           if (e.button === 1 && !tab.pinned) post({ type: "closeTab", tab: tab.id });
         }}
@@ -412,7 +417,7 @@ export function TabSidebar({
           ].join("\n")}
           data-vscode-context={JSON.stringify({ webviewSection: "tabGroup", preventDefaultContextMenuItems: true })}
           onClick={() => selectGroup(group.id)}
-          onDoubleClick={() => setRenamingGroup(group.id)}
+          onDoubleClick={onRowDoubleClick(() => setRenamingGroup(group.id))}
           onAuxClick={(e) => {
             if (e.button === 1 && !pinned) post({ type: "closeGroup", group: group.id });
           }}
@@ -485,7 +490,7 @@ export function TabSidebar({
 
   const rows = tabRows(tabs, groups);
   // A row keeps its section during a drag or a rename: moving it would end them.
-  if (dragged === undefined && renaming === undefined && renamingGroup === undefined) {
+  if (!inHand) {
     workingKeys.current = workingRowKeys(
       rows,
       (tab) => tabWorking(tab, states[tab.id]),

@@ -599,6 +599,22 @@ describe("ChatViewProvider", () => {
     ),
   );
 
+  it.live("shows a background tab idle when a restart cuts off its turn", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { idle, ofType, provider, runtime, say, send, tab, tabsNow } = yield* startChat;
+        say(tab, "permission");
+        yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+        assert.strictEqual(ofType("status", tab).at(-1)!.busy, true);
+        send({ type: "newTab" });
+        yield* until(() => tabsNow().active !== tab, "the new tab");
+        yield* Effect.promise(() => runtime.runPromise(provider.restart()));
+        yield* until(() => ofType("reset", tab).length === 1, "the reset");
+        yield* idle(tab);
+      }),
+    ),
+  );
+
   describe("restarting an agent that can reopen sessions", () => {
     const restartIn = (chat: { runtime: { runPromise: (effect: any) => Promise<unknown> }; provider: ChatViewProvider }, agentId?: string) =>
       Effect.promise(() => chat.runtime.runPromise(chat.provider.restart(agentId)));

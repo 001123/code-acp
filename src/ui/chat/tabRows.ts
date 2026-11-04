@@ -38,6 +38,19 @@ export function workingRowKeys(rows: ReadonlyArray<TabRow>, working: (tab: TabIn
   return new Set(rows.filter((row) => isWorking(row.kind === "tab" ? [row.tab] : row.members)).map(rowKey));
 }
 
+/** What a drag or a rename is on, by id. */
+export interface RowsInHand {
+  dragged?: ReadonlyArray<number> | undefined;
+  renaming?: number | undefined;
+  renamingGroup?: number | undefined;
+}
+
+/** Whether a drag or a rename is under way. A row that goes takes its drag or name input along, and neither says it ended, so one on rows now gone is over. */
+export function rowsInHand(tabs: ReadonlyArray<TabInfo>, groups: ReadonlyArray<TabGroupInfo>, { dragged, renaming, renamingGroup }: RowsInHand): boolean {
+  const isTab = (id: number) => tabs.some((tab) => tab.id === id);
+  return dragged?.some(isTab) === true || (renaming !== undefined && isTab(renaming)) || groups.some((group) => group.id === renamingGroup);
+}
+
 /** The rows matching `query`: a group whose title doesn't match shows just the tabs that do. `titleOf` names a tab, `member` when in a group. */
 export function matchingRows(rows: ReadonlyArray<TabRow>, query: string, titleOf: (tab: TabInfo, member: boolean) => string): ShownRow[] {
   const matches = (tab: TabInfo, member: boolean) => matchesText(`${titleOf(tab, member)} ${tab.cwd}`, query);

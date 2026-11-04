@@ -405,6 +405,8 @@ export class TabAgents {
       }
       resetConversation(tab);
       this.host.postTab(tab, { type: "reset" });
+      // A tab in the background gets no session, and so no other status, until it is selected.
+      this.host.refreshStatus(tab);
       changes.clear(tab);
     }
     this.host.postTabs();

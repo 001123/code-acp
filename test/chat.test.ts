@@ -14,7 +14,7 @@ import type { TabGroupInfo, TabInfo } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow } from "../src/ui/chat/compareAttempts";
 import { folderName, historyGroups, shortTime, type HistoryGroup, type HistorySort } from "../src/ui/chat/historyList";
-import { attemptStatus, diffTotals, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow } from "../src/ui/chat/tabRows";
+import { attemptStatus, diffTotals, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, rowsInHand, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow } from "../src/ui/chat/tabRows";
 import type { TabState } from "../src/ui/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
 import { transcript, EMPTY, fileLinkTokens, noticeItem, permissionInput, stopReasonText, type Action } from "../src/ui/chat/transcript";
@@ -455,6 +455,18 @@ describe("sidebar rows", () => {
       assert.isFalse(tabWorking(tab(1, "Alpha"), status({ text: "", busy: true, loading: true })));
       assert.isFalse(tabWorking(tab(1, "Alpha"), undefined));
       assert.isTrue(tabWorking({ ...tab(1, "Alpha"), attempt: "running" }, undefined));
+    });
+
+    it("stays held only by a drag or a rename on rows still there", () => {
+      const tabs = [tab(1, "Alpha")];
+      const groups = [{ id: 1 } as TabGroupInfo];
+      assert.isFalse(rowsInHand(tabs, groups, {}));
+      assert.isTrue(rowsInHand(tabs, groups, { renaming: 1 }));
+      assert.isTrue(rowsInHand(tabs, groups, { renamingGroup: 1 }));
+      assert.isTrue(rowsInHand(tabs, groups, { dragged: [9, 1] }));
+      assert.isFalse(rowsInHand(tabs, groups, { renaming: 9 }));
+      assert.isFalse(rowsInHand(tabs, groups, { renamingGroup: 9 }));
+      assert.isFalse(rowsInHand(tabs, groups, { dragged: [9] }));
     });
   });
 });
