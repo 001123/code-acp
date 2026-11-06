@@ -7,6 +7,7 @@ import { ASKS, AskAgentActions } from "./askAgent";
 import { ChatViewProvider } from "./chat/chatViewProvider";
 import { CommitMessage } from "./commitMessage";
 import { LOGIN_AGENT_COMMAND } from "./doctor";
+import { registerDiagramSerializer } from "./diagramPanel";
 import { DropViewProvider } from "./dropView";
 import { t } from "./i18n";
 import { FixProblemsActions } from "./problems";
@@ -101,6 +102,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       treeDataProvider: dropView,
       dragAndDropController: dropView,
     }),
+    SettingsPanel.registerSerializer(context, runtime, manager),
+    registerDiagramSerializer(context.extensionUri),
     vscode.commands.registerCommand("codeAcp.manageAgents", manageAgents),
     vscode.commands.registerCommand("codeAcp.selectAgent", run(selectAgent)),
     vscode.commands.registerCommand("codeAcp.openSettings", () => SettingsPanel.show(context, runtime, manager)),

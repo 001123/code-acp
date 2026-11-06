@@ -140,9 +140,18 @@
   /* Below the buttons. */
   --pele-zoom-top: 76px;
   padding: 8px;
+  /* Keep the diagram clear of the button column (8px inset + 30px buttons + 8px gap). */
+  padding-right: 46px;
   border-radius: 6px;
   background: var(--pele-bg);
   overflow-x: auto;
+}
+/* Tall diagrams shrink to fit, keeping their aspect ratio, instead of running far down the chat; zoom in to read them. */
+.md .mermaid > svg {
+  display: block;
+  width: auto;
+  max-height: 50vh;
+  margin-inline: auto;
 }
 /* A third button, to play a sequence diagram. */
 .md .mermaid-block[data-sequence] .mermaid {

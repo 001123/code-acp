@@ -25,6 +25,15 @@
   fill: var(--pele-surface);
 }
 
+/* pele strokes line-drawn figures (stick actors, boundary, control, entity, database) with --pele-border,
+   which is barely visible on dark themes. */
+.mermaid
+  :is(.pele-actor-actor, .pele-actor-boundary, .pele-actor-control, .pele-actor-entity, .pele-actor-database)
+  :is(circle, path),
+.mermaid .pele-actor-figure :is(circle, path) {
+  stroke: var(--pele-line);
+}
+
 /* Hover highlighting, set up by src/ui/diagramHover.ts. */
 .mermaid :is(.pele-node, .pele-edge, .pele-edge-label) {
   transition: opacity 0.15s;
@@ -66,6 +75,19 @@
 .mermaid :is(.pele-node, .pele-cluster)[data-hot] > :is(rect, path, polygon, circle, ellipse) {
   stroke: var(--pele-accent);
   stroke-width: 2;
+}
+/* The participant pointed at, set apart from the ones it talks to. */
+.mermaid .pele-actor[data-picked] > :is(rect, circle) {
+  fill: color-mix(in srgb, var(--pele-accent) 20%, var(--pele-surface));
+  stroke-width: 3;
+}
+.mermaid .pele-actor[data-picked] > .pele-label {
+  fill: var(--pele-accent);
+  font-weight: 600;
+}
+.mermaid .pele-lifeline[data-picked] {
+  stroke: var(--pele-accent);
+  stroke-width: 1.5;
 }
 .mermaid .pele-frame[data-hot] > rect:first-child {
   stroke: var(--pele-accent);

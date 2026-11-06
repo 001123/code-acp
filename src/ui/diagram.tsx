@@ -1,12 +1,12 @@
 import { render } from "pele";
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
-import type { DiagramFromWebview, DiagramToWebview } from "../diagramPanel";
+import type { DiagramFromWebview, DiagramState, DiagramToWebview } from "../diagramPanel";
 import { hoverDiagram } from "./diagramHover";
 import { useSequencePlayer } from "./diagramPlay";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
-import { poster, useMessages } from "./vscode";
+import { poster, setState, useMessages } from "./vscode";
 import codeIcon from "@tabler/icons/outline/code.svg";
 import playIcon from "@tabler/icons/outline/player-play.svg";
 import stopIcon from "@tabler/icons/outline/player-stop.svg";
@@ -59,6 +59,8 @@ function DiagramPage() {
 
   useMessages((msg: DiagramToWebview) => {
     if (msg.type === "diagram") {
+      // Kept for the host, which reopens the tab from it after a window reload.
+      setState({ code: msg.code } satisfies DiagramState);
       player.stop();
       setCode(msg.code);
       setView(FIT);

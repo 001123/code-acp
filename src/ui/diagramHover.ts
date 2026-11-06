@@ -197,24 +197,31 @@ export function addHitPaths(svg: SVGSVGElement) {
 /** Removes every highlight inside `root`. */
 export function clear(root: HTMLElement) {
   delete root.dataset.hover;
-  for (const el of root.querySelectorAll("[data-hot], [data-done]")) {
+  for (const el of root.querySelectorAll("[data-hot], [data-done], [data-picked]")) {
     el.removeAttribute("data-hot");
     el.removeAttribute("data-done");
+    el.removeAttribute("data-picked");
   }
 }
 
-/** Lights up the given participants and messages of a sequence diagram; everything else fades. */
+/**
+ * Lights up the given participants and messages of a sequence diagram; everything else fades.
+ * `picked` is the participant pointed at, set apart from the ones it talks to.
+ */
 export function markSequence(
   root: HTMLElement,
   svg: SVGSVGElement,
   participants: ReadonlySet<string>,
   hot: ReadonlySet<string>,
   done: ReadonlySet<string> = new Set(),
+  picked?: string,
 ) {
   clear(root);
   root.dataset.hover = "";
   for (const el of svg.querySelectorAll(SEQ_PARTICIPANT)) {
-    if (participants.has(el.getAttribute("data-id")!)) el.setAttribute("data-hot", "");
+    const id = el.getAttribute("data-id")!;
+    if (participants.has(id)) el.setAttribute("data-hot", "");
+    if (id === picked) el.setAttribute("data-picked", "");
   }
   for (const el of svg.querySelectorAll(SEQ_MESSAGE)) {
     const id = el.getAttribute("data-id")!;
@@ -230,9 +237,10 @@ function highlightSequence(root: HTMLElement, svg: SVGSVGElement, item: Element)
   const picked = item.matches(SEQ_MESSAGE)
     ? all.filter((m) => m.id === id)
     : all.filter((m) => m.from === id || m.to === id);
-  const participants = new Set(item.matches(SEQ_MESSAGE) ? [] : [id]);
+  const isMessage = item.matches(SEQ_MESSAGE);
+  const participants = new Set(isMessage ? [] : [id]);
   for (const m of picked) participants.add(m.from).add(m.to);
-  markSequence(root, svg, participants, new Set(picked.map((m) => m.id)));
+  markSequence(root, svg, participants, new Set(picked.map((m) => m.id)), new Set(), isMessage ? undefined : id);
 }
 
 const within = (inner: DOMRect, outer: DOMRect) =>

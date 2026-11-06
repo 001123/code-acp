@@ -127,6 +127,7 @@ export function scopedSetting(
 /** Webview page for the extension's settings, of the user or the open workspace, with a link to the native Settings UI. */
 export class SettingsPanel {
   private static current?: SettingsPanel;
+  private static readonly viewType = "codeAcp.settings";
 
   private readonly disposables: vscode.Disposable[] = [];
   private readonly catalog: AgentCatalog;
@@ -157,12 +158,35 @@ export class SettingsPanel {
       }
       return;
     }
-    const panel = vscode.window.createWebviewPanel("codeAcp.settings", t("settings.title"), vscode.ViewColumn.Active, {
-      enableScripts: true,
-      localResourceRoots: webviewRoots(context.extensionUri),
-    });
+    const panel = vscode.window.createWebviewPanel(
+      SettingsPanel.viewType,
+      t("settings.title"),
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        localResourceRoots: webviewRoots(context.extensionUri),
+      },
+    );
     SettingsPanel.current = new SettingsPanel(panel, context, runtime, manager);
     SettingsPanel.current.pendingSelect = select;
+  }
+
+  /** Brings the page back after a window reload; the page restores its own tab from its saved state. */
+  static registerSerializer(
+    context: vscode.ExtensionContext,
+    runtime: AppRuntime,
+    manager: AgentManager["Service"],
+  ): vscode.Disposable {
+    return vscode.window.registerWebviewPanelSerializer(SettingsPanel.viewType, {
+      deserializeWebviewPanel: async (panel) => {
+        if (SettingsPanel.current) {
+          panel.dispose();
+          return;
+        }
+        panel.webview.options = { enableScripts: true, localResourceRoots: webviewRoots(context.extensionUri) };
+        SettingsPanel.current = new SettingsPanel(panel, context, runtime, manager);
+      },
+    });
   }
 
   private constructor(
@@ -171,6 +195,7 @@ export class SettingsPanel {
     private readonly runtime: AppRuntime,
     private readonly manager: AgentManager["Service"],
   ) {
+    panel.title = t("settings.title");
     panel.iconPath = vscode.Uri.joinPath(context.extensionUri, "media", "icon.svg");
     panel.webview.html = webviewHtml(panel.webview, context.extensionUri, "settings", CATALOG_IMG_SRC);
     // An install can outlast the page.

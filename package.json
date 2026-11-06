@@ -28,7 +28,9 @@
     }
   },
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onWebviewPanel:codeAcp.settings",
+    "onWebviewPanel:codeAcp.diagram"
   ],
   "contributes": {
     "viewsContainers": {
