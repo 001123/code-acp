@@ -109,7 +109,8 @@ export interface AcpAgent {
 
 /** Whether the agent can fork sessions; session/fork is unstable, so the stable types leave it out. */
 export function canFork(agent: AcpAgent): boolean {
-  const caps: unstable.SessionCapabilities | null | undefined = agent.initializeResponse.agentCapabilities?.sessionCapabilities;
+  const caps: unstable.SessionCapabilities | null | undefined =
+    agent.initializeResponse.agentCapabilities?.sessionCapabilities;
   return !!caps?.fork;
 }
 
@@ -184,7 +185,9 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
             ? runPromise(handlers.elicit(params as Elicitation, signal))
             : ({ action: "cancel" } satisfies acp.CreateElicitationResponse),
         )
-        .onNotification(acp.methods.client.elicitation.complete, ({ params }) => handlers.onElicitationComplete?.(params.elicitationId))
+        .onNotification(acp.methods.client.elicitation.complete, ({ params }) =>
+          handlers.onElicitationComplete?.(params.elicitationId),
+        )
         .onRequest(acp.methods.client.fs.readTextFile, ({ params }) => runPromise(readTextFile(params)))
         .onRequest(acp.methods.client.fs.writeTextFile, ({ params }) =>
           runPromise(
@@ -318,7 +321,11 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
       mcpServers.pipe(
         Effect.flatMap((mcpServers) =>
           request("session/fork", (agent) =>
-            agent.request<unstable.ForkSessionResponse, unstable.ForkSessionRequest>("session/fork", { sessionId, cwd, mcpServers }),
+            agent.request<unstable.ForkSessionResponse, unstable.ForkSessionRequest>("session/fork", {
+              sessionId,
+              cwd,
+              mcpServers,
+            }),
           ),
         ),
         Effect.tap((res) => remember(res.sessionId, cwd)),
@@ -335,16 +342,18 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         Effect.asVoid,
       ),
     deleteSession: (sessionId) =>
-      request("session/delete", (agent) => agent.request(acp.methods.agent.session.delete, { sessionId })).pipe(Effect.asVoid),
+      request("session/delete", (agent) => agent.request(acp.methods.agent.session.delete, { sessionId })).pipe(
+        Effect.asVoid,
+      ),
     prompt: (sessionId, prompt) =>
       request("session/prompt", (agent) => agent.request(acp.methods.agent.session.prompt, { sessionId, prompt })),
     cancel: (sessionId) =>
       request("session/cancel", (agent) => agent.notify(acp.methods.agent.session.cancel, { sessionId })),
     setConfigOption: (sessionId, configId, value) =>
       configId === MODE_OPTION
-        ? request("session/set_mode", (agent) => agent.request(acp.methods.agent.session.setMode, { sessionId, modeId: value })).pipe(
-            Effect.map(() => ({ configOptions: modes.select(sessionId, value) })),
-          )
+        ? request("session/set_mode", (agent) =>
+            agent.request(acp.methods.agent.session.setMode, { sessionId, modeId: value }),
+          ).pipe(Effect.map(() => ({ configOptions: modes.select(sessionId, value) })))
         : request("session/set_config_option", (agent) =>
             agent.request(acp.methods.agent.session.setConfigOption, { sessionId, configId, value }),
           ),

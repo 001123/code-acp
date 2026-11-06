@@ -23,7 +23,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const run =
     <A extends Array<unknown>, E>(command: (...args: A) => Effect.Effect<void, E, AppServices>) =>
     (...args: A) =>
-      runIn(runtime, Effect.suspend(() => command(...args)), showError);
+      runIn(
+        runtime,
+        Effect.suspend(() => command(...args)),
+        showError,
+      );
 
   const updates = await runtime.runPromise(AgentUpdates.use(Effect.succeed));
   const provider = new ChatViewProvider(context, runtime, manager, updates);
@@ -40,7 +44,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       detail: a.id === activeId ? t("agent.inUse") : undefined,
       id: a.id as string | undefined,
     }));
-    const picked = yield* thenable(() => vscode.window.showQuickPick([...items, manage], { title: t("agent.pickTitle") }));
+    const picked = yield* thenable(() =>
+      vscode.window.showQuickPick([...items, manage], { title: t("agent.pickTitle") }),
+    );
     if (picked === manage) {
       manageAgents();
     } else if (picked?.id) {
@@ -63,14 +69,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     const list = due.map((u) => `${u.latest.name} ${u.installed.version} → ${u.latest.version}`).join(", ");
     const [update, manage, disable] = [t("updates.update"), t("settings.manageAgents"), t("updates.disable")];
-    const picked = yield* thenable(() => vscode.window.showInformationMessage(t("updates.available", list), update, manage, disable));
+    const picked = yield* thenable(() =>
+      vscode.window.showInformationMessage(t("updates.available", list), update, manage, disable),
+    );
     if (picked === update) {
       yield* provider.updateAgents(due);
     } else if (picked === manage) {
       manageAgents();
     } else if (picked === disable) {
       yield* thenable(() =>
-        vscode.workspace.getConfiguration("codeAcp").update("checkAgentUpdates", false, vscode.ConfigurationTarget.Global),
+        vscode.workspace
+          .getConfiguration("codeAcp")
+          .update("checkAgentUpdates", false, vscode.ConfigurationTarget.Global),
       );
     }
   });
@@ -95,25 +105,70 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("codeAcp.selectAgent", run(selectAgent)),
     vscode.commands.registerCommand("codeAcp.openSettings", () => SettingsPanel.show(context, runtime, manager)),
     vscode.commands.registerCommand("codeAcp.showUsage", () => SettingsPanel.show(context, runtime, manager, "usage")),
-    vscode.commands.registerCommand("codeAcp.newSession", run(() => provider.newSession())),
-    vscode.commands.registerCommand("codeAcp.history", run(() => provider.showConversations)),
-    vscode.commands.registerCommand("codeAcp.cancel", run(() => provider.cancel())),
-    vscode.commands.registerCommand("codeAcp.findInConversation", run(() => provider.findInConversation)),
-    vscode.commands.registerCommand("codeAcp.exportConversation", run(() => provider.exportConversation)),
-    vscode.commands.registerCommand(ChatViewProvider.showAttentionCommand, run(() => provider.showAttention())),
-    vscode.commands.registerCommand("codeAcp.worktree", run(() => provider.pickWorktree())),
-    vscode.commands.registerCommand("codeAcp.cleanWorktrees", run(() => provider.cleanWorktrees())),
-    vscode.commands.registerCommand("codeAcp.login", run(() => provider.login())),
-    vscode.commands.registerCommand("codeAcp.logout", run(() => provider.logout())),
-    vscode.commands.registerCommand("codeAcp.restart", run(() => provider.restart())),
+    vscode.commands.registerCommand(
+      "codeAcp.newSession",
+      run(() => provider.newSession()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.history",
+      run(() => provider.showConversations),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.cancel",
+      run(() => provider.cancel()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.findInConversation",
+      run(() => provider.findInConversation),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.exportConversation",
+      run(() => provider.exportConversation),
+    ),
+    vscode.commands.registerCommand(
+      ChatViewProvider.showAttentionCommand,
+      run(() => provider.showAttention()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.worktree",
+      run(() => provider.pickWorktree()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.cleanWorktrees",
+      run(() => provider.cleanWorktrees()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.login",
+      run(() => provider.login()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.logout",
+      run(() => provider.logout()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.restart",
+      run(() => provider.restart()),
+    ),
     vscode.commands.registerCommand("codeAcp.showLog", () => log.show()),
-    vscode.commands.registerCommand("codeAcp.showTrace", run(() => AcpTrace.use((trace) => trace.show))),
+    vscode.commands.registerCommand(
+      "codeAcp.showTrace",
+      run(() => AcpTrace.use((trace) => trace.show)),
+    ),
     // "run": a command asks for the checks; merely opening the tab does not start the agents.
-    vscode.commands.registerCommand("codeAcp.doctor", () => SettingsPanel.show(context, runtime, manager, "doctor", "run")),
-    vscode.commands.registerCommand(LOGIN_AGENT_COMMAND, run((agentId: string) => provider.loginTo(agentId))),
+    vscode.commands.registerCommand("codeAcp.doctor", () =>
+      SettingsPanel.show(context, runtime, manager, "doctor", "run"),
+    ),
+    vscode.commands.registerCommand(
+      LOGIN_AGENT_COMMAND,
+      run((agentId: string) => provider.loginTo(agentId)),
+    ),
     vscode.commands.registerCommand(
       "codeAcp.openWalkthrough",
-      run(() => thenable(() => vscode.commands.executeCommand("workbench.action.openWalkthrough", `${context.extension.id}#gettingStarted`))),
+      run(() =>
+        thenable(() =>
+          vscode.commands.executeCommand("workbench.action.openWalkthrough", `${context.extension.id}#gettingStarted`),
+        ),
+      ),
     ),
     // scm/title passes the SourceControl; the palette passes nothing.
     vscode.commands.registerCommand(
@@ -159,21 +214,38 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.languages.registerCodeActionsProvider({ scheme: "file" }, new AskAgentActions(), {
       providedCodeActionKinds: AskAgentActions.kinds,
     }),
-    vscode.commands.registerCommand("codeAcp.addProblems", run(() => provider.composer.attachProblems("file"))),
-    vscode.commands.registerCommand("codeAcp.addWorkspaceProblems", run(() => provider.composer.attachProblems("workspace"))),
+    vscode.commands.registerCommand(
+      "codeAcp.addProblems",
+      run(() => provider.composer.attachProblems("file")),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.addWorkspaceProblems",
+      run(() => provider.composer.attachProblems("workspace")),
+    ),
     // The "Fix with Code ACP" quick fix passes the document's uri and the diagnostics under the cursor.
     vscode.commands.registerCommand(
       "codeAcp.fixProblems",
       run((uri?: unknown, diagnostics?: unknown) =>
-        uri instanceof vscode.Uri && Array.isArray(diagnostics) ? provider.composer.fixProblems(uri, diagnostics) : Effect.void,
+        uri instanceof vscode.Uri && Array.isArray(diagnostics)
+          ? provider.composer.fixProblems(uri, diagnostics)
+          : Effect.void,
       ),
     ),
     vscode.languages.registerCodeActionsProvider({ scheme: "file" }, new FixProblemsActions(), {
       providedCodeActionKinds: FixProblemsActions.kinds,
     }),
-    vscode.commands.registerCommand("codeAcp.addTerminalSelection", run(() => provider.composer.attachTerminalSelection())),
-    vscode.commands.registerCommand("codeAcp.addTerminalOutput", run(() => provider.composer.attachTerminalOutput(false))),
-    vscode.commands.registerCommand("codeAcp.addTerminalFailure", run(() => provider.composer.attachTerminalOutput(true))),
+    vscode.commands.registerCommand(
+      "codeAcp.addTerminalSelection",
+      run(() => provider.composer.attachTerminalSelection()),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.addTerminalOutput",
+      run(() => provider.composer.attachTerminalOutput(false)),
+    ),
+    vscode.commands.registerCommand(
+      "codeAcp.addTerminalFailure",
+      run(() => provider.composer.attachTerminalOutput(true)),
+    ),
     // webview/context passes the merged `data-vscode-context` of the clicked element (see src/ui/chat.tsx).
     vscode.commands.registerCommand("codeAcp.quoteSelection", (context?: { selectedText?: unknown }) => {
       if (typeof context?.selectedText === "string") {
@@ -196,7 +268,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // The tab's `data-vscode-context` (see TabSidebar in src/ui/chat/tabs.tsx).
       vscode.commands.registerCommand(
         command,
-        run((context?: { tab?: unknown }) => (typeof context?.tab === "number" ? provider.tabAction(context.tab, action) : Effect.void)),
+        run((context?: { tab?: unknown }) =>
+          typeof context?.tab === "number" ? provider.tabAction(context.tab, action) : Effect.void,
+        ),
       ),
     ),
     // Last, so services (e.g. the AgentManager event emitter) outlive everything above.

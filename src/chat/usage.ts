@@ -29,7 +29,9 @@ export class TabUsage {
   private sessionRef(tab: Tab, sessionId: string | undefined = tab.sessionId): SessionRef | undefined {
     const agentId = tab.running?.agentId ?? tab.reopen?.agentId ?? tab.agentId;
     // A worktree's usage counts for the folder it came from.
-    return agentId && sessionId ? { agentId, sessionId, cwd: tab.worktree?.base ?? tab.cwd, title: tab.name ?? tab.title } : undefined;
+    return agentId && sessionId
+      ? { agentId, sessionId, cwd: tab.worktree?.base ?? tab.cwd, title: tab.name ?? tab.title }
+      : undefined;
   }
 
   /** The tokens, turns and cost recorded for the tab's session (or the one it will reopen). */
@@ -49,7 +51,9 @@ export class TabUsage {
     const ref = this.sessionRef(tab, sessionId);
     // `usage` is unstable in ACP, so the stable PromptResponse leaves it out.
     const usage = Predicate.hasProperty(response, "usage") ? response.usage : undefined;
-    return ref ? UsageLedger.use((ledger) => ledger.recordTurn(ref, usage)).pipe(Effect.andThen(this.postTotals(tab))) : Effect.void;
+    return ref
+      ? UsageLedger.use((ledger) => ledger.recordTurn(ref, usage)).pipe(Effect.andThen(this.postTotals(tab)))
+      : Effect.void;
   }
 
   /** Keeps what the agent reports about the session's usage; its spending goes to the ledger. */

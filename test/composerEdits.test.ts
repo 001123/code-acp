@@ -1,5 +1,12 @@
 import { assert, describe, it } from "@effect/vitest";
-import { codeKey, continueList, paragraphEdit, quoteEdit, type Edit, type Selected } from "../src/ui/chat/composerEdits";
+import {
+  codeKey,
+  continueList,
+  paragraphEdit,
+  quoteEdit,
+  type Edit,
+  type Selected,
+} from "../src/ui/chat/composerEdits";
 
 /** `text` with "|" at the caret. */
 const at = (text: string): Selected => {

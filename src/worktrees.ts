@@ -124,7 +124,11 @@ export interface PrSummary {
   readonly stat: string;
 }
 
-const decodePrList = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.Struct({ url: Schema.String, state: Schema.String, headRefOid: Schema.String }))));
+const decodePrList = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Array(Schema.Struct({ url: Schema.String, state: Schema.String, headRefOid: Schema.String })),
+  ),
+);
 
 export class WorktreeError extends Schema.TaggedError<WorktreeError>()("WorktreeError", {
   message: Schema.String,
@@ -138,7 +142,9 @@ export function isManaged(root: string): boolean {
 /** Where `file` is in a worktree whose `cwd` matches `base`; undefined when it is outside `base`. */
 export function intoWorktree(file: string, base: string, cwd: string): string | undefined {
   const relative = path.relative(base, file);
-  return relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative) ? undefined : path.join(cwd, relative);
+  return relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+    ? undefined
+    : path.join(cwd, relative);
 }
 
 /** The worktrees in the output of `git worktree list --porcelain`, without those whose folder is gone. */
@@ -176,7 +182,9 @@ export function branchSlug(text: string, maxLength = MAX_SLUG_LENGTH): string | 
 
 /** The name, under the prefix, for the branch of an attempt at `prompt` in a comparison. */
 export function attemptBranchName(prompt: string, attempt: string): string {
-  const parts = [branchSlug(prompt, MAX_ATTEMPT_SLUG_LENGTH), branchSlug(attempt, MAX_ATTEMPT_SLUG_LENGTH)].filter(Predicate.isString);
+  const parts = [branchSlug(prompt, MAX_ATTEMPT_SLUG_LENGTH), branchSlug(attempt, MAX_ATTEMPT_SLUG_LENGTH)].filter(
+    Predicate.isString,
+  );
   return `${COMPARE_DIR}/${parts.join("-") || "attempt"}`;
 }
 
@@ -220,79 +228,83 @@ export function fallbackPrText({ subjects, stat }: PrSummary, title: string): Pr
 }
 
 /** The git worktrees chat tabs run in. Listings come from git, so worktrees made outside the extension show up too. */
-export class Worktrees extends Context.Service<Worktrees, {
-  /** Whether `folder` is in a git work tree. */
-  isRepo(folder: string): Effect.Effect<boolean>;
-  /** The branch checked out in `folder`, else its short commit when HEAD is detached; undefined outside git. */
-  branchOf(folder: string): Effect.Effect<string | undefined>;
-  /**
-   * A new worktree from the HEAD of `folder`, on a new branch called `name` under the prefix, or a random name without
-   * one; none when `folder` isn't in a git work tree.
-   */
-  create(folder: string, name?: string): Effect.Effect<Option.Option<PlacedWorktree>, WorktreeError>;
-  /**
-   * The worktree with its branch named after `text`. Only a branch the extension created and that still has its random
-   * name and no commits changes. With `move`, its folder follows, as VS Code shows repositories by their folder's name;
-   * no session may run there then. A folder stays where a setup command may have left its path in what it installed,
-   * or where git can't move it.
-   */
-  nameAfter(worktree: TabWorktree, text: string, move: boolean): Effect.Effect<TabWorktree, WorktreeError>;
-  /**
-   * Readies a new worktree as the settings say: copies ignored files from its base checkout, then runs a setup
-   * command at its top: the project's if `approve` allows it (without `approve` it doesn't run), else the user's.
-   * One failure doesn't stop the rest; it fails in the end with all of them.
-   */
-  setup(worktree: TabWorktree, approve?: ApproveCommand): Effect.Effect<void, WorktreeError>;
-  /** The other worktrees of the repository of `folder`, which becomes their base. */
-  list(folder: string): Effect.Effect<ReadonlyArray<PlacedWorktree>, WorktreeError>;
-  /** The worktree of one of `folders`' repositories holding `cwd`. */
-  locate(folders: ReadonlyArray<string>, cwd: string): Effect.Effect<TabWorktree | undefined>;
-  exists(folder: string): Effect.Effect<boolean>;
-  /** Puts a missing worktree the extension created back on its branch; false when it can't be. */
-  restore(worktree: TabWorktree): Effect.Effect<boolean>;
-  status(worktree: TabWorktree): Effect.Effect<WorktreeStatus, WorktreeError>;
-  /** Stands for everything the worktree holds, committed or not; it changes with what it holds. */
-  contentId(worktree: TabWorktree): Effect.Effect<string, WorktreeError>;
-  /** The files the worktree holds differently from the commit it forked off, committed or not. */
-  diff(worktree: TabWorktree): Effect.Effect<ReadonlyArray<WorktreeFileDiff>, WorktreeError>;
-  /** What `file` (from the top of the worktree) held in the commit the worktree forked off; null when it didn't exist. */
-  original(worktree: TabWorktree, file: string): Effect.Effect<string | null, WorktreeError>;
-  /**
-   * Brings what the worktree holds, committed or not, into its base folder as staged changes. The worktree stays
-   * as it is. It fails, changing nothing, when the base folder's own changes to those files are in the way.
-   */
-  apply(worktree: TabWorktree): Effect.Effect<AppliedWorktree, WorktreeError>;
-  /** Commits everything the worktree holds on its branch, untracked files included. */
-  commit(worktree: TabWorktree, message: string): Effect.Effect<void, WorktreeError>;
-  /** Whether the base folder has uncommitted changes to tracked files, which a merge shouldn't run into. */
-  isBaseDirty(worktree: TabWorktree): Effect.Effect<boolean, WorktreeError>;
-  /**
-   * Merges the worktree's branch into what its base folder has checked out, commits and all. It fails when the base
-   * folder isn't clean; with conflicts, the merge stays open there for the user to finish or abort.
-   */
-  merge(worktree: TabWorktree): Effect.Effect<MergedWorktree, WorktreeError>;
-  /** Whether a merge of the worktree's branch is still open in its base folder, with its conflicts. */
-  isMerging(worktree: TabWorktree): Effect.Effect<boolean, WorktreeError>;
-  /** Gives up the merge going on in the worktree's base folder. */
-  abortMerge(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
-  /** Where a pull request of the worktree's branch goes; fails without a branch, a remote or a working `gh`. */
-  prTarget(worktree: TabWorktree): Effect.Effect<PrTarget, WorktreeError>;
-  /** What the worktree's branch holds. */
-  prSummary(worktree: TabWorktree): Effect.Effect<PrSummary, WorktreeError>;
-  /** Pushes the worktree's branch to `remote`, and tracks it there. */
-  push(worktree: TabWorktree, remote: string): Effect.Effect<void, WorktreeError>;
-  /** Opens a pull request of the worktree's pushed branch; its URL. */
-  createPr(worktree: TabWorktree, text: PrText, base?: string): Effect.Effect<string, WorktreeError>;
-  /** Deletes a worktree the extension created, and its branch; others are left alone. */
-  remove(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
-}>()("code-acp/Worktrees") {
+export class Worktrees extends Context.Service<
+  Worktrees,
+  {
+    /** Whether `folder` is in a git work tree. */
+    isRepo(folder: string): Effect.Effect<boolean>;
+    /** The branch checked out in `folder`, else its short commit when HEAD is detached; undefined outside git. */
+    branchOf(folder: string): Effect.Effect<string | undefined>;
+    /**
+     * A new worktree from the HEAD of `folder`, on a new branch called `name` under the prefix, or a random name without
+     * one; none when `folder` isn't in a git work tree.
+     */
+    create(folder: string, name?: string): Effect.Effect<Option.Option<PlacedWorktree>, WorktreeError>;
+    /**
+     * The worktree with its branch named after `text`. Only a branch the extension created and that still has its random
+     * name and no commits changes. With `move`, its folder follows, as VS Code shows repositories by their folder's name;
+     * no session may run there then. A folder stays where a setup command may have left its path in what it installed,
+     * or where git can't move it.
+     */
+    nameAfter(worktree: TabWorktree, text: string, move: boolean): Effect.Effect<TabWorktree, WorktreeError>;
+    /**
+     * Readies a new worktree as the settings say: copies ignored files from its base checkout, then runs a setup
+     * command at its top: the project's if `approve` allows it (without `approve` it doesn't run), else the user's.
+     * One failure doesn't stop the rest; it fails in the end with all of them.
+     */
+    setup(worktree: TabWorktree, approve?: ApproveCommand): Effect.Effect<void, WorktreeError>;
+    /** The other worktrees of the repository of `folder`, which becomes their base. */
+    list(folder: string): Effect.Effect<ReadonlyArray<PlacedWorktree>, WorktreeError>;
+    /** The worktree of one of `folders`' repositories holding `cwd`. */
+    locate(folders: ReadonlyArray<string>, cwd: string): Effect.Effect<TabWorktree | undefined>;
+    exists(folder: string): Effect.Effect<boolean>;
+    /** Puts a missing worktree the extension created back on its branch; false when it can't be. */
+    restore(worktree: TabWorktree): Effect.Effect<boolean>;
+    status(worktree: TabWorktree): Effect.Effect<WorktreeStatus, WorktreeError>;
+    /** Stands for everything the worktree holds, committed or not; it changes with what it holds. */
+    contentId(worktree: TabWorktree): Effect.Effect<string, WorktreeError>;
+    /** The files the worktree holds differently from the commit it forked off, committed or not. */
+    diff(worktree: TabWorktree): Effect.Effect<ReadonlyArray<WorktreeFileDiff>, WorktreeError>;
+    /** What `file` (from the top of the worktree) held in the commit the worktree forked off; null when it didn't exist. */
+    original(worktree: TabWorktree, file: string): Effect.Effect<string | null, WorktreeError>;
+    /**
+     * Brings what the worktree holds, committed or not, into its base folder as staged changes. The worktree stays
+     * as it is. It fails, changing nothing, when the base folder's own changes to those files are in the way.
+     */
+    apply(worktree: TabWorktree): Effect.Effect<AppliedWorktree, WorktreeError>;
+    /** Commits everything the worktree holds on its branch, untracked files included. */
+    commit(worktree: TabWorktree, message: string): Effect.Effect<void, WorktreeError>;
+    /** Whether the base folder has uncommitted changes to tracked files, which a merge shouldn't run into. */
+    isBaseDirty(worktree: TabWorktree): Effect.Effect<boolean, WorktreeError>;
+    /**
+     * Merges the worktree's branch into what its base folder has checked out, commits and all. It fails when the base
+     * folder isn't clean; with conflicts, the merge stays open there for the user to finish or abort.
+     */
+    merge(worktree: TabWorktree): Effect.Effect<MergedWorktree, WorktreeError>;
+    /** Whether a merge of the worktree's branch is still open in its base folder, with its conflicts. */
+    isMerging(worktree: TabWorktree): Effect.Effect<boolean, WorktreeError>;
+    /** Gives up the merge going on in the worktree's base folder. */
+    abortMerge(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
+    /** Where a pull request of the worktree's branch goes; fails without a branch, a remote or a working `gh`. */
+    prTarget(worktree: TabWorktree): Effect.Effect<PrTarget, WorktreeError>;
+    /** What the worktree's branch holds. */
+    prSummary(worktree: TabWorktree): Effect.Effect<PrSummary, WorktreeError>;
+    /** Pushes the worktree's branch to `remote`, and tracks it there. */
+    push(worktree: TabWorktree, remote: string): Effect.Effect<void, WorktreeError>;
+    /** Opens a pull request of the worktree's pushed branch; its URL. */
+    createPr(worktree: TabWorktree, text: PrText, base?: string): Effect.Effect<string, WorktreeError>;
+    /** Deletes a worktree the extension created, and its branch; others are left alone. */
+    remove(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
+  }
+>()("code-acp/Worktrees") {
   static readonly layer = Layer.effect(
     Worktrees,
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const fs = yield* FileSystem.FileSystem;
 
-      const failed = (command: string, reason: unknown) => new WorktreeError({ message: t("worktree.gitFailed", command, reason) });
+      const failed = (command: string, reason: unknown) =>
+        new WorktreeError({ message: t("worktree.gitFailed", command, reason) });
 
       /** Runs git in `cwd`, whatever its exit code. */
       const exec = Effect.fn("Worktrees.exec")(
@@ -300,7 +312,11 @@ export class Worktrees extends Context.Service<Worktrees, {
           const stdin = input === undefined ? undefined : Stream.make(new TextEncoder().encode(input));
           const handle = yield* spawner.spawn(ChildProcess.make("git", args, { cwd, env, extendEnv: true, stdin }));
           const [out, err, code] = yield* Effect.all(
-            [Stream.mkString(Stream.decodeText(handle.stdout)), Stream.mkString(Stream.decodeText(handle.stderr)), handle.exitCode],
+            [
+              Stream.mkString(Stream.decodeText(handle.stdout)),
+              Stream.mkString(Stream.decodeText(handle.stderr)),
+              handle.exitCode,
+            ],
             { concurrency: "unbounded" },
           );
           return { out, err: err.trim(), code };
@@ -325,7 +341,11 @@ export class Worktrees extends Context.Service<Worktrees, {
           const env = { GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1" };
           const handle = yield* spawner.spawn(ChildProcess.make("gh", args, { cwd, env, extendEnv: true, stdin }));
           const [out, err, code] = yield* Effect.all(
-            [Stream.mkString(Stream.decodeText(handle.stdout)), Stream.mkString(Stream.decodeText(handle.stderr)), handle.exitCode],
+            [
+              Stream.mkString(Stream.decodeText(handle.stdout)),
+              Stream.mkString(Stream.decodeText(handle.stderr)),
+              handle.exitCode,
+            ],
             { concurrency: "unbounded" },
           );
           if (code !== 0) {
@@ -337,7 +357,8 @@ export class Worktrees extends Context.Service<Worktrees, {
         Effect.catchTag("PlatformError", () => Effect.fail(new WorktreeError({ message: t("worktree.ghMissing") }))),
         Effect.timeoutOrElse({
           duration: Duration.minutes(REMOTE_TIMEOUT_MINUTES),
-          orElse: () => Effect.fail(new WorktreeError({ message: t("worktree.remoteTimedOut", REMOTE_TIMEOUT_MINUTES) })),
+          orElse: () =>
+            Effect.fail(new WorktreeError({ message: t("worktree.remoteTimedOut", REMOTE_TIMEOUT_MINUTES) })),
         }),
       );
 
@@ -363,7 +384,10 @@ export class Worktrees extends Context.Service<Worktrees, {
       /** The branch under the prefix to use for `name`, given the ones that exist. */
       const freeBranch = Effect.fnUntraced(function* (folder: string, name: string) {
         const refs = yield* git(folder, ["for-each-ref", "--format=%(refname)", `refs/heads/${BRANCH_PREFIX}`]);
-        const taken = refs.split("\n").filter(Boolean).map((ref) => ref.slice(`refs/heads/${BRANCH_PREFIX}`.length));
+        const taken = refs
+          .split("\n")
+          .filter(Boolean)
+          .map((ref) => ref.slice(`refs/heads/${BRANCH_PREFIX}`.length));
         return `${BRANCH_PREFIX}${freeBranchName(name, new Set(taken))}`;
       });
 
@@ -383,14 +407,18 @@ export class Worktrees extends Context.Service<Worktrees, {
         const repoDir = `${path.basename(top)}-${createHash("sha256").update(top).digest("hex").slice(0, 8)}`;
         const parent = path.join(os.homedir(), MANAGED_DIR, repoDir);
         const branch = name === undefined ? `${BRANCH_PREFIX}${slug}` : yield* freeBranch(folder, name);
-        yield* fs.makeDirectory(parent, { recursive: true }).pipe(Effect.mapError((err) => failed("worktree", err.message)));
+        yield* fs
+          .makeDirectory(parent, { recursive: true })
+          .pipe(Effect.mapError((err) => failed("worktree", err.message)));
         const dir = yield* freeFolder(parent, branch);
         yield* git(folder, ["worktree", "add", "--quiet", "-b", branch, dir, "HEAD"]);
         // As git reports it, with symbolic links resolved, to match its listings.
         const root = (yield* git(dir, ["rev-parse", "--show-toplevel"])).trim();
         const cwd = path.resolve(root, prefix);
         // A folder with nothing committed in it isn't in the new worktree.
-        yield* fs.makeDirectory(cwd, { recursive: true }).pipe(Effect.mapError((err) => failed("worktree", err.message)));
+        yield* fs
+          .makeDirectory(cwd, { recursive: true })
+          .pipe(Effect.mapError((err) => failed("worktree", err.message)));
         return Option.some<PlacedWorktree>({ worktree: { root, branch, base: folder }, cwd });
       });
 
@@ -401,7 +429,14 @@ export class Worktrees extends Context.Service<Worktrees, {
           return [];
         }
         const { top } = repo.value;
-        const named = yield* git(top, ["ls-files", "-z", "--others", "--ignored", "--directory", ...patterns.map((pattern) => `--exclude=${pattern}`)]);
+        const named = yield* git(top, [
+          "ls-files",
+          "-z",
+          "--others",
+          "--ignored",
+          "--directory",
+          ...patterns.map((pattern) => `--exclude=${pattern}`),
+        ]);
         // By the worktree's own rules: a file it doesn't ignore would be staged when its changes are applied.
         const { out, err, code } = yield* exec(worktree.root, ["check-ignore", "-z", "--stdin"], undefined, named);
         if (code > 1) {
@@ -444,7 +479,9 @@ export class Worktrees extends Context.Service<Worktrees, {
           }
         },
         Effect.scoped,
-        Effect.catchTag("PlatformError", (err) => Effect.fail(new WorktreeError({ message: t("worktree.setupFailed", "-", err.message) }))),
+        Effect.catchTag("PlatformError", (err) =>
+          Effect.fail(new WorktreeError({ message: t("worktree.setupFailed", "-", err.message) })),
+        ),
         Effect.timeoutOrElse({
           duration: Duration.minutes(SETUP_TIMEOUT_MINUTES),
           orElse: () => Effect.fail(new WorktreeError({ message: t("worktree.setupTimedOut", SETUP_TIMEOUT_MINUTES) })),
@@ -472,13 +509,16 @@ export class Worktrees extends Context.Service<Worktrees, {
 
       const setup = Effect.fn("Worktrees.setup")(function* (worktree: TabWorktree, approve?: ApproveCommand) {
         const { worktreeCopyFiles: patterns, worktreeSetupCommand: userCommand } = readSettings();
-        const failures = patterns.length === 0
-          ? []
-          : [...yield* copyIgnored(worktree, patterns).pipe(Effect.catch((err) => Effect.succeed([err.message])))];
+        const failures =
+          patterns.length === 0
+            ? []
+            : [...(yield* copyIgnored(worktree, patterns).pipe(Effect.catch((err) => Effect.succeed([err.message]))))];
         // After the copy: a script the project's command names may be among the copied files.
         const project = projectSetupCommand(worktree.base);
-        const allowed = project !== "" && approve !== undefined
-          && (yield* approve({ command: project, fingerprint: yield* fingerprintOf(worktree, project) }));
+        const allowed =
+          project !== "" &&
+          approve !== undefined &&
+          (yield* approve({ command: project, fingerprint: yield* fingerprintOf(worktree, project) }));
         const command = allowed ? project : userCommand;
         if (command !== "") {
           yield* runSetupCommand(worktree.root, command).pipe(
@@ -515,18 +555,23 @@ export class Worktrees extends Context.Service<Worktrees, {
         return undefined;
       });
 
-      const restore = Effect.fn("Worktrees.restore")(function* (worktree: TabWorktree) {
-        if (yield* exists(worktree.root)) {
+      const restore = Effect.fn("Worktrees.restore")(
+        function* (worktree: TabWorktree) {
+          if (yield* exists(worktree.root)) {
+            return true;
+          }
+          if (!isManaged(worktree.root) || worktree.branch === undefined) {
+            return false;
+          }
+          yield* git(worktree.base, ["worktree", "prune"]);
+          yield* fs
+            .makeDirectory(path.dirname(worktree.root), { recursive: true })
+            .pipe(Effect.mapError((err) => failed("worktree", err.message)));
+          yield* git(worktree.base, ["worktree", "add", "--quiet", worktree.root, worktree.branch]);
           return true;
-        }
-        if (!isManaged(worktree.root) || worktree.branch === undefined) {
-          return false;
-        }
-        yield* git(worktree.base, ["worktree", "prune"]);
-        yield* fs.makeDirectory(path.dirname(worktree.root), { recursive: true }).pipe(Effect.mapError((err) => failed("worktree", err.message)));
-        yield* git(worktree.base, ["worktree", "add", "--quiet", worktree.root, worktree.branch]);
-        return true;
-      }, Effect.orElseSucceed(() => false));
+        },
+        Effect.orElseSucceed(() => false),
+      );
 
       /** The commit the worktree forked off the base folder's history. */
       const forkPoint = Effect.fnUntraced(function* (worktree: TabWorktree) {
@@ -551,49 +596,68 @@ export class Worktrees extends Context.Service<Worktrees, {
           yield* git(worktree.base, ["worktree", "move", worktree.root, root]);
           return root;
         },
-        (effect, worktree) => effect.pipe(Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(worktree.root)))),
+        (effect, worktree) =>
+          effect.pipe(
+            Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(worktree.root))),
+          ),
       );
 
-      const nameAfter = Effect.fn("Worktrees.nameAfter")(function* (worktree: TabWorktree, text: string, move: boolean) {
+      const nameAfter = Effect.fn("Worktrees.nameAfter")(function* (
+        worktree: TabWorktree,
+        text: string,
+        move: boolean,
+      ) {
         const { branch } = worktree;
         const slug = branchSlug(text);
-        if (slug === undefined || branch === undefined || !UNNAMED_BRANCH.test(branch) || !isManaged(worktree.root) || (yield* commitsSinceFork(worktree)) > 0) {
+        if (
+          slug === undefined ||
+          branch === undefined ||
+          !UNNAMED_BRANCH.test(branch) ||
+          !isManaged(worktree.root) ||
+          (yield* commitsSinceFork(worktree)) > 0
+        ) {
           return worktree;
         }
         const named = yield* freeBranch(worktree.base, slug);
         yield* git(worktree.base, ["branch", "-m", branch, named]);
-        const keepFolder = !move || readSettings().worktreeSetupCommand !== "" || projectSetupCommand(worktree.base) !== "";
+        const keepFolder =
+          !move || readSettings().worktreeSetupCommand !== "" || projectSetupCommand(worktree.base) !== "";
         return { ...worktree, branch: named, root: keepFolder ? worktree.root : yield* moveFolder(worktree, named) };
       });
 
       /** The tree of everything the worktree holds, on a scratch index so that what it has staged stays as it is. */
       const snapshot = Effect.fnUntraced(function* (worktree: TabWorktree) {
-        const scratch = yield* fs.makeTempDirectoryScoped().pipe(Effect.mapError((err) => failed("snapshot", err.message)));
+        const scratch = yield* fs
+          .makeTempDirectoryScoped()
+          .pipe(Effect.mapError((err) => failed("snapshot", err.message)));
         const env = { GIT_INDEX_FILE: path.join(scratch, "index") };
         yield* git(worktree.root, ["read-tree", "HEAD"], env);
         yield* git(worktree.root, ["add", "--all"], env);
         return { scratch, tree: (yield* git(worktree.root, ["write-tree"], env)).trim() };
       });
 
-      const diff = Effect.fn("Worktrees.diff")(
-        function* (worktree: TabWorktree) {
-          const { tree } = yield* snapshot(worktree);
-          const fork = yield* forkPoint(worktree);
-          const out = yield* git(worktree.root, ["diff", "--numstat", "-z", "--no-renames", "--no-color", "--no-ext-diff", fork, tree]);
-          return parseNumstat(out);
-        },
-        Effect.scoped,
-      );
+      const diff = Effect.fn("Worktrees.diff")(function* (worktree: TabWorktree) {
+        const { tree } = yield* snapshot(worktree);
+        const fork = yield* forkPoint(worktree);
+        const out = yield* git(worktree.root, [
+          "diff",
+          "--numstat",
+          "-z",
+          "--no-renames",
+          "--no-color",
+          "--no-ext-diff",
+          fork,
+          tree,
+        ]);
+        return parseNumstat(out);
+      }, Effect.scoped);
 
-      const contentId = Effect.fn("Worktrees.contentId")(
-        function* (worktree: TabWorktree) {
-          const head = (yield* git(worktree.root, ["rev-parse", "HEAD"])).trim();
-          // Hashing the files is only worth it when some aren't committed.
-          const dirty = (yield* git(worktree.root, ["status", "--porcelain"])).trim() !== "";
-          return dirty ? `${head}+${(yield* snapshot(worktree)).tree}` : head;
-        },
-        Effect.scoped,
-      );
+      const contentId = Effect.fn("Worktrees.contentId")(function* (worktree: TabWorktree) {
+        const head = (yield* git(worktree.root, ["rev-parse", "HEAD"])).trim();
+        // Hashing the files is only worth it when some aren't committed.
+        const dirty = (yield* git(worktree.root, ["status", "--porcelain"])).trim() !== "";
+        return dirty ? `${head}+${(yield* snapshot(worktree)).tree}` : head;
+      }, Effect.scoped);
 
       const original = Effect.fn("Worktrees.original")(function* (worktree: TabWorktree, file: string) {
         const fork = yield* forkPoint(worktree);
@@ -601,44 +665,47 @@ export class Worktrees extends Context.Service<Worktrees, {
         return code === 0 ? out : null;
       });
 
-      const apply = Effect.fn("Worktrees.apply")(
-        function* (worktree: TabWorktree) {
-          const repo = yield* repoOf(worktree.base);
-          if (Option.isNone(repo)) {
-            return yield* failed("apply", worktree.base);
-          }
-          const { scratch, tree } = yield* snapshot(worktree);
-          const fork = yield* forkPoint(worktree);
-          // A file, not a pipe: the patch of a file in another encoding isn't text.
-          const patch = path.join(scratch, "patch");
-          yield* git(worktree.root, ["diff", "--binary", "--no-color", "--no-ext-diff", `--output=${patch}`, fork, tree]);
-          const info = yield* fs.stat(patch).pipe(Effect.mapError((err) => failed("apply", err.message)));
-          if (Number(info.size) === 0) {
-            return { applied: false, conflicts: [] };
-          }
-          // Git would refuse these with a message about its index.
-          const names = (out: string) => out.split("\0").filter(Boolean);
-          const touched = new Set(names(yield* git(worktree.root, ["diff", "--name-only", "-z", "--no-renames", fork, tree])));
-          const own = [
-            ...names(yield* git(repo.value.top, ["diff", "--name-only", "-z"])),
-            ...names(yield* git(repo.value.top, ["ls-files", "--others", "--exclude-standard", "-z"])),
-          ];
-          const blocking = own.filter((file) => touched.has(file));
-          if (blocking.length > 0) {
-            return yield* new WorktreeError({ message: t("worktree.applyBlocked", path.basename(worktree.base), blocking.join(", ")) });
-          }
-          const { err, code } = yield* exec(repo.value.top, ["apply", "--3way", "--whitespace=nowarn", patch]);
-          if (code === 0) {
-            return { applied: true, conflicts: [] };
-          }
-          const conflicts = (yield* git(repo.value.top, ["diff", "--name-only", "--diff-filter=U"])).split("\n").filter(Boolean);
-          if (conflicts.length === 0) {
-            return yield* failed("apply", err || code);
-          }
-          return { applied: true, conflicts };
-        },
-        Effect.scoped,
-      );
+      const apply = Effect.fn("Worktrees.apply")(function* (worktree: TabWorktree) {
+        const repo = yield* repoOf(worktree.base);
+        if (Option.isNone(repo)) {
+          return yield* failed("apply", worktree.base);
+        }
+        const { scratch, tree } = yield* snapshot(worktree);
+        const fork = yield* forkPoint(worktree);
+        // A file, not a pipe: the patch of a file in another encoding isn't text.
+        const patch = path.join(scratch, "patch");
+        yield* git(worktree.root, ["diff", "--binary", "--no-color", "--no-ext-diff", `--output=${patch}`, fork, tree]);
+        const info = yield* fs.stat(patch).pipe(Effect.mapError((err) => failed("apply", err.message)));
+        if (Number(info.size) === 0) {
+          return { applied: false, conflicts: [] };
+        }
+        // Git would refuse these with a message about its index.
+        const names = (out: string) => out.split("\0").filter(Boolean);
+        const touched = new Set(
+          names(yield* git(worktree.root, ["diff", "--name-only", "-z", "--no-renames", fork, tree])),
+        );
+        const own = [
+          ...names(yield* git(repo.value.top, ["diff", "--name-only", "-z"])),
+          ...names(yield* git(repo.value.top, ["ls-files", "--others", "--exclude-standard", "-z"])),
+        ];
+        const blocking = own.filter((file) => touched.has(file));
+        if (blocking.length > 0) {
+          return yield* new WorktreeError({
+            message: t("worktree.applyBlocked", path.basename(worktree.base), blocking.join(", ")),
+          });
+        }
+        const { err, code } = yield* exec(repo.value.top, ["apply", "--3way", "--whitespace=nowarn", patch]);
+        if (code === 0) {
+          return { applied: true, conflicts: [] };
+        }
+        const conflicts = (yield* git(repo.value.top, ["diff", "--name-only", "--diff-filter=U"]))
+          .split("\n")
+          .filter(Boolean);
+        if (conflicts.length === 0) {
+          return yield* failed("apply", err || code);
+        }
+        return { applied: true, conflicts };
+      }, Effect.scoped);
 
       /** The worktree's branch; merging and pull requests need one. */
       const branchIn = (worktree: TabWorktree) =>
@@ -694,7 +761,11 @@ export class Worktrees extends Context.Service<Worktrees, {
         const remotes = (yield* git(worktree.root, ["remote"])).split("\n").filter(Boolean);
         const baseBranch = (yield* exec(worktree.base, ["symbolic-ref", "--short", "-q", "HEAD"])).out.trim();
         const configured = (key: string) =>
-          baseBranch === "" ? Effect.succeed("") : exec(worktree.base, ["config", "--get", `branch.${baseBranch}.${key}`]).pipe(Effect.map(({ out }) => out.trim()));
+          baseBranch === ""
+            ? Effect.succeed("")
+            : exec(worktree.base, ["config", "--get", `branch.${baseBranch}.${key}`]).pipe(
+                Effect.map(({ out }) => out.trim()),
+              );
         const tracked = yield* configured("remote");
         const merged = yield* configured("merge");
         const remote = remotes.includes(tracked) ? tracked : remotes.includes("origin") ? "origin" : remotes[0];
@@ -702,12 +773,26 @@ export class Worktrees extends Context.Service<Worktrees, {
           return yield* new WorktreeError({ message: t("worktree.noRemote") });
         }
         // The latest one of any state: a merged one isn't a reason to open another for the same commits.
-        const listed = yield* gh(worktree.root, ["pr", "list", "--head", branch, "--state", "all", "--json", "url,state,headRefOid", "--limit", "1"]);
+        const listed = yield* gh(worktree.root, [
+          "pr",
+          "list",
+          "--head",
+          branch,
+          "--state",
+          "all",
+          "--json",
+          "url,state,headRefOid",
+          "--limit",
+          "1",
+        ]);
         const latest = Option.getOrElse(decodePrList(listed), () => [])[0];
         const head = (yield* git(worktree.root, ["rev-parse", "HEAD"])).trim();
         const existing = latest?.state === "OPEN" ? latest.url : undefined;
         const mergedAs = latest?.state === "MERGED" && latest.headRefOid === head ? latest.url : undefined;
-        const base = remotes.includes(tracked) && merged.startsWith("refs/heads/") ? merged.slice("refs/heads/".length) : undefined;
+        const base =
+          remotes.includes(tracked) && merged.startsWith("refs/heads/")
+            ? merged.slice("refs/heads/".length)
+            : undefined;
         return {
           remote,
           ...(base === undefined ? {} : { base }),
@@ -719,7 +804,9 @@ export class Worktrees extends Context.Service<Worktrees, {
 
       const prSummary = Effect.fn("Worktrees.prSummary")(function* (worktree: TabWorktree) {
         const fork = yield* forkPoint(worktree);
-        const subjects = (yield* git(worktree.root, ["log", "--reverse", "--format=%s", `${fork}..HEAD`])).split("\n").filter(Boolean);
+        const subjects = (yield* git(worktree.root, ["log", "--reverse", "--format=%s", `${fork}..HEAD`]))
+          .split("\n")
+          .filter(Boolean);
         const stat = yield* git(worktree.root, ["diff", "--stat", "--no-color", "--no-ext-diff", fork, "HEAD"]);
         return { fork, subjects, stat };
       });
@@ -728,18 +815,29 @@ export class Worktrees extends Context.Service<Worktrees, {
         function* (worktree: TabWorktree, remote: string) {
           const branch = yield* branchIn(worktree);
           // With no terminal to ask in, a remote that wants credentials should fail, not hang.
-          yield* git(worktree.root, ["push", "--quiet", "--set-upstream", remote, branch], { GIT_TERMINAL_PROMPT: "0" });
+          yield* git(worktree.root, ["push", "--quiet", "--set-upstream", remote, branch], {
+            GIT_TERMINAL_PROMPT: "0",
+          });
         },
         Effect.timeoutOrElse({
           duration: Duration.minutes(REMOTE_TIMEOUT_MINUTES),
-          orElse: () => Effect.fail(new WorktreeError({ message: t("worktree.remoteTimedOut", REMOTE_TIMEOUT_MINUTES) })),
+          orElse: () =>
+            Effect.fail(new WorktreeError({ message: t("worktree.remoteTimedOut", REMOTE_TIMEOUT_MINUTES) })),
         }),
       );
 
-      const createPr = Effect.fn("Worktrees.createPr")(function* (worktree: TabWorktree, { title, body }: PrText, base?: string) {
+      const createPr = Effect.fn("Worktrees.createPr")(function* (
+        worktree: TabWorktree,
+        { title, body }: PrText,
+        base?: string,
+      ) {
         const branch = yield* branchIn(worktree);
         const onto = base === undefined ? [] : ["--base", base];
-        const out = yield* gh(worktree.root, ["pr", "create", "--head", branch, "--title", title, "--body-file", "-", ...onto], body);
+        const out = yield* gh(
+          worktree.root,
+          ["pr", "create", "--head", branch, "--title", title, "--body-file", "-", ...onto],
+          body,
+        );
         return out.trim().split("\n").at(-1) ?? "";
       });
 

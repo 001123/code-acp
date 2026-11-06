@@ -16,9 +16,11 @@ import { __test } from "./stubs/vscode";
 
 type Reply = Deferred.Deferred<acp.PromptResponse, AuthRequiredError>;
 
-const textsOf = (prompt: ReadonlyArray<acp.ContentBlock>) => prompt.flatMap((block) => (block.type === "text" ? [block.text] : []));
+const textsOf = (prompt: ReadonlyArray<acp.ContentBlock>) =>
+  prompt.flatMap((block) => (block.type === "text" ? [block.text] : []));
 
-const runFork = (effect: Effect.Effect<void, unknown, any>) => void Effect.runFork(effect as Effect.Effect<void, unknown>);
+const runFork = (effect: Effect.Effect<void, unknown, any>) =>
+  void Effect.runFork(effect as Effect.Effect<void, unknown>);
 
 const until = (ready: () => boolean) =>
   Effect.gen(function* () {
@@ -28,7 +30,9 @@ const until = (ready: () => boolean) =>
   });
 
 /** The turns of one tab with a session on an agent that answers each prompt when told to. */
-const makeTurns = Effect.fnUntraced(function* (ensureSession: TurnsHost["ensureSession"] = (each) => Effect.succeed(each.sessionId)) {
+const makeTurns = Effect.fnUntraced(function* (
+  ensureSession: TurnsHost["ensureSession"] = (each) => Effect.succeed(each.sessionId),
+) {
   const posted: Array<Record<string, unknown>> = [];
   const statuses: string[] = [];
   const finished: Tab[] = [];
@@ -61,9 +65,17 @@ const makeTurns = Effect.fnUntraced(function* (ensureSession: TurnsHost["ensureS
     {
       ...ui,
       tabs,
-      changes: new ChangeReview({ postTab: ui.postTab, saveTabs: ui.saveTabs, run: () => {}, openFile: () => Effect.void }),
+      changes: new ChangeReview({
+        postTab: ui.postTab,
+        saveTabs: ui.saveTabs,
+        run: () => {},
+        openFile: () => Effect.void,
+      }),
       usage: { recordTurn: () => Effect.void, totals: () => Effect.succeed({ turns: 7 }) } as unknown as TabUsage,
-      tabWorktrees: { localize: (_tab: Tab, attachment: unknown) => Effect.succeed(attachment), nameAfter: () => Effect.void } as unknown as TabWorktrees,
+      tabWorktrees: {
+        localize: (_tab: Tab, attachment: unknown) => Effect.succeed(attachment),
+        nameAfter: () => Effect.void,
+      } as unknown as TabWorktrees,
       ensureSession,
       cancelTab: () =>
         Effect.sync(() => {
@@ -78,30 +90,49 @@ const makeTurns = Effect.fnUntraced(function* (ensureSession: TurnsHost["ensureS
   const say = (text: string, options: { now?: boolean; rewind?: number } = {}) =>
     send({ type: "send", tab: tab.id, parts: [text], ...options });
   const answer = (index: number, stopReason: acp.StopReason = "end_turn") =>
-    Deferred.succeed(prompts[index]!.reply, { stopReason }).pipe(Effect.andThen(until(() => !tab.busy || prompts.length > index + 1)));
+    Deferred.succeed(prompts[index]!.reply, { stopReason }).pipe(
+      Effect.andThen(until(() => !tab.busy || prompts.length > index + 1)),
+    );
   // The fakes above need no services.
   const ask = (text: string) => turns.ask(tab, text) as Effect.Effect<string | undefined, unknown>;
-  return { tab, tabs, turns, posted, statuses, finished, ended, prompts, send, say, ask, answer, cancelled: () => cancelled };
+  return {
+    tab,
+    tabs,
+    turns,
+    posted,
+    statuses,
+    finished,
+    ended,
+    prompts,
+    send,
+    say,
+    ask,
+    answer,
+    cancelled: () => cancelled,
+  };
 });
 
-const ofType = (posted: ReadonlyArray<Record<string, unknown>>, type: string) => posted.filter((message) => message.type === type);
+const ofType = (posted: ReadonlyArray<Record<string, unknown>>, type: string) =>
+  posted.filter((message) => message.type === type);
 
 beforeEach(() => __test.reset());
 
 describe("TabTurns", () => {
-  it.live("gives whoever asked the agent's last message once the turn finished, and shows the turn like any other", () =>
-    Effect.gen(function* () {
-      const { tab, ask, prompts, answer, posted } = yield* makeTurns();
-      const fiber = yield* Effect.forkChild(ask("write it"));
-      yield* until(() => prompts.length === 1);
-      assert.deepStrictEqual(prompts[0]!.texts, ["write it"]);
-      assert.strictEqual(ofType(posted, "userMessage").length, 1);
-      tab.reply!.text = "The reply";
-      yield* answer(0);
-      assert.strictEqual(yield* Fiber.join(fiber), "The reply");
-      assert.isUndefined(tab.reply);
-      assert.isFalse(tab.sending);
-    }),
+  it.live(
+    "gives whoever asked the agent's last message once the turn finished, and shows the turn like any other",
+    () =>
+      Effect.gen(function* () {
+        const { tab, ask, prompts, answer, posted } = yield* makeTurns();
+        const fiber = yield* Effect.forkChild(ask("write it"));
+        yield* until(() => prompts.length === 1);
+        assert.deepStrictEqual(prompts[0]!.texts, ["write it"]);
+        assert.strictEqual(ofType(posted, "userMessage").length, 1);
+        tab.reply!.text = "The reply";
+        yield* answer(0);
+        assert.strictEqual(yield* Fiber.join(fiber), "The reply");
+        assert.isUndefined(tab.reply);
+        assert.isFalse(tab.sending);
+      }),
   );
 
   it.live("gives nothing for a turn that was stopped, or a tab that is busy", () =>
@@ -136,7 +167,9 @@ describe("TabTurns", () => {
       say("second");
       yield* until(() => prompts.length === 2);
       yield* answer(1, "max_tokens");
-      const traces = ofType(posted, "turnTrace") as Array<{ trace: { stopReason: string; sessionId: string; durationMs: number } }>;
+      const traces = ofType(posted, "turnTrace") as Array<{
+        trace: { stopReason: string; sessionId: string; durationMs: number };
+      }>;
       assert.strictEqual(traces.length, 1);
       assert.strictEqual(traces[0]!.trace.stopReason, "max_tokens");
       assert.strictEqual(traces[0]!.trace.sessionId, "s");
@@ -197,7 +230,10 @@ describe("TabTurns", () => {
       yield* answer(0);
       yield* until(() => prompts.length === 2);
       assert.deepStrictEqual(prompts[1]!.texts, ["second"]);
-      assert.deepStrictEqual(tab.queue.map((each) => each.parts), [["third"]]);
+      assert.deepStrictEqual(
+        tab.queue.map((each) => each.parts),
+        [["third"]],
+      );
       // The queue follows, so this is not the end yet.
       assert.deepStrictEqual(finished, []);
       assert.deepStrictEqual(ofType(posted, "queue").at(-1)?.items, [{ id: 2, text: "third", attachments: [] }]);
@@ -239,7 +275,10 @@ describe("TabTurns", () => {
       yield* until(() => prompts.length === 2);
       assert.deepStrictEqual(prompts[1]!.texts, ["urgent"]);
       assert.isFalse(tab.steer);
-      assert.deepStrictEqual(tab.queue.map((each) => each.parts), [["queued"]]);
+      assert.deepStrictEqual(
+        tab.queue.map((each) => each.parts),
+        [["queued"]],
+      );
     }),
   );
 
@@ -289,7 +328,9 @@ describe("TabTurns", () => {
       const [turn] = [...tab.sent.keys()];
       say("edited", { rewind: turn! });
       yield* until(() => ofType(posted, "loadComposer").length === 1);
-      assert.deepStrictEqual(ofType(posted, "loadComposer"), [{ type: "loadComposer", parts: ["edited"], rewind: turn }]);
+      assert.deepStrictEqual(ofType(posted, "loadComposer"), [
+        { type: "loadComposer", parts: ["edited"], rewind: turn },
+      ]);
       assert.deepStrictEqual(ofType(posted, "rewind"), []);
       assert.strictEqual(prompts.length, 1);
     }),
@@ -319,14 +360,28 @@ describe("TabTurns", () => {
         "look ",
         { kind: "uri" as const, uri: `file://${file}`, name: "open.ts", token: "@open.ts" },
         " ",
-        { kind: "snippet" as const, uri: `file://${file}`, name: "open.ts:2-3", languageId: "ts", startLine: 2, endLine: 3, text: "selected", token: "@open.ts:2-3" },
+        {
+          kind: "snippet" as const,
+          uri: `file://${file}`,
+          name: "open.ts:2-3",
+          languageId: "ts",
+          startLine: 2,
+          endLine: 3,
+          text: "selected",
+          token: "@open.ts:2-3",
+        },
       ];
       send({ type: "send", tab: tab.id, parts });
       yield* until(() => ofType(posted, "userMessage").length === 1);
       const shown = ofType(posted, "userMessage")[0]!;
       assert.strictEqual(shown.text, "look @open.ts @open.ts:2-3");
       assert.deepStrictEqual(
-        (shown.attachments as Array<{ name: string; token?: string; path?: string; line?: number }>).map((a) => [a.name, a.token, a.path, a.line]),
+        (shown.attachments as Array<{ name: string; token?: string; path?: string; line?: number }>).map((a) => [
+          a.name,
+          a.token,
+          a.path,
+          a.line,
+        ]),
         [
           ["open.ts", "@open.ts", file, undefined],
           ["open.ts:2-3", "@open.ts:2-3", file, 2],

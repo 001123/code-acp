@@ -239,7 +239,9 @@ export const lockedSettings = (scope: SettingsScope): ReadonlyArray<SettingKey> 
 
 /** The setup command the project of `folder` asks for, from its folder or workspace settings; a user value doesn't count. */
 export function projectSetupCommand(folder: string): string {
-  const info = vscode.workspace.getConfiguration("codeAcp", vscode.Uri.file(folder)).inspect("worktreeProjectSetupCommand");
+  const info = vscode.workspace
+    .getConfiguration("codeAcp", vscode.Uri.file(folder))
+    .inspect("worktreeProjectSetupCommand");
   const command = Schema.decodeUnknownOption(Schema.String)(info?.workspaceFolderValue ?? info?.workspaceValue);
   return Option.getOrElse(command, () => "").trim();
 }

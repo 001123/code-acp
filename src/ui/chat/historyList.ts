@@ -71,5 +71,7 @@ export function shortTime(lang: string, iso: string | null | undefined, now = Da
     ["minute", 60],
   ];
   const [unit, size] = units.find(([, each]) => seconds >= each) ?? ["minute", 60];
-  return new Intl.NumberFormat(lang, { style: "unit", unit, unitDisplay: "narrow" }).format(Math.max(1, Math.floor(seconds / size)));
+  return new Intl.NumberFormat(lang, { style: "unit", unit, unitDisplay: "narrow" }).format(
+    Math.max(1, Math.floor(seconds / size)),
+  );
 }

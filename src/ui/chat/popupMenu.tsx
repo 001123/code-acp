@@ -72,7 +72,8 @@ export function placeSubMenu(row: DOMRect, menu: DOMRect, width: number, height:
   const margin = 4;
   const maxTop = window.innerHeight - margin - height;
   const atRow = Math.max(margin, Math.min(row.top - 5, maxTop));
-  if (menu.right + gap + width <= window.innerWidth - margin) return { left: menu.right + gap, top: atRow, opens: "right" };
+  if (menu.right + gap + width <= window.innerWidth - margin)
+    return { left: menu.right + gap, top: atRow, opens: "right" };
   if (menu.left - gap - width >= margin) return { left: menu.left - gap - width, top: atRow, opens: "left" };
   // Lined up with the menu's left edge, or its right edge when that would leave the viewport.
   const left = menu.left + width <= window.innerWidth - margin ? menu.left : Math.max(margin, menu.right - width);
@@ -120,7 +121,12 @@ export function SubMenu({
     const el = list.current;
     if (!row.current || !menu || !el) return;
     const box = el.getBoundingClientRect();
-    const place = placeSubMenu(row.current.getBoundingClientRect(), menu.getBoundingClientRect(), box.width, box.height);
+    const place = placeSubMenu(
+      row.current.getBoundingClientRect(),
+      menu.getBoundingClientRect(),
+      box.width,
+      box.height,
+    );
     setStyle({ left: place.left, top: place.top });
     setOpens(place.opens);
     const selected = el.querySelector<HTMLElement>('[role=menuitemradio][aria-checked="true"]');

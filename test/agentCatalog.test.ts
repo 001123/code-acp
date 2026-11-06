@@ -12,7 +12,14 @@ const registry: Registry = {
   version: "1",
   agents: [
     { id: "one", name: "One", version: "2.0.0", description: "first", distribution: npx },
-    { id: "two", name: "Two", version: "1.0.0", description: "second", distribution: npx, website: "https://two.example" },
+    {
+      id: "two",
+      name: "Two",
+      version: "1.0.0",
+      description: "second",
+      distribution: npx,
+      website: "https://two.example",
+    },
   ],
 } as unknown as Registry;
 
@@ -31,7 +38,9 @@ const setup = (manager = makeManager()) => {
   const catalog = new AgentCatalog(manager, (state) => void posted.push(state));
   const fetch = Effect.suspend(() => {
     fetches.count++;
-    return failing.now ? Effect.fail(new RegistryError({ message: "offline", cause: "test" })) : Effect.succeed(registry);
+    return failing.now
+      ? Effect.fail(new RegistryError({ message: "offline", cause: "test" }))
+      : Effect.succeed(registry);
   });
   const layer = Layer.succeed(AcpRegistry, AcpRegistry.of({ fetch }));
   return { catalog, posted, fetches, failing, layer };
@@ -85,10 +94,11 @@ describe("AgentCatalog", () => {
   it.effect("ignores an install of an agent the registry doesn't list", () => {
     let installs = 0;
     const { catalog, layer } = setup(
-      makeManager(() =>
-        Effect.sync(() => {
-          installs++;
-        }) as never,
+      makeManager(
+        () =>
+          Effect.sync(() => {
+            installs++;
+          }) as never,
       ),
     );
     return Effect.gen(function* () {

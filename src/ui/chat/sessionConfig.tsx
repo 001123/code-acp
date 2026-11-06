@@ -49,14 +49,20 @@ function currentName(option: SelectOption): string {
 }
 
 /** The session's models and its current model and level of thinking, as a comparison starts from them. */
-export function sessionChoices(options: ReadonlyArray<acp.SessionConfigOption>): { models?: ReadonlyArray<Choice>; model?: string; effort?: string } {
+export function sessionChoices(options: ReadonlyArray<acp.SessionConfigOption>): {
+  models?: ReadonlyArray<Choice>;
+  model?: string;
+  effort?: string;
+} {
   const selects = options.filter((o): o is SelectOption => o.type === "select");
   const model = selects.find((o) => configKind(o) === "model");
   const effort = selects.find((o) => configKind(o) === "effort")?.currentValue;
   return {
     ...(model && {
       model: model.currentValue,
-      models: model.options.flatMap((o) => ("options" in o ? o.options : [o])).map((o) => ({ value: o.value, name: o.name })),
+      models: model.options
+        .flatMap((o) => ("options" in o ? o.options : [o]))
+        .map((o) => ({ value: o.value, name: o.name })),
     }),
     // The agent's own "default" is what no pick means.
     ...(effort !== undefined && !/^(default|auto)$/i.test(effort) && { effort }),
@@ -76,7 +82,10 @@ export function ConfigSelect({
   const grouped = option.options.some((o) => "options" in o);
   const entries = option.options.flatMap((o): SubMenuEntry[] =>
     "options" in o
-      ? [{ heading: o.name }, ...o.options.map((v) => ({ value: v.value, label: v.name, title: v.description ?? undefined }))]
+      ? [
+          { heading: o.name },
+          ...o.options.map((v) => ({ value: v.value, label: v.name, title: v.description ?? undefined })),
+        ]
       : [{ value: o.value, label: o.name, title: o.description ?? undefined }],
   );
   return (

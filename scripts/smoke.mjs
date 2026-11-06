@@ -35,9 +35,19 @@ try {
     protocolVersion: acp.PROTOCOL_VERSION,
     clientCapabilities: { auth: { terminal: true } },
   });
-  console.log("agent:", init.agentInfo, "auth:", init.authMethods.map((m) => m.id));
+  console.log(
+    "agent:",
+    init.agentInfo,
+    "auth:",
+    init.authMethods.map((m) => m.id),
+  );
   const session = await conn.agent.request(acp.methods.agent.session.new, { cwd: process.cwd(), mcpServers: [] });
-  console.log("session:", session.sessionId, "config:", session.configOptions?.map((o) => o.id));
+  console.log(
+    "session:",
+    session.sessionId,
+    "config:",
+    session.configOptions?.map((o) => o.id),
+  );
   if (promptText) {
     const res = await conn.agent.request(acp.methods.agent.session.prompt, {
       sessionId: session.sessionId,

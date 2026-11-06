@@ -147,7 +147,9 @@ export const attachmentBlock = Effect.fn("attachmentBlock")(function* (
 
   if (attachment.kind === "terminal") {
     const { terminal, shell, commandLine, cwd, exitCode, text } = attachment;
-    const facts = [shell && `shell ${shell}`, cwd && `cwd ${cwd}`, exitCode !== undefined && `exit code ${exitCode}`].filter(Boolean).join(", ");
+    const facts = [shell && `shell ${shell}`, cwd && `cwd ${cwd}`, exitCode !== undefined && `exit code ${exitCode}`]
+      .filter(Boolean)
+      .join(", ");
     const where = `terminal "${terminal}"${facts ? ` (${facts})` : ""}`;
     const title = commandLine === undefined ? `Selection in ${where}` : `Command in ${where}`;
     const body = commandLine === undefined ? text : `$ ${commandLine}\n${text}`;
@@ -204,7 +206,10 @@ export class AttachmentQueue {
 
   /** Hands the queued attachments and prompts to the webview, when there is one. */
   flush(): void {
-    if ((this.queued.length || this.prompts.length) && this.deliver(this.queued, this.prompts.join("\n\n") || undefined)) {
+    if (
+      (this.queued.length || this.prompts.length) &&
+      this.deliver(this.queued, this.prompts.join("\n\n") || undefined)
+    ) {
       this.queued = [];
       this.prompts = [];
     }

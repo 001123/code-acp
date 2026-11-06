@@ -67,20 +67,23 @@ function short(text: string): string {
  * Terminal content for the chat: output of recent commands (read through shell integration, which only
  * sees commands that start after activation, i.e. once VS Code has started) and the selected text.
  */
-export class TerminalContext extends Context.Service<TerminalContext, {
-  readonly suggestions: (query: string) => Effect.Effect<ReadonlyArray<TerminalSuggestion>>;
-  /** The command offered as a suggestion, as an attachment. */
-  readonly command: (id: number) => Effect.Effect<Option.Option<Attachment>>;
-  /** The newest command of `terminal`, running or not; none without shell integration or commands. */
-  readonly lastCommand: (terminal: vscode.Terminal) => Effect.Effect<Option.Option<Attachment>>;
-  /** The newest command of `terminal` that exited with a non-zero code. */
-  readonly lastFailed: (terminal: vscode.Terminal) => Effect.Effect<Option.Option<Attachment>>;
-  /**
-   * The active terminal's selection. The API has no terminal selection, so it goes through the clipboard,
-   * whose text is put back afterwards.
-   */
-  readonly selection: Effect.Effect<Option.Option<Attachment>, VscodeError>;
-}>()("code-acp/TerminalContext") {
+export class TerminalContext extends Context.Service<
+  TerminalContext,
+  {
+    readonly suggestions: (query: string) => Effect.Effect<ReadonlyArray<TerminalSuggestion>>;
+    /** The command offered as a suggestion, as an attachment. */
+    readonly command: (id: number) => Effect.Effect<Option.Option<Attachment>>;
+    /** The newest command of `terminal`, running or not; none without shell integration or commands. */
+    readonly lastCommand: (terminal: vscode.Terminal) => Effect.Effect<Option.Option<Attachment>>;
+    /** The newest command of `terminal` that exited with a non-zero code. */
+    readonly lastFailed: (terminal: vscode.Terminal) => Effect.Effect<Option.Option<Attachment>>;
+    /**
+     * The active terminal's selection. The API has no terminal selection, so it goes through the clipboard,
+     * whose text is put back afterwards.
+     */
+    readonly selection: Effect.Effect<Option.Option<Attachment>, VscodeError>;
+  }
+>()("code-acp/TerminalContext") {
   static readonly layer = Layer.effect(
     TerminalContext,
     Effect.gen(function* () {
@@ -164,7 +167,11 @@ export class TerminalContext extends Context.Service<TerminalContext, {
         Effect.sync(() => {
           const q = query.toLowerCase();
           return newestFirst()
-            .filter((c) => c.commandLine.trim() && (c.commandLine.toLowerCase().includes(q) || c.terminal.name.toLowerCase().includes(q)))
+            .filter(
+              (c) =>
+                c.commandLine.trim() &&
+                (c.commandLine.toLowerCase().includes(q) || c.terminal.name.toLowerCase().includes(q)),
+            )
             .slice(0, MAX_SUGGESTIONS)
             .map((c): TerminalSuggestion => ({
               id: c.id,
@@ -181,7 +188,15 @@ export class TerminalContext extends Context.Service<TerminalContext, {
 
       const lastFailed = (terminal: vscode.Terminal) =>
         Effect.sync(() =>
-          Option.map(Option.fromUndefinedOr(history.get(terminal)?.filter((c) => !c.running && !!c.exitCode).at(-1)), attachment),
+          Option.map(
+            Option.fromUndefinedOr(
+              history
+                .get(terminal)
+                ?.filter((c) => !c.running && !!c.exitCode)
+                .at(-1),
+            ),
+            attachment,
+          ),
         );
 
       const selection = Effect.gen(function* () {

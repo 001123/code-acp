@@ -75,13 +75,19 @@ function entryOf(uri: vscode.Uri, diagnostic: vscode.Diagnostic): ProblemEntry {
 const relevant = (d: vscode.Diagnostic) => d.severity <= vscode.DiagnosticSeverity.Warning;
 
 /** The Problems panel as composer attachments: "@" picks and the "Fix with Code ACP" quick fix. */
-export class Problems extends Context.Service<Problems, {
-  readonly suggestions: (query: string) => Effect.Effect<ReadonlyArray<ProblemSuggestion>>;
-  /** The errors and warnings of the active editor's file, or of the workspace; none when there are none. */
-  readonly attachment: (scope: ProblemScope) => Effect.Effect<Option.Option<Attachment>>;
-  /** `diagnostics` of `uri` and the code around them, for a quick fix. */
-  readonly forDiagnostics: (uri: vscode.Uri, diagnostics: ReadonlyArray<vscode.Diagnostic>) => Effect.Effect<Attachment[]>;
-}>()("code-acp/Problems") {
+export class Problems extends Context.Service<
+  Problems,
+  {
+    readonly suggestions: (query: string) => Effect.Effect<ReadonlyArray<ProblemSuggestion>>;
+    /** The errors and warnings of the active editor's file, or of the workspace; none when there are none. */
+    readonly attachment: (scope: ProblemScope) => Effect.Effect<Option.Option<Attachment>>;
+    /** `diagnostics` of `uri` and the code around them, for a quick fix. */
+    readonly forDiagnostics: (
+      uri: vscode.Uri,
+      diagnostics: ReadonlyArray<vscode.Diagnostic>,
+    ) => Effect.Effect<Attachment[]>;
+  }
+>()("code-acp/Problems") {
   static readonly layer = Layer.succeed(
     Problems,
     (() => {
@@ -93,9 +99,16 @@ export class Problems extends Context.Service<Problems, {
       const collect = (scope: ProblemScope): Array<ProblemEntry> => {
         if (scope === "file") {
           const uri = activeUri();
-          return uri ? vscode.languages.getDiagnostics(uri).filter(relevant).map((d) => entryOf(uri, d)) : [];
+          return uri
+            ? vscode.languages
+                .getDiagnostics(uri)
+                .filter(relevant)
+                .map((d) => entryOf(uri, d))
+            : [];
         }
-        return vscode.languages.getDiagnostics().flatMap(([uri, ds]) => ds.filter(relevant).map((d) => entryOf(uri, d)));
+        return vscode.languages
+          .getDiagnostics()
+          .flatMap(([uri, ds]) => ds.filter(relevant).map((d) => entryOf(uri, d)));
       };
 
       const nameOf = (scope: ProblemScope) => {
@@ -149,7 +162,10 @@ export class Problems extends Context.Service<Problems, {
             return [problems];
           }
           const first = Math.max(0, Math.min(...diagnostics.map((d) => d.range.start.line)) - CONTEXT_LINES);
-          const last = Math.min(doc.lineCount - 1, Math.max(...diagnostics.map((d) => d.range.end.line)) + CONTEXT_LINES);
+          const last = Math.min(
+            doc.lineCount - 1,
+            Math.max(...diagnostics.map((d) => d.range.end.line)) + CONTEXT_LINES,
+          );
           const range = new vscode.Range(first, 0, last, doc.lineAt(last).text.length);
           const snippet: Attachment = {
             kind: "snippet",
@@ -181,7 +197,11 @@ export class FixProblemsActions implements vscode.CodeActionProvider {
       return [];
     }
     const action = new vscode.CodeAction(t("problems.fix"), vscode.CodeActionKind.QuickFix);
-    action.command = { command: "codeAcp.fixProblems", title: t("problems.fix"), arguments: [document.uri, [...context.diagnostics]] };
+    action.command = {
+      command: "codeAcp.fixProblems",
+      title: t("problems.fix"),
+      arguments: [document.uri, [...context.diagnostics]],
+    };
     return [action];
   }
 }

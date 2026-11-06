@@ -9,13 +9,29 @@ import plusIcon from "@tabler/icons/outline/plus.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { AgentIcon, type AgentChoices } from "./agentPanel";
 import { ComposerCheckbox } from "./composerParts";
-import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow, type LoadedAttempt, type LoadedAttempts } from "./compareAttempts";
+import {
+  attemptKey,
+  attemptPick,
+  modelsIn,
+  nextRow,
+  type AttemptRow,
+  type LoadedAttempt,
+  type LoadedAttempts,
+} from "./compareAttempts";
 import { useClickMenu } from "./popupMenu";
 import { post } from "./post";
 import { sessionChoices } from "./sessionConfig";
 
 /** A select's options: `usual` for no pick, `choices`, and the value picked when they don't have it (yet). */
-function ChoiceOptions({ choices, value, usual }: { choices: ReadonlyArray<Choice> | undefined; value: string; usual: string }) {
+function ChoiceOptions({
+  choices,
+  value,
+  usual,
+}: {
+  choices: ReadonlyArray<Choice> | undefined;
+  value: string;
+  usual: string;
+}) {
   return (
     <>
       <option value="">{usual}</option>
@@ -61,14 +77,22 @@ export function useCompare({
   const asked = rows.map((row) => attemptKey(row.agentId, row.model)).join("\n");
   useEffect(() => {
     if (!menu.open) return;
-    const missing = new Map(rows.map((row) => [attemptKey(row.agentId, row.model), row]).filter(([key]) => !loaded[key as string]) as Array<[string, AttemptRow]>);
+    const missing = new Map(
+      rows.map((row) => [attemptKey(row.agentId, row.model), row]).filter(([key]) => !loaded[key as string]) as Array<
+        [string, AttemptRow]
+      >,
+    );
     if (missing.size === 0) return;
-    setLoaded((all) => ({ ...all, ...Object.fromEntries([...missing].map(([key, { agentId: id, model }]) => [key, { agentId: id, model }])) }));
+    setLoaded((all) => ({
+      ...all,
+      ...Object.fromEntries([...missing].map(([key, { agentId: id, model }]) => [key, { agentId: id, model }])),
+    }));
     for (const { agentId: id, model } of missing.values()) post({ type: "loadAttemptOptions", agentId: id, model });
   }, [menu.open, asked]);
   // Closing it is the way to ask again: after logging in, say.
   useEffect(() => {
-    if (!menu.open) setLoaded((all) => Object.fromEntries(Object.entries(all).filter(([, each]) => each.error === undefined)));
+    if (!menu.open)
+      setLoaded((all) => Object.fromEntries(Object.entries(all).filter(([, each]) => each.error === undefined)));
   }, [menu.open]);
 
   const turnOn = () => {
@@ -76,7 +100,9 @@ export function useCompare({
     menu.set(true);
     if (rows.length >= 2) return;
     const first = agentId !== undefined && agentIds.includes(agentId) ? agentId : agentIds[0]!;
-    const seeded: AttemptRow[] = [{ id: nextId.current++, agentId: first, model: current.model ?? "", effort: current.effort ?? "" }];
+    const seeded: AttemptRow[] = [
+      { id: nextId.current++, agentId: first, model: current.model ?? "", effort: current.effort ?? "" },
+    ];
     seeded.push(nextRow(nextId.current++, seeded, agentIds, modelsOf));
     setRows(seeded);
   };
@@ -85,7 +111,8 @@ export function useCompare({
     menu.set(false);
   };
   const toggle = () => (checked ? turnOff() : turnOn());
-  const patch = (id: number, change: Partial<AttemptRow>) => setRows(rows.map((row) => (row.id === id ? { ...row, ...change } : row)));
+  const patch = (id: number, change: Partial<AttemptRow>) =>
+    setRows(rows.map((row) => (row.id === id ? { ...row, ...change } : row)));
 
   const panel = (
     <div id="compare-panel" className="popup-menu" role="dialog" aria-label={t("bestOf.attempts")}>
@@ -112,7 +139,11 @@ export function useCompare({
                   ))}
                 </select>
               )}
-              <div className="compare-options" aria-busy={loading} title={loading ? t("chat.loadingOptions") : undefined}>
+              <div
+                className="compare-options"
+                aria-busy={loading}
+                title={loading ? t("chat.loadingOptions") : undefined}
+              >
                 <select
                   aria-label={t("bestOf.model")}
                   value={row.model}
@@ -122,7 +153,12 @@ export function useCompare({
                   <ChoiceOptions choices={modelsOf(row.agentId)} value={row.model} usual={t("bestOf.usualModel")} />
                 </select>
                 {efforts?.length !== 0 && (
-                  <select aria-label={t("bestOf.effort")} disabled={!efforts} value={row.effort} onChange={(e) => patch(row.id, { effort: e.target.value })}>
+                  <select
+                    aria-label={t("bestOf.effort")}
+                    disabled={!efforts}
+                    value={row.effort}
+                    onChange={(e) => patch(row.id, { effort: e.target.value })}
+                  >
                     <ChoiceOptions choices={efforts} value={row.effort} usual={t("bestOf.usualEffort")} />
                   </select>
                 )}
@@ -143,7 +179,11 @@ export function useCompare({
           </div>
         );
       })}
-      <button type="button" id="compare-add" onClick={() => setRows([...rows, nextRow(nextId.current++, rows, agentIds, modelsOf)])}>
+      <button
+        type="button"
+        id="compare-add"
+        onClick={() => setRows([...rows, nextRow(nextId.current++, rows, agentIds, modelsOf)])}
+      >
         <Icon svg={plusIcon} />
         <span className="menu-label">{t("bestOf.addAttempt")}</span>
       </button>
@@ -179,7 +219,8 @@ export function useCompare({
     attempts: (): AttemptPick[] => rows.map((row) => attemptPick(row, loaded, modelsOf)),
     /** A comparison starts worktrees and sessions: each takes checking the box, while the picks stay for the next. */
     turnOff,
-    receive: (answer: LoadedAttempt) => setLoaded((all) => ({ ...all, [attemptKey(answer.agentId, answer.model)]: answer })),
+    receive: (answer: LoadedAttempt) =>
+      setLoaded((all) => ({ ...all, [attemptKey(answer.agentId, answer.model)]: answer })),
     element,
   };
 }

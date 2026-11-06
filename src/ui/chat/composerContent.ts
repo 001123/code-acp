@@ -53,7 +53,12 @@ export function pruneTokens(tokens: Map<string, Attachment>, shown: ReadonlySet<
 }
 
 /** A free token for `a`, kept in `tokens`; undefined when the same file is already in the text (`shown`). */
-export function addToken(tokens: Map<string, Attachment>, shown: ReadonlySet<string>, a: Attachment, sigil: string): string | undefined {
+export function addToken(
+  tokens: Map<string, Attachment>,
+  shown: ReadonlySet<string>,
+  a: Attachment,
+  sigil: string,
+): string | undefined {
   pruneTokens(tokens, shown);
   const key = attachmentKey(a);
   if (key !== undefined && [...tokens.values()].some((x) => attachmentKey(x) === key)) return undefined;

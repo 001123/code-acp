@@ -15,7 +15,8 @@ const FLUSH_AFTER_MS = 500;
 const SECRET_GROUP = /^(env|headers)$/i;
 const SECRET_KEY = /api[-_]?key|token|secret|password|authorization|credential|cookie/i;
 
-const maskPair = (pair: unknown): unknown => (Predicate.isObject(pair) && "value" in pair ? { ...pair, value: MASK } : MASK);
+const maskPair = (pair: unknown): unknown =>
+  Predicate.isObject(pair) && "value" in pair ? { ...pair, value: MASK } : MASK;
 
 function maskGroup(group: unknown): unknown {
   if (Array.isArray(group)) return group.map(maskPair);
@@ -29,7 +30,9 @@ export function sanitize(value: unknown, key = ""): unknown {
   if (SECRET_GROUP.test(key)) return maskGroup(value);
   if (Predicate.isString(value)) {
     if (SECRET_KEY.test(key)) return MASK;
-    return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…[+${value.length - MAX_STRING_LENGTH}]` : value;
+    return value.length > MAX_STRING_LENGTH
+      ? `${value.slice(0, MAX_STRING_LENGTH)}…[+${value.length - MAX_STRING_LENGTH}]`
+      : value;
   }
   if (Array.isArray(value)) return value.map((item) => sanitize(item, key));
   if (Predicate.isObject(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitize(v, k)]));
@@ -76,7 +79,9 @@ export function makeTraceLog(write: (line: string) => void, enabled: () => boole
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const writeLine = (at: number, direction: Direction, message: unknown, chunks = 1) =>
-    write(`${new Date(at).toISOString()} [${label}] ${direction}${chunks > 1 ? ` ×${chunks}` : ""} ${JSON.stringify(sanitize(message))}`);
+    write(
+      `${new Date(at).toISOString()} [${label}] ${direction}${chunks > 1 ? ` ×${chunks}` : ""} ${JSON.stringify(sanitize(message))}`,
+    );
 
   const flush = () => {
     clearTimeout(timer);
@@ -86,7 +91,12 @@ export function makeTraceLog(write: (line: string) => void, enabled: () => boole
     pending = undefined;
     try {
       const { update } = first.params;
-      writeLine(at, direction, { ...first, params: { ...first.params, update: { ...update, content: { ...update.content, text } } } }, chunks);
+      writeLine(
+        at,
+        direction,
+        { ...first, params: { ...first.params, update: { ...update, content: { ...update.content, text } } } },
+        chunks,
+      );
     } catch {
       // See above.
     }
@@ -179,7 +189,11 @@ export class AcpTrace extends Context.Service<
         tap: (stream, label) =>
           tapStream(
             stream,
-            makeTraceLog((line) => open().appendLine(line), () => enabled, label),
+            makeTraceLog(
+              (line) => open().appendLine(line),
+              () => enabled,
+              label,
+            ),
           ),
         show: Effect.sync(() => open().show(true)),
       });

@@ -30,8 +30,16 @@ describe("composer controls", () => {
 
   describe("model and effort", () => {
     const panel = (summary: ReactNode) => createElement(AgentPanel, { tab: gitTab, choices: { agents: [] }, summary });
-    const click = (detail: number) => act(() => void find("#agent-summary")!.dispatchEvent(new MouseEvent("click", { bubbles: true, detail })));
-    const model: acp.SessionConfigOption = { id: "m", name: "Model", type: "select", category: "model", currentValue: "o", options: [{ value: "o", name: "Opus" }] };
+    const click = (detail: number) =>
+      act(() => void find("#agent-summary")!.dispatchEvent(new MouseEvent("click", { bubbles: true, detail })));
+    const model: acp.SessionConfigOption = {
+      id: "m",
+      name: "Model",
+      type: "select",
+      category: "model",
+      currentValue: "o",
+      options: [{ value: "o", name: "Opus" }],
+    };
 
     it("are no button when the agent has neither", () => {
       assert.isUndefined(quickConfig([]));
@@ -66,7 +74,12 @@ describe("composer controls", () => {
 
   describe("worktree checkbox", () => {
     const bar = (tab: TabInfo, opts: { comparing?: boolean; editing?: boolean } = {}) =>
-      createElement(WorkspaceBar, { tab, busy: false, comparing: opts.comparing ?? false, editing: opts.editing ?? false });
+      createElement(WorkspaceBar, {
+        tab,
+        busy: false,
+        comparing: opts.comparing ?? false,
+        editing: opts.editing ?? false,
+      });
     const box = () => find<HTMLInputElement>("#workspace-bar #worktree input");
 
     it("sits in the bar beside the branch", () => {

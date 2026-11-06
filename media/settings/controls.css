@@ -68,7 +68,9 @@ select:focus {
   height: 12px;
   border-radius: 50%;
   background: var(--vscode-descriptionForeground);
-  transition: transform 0.15s, background 0.15s;
+  transition:
+    transform 0.15s,
+    background 0.15s;
 }
 .toggle input:checked + .track {
   background: var(--vscode-button-background);

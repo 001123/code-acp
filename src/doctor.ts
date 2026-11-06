@@ -61,12 +61,15 @@ interface Tool {
 }
 
 /** Checks the tools agents depend on, and starts each agent to see that it runs and whether it needs a login. */
-export class Doctor extends Context.Service<Doctor, {
-  /** One check per tool and agent, not started yet, so the page can show each as it finishes. */
-  readonly checks: Effect.Effect<ReadonlyArray<DoctorCheck>>;
-  /** The tools alone, for the first run, when there is no agent to start yet. */
-  readonly setupChecks: Effect.Effect<ReadonlyArray<DoctorCheck>>;
-}>()("code-acp/Doctor") {
+export class Doctor extends Context.Service<
+  Doctor,
+  {
+    /** One check per tool and agent, not started yet, so the page can show each as it finishes. */
+    readonly checks: Effect.Effect<ReadonlyArray<DoctorCheck>>;
+    /** The tools alone, for the first run, when there is no agent to start yet. */
+    readonly setupChecks: Effect.Effect<ReadonlyArray<DoctorCheck>>;
+  }
+>()("code-acp/Doctor") {
   static readonly layer = Layer.effect(
     Doctor,
     Effect.gen(function* () {
@@ -90,14 +93,19 @@ export class Doctor extends Context.Service<Doctor, {
               forceKillAfter: "2 seconds",
             }),
           );
-          const [stdout, code] = yield* Effect.all([Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode], {
-            concurrency: "unbounded",
-          });
+          const [stdout, code] = yield* Effect.all(
+            [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
+            {
+              concurrency: "unbounded",
+            },
+          );
           return code === 0 ? Option.some(stdout.trim().split(/\r?\n/)[0] ?? "") : Option.none<string>();
         }).pipe(
           Effect.scoped,
           Effect.timeoutOrElse({ duration: TOOL_TIMEOUT, orElse: () => Effect.succeedNone }),
-          Effect.catch((err) => Effect.logInfo(`[doctor] ${command}: ${err.message}`).pipe(Effect.as(Option.none<string>()))),
+          Effect.catch((err) =>
+            Effect.logInfo(`[doctor] ${command}: ${err.message}`).pipe(Effect.as(Option.none<string>())),
+          ),
         );
 
       const toolCheck = (tool: Tool, needed: boolean): DoctorCheck => ({
@@ -126,9 +134,9 @@ export class Doctor extends Context.Service<Doctor, {
             onUpdate: () => {},
             requestPermission: () => Effect.succeed(CANCELLED),
           });
-          const session = yield* agent.newSession(folder).pipe(
-            Effect.timeoutOption(`${SESSION_TIMEOUT_SECONDS} seconds`),
-          );
+          const session = yield* agent
+            .newSession(folder)
+            .pipe(Effect.timeoutOption(`${SESSION_TIMEOUT_SECONDS} seconds`));
           if (Option.isNone(session)) {
             return {
               status: "warning",
@@ -139,9 +147,13 @@ export class Doctor extends Context.Service<Doctor, {
           }
           const { sessionId } = session.value;
           const capabilities = agent.initializeResponse.agentCapabilities?.sessionCapabilities;
-          yield* (capabilities?.delete ? agent.deleteSession(sessionId) : capabilities?.close ? agent.closeSession(sessionId) : Effect.void).pipe(
-            Effect.ignore,
-          );
+          yield* (
+            capabilities?.delete
+              ? agent.deleteSession(sessionId)
+              : capabilities?.close
+                ? agent.closeSession(sessionId)
+                : Effect.void
+          ).pipe(Effect.ignore);
           return { status: "ok", description: choice.version, detail: t("doctor.agent.ok") } satisfies DoctorResult;
         }).pipe(
           Effect.scoped,
@@ -170,7 +182,11 @@ export class Doctor extends Context.Service<Doctor, {
           Effect.flatMap((command) =>
             command
               ? probe(choice, command)
-              : Effect.succeed<DoctorResult>({ status: "warning", detail: t("doctor.agent.none"), fix: { type: "manageAgents" } }),
+              : Effect.succeed<DoctorResult>({
+                  status: "warning",
+                  detail: t("doctor.agent.none"),
+                  fix: { type: "manageAgents" },
+                }),
           ),
         ),
       });
@@ -178,8 +194,23 @@ export class Doctor extends Context.Service<Doctor, {
       const tools = Effect.sync((): ReadonlyArray<Tool> => {
         const node = readSettings().nodePath || "node";
         return [
-          { id: "node", label: "Node.js", command: node, url: NODE_URL, neededBy: "npx", neededAtSetup: true, missing: t("doctor.node.missing", node) },
-          { id: "npm", label: "npm", command: "npm", url: NODE_URL, neededAtSetup: true, missing: t("doctor.npm.missing") },
+          {
+            id: "node",
+            label: "Node.js",
+            command: node,
+            url: NODE_URL,
+            neededBy: "npx",
+            neededAtSetup: true,
+            missing: t("doctor.node.missing", node),
+          },
+          {
+            id: "npm",
+            label: "npm",
+            command: "npm",
+            url: NODE_URL,
+            neededAtSetup: true,
+            missing: t("doctor.npm.missing"),
+          },
           { id: "uv", label: "uv", command: "uvx", url: UV_URL, neededBy: "uvx", missing: t("doctor.uv.missing") },
           { id: "git", label: "git", command: "git", url: GIT_URL, missing: t("doctor.git.missing") },
         ];
@@ -199,7 +230,11 @@ export class Doctor extends Context.Service<Doctor, {
                     id: "agents",
                     group: "agents",
                     label: t("doctor.group.agents"),
-                    run: Effect.succeed({ status: "warning", detail: t("doctor.agent.none"), fix: { type: "manageAgents" } }),
+                    run: Effect.succeed({
+                      status: "warning",
+                      detail: t("doctor.agent.none"),
+                      fix: { type: "manageAgents" },
+                    }),
                   } satisfies DoctorCheck,
                 ]),
           ];
@@ -236,7 +271,9 @@ export class DoctorPage {
 
   constructor(
     private readonly post: (state: DoctorState) => void,
-    private readonly loadChecks: Effect.Effect<ReadonlyArray<DoctorCheck>, never, Doctor> = Doctor.use((doctor) => doctor.checks),
+    private readonly loadChecks: Effect.Effect<ReadonlyArray<DoctorCheck>, never, Doctor> = Doctor.use(
+      (doctor) => doctor.checks,
+    ),
   ) {}
 
   /** The fix of the check `id`'s result, if any. */
@@ -290,6 +327,8 @@ export class DoctorPage {
 
   /** Stops the run going on, which also stops the agents it started. */
   get stop(): Effect.Effect<void> {
-    return Effect.suspend(() => (this.stopRequest ? Deferred.succeed(this.stopRequest, undefined).pipe(Effect.asVoid) : Effect.void));
+    return Effect.suspend(() =>
+      this.stopRequest ? Deferred.succeed(this.stopRequest, undefined).pipe(Effect.asVoid) : Effect.void,
+    );
   }
 }

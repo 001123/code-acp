@@ -12,7 +12,7 @@ export interface SidebarPrefs {
 }
 
 const read = (): SidebarPrefs => {
-  const saved = ((getState() as { sidebar?: Partial<Record<keyof SidebarPrefs, unknown>> } | undefined)?.sidebar ?? {});
+  const saved = (getState() as { sidebar?: Partial<Record<keyof SidebarPrefs, unknown>> } | undefined)?.sidebar ?? {};
   return {
     docked: saved.docked === true,
     sort: HISTORY_SORTS.find((sort) => sort === saved.sort) ?? "updated",

@@ -5,7 +5,14 @@ import { createHash } from "node:crypto";
 import * as vscode from "vscode";
 import type { AgentCommand } from "./acpClient";
 import { t } from "./i18n";
-import { binaryTarget, currentPlatform, isPathSegment, type BinaryTarget, type PackageDistribution, type RegistryAgent } from "./registry";
+import {
+  binaryTarget,
+  currentPlatform,
+  isPathSegment,
+  type BinaryTarget,
+  type PackageDistribution,
+  type RegistryAgent,
+} from "./registry";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
 import { CustomAgentEntry, readSettings } from "./settings";
 
@@ -87,27 +94,33 @@ export function installKind(agent: RegistryAgent): InstallKind | undefined {
 }
 
 /** Agents installed from the registry and custom agents from the settings, and which one the chat uses. */
-export class AgentManager extends Context.Service<AgentManager, {
-  /** Fires when agents are installed or removed, the default changes, or codeAcp.customAgents changes. */
-  readonly onDidChange: vscode.Event<void>;
-  readonly list: Effect.Effect<ReadonlyArray<InstalledAgent>>;
-  get(id: string): Effect.Effect<InstalledAgent | undefined>;
-  /** Every agent the chat can run: the installed ones, then the custom ones. */
-  readonly agents: Effect.Effect<ReadonlyArray<AgentChoice>>;
-  has(id: string): Effect.Effect<boolean>;
-  /** Command to launch the agent `id`, installed or custom; undefined when there is no such agent. */
-  command(id: string): Effect.Effect<AgentCommand | undefined>;
-  /** The default agent for new tabs, while it still exists. */
-  readonly activeId: Effect.Effect<string | undefined>;
-  readonly active: Effect.Effect<InstalledAgent | undefined>;
-  setActive(id: string | undefined): Effect.Effect<void, InstallError>;
-  /** Command to launch an installed agent, with the user's extra env applied. */
-  commandFor(agent: InstalledAgent): AgentCommand;
-  /** Command for the default agent; undefined when there is none. */
-  readonly selectedCommand: Effect.Effect<AgentCommand | undefined>;
-  install(agent: RegistryAgent, report: (message: string) => Effect.Effect<void>): Effect.Effect<InstalledAgent, InstallError>;
-  uninstall(id: string): Effect.Effect<void, InstallError>;
-}>()("code-acp/AgentManager") {
+export class AgentManager extends Context.Service<
+  AgentManager,
+  {
+    /** Fires when agents are installed or removed, the default changes, or codeAcp.customAgents changes. */
+    readonly onDidChange: vscode.Event<void>;
+    readonly list: Effect.Effect<ReadonlyArray<InstalledAgent>>;
+    get(id: string): Effect.Effect<InstalledAgent | undefined>;
+    /** Every agent the chat can run: the installed ones, then the custom ones. */
+    readonly agents: Effect.Effect<ReadonlyArray<AgentChoice>>;
+    has(id: string): Effect.Effect<boolean>;
+    /** Command to launch the agent `id`, installed or custom; undefined when there is no such agent. */
+    command(id: string): Effect.Effect<AgentCommand | undefined>;
+    /** The default agent for new tabs, while it still exists. */
+    readonly activeId: Effect.Effect<string | undefined>;
+    readonly active: Effect.Effect<InstalledAgent | undefined>;
+    setActive(id: string | undefined): Effect.Effect<void, InstallError>;
+    /** Command to launch an installed agent, with the user's extra env applied. */
+    commandFor(agent: InstalledAgent): AgentCommand;
+    /** Command for the default agent; undefined when there is none. */
+    readonly selectedCommand: Effect.Effect<AgentCommand | undefined>;
+    install(
+      agent: RegistryAgent,
+      report: (message: string) => Effect.Effect<void>,
+    ): Effect.Effect<InstalledAgent, InstallError>;
+    uninstall(id: string): Effect.Effect<void, InstallError>;
+  }
+>()("code-acp/AgentManager") {
   static readonly layer = Layer.effect(
     AgentManager,
     Effect.gen(function* () {
@@ -144,13 +157,18 @@ export class AgentManager extends Context.Service<AgentManager, {
           : Effect.logWarning(`[install] not removing unsafe path: ${segments.join("/")}`);
       const isInside = (dir: string, target: string) => {
         const relative = path.relative(dir, target);
-        return relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+        return (
+          relative !== "" && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
+        );
       };
       const update = (key: string, value: unknown) =>
         thenable(() => context.globalState.update(key, value)).pipe(Effect.mapError((err) => fail(err.message, err)));
 
       const state = Effect.sync((): InstalledAgents =>
-        Option.getOrElse(Schema.decodeUnknownOption(InstalledAgents)(context.globalState.get(INSTALLED_KEY)), () => ({})),
+        Option.getOrElse(
+          Schema.decodeUnknownOption(InstalledAgents)(context.globalState.get(INSTALLED_KEY)),
+          () => ({}),
+        ),
       );
       const has = (id: string) =>
         Effect.gen(function* () {
@@ -163,26 +181,23 @@ export class AgentManager extends Context.Service<AgentManager, {
       const notify = Effect.sync(() => changed.fire());
 
       /** Runs a command, streaming its output to the log; fails unless it exits with code 0. */
-      const run = Effect.fn("AgentManager.run")(
-        function* (command: string, args: ReadonlyArray<string>) {
-          yield* Effect.logInfo(`[install] ${command} ${args.join(" ")}`);
-          const handle = yield* spawner
-            .spawn(ChildProcess.make(command, args, { shell: process.platform === "win32" }))
-            .pipe(Effect.mapError((err) => fail(t("install.spawnFailed", command, err.message), err)));
-          yield* handle.all.pipe(
-            Stream.decodeText(),
-            Stream.runForEach((text) => Effect.sync(() => output.append(text))),
-            Effect.mapError((err) => fail(t("install.spawnFailed", command, err.message), err)),
-          );
-          const code = yield* handle.exitCode.pipe(
-            Effect.mapError((err) => fail(t("install.spawnFailed", command, err.message), err)),
-          );
-          if (code !== 0) {
-            return yield* fail(t("install.exitCode", command, code));
-          }
-        },
-        Effect.scoped,
-      );
+      const run = Effect.fn("AgentManager.run")(function* (command: string, args: ReadonlyArray<string>) {
+        yield* Effect.logInfo(`[install] ${command} ${args.join(" ")}`);
+        const handle = yield* spawner
+          .spawn(ChildProcess.make(command, args, { shell: process.platform === "win32" }))
+          .pipe(Effect.mapError((err) => fail(t("install.spawnFailed", command, err.message), err)));
+        yield* handle.all.pipe(
+          Stream.decodeText(),
+          Stream.runForEach((text) => Effect.sync(() => output.append(text))),
+          Effect.mapError((err) => fail(t("install.spawnFailed", command, err.message), err)),
+        );
+        const code = yield* handle.exitCode.pipe(
+          Effect.mapError((err) => fail(t("install.spawnFailed", command, err.message), err)),
+        );
+        if (code !== 0) {
+          return yield* fail(t("install.exitCode", command, code));
+        }
+      }, Effect.scoped);
 
       const installNpm = Effect.fn("AgentManager.installNpm")(function* (
         dist: PackageDistribution,
@@ -206,7 +221,11 @@ export class AgentManager extends Context.Service<AgentManager, {
           return yield* fail(t("install.noBin", name));
         }
         const node = readSettings().nodePath || "node";
-        return { command: node, args: [path.join(pkgDir, bin), ...(dist.args ?? [])], env: dist.env ?? {} } satisfies Launch;
+        return {
+          command: node,
+          args: [path.join(pkgDir, bin), ...(dist.args ?? [])],
+          env: dist.env ?? {},
+        } satisfies Launch;
       });
 
       const installBinary = Effect.fn("AgentManager.installBinary")(function* (
@@ -219,12 +238,16 @@ export class AgentManager extends Context.Service<AgentManager, {
         const file = path.join(dir, fileName);
 
         yield* report(t("install.download", fileName));
-        const res = yield* http.get(url).pipe(Effect.mapError((err) => fail(t("install.downloadFailed", url, err.message), err)));
+        const res = yield* http
+          .get(url)
+          .pipe(Effect.mapError((err) => fail(t("install.downloadFailed", url, err.message), err)));
         if (res.status < 200 || res.status >= 300) {
           return yield* fail(t("install.downloadFailed", url, res.status));
         }
         const data = new Uint8Array(
-          yield* res.arrayBuffer.pipe(Effect.mapError((err) => fail(t("install.downloadFailed", url, err.message), err))),
+          yield* res.arrayBuffer.pipe(
+            Effect.mapError((err) => fail(t("install.downloadFailed", url, err.message), err)),
+          ),
         );
         if (target.sha256 === undefined) {
           yield* Effect.logWarning(`[install] no SHA-256 checksum for ${url}`);
@@ -260,70 +283,76 @@ export class AgentManager extends Context.Service<AgentManager, {
         return { command: cmd, args: target.args ?? [], env: target.env ?? {} } satisfies Launch;
       });
 
-      const install = Effect.fn("AgentManager.install")(function* (
-        agent: RegistryAgent,
-        report: (message: string) => Effect.Effect<void>,
-      ) {
-        const kind = installKind(agent);
-        if (!kind) {
-          return yield* fail(t("install.unsupported", agent.name, currentPlatform() ?? process.platform));
-        }
-        if (!isPathSegment(agent.id) || !isPathSegment(agent.version)) {
-          return yield* fail(t("install.unsafePath", `${agent.id}/${agent.version}`));
-        }
-        const dir = path.join(root, agent.id, agent.version);
-        const binary = binaryTarget(agent);
-        // Before removeDir, so a bad entry does not cost the copy already installed.
-        if (binary && !isInside(dir, path.resolve(dir, binary.cmd))) {
-          return yield* fail(t("install.unsafePath", binary.cmd));
-        }
-        yield* removeDir(dir);
-        yield* fs.makeDirectory(dir, { recursive: true });
+      const install = Effect.fn("AgentManager.install")(
+        function* (agent: RegistryAgent, report: (message: string) => Effect.Effect<void>) {
+          const kind = installKind(agent);
+          if (!kind) {
+            return yield* fail(t("install.unsupported", agent.name, currentPlatform() ?? process.platform));
+          }
+          if (!isPathSegment(agent.id) || !isPathSegment(agent.version)) {
+            return yield* fail(t("install.unsafePath", `${agent.id}/${agent.version}`));
+          }
+          const dir = path.join(root, agent.id, agent.version);
+          const binary = binaryTarget(agent);
+          // Before removeDir, so a bad entry does not cost the copy already installed.
+          if (binary && !isInside(dir, path.resolve(dir, binary.cmd))) {
+            return yield* fail(t("install.unsafePath", binary.cmd));
+          }
+          yield* removeDir(dir);
+          yield* fs.makeDirectory(dir, { recursive: true });
 
-        const launch = yield* Effect.gen(function* () {
-          const { npx, uvx } = agent.distribution;
-          if (kind === "binary" && binary) {
-            return yield* installBinary(binary, dir, report);
-          }
-          if (kind === "npx" && npx) {
-            return yield* installNpm(npx, dir, report);
-          }
-          if (uvx) {
-            yield* report(t("install.checkUvx"));
-            yield* run("uvx", ["--version"]);
-            return { command: "uvx", args: [uvx.package, ...(uvx.args ?? [])], env: uvx.env ?? {} } satisfies Launch;
-          }
-          return yield* fail(t("install.unsupported", agent.name, currentPlatform() ?? process.platform));
-        }).pipe(Effect.onError(() => removeDir(dir).pipe(Effect.ignore)));
-
-        const installed: InstalledAgent = {
-          id: agent.id,
-          name: agent.name,
-          version: agent.version,
-          kind,
-          icon: agent.icon,
-          ...launch,
-        };
-        const previous = yield* Semaphore.withPermits(stateLock, 1)(
-          Effect.gen(function* () {
-            const current = yield* state;
-            yield* update(INSTALLED_KEY, { ...current, [agent.id]: installed });
-            if (!(yield* activeId)) {
-              yield* update(ACTIVE_KEY, agent.id);
+          const launch = yield* Effect.gen(function* () {
+            const { npx, uvx } = agent.distribution;
+            if (kind === "binary" && binary) {
+              return yield* installBinary(binary, dir, report);
             }
-            return current[agent.id];
-          }),
-        );
-        if (previous && previous.version !== agent.version) {
-          yield* removeAgentDir(agent.id, previous.version);
-        }
-        yield* notify;
-        return installed;
-      }, Effect.mapError((err) => (err instanceof InstallError ? err : fail(messageOf(err), err))));
+            if (kind === "npx" && npx) {
+              return yield* installNpm(npx, dir, report);
+            }
+            if (uvx) {
+              yield* report(t("install.checkUvx"));
+              yield* run("uvx", ["--version"]);
+              return { command: "uvx", args: [uvx.package, ...(uvx.args ?? [])], env: uvx.env ?? {} } satisfies Launch;
+            }
+            return yield* fail(t("install.unsupported", agent.name, currentPlatform() ?? process.platform));
+          }).pipe(Effect.onError(() => removeDir(dir).pipe(Effect.ignore)));
+
+          const installed: InstalledAgent = {
+            id: agent.id,
+            name: agent.name,
+            version: agent.version,
+            kind,
+            icon: agent.icon,
+            ...launch,
+          };
+          const previous = yield* Semaphore.withPermits(
+            stateLock,
+            1,
+          )(
+            Effect.gen(function* () {
+              const current = yield* state;
+              yield* update(INSTALLED_KEY, { ...current, [agent.id]: installed });
+              if (!(yield* activeId)) {
+                yield* update(ACTIVE_KEY, agent.id);
+              }
+              return current[agent.id];
+            }),
+          );
+          if (previous && previous.version !== agent.version) {
+            yield* removeAgentDir(agent.id, previous.version);
+          }
+          yield* notify;
+          return installed;
+        },
+        Effect.mapError((err) => (err instanceof InstallError ? err : fail(messageOf(err), err))),
+      );
 
       const uninstall = Effect.fn("AgentManager.uninstall")(function* (id: string) {
         yield* removeAgentDir(id).pipe(Effect.mapError((err) => fail(err.message, err)));
-        yield* Semaphore.withPermits(stateLock, 1)(
+        yield* Semaphore.withPermits(
+          stateLock,
+          1,
+        )(
           Effect.gen(function* () {
             const { [id]: _removed, ...rest } = yield* state;
             yield* update(INSTALLED_KEY, rest);
@@ -361,7 +390,12 @@ export class AgentManager extends Context.Service<AgentManager, {
         list: Effect.map(state, Object.values),
         get: (id) => Effect.map(state, (agents) => agents[id]),
         agents: Effect.gen(function* () {
-          const installed = Object.values(yield* state).map(({ id, name, version, icon }): AgentChoice => ({ id, name, version, icon }));
+          const installed = Object.values(yield* state).map(({ id, name, version, icon }): AgentChoice => ({
+            id,
+            name,
+            version,
+            icon,
+          }));
           const custom = [...(yield* customAgents)].map(([id, { name }]): AgentChoice => ({ id, name }));
           return [...installed, ...custom];
         }),

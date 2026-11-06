@@ -13,7 +13,8 @@ const posted: Array<unknown> = [];
   getState: () => undefined,
   setState: () => {},
 });
-const { AgentPicker, AgentSetup, checkOutcome, needsSetup, suggestedAgents } = await import("../src/ui/chat/agentSetup");
+const { AgentPicker, AgentSetup, checkOutcome, needsSetup, suggestedAgents } =
+  await import("../src/ui/chat/agentSetup");
 
 const agent = (id: string, extra: Partial<CatalogAgent> = {}): CatalogAgent => ({
   id,
@@ -24,17 +25,27 @@ const agent = (id: string, extra: Partial<CatalogAgent> = {}): CatalogAgent => (
   active: false,
   ...extra,
 });
-const state = (agents: CatalogAgent[], extra: Partial<CatalogState> = {}): CatalogState => ({ agents, loading: false, ...extra });
+const state = (agents: CatalogAgent[], extra: Partial<CatalogState> = {}): CatalogState => ({
+  agents,
+  loading: false,
+  ...extra,
+});
 const three = [agent("other"), agent("antigravity-acp", { kind: "binary" }), agent("codex-acp"), agent("claude-acp")];
 
 describe("suggestedAgents", () => {
   it("gives Claude, Codex and Antigravity in that order", () => {
-    assert.deepStrictEqual(suggestedAgents(three).map((a) => a.id), ["claude-acp", "codex-acp", "antigravity-acp"]);
+    assert.deepStrictEqual(
+      suggestedAgents(three).map((a) => a.id),
+      ["claude-acp", "codex-acp", "antigravity-acp"],
+    );
   });
 
   it("leaves out what this machine can't install", () => {
     const agents = [agent("claude-acp"), agent("antigravity-acp", { kind: undefined })];
-    assert.deepStrictEqual(suggestedAgents(agents).map((a) => a.id), ["claude-acp"]);
+    assert.deepStrictEqual(
+      suggestedAgents(agents).map((a) => a.id),
+      ["claude-acp"],
+    );
   });
 });
 
@@ -114,7 +125,11 @@ const tools = (results: Record<string, DoctorResult | undefined>, running = fals
   running,
 });
 const ok: DoctorResult = { status: "ok", description: "1.0.0" };
-const missing = (status: "warning" | "error"): DoctorResult => ({ status, detail: "Not found", fix: { type: "open", url: "https://example.com" } });
+const missing = (status: "warning" | "error"): DoctorResult => ({
+  status,
+  detail: "Not found",
+  fix: { type: "open", url: "https://example.com" },
+});
 
 describe("checkOutcome", () => {
   it("is still checking before the first result and during a run", () => {
@@ -134,7 +149,8 @@ describe("AgentSetup", () => {
   let root: Root;
   const catalog = state(three);
   const render = (doctor: DoctorState) => act(() => root.render(createElement(AgentSetup, { catalog, doctor })));
-  const button = (text: string) => [...document.querySelectorAll<HTMLButtonElement>("#agent-setup button")].find((b) => b.textContent === text);
+  const button = (text: string) =>
+    [...document.querySelectorAll<HTMLButtonElement>("#agent-setup button")].find((b) => b.textContent === text);
   const picker = () => document.querySelector(".setup-agent");
 
   beforeEach(() => {

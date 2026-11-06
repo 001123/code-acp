@@ -37,7 +37,12 @@ const manager = {
   onDidChange: managerChanged.event,
   agents: Effect.sync(() => agentList),
   has: (id: string) => Effect.sync(() => installed && agentList.some((agent) => agent.id === id)),
-  command: () => Effect.sync(() => ({ command: process.execPath, args: [MOCK_AGENT], env: { ...process.env, MOCK_FORK: "1", ...agentEnv } })),
+  command: () =>
+    Effect.sync(() => ({
+      command: process.execPath,
+      args: [MOCK_AGENT],
+      env: { ...process.env, MOCK_FORK: "1", ...agentEnv },
+    })),
   activeId: Effect.sync(() => activeAgent),
   setActive: () => Effect.void,
 } as unknown as AgentManager["Service"];
@@ -112,8 +117,10 @@ const until = (ready: () => boolean, what: string) =>
 const startChat = Effect.gen(function* () {
   const chat = yield* openChat;
   const { posted, send } = chat;
-  const ofType = (type: string, tab?: number) => posted.filter((m) => m.type === type && (tab === undefined || m.tab === tab));
-  const tabsNow = () => ofType("tabs").at(-1) as { tabs: TabInfo[]; groups: TabGroupInfo[]; active: number; shownGroup?: number };
+  const ofType = (type: string, tab?: number) =>
+    posted.filter((m) => m.type === type && (tab === undefined || m.tab === tab));
+  const tabsNow = () =>
+    ofType("tabs").at(-1) as { tabs: TabInfo[]; groups: TabGroupInfo[]; active: number; shownGroup?: number };
   const say = (tab: number, text: string) => send({ type: "send", tab, parts: [text] });
   const replyOf = (tab: number) =>
     ofType("update", tab)
@@ -146,7 +153,10 @@ describe("ChatViewProvider", () => {
         const last = () => posted.filter((m) => m.type === "doctor").at(-1)?.doctor;
         send({ type: "doctorRun" });
         yield* until(() => last()?.rows.length > 0 && !last().running, "the check to end");
-        assert.deepStrictEqual(last().rows.map((row: Posted) => row.id), ["node", "npm", "uv", "git"]);
+        assert.deepStrictEqual(
+          last().rows.map((row: Posted) => row.id),
+          ["node", "npm", "uv", "git"],
+        );
         assert.strictEqual(last().rows[1].result.status, "error");
 
         send({ type: "doctorFix", id: "npm" });
@@ -176,7 +186,8 @@ describe("ChatViewProvider", () => {
   );
 
   describe("saving tabs", () => {
-    const savedText = (context: vscode.ExtensionContext) => JSON.stringify(context.workspaceState.get("codeAcp.tabs") ?? null);
+    const savedText = (context: vscode.ExtensionContext) =>
+      JSON.stringify(context.workspaceState.get("codeAcp.tabs") ?? null);
 
     it.live("writes a draft right away, as a window reload drops what isn't written yet", () =>
       Effect.scoped(
@@ -223,7 +234,10 @@ describe("ChatViewProvider", () => {
       Effect.gen(function* () {
         const { ofType, tab, tabsNow } = yield* startChat;
         assert.strictEqual(ofType("session", tab)[0]!.sessionId, "s1");
-        assert.deepStrictEqual(ofType("agent")[0]!.agents.map((a: { id: string }) => a.id), ["mock"]);
+        assert.deepStrictEqual(
+          ofType("agent")[0]!.agents.map((a: { id: string }) => a.id),
+          ["mock"],
+        );
         assert.strictEqual(ofType("folders").length, 1);
         assert.strictEqual(tabsNow().tabs.length, 1);
       }),
@@ -242,7 +256,10 @@ describe("ChatViewProvider", () => {
           assert.include(replyOf(tab), `"optionId":"allow"`);
           assert.strictEqual(ofType("permissionRequest", tab).length, 0);
           const notices = ofType("notice", tab).filter((m) => m.key === "chat.autoApproved");
-          assert.deepStrictEqual(notices.map((m) => m.args), [["Do it"]]);
+          assert.deepStrictEqual(
+            notices.map((m) => m.args),
+            [["Do it"]],
+          );
         }),
       ),
     );
@@ -305,12 +322,18 @@ describe("ChatViewProvider", () => {
       Effect.gen(function* () {
         const { ofType } = yield* startChat;
         assert.deepStrictEqual(ofType("showRestore").at(-1), { type: "showRestore", enabled: false });
-        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), { type: "rememberSessionOptions", enabled: true });
+        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), {
+          type: "rememberSessionOptions",
+          enabled: true,
+        });
         __test.setSetting("codeAcp.showRestore", true);
         __test.setSetting("codeAcp.rememberSessionOptions", false);
         yield* until(() => ofType("rememberSessionOptions").at(-1)?.enabled === false, "the setting");
         assert.deepStrictEqual(ofType("showRestore").at(-1), { type: "showRestore", enabled: true });
-        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), { type: "rememberSessionOptions", enabled: false });
+        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), {
+          type: "rememberSessionOptions",
+          enabled: false,
+        });
       }),
     ),
   );
@@ -384,7 +407,10 @@ describe("ChatViewProvider", () => {
         send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "allow" });
         yield* until(() => ofType("turnEnd", tab).length === 2, "both turns");
         assert.strictEqual(ofType("permissionDone", tab).length, 1);
-        assert.deepStrictEqual(ofType("userMessage", tab).map((m) => m.text), ["permission", "updates"]);
+        assert.deepStrictEqual(
+          ofType("userMessage", tab).map((m) => m.text),
+          ["permission", "updates"],
+        );
         assert.include(replyOf(tab), '"optionId":"allow"');
         assert.include(replyOf(tab), "hello world");
         assert.deepStrictEqual(ofType("queue", tab).at(-1)?.items, []);
@@ -453,7 +479,9 @@ describe("ChatViewProvider", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { ofType, send, provider, runtime, tab } = yield* startChat;
-        yield* Effect.promise(() => runtime.runPromise(provider.composer.attach([Uri.file("/w/a.ts") as unknown as vscode.Uri])));
+        yield* Effect.promise(() =>
+          runtime.runPromise(provider.composer.attach([Uri.file("/w/a.ts") as unknown as vscode.Uri])),
+        );
         assert.strictEqual(ofType("addAttachments")[0]!.attachments.length, 1);
         send({ type: "cancel", tab: tab + 100 });
         send({ type: "searchFiles", id: 7, query: "nothing-matches" });
@@ -475,7 +503,9 @@ describe("ChatViewProvider", () => {
           return undefined;
         };
         yield* Effect.addFinalizer(() => Effect.sync(() => (commands.executeCommand = original)));
-        yield* Effect.promise(() => runtime.runPromise(provider.composer.attach([Uri.file("/w/a.ts") as unknown as vscode.Uri])));
+        yield* Effect.promise(() =>
+          runtime.runPromise(provider.composer.attach([Uri.file("/w/a.ts") as unknown as vscode.Uri])),
+        );
         assert.deepStrictEqual(focused, [0]);
         assert.strictEqual(posted.at(-1)!.type, "focusComposer");
       }),
@@ -515,11 +545,17 @@ describe("ChatViewProvider", () => {
         const other = yield* addTab;
         send({ type: "pinTab", tab: pinned, pinned: true });
         yield* until(() => tabsNow().tabs.some((t) => t.id === pinned && t.pinned), "the pin");
-        const act = (id: number, action: Parameters<typeof provider.tabAction>[1]) => Effect.promise(() => runtime.runPromise(provider.tabAction(id, action)));
+        const act = (id: number, action: Parameters<typeof provider.tabAction>[1]) =>
+          Effect.promise(() => runtime.runPromise(provider.tabAction(id, action)));
         yield* act(pinned, "close");
         assert.isTrue(tabsNow().tabs.some((t) => t.id === pinned));
         yield* act(tab, "closeOthers");
-        assert.deepStrictEqual(tabsNow().tabs.map((t) => t.id).sort(), [tab, pinned].sort());
+        assert.deepStrictEqual(
+          tabsNow()
+            .tabs.map((t) => t.id)
+            .sort(),
+          [tab, pinned].sort(),
+        );
         assert.isFalse(tabsNow().tabs.some((t) => t.id === other));
         assert.strictEqual(tabsNow().active, tab);
         assert.deepStrictEqual(ofType("error"), []);
@@ -616,8 +652,10 @@ describe("ChatViewProvider", () => {
   );
 
   describe("restarting an agent that can reopen sessions", () => {
-    const restartIn = (chat: { runtime: { runPromise: (effect: any) => Promise<unknown> }; provider: ChatViewProvider }, agentId?: string) =>
-      Effect.promise(() => chat.runtime.runPromise(chat.provider.restart(agentId)));
+    const restartIn = (
+      chat: { runtime: { runPromise: (effect: any) => Promise<unknown> }; provider: ChatViewProvider },
+      agentId?: string,
+    ) => Effect.promise(() => chat.runtime.runPromise(chat.provider.restart(agentId)));
 
     it.live("keeps the conversation of the active tab, and of the others until selected", () =>
       Effect.scoped(
@@ -825,7 +863,10 @@ describe("ChatViewProvider", () => {
 
     it.live("logs in to another agent in a new tab, leaving the active one alone", () =>
       Effect.gen(function* () {
-        agentList = [{ id: "mock", name: "Mock" }, { id: "other", name: "Other" }];
+        agentList = [
+          { id: "mock", name: "Mock" },
+          { id: "other", name: "Other" },
+        ];
         const { runtime, provider, tabsNow, tab } = yield* startChat;
         agentEnv = { MOCK_AUTH: "1", MOCK_TERMINAL_AUTH: "1" };
         const login = runtime.runPromise(provider.loginTo("other"));
@@ -907,7 +948,10 @@ describe("ChatViewProvider", () => {
         yield* until(() => ofType("elicitationComplete", tab).length === 1, "the link to complete");
         yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
         yield* idle(tab);
-        assert.deepStrictEqual(ofType("elicitationDone", tab).map((m) => m.action), ["cancel"]);
+        assert.deepStrictEqual(
+          ofType("elicitationDone", tab).map((m) => m.action),
+          ["cancel"],
+        );
         assert.deepStrictEqual(__test.openedExternal, []);
         assert.deepStrictEqual(JSON.parse(replyOf(tab)), { action: "cancel" });
       }).pipe(Effect.scoped),
@@ -990,12 +1034,10 @@ describe("ChatViewProvider", () => {
       yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
       yield* idle(tab);
       const updates = ofType("update", tab).map((m) => m.update.sessionUpdate);
-      assert.deepStrictEqual(updates.filter((u) => u.startsWith("compaction")), [
-        "compaction_update",
-        "compaction_summary_chunk",
-        "compaction_summary_chunk",
-        "compaction_update",
-      ]);
+      assert.deepStrictEqual(
+        updates.filter((u) => u.startsWith("compaction")),
+        ["compaction_update", "compaction_summary_chunk", "compaction_summary_chunk", "compaction_update"],
+      );
     }).pipe(Effect.scoped),
   );
 
@@ -1023,7 +1065,8 @@ describe("ChatViewProvider", () => {
   describe("best of N", () => {
     const showWarningMessage = window.showWarningMessage;
     const realHome = process.env.HOME;
-    const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" });
+    const git = (cwd: string, ...args: string[]) =>
+      execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" });
     /** The question's first action, or none. */
     const answering = (yes: boolean) => {
       const asked: string[] = [];
@@ -1062,7 +1105,10 @@ describe("ChatViewProvider", () => {
       git(folder, "add", "--all");
       git(folder, "commit", "--quiet", "-m", "init");
       const members = () => chat.tabsNow().tabs.filter((tab) => tab.group !== undefined);
-      const finished = until(() => members().length === 2 && members().every((tab) => tab.attempt === "done"), "both agents to finish");
+      const finished = until(
+        () => members().length === 2 && members().every((tab) => tab.attempt === "done"),
+        "both agents to finish",
+      );
       const started = (prompt: string) =>
         Effect.gen(function* () {
           chat.send({ type: "bestOf", tab: chat.tab, parts: [prompt], attempts: both });
@@ -1207,39 +1253,52 @@ describe("ChatViewProvider", () => {
       }).pipe(Effect.scoped),
     );
 
-    it.live("starts each attempt on the model and effort picked for it, without changing what the agent's next sessions start with", () =>
-      Effect.gen(function* () {
-        agentEnv = { MOCK_MODELS: "1" };
-        const { send, members, ofType, tabsNow, tab, context } = yield* startInRepo;
-        send({
-          type: "bestOf",
-          tab,
-          parts: ["updates"],
-          attempts: [
-            { agentId: "mock", model: "big", effort: "high", label: "Big · High" },
-            { agentId: "mock", model: "small", effort: "", label: "Small" },
-          ],
-        });
-        yield* until(() => members().length === 2 && members().every((each) => each.attempt === "done"), "both to finish");
-        const [big, small] = members();
-        const picked = (id: number) =>
-          (ofType("session", id).at(-1)!.configOptions as Array<{ id: string; currentValue: string }>).map((option) => option.currentValue);
-        assert.deepStrictEqual(picked(big!.id), ["big", "high"]);
-        assert.deepStrictEqual(picked(small!.id), ["small", "low"]);
-        assert.strictEqual(big!.attemptLabel, "Big · High");
-        assert.isUndefined(context.globalState.get("codeAcp.lastSessionOptions"));
-        for (const each of members()) {
-          yield* until(() => ofType("status", each.id).at(-1)?.busy === false, "the tab to be idle");
-        }
+    it.live(
+      "starts each attempt on the model and effort picked for it, without changing what the agent's next sessions start with",
+      () =>
+        Effect.gen(function* () {
+          agentEnv = { MOCK_MODELS: "1" };
+          const { send, members, ofType, tabsNow, tab, context } = yield* startInRepo;
+          send({
+            type: "bestOf",
+            tab,
+            parts: ["updates"],
+            attempts: [
+              { agentId: "mock", model: "big", effort: "high", label: "Big · High" },
+              { agentId: "mock", model: "small", effort: "", label: "Small" },
+            ],
+          });
+          yield* until(
+            () => members().length === 2 && members().every((each) => each.attempt === "done"),
+            "both to finish",
+          );
+          const [big, small] = members();
+          const picked = (id: number) =>
+            (ofType("session", id).at(-1)!.configOptions as Array<{ id: string; currentValue: string }>).map(
+              (option) => option.currentValue,
+            );
+          assert.deepStrictEqual(picked(big!.id), ["big", "high"]);
+          assert.deepStrictEqual(picked(small!.id), ["small", "low"]);
+          assert.strictEqual(big!.attemptLabel, "Big · High");
+          assert.isUndefined(context.globalState.get("codeAcp.lastSessionOptions"));
+          for (const each of members()) {
+            yield* until(() => ofType("status", each.id).at(-1)?.busy === false, "the tab to be idle");
+          }
 
-        // Still so after a reload, for the sessions to reopen with.
-        yield* until(() => (context.workspaceState.get("codeAcp.tabs") as { tabs: Array<{ wanted?: unknown }> } | undefined)?.tabs.some((each) => each.wanted) === true, "the tabs to be saved");
-        const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
-        const saved = restored.all.find((each) => each.group !== undefined);
-        assert.deepStrictEqual(saved!.wanted, { model: "big", effort: "high" });
-        assert.strictEqual(saved!.attemptLabel, "Big · High");
-        assert.strictEqual(tabsNow().groups.length, 1);
-      }).pipe(Effect.scoped),
+          // Still so after a reload, for the sessions to reopen with.
+          yield* until(
+            () =>
+              (
+                context.workspaceState.get("codeAcp.tabs") as { tabs: Array<{ wanted?: unknown }> } | undefined
+              )?.tabs.some((each) => each.wanted) === true,
+            "the tabs to be saved",
+          );
+          const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
+          const saved = restored.all.find((each) => each.group !== undefined);
+          assert.deepStrictEqual(saved!.wanted, { model: "big", effort: "high" });
+          assert.strictEqual(saved!.attemptLabel, "Big · High");
+          assert.strictEqual(tabsNow().groups.length, 1);
+        }).pipe(Effect.scoped),
     );
 
     it.live("reads an attempt's options from a session on that model, and says why it can't otherwise", () =>
@@ -1281,7 +1340,10 @@ describe("ChatViewProvider", () => {
         assert.strictEqual(worktreeCount(), 1);
         assert.isUndefined(info().worktree);
         // Still ticked after a reload.
-        yield* until(() => new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d").all[0]?.worktreeOnSend === true, "the tick to be saved");
+        yield* until(
+          () => new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d").all[0]?.worktreeOnSend === true,
+          "the tick to be saved",
+        );
         say(tab, "updates đăng nhập");
         yield* until(() => ofType("turnEnd", tab).length === 1, "the turn");
         yield* idle(tab);
@@ -1296,7 +1358,8 @@ describe("ChatViewProvider", () => {
         send({ type: "toggleWorktree", tab });
         answering(true);
         const { showQuickPick } = window;
-        window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "local")) as typeof window.showQuickPick;
+        window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "local")) as typeof window.showQuickPick;
         send({ type: "pickWorktree", tab });
         yield* until(() => info().worktree === undefined, "the tab back in the folder").pipe(
           Effect.ensuring(
@@ -1328,29 +1391,40 @@ describe("ChatViewProvider", () => {
         assert.strictEqual(ofType("userMessage", tab).length, 1);
         answering(true);
         say(tab, "updates second");
-        yield* until(() => info().worktree !== undefined && ofType("turnEnd", tab).length === 2, "the turn in the worktree");
+        yield* until(
+          () => info().worktree !== undefined && ofType("turnEnd", tab).length === 2,
+          "the turn in the worktree",
+        );
         assert.strictEqual(info().worktree!.base, folder);
       }).pipe(Effect.scoped),
     );
 
-    it.live("keeps the queued messages when a ticked box starts the conversation over, and sends them in the worktree", () =>
-      Effect.gen(function* () {
-        const { folder, ofType, say, send, tab, tabsNow, idle } = yield* startInRepo;
-        const info = () => tabsNow().tabs.find((each) => each.id === tab)!;
-        say(tab, "permission");
-        yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
-        send({ type: "toggleWorktree", tab });
-        yield* until(() => info().worktreeOnSend === true, "the tick");
-        say(tab, "updates one");
-        say(tab, "updates two");
-        yield* until(() => ofType("queue", tab).at(-1)?.items.length === 2, "the queued messages");
-        answering(true);
-        send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "allow" });
-        yield* until(() => ofType("userMessage", tab).length === 3 && ofType("queue", tab).at(-1)?.items.length === 0, "both messages to go");
-        yield* idle(tab);
-        assert.deepStrictEqual(ofType("userMessage", tab).map((m) => m.text), ["permission", "updates one", "updates two"]);
-        assert.strictEqual(info().worktree!.base, folder);
-      }).pipe(Effect.scoped),
+    it.live(
+      "keeps the queued messages when a ticked box starts the conversation over, and sends them in the worktree",
+      () =>
+        Effect.gen(function* () {
+          const { folder, ofType, say, send, tab, tabsNow, idle } = yield* startInRepo;
+          const info = () => tabsNow().tabs.find((each) => each.id === tab)!;
+          say(tab, "permission");
+          yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
+          send({ type: "toggleWorktree", tab });
+          yield* until(() => info().worktreeOnSend === true, "the tick");
+          say(tab, "updates one");
+          say(tab, "updates two");
+          yield* until(() => ofType("queue", tab).at(-1)?.items.length === 2, "the queued messages");
+          answering(true);
+          send({ type: "permission", id: ofType("permissionRequest", tab)[0]!.id, optionId: "allow" });
+          yield* until(
+            () => ofType("userMessage", tab).length === 3 && ofType("queue", tab).at(-1)?.items.length === 0,
+            "both messages to go",
+          );
+          yield* idle(tab);
+          assert.deepStrictEqual(
+            ofType("userMessage", tab).map((m) => m.text),
+            ["permission", "updates one", "updates two"],
+          );
+          assert.strictEqual(info().worktree!.base, folder);
+        }).pipe(Effect.scoped),
     );
 
     it.live("names the branch of a new tab's worktree after its first prompt only", () =>
@@ -1404,13 +1478,18 @@ describe("ChatViewProvider", () => {
         const bin = path.join(root, "bin");
         yield* Effect.promise(async () => {
           await fs.mkdir(bin);
-          await fs.writeFile(path.join(bin, "gh"), '#!/bin/sh\nif [ "$2" = "list" ]; then echo "[]"; exit 0; fi\ncat > /dev/null\necho https://example.test/pr/1\n', { mode: 0o755 });
+          await fs.writeFile(
+            path.join(bin, "gh"),
+            '#!/bin/sh\nif [ "$2" = "list" ]; then echo "[]"; exit 0; fi\ncat > /dev/null\necho https://example.test/pr/1\n',
+            { mode: 0o755 },
+          );
         });
         const realPath = process.env.PATH;
         process.env.PATH = `${bin}${path.delimiter}${realPath}`;
         const { showInputBox, showQuickPick } = window;
         window.showInputBox = async () => "add new";
-        window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "pr")) as typeof window.showQuickPick;
+        window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "pr")) as typeof window.showQuickPick;
         yield* Effect.gen(function* () {
           send({ type: "finishWorktree", tab: added });
           yield* until(() => ofType("prDraft", added).length === 1, "the draft");
@@ -1421,7 +1500,10 @@ describe("ChatViewProvider", () => {
           assert.notStrictEqual(git(worktreeRoot, "log", "--format=%s").split("\n")[0], "init");
           assert.strictEqual(git(remote, "branch", "--list", branch!), "");
           send({ type: "createPr", tab: added, title: "The title", body: "The body" });
-          yield* until(() => ofType("prDraft", added).some((message) => message.draft === undefined), "the draft to go");
+          yield* until(
+            () => ofType("prDraft", added).some((message) => message.draft === undefined),
+            "the draft to go",
+          );
           assert.notStrictEqual(git(remote, "branch", "--list", branch!), "");
         }).pipe(
           Effect.ensuring(
@@ -1441,9 +1523,17 @@ describe("ChatViewProvider", () => {
         send({ type: "bestOf", tab, parts: ["just one"], attempts: both.slice(0, 1) });
         yield* until(() => ofType("loadComposer", tab).length === 1, "the prompt to come back");
         // An agent uninstalled since it was picked doesn't count.
-        send({ type: "bestOf", tab, parts: ["one left"], attempts: [both[0]!, { agentId: "gone", model: "", effort: "" }] });
+        send({
+          type: "bestOf",
+          tab,
+          parts: ["one left"],
+          attempts: [both[0]!, { agentId: "gone", model: "", effort: "" }],
+        });
         yield* until(() => ofType("loadComposer", tab).length === 2, "the prompt to come back");
-        assert.deepStrictEqual(ofType("loadComposer", tab).map((m) => m.parts), [["just one"], ["one left"]]);
+        assert.deepStrictEqual(
+          ofType("loadComposer", tab).map((m) => m.parts),
+          [["just one"], ["one left"]],
+        );
         assert.strictEqual(tabsNow().tabs.length, 1);
         assert.deepStrictEqual(tabsNow().groups, []);
       }).pipe(Effect.scoped),
@@ -1468,7 +1558,10 @@ describe("ChatViewProvider", () => {
         git(folder, "init", "--quiet");
         send({ type: "bestOf", tab, parts: ["go"], attempts: both });
         const members = () => tabsNow().tabs.filter((each) => each.group !== undefined);
-        yield* until(() => members().length === 2 && members().every((each) => each.attempt === "failed"), "both to fail");
+        yield* until(
+          () => members().length === 2 && members().every((each) => each.attempt === "failed"),
+          "both to fail",
+        );
         for (const member of members()) {
           assert.isUndefined(member.worktree);
           assert.deepStrictEqual(ofType("session", member.id), []);
@@ -1486,7 +1579,12 @@ describe("ChatViewProvider", () => {
         yield* started("updates");
         send({ type: "renameGroup", group: members()[0]!.group!, title: "Named" });
         yield* until(() => tabsNow().groups[0]?.title === "Named", "the name");
-        yield* until(() => (context.workspaceState.get("codeAcp.tabs") as { groups?: Array<{ name?: string }> } | undefined)?.groups?.[0]?.name === "Named", "the tabs to be saved");
+        yield* until(
+          () =>
+            (context.workspaceState.get("codeAcp.tabs") as { groups?: Array<{ name?: string }> } | undefined)
+              ?.groups?.[0]?.name === "Named",
+          "the tabs to be saved",
+        );
         const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
         assert.strictEqual(restored.groups.length, 1);
         assert.strictEqual(restored.groups[0]!.name, "Named");

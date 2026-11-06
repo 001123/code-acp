@@ -24,7 +24,9 @@ export function workspaceFolders(): Folder[] {
 export function folderOf(file: string): Folder | undefined {
   const inside = (folder: Folder) => {
     const relative = path.relative(folder.path, file);
-    return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+    return (
+      relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+    );
   };
   return workspaceFolders()
     .filter(inside)
@@ -88,5 +90,12 @@ export const gitIgnored = Effect.fn("gitIgnored")(function* (uris: ReadonlyArray
         .pipe(Effect.orElseSucceed(() => "")),
     { concurrency: "unbounded" },
   );
-  return new Set(outputs.flatMap((out) => out.split("\n").filter(Boolean).map((file) => path.resolve(file))));
+  return new Set(
+    outputs.flatMap((out) =>
+      out
+        .split("\n")
+        .filter(Boolean)
+        .map((file) => path.resolve(file)),
+    ),
+  );
 });

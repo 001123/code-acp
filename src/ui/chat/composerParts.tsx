@@ -10,7 +10,19 @@ import type { Preview } from "./context";
 import { post } from "./post";
 
 /** A checkbox for how the composer's next message is sent. */
-export function ComposerCheckbox({ label, title, checked, disabled, onToggle }: { label: string; title: string; checked: boolean; disabled?: boolean; onToggle: () => void }) {
+export function ComposerCheckbox({
+  label,
+  title,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  label: string;
+  title: string;
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
   return (
     <label className="composer-toggle" title={title}>
       <input
@@ -84,7 +96,13 @@ export function EditingBar({ onCancel }: { onCancel: () => void }) {
     <div id="editing">
       <Icon svg={pencilIcon} />
       <span className="editing-text">{t("chat.editing")}</span>
-      <button type="button" className="icon-btn small" title={t("chat.cancelEdit")} aria-label={t("chat.cancelEdit")} onClick={onCancel}>
+      <button
+        type="button"
+        className="icon-btn small"
+        title={t("chat.cancelEdit")}
+        aria-label={t("chat.cancelEdit")}
+        onClick={onCancel}
+      >
         <Icon svg={xIcon} />
       </button>
     </div>
@@ -121,7 +139,12 @@ export function AttachmentChips({
             />
           )}
           <span>{a.name}</span>
-          <button type="button" className="chip-remove" title={t("chat.removeAttachment")} onClick={() => onChange((list) => list.filter((x) => x !== a))}>
+          <button
+            type="button"
+            className="chip-remove"
+            title={t("chat.removeAttachment")}
+            onClick={() => onChange((list) => list.filter((x) => x !== a))}
+          >
             ×
           </button>
         </span>

@@ -47,14 +47,21 @@ describe("ChatIndicators usage", () => {
       return item;
     }) as never);
     const changed = new vscode.EventEmitter<void>();
-    const recorded = new Map([["claude a", totals(100, 1)], ["claude b", totals(2000, 3)]]);
+    const recorded = new Map([
+      ["claude a", totals(100, 1)],
+      ["claude b", totals(2000, 3)],
+    ]);
     const ledger = {
       onDidChange: changed.event,
       session: (agentId: string, sessionId: string) => Effect.succeed(recorded.get(`${agentId} ${sessionId}`)),
       today: Effect.succeed(totals(9000, 9)),
     } as unknown as UsageLedger["Service"];
     const tabA = { sessionId: "a", agentId: "claude", cwd: "/a", configOptions: [] } as unknown as Tab;
-    const tabB = { reopen: { sessionId: "b", agentId: "claude", cwd: "/b" }, cwd: "/b", configOptions: [] } as unknown as Tab;
+    const tabB = {
+      reopen: { sessionId: "b", agentId: "claude", cwd: "/b" },
+      cwd: "/b",
+      configOptions: [],
+    } as unknown as Tab;
     const unused = { sessionId: undefined, agentId: "claude", cwd: "/c", configOptions: [] } as unknown as Tab;
     const tabs = { active: tabA, all: [tabA, tabB, unused] };
     const usage = new TabUsage({ postTab: () => {}, saveTabs: () => {}, run: () => {} });
@@ -69,7 +76,8 @@ describe("ChatIndicators usage", () => {
       view: () => undefined,
       agentIdOf: () => Effect.succeed("claude"),
       reveal: () => {},
-      run: (effect: Effect.Effect<void, never, UsageLedger>) => Effect.runSync(effect.pipe(Effect.provideService(UsageLedger, ledger))),
+      run: (effect: Effect.Effect<void, never, UsageLedger>) =>
+        Effect.runSync(effect.pipe(Effect.provideService(UsageLedger, ledger))),
     } as unknown as IndicatorsHost);
     const item = items.get("codeAcp.usage")!;
     const flush = async () => {
@@ -112,7 +120,10 @@ describe("UsageLedger.today", () => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const storage = yield* fs.makeTempDirectoryScoped();
-      const context = { globalStorageUri: { fsPath: storage }, globalState: { get: () => undefined } } as unknown as vscode.ExtensionContext;
+      const context = {
+        globalStorageUri: { fsPath: storage },
+        globalState: { get: () => undefined },
+      } as unknown as vscode.ExtensionContext;
       const layer = UsageLedger.layer.pipe(Layer.provide(Layer.succeed(ExtensionCtx, context)));
       yield* Effect.gen(function* () {
         const ledger = yield* UsageLedger;

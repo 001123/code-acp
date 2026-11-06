@@ -36,7 +36,11 @@ export function paragraphEdit({ text, from, to }: Selected, added: string): Edit
 export function quoteEdit({ text, from, to }: Selected, quoted: string): Edit {
   const before = text.slice(0, from);
   const lead = before && !before.endsWith("\n") ? "\n\n" : "";
-  const lines = quoted.trimEnd().split(/\r?\n/).map((l) => (l ? `> ${l}` : "> ")).join("\n");
+  const lines = quoted
+    .trimEnd()
+    .split(/\r?\n/)
+    .map((l) => (l ? `> ${l}` : "> "))
+    .join("\n");
   return { from, to, text: `${lead}${lines}\n\n` };
 }
 
@@ -55,7 +59,8 @@ export function codeKey({ text, from, to }: Selected, key: "Enter" | "ArrowDown"
   const { block, fence } = styles[i]!;
   if (fence === undefined) return undefined;
   const lineEnd = start + lines[i]!.length;
-  const close = block === "fence-close" ? i : styles.findIndex((s, j) => j > i && s.block === "fence-close" && s.fence === fence);
+  const close =
+    block === "fence-close" ? i : styles.findIndex((s, j) => j > i && s.block === "fence-close" && s.fence === fence);
   if (key === "ArrowDown") {
     return i === lines.length - 1 ? [{ from: text.length, to: text.length, text: "\n" }] : undefined;
   }
@@ -69,7 +74,11 @@ export function codeKey({ text, from, to }: Selected, key: "Enter" | "ArrowDown"
   if (close < 0) {
     // The empty last line becomes the closing fence.
     const marker = FENCE.exec(lines[fence]!)![1];
-    return [emptyLast ? { from: start, to: lineEnd, text: `${marker}\n` } : { from: lineEnd, to: lineEnd, text: `\n${marker}\n` }];
+    return [
+      emptyLast
+        ? { from: start, to: lineEnd, text: `${marker}\n` }
+        : { from: lineEnd, to: lineEnd, text: `\n${marker}\n` },
+    ];
   }
   const edits: Edit[] = [];
   let closeEnd = lines.slice(0, close + 1).join("\n").length;
@@ -77,6 +86,10 @@ export function codeKey({ text, from, to }: Selected, key: "Enter" | "ArrowDown"
     edits.push({ from: start - 1, to: lineEnd, text: "" });
     closeEnd -= lineEnd - start + 1;
   }
-  edits.push(close + 1 < lines.length && lines[close + 1] === "" ? { caret: closeEnd + 1 } : { from: closeEnd, to: closeEnd, text: "\n" });
+  edits.push(
+    close + 1 < lines.length && lines[close + 1] === ""
+      ? { caret: closeEnd + 1 }
+      : { from: closeEnd, to: closeEnd, text: "\n" },
+  );
   return edits;
 }

@@ -48,7 +48,9 @@ function editScript(a: ReadonlyArray<string>, b: ReadonlyArray<string>): DiffLin
     for (let i = n - 1; i >= 0; i--) {
       for (let j = m - 1; j >= 0; j--) {
         lcs[i * w + j] =
-          a[start + i] === b[start + j] ? lcs[(i + 1) * w + j + 1]! + 1 : Math.max(lcs[(i + 1) * w + j]!, lcs[i * w + j + 1]!);
+          a[start + i] === b[start + j]
+            ? lcs[(i + 1) * w + j + 1]! + 1
+            : Math.max(lcs[(i + 1) * w + j]!, lcs[i * w + j + 1]!);
       }
     }
     let i = 0;
@@ -161,7 +163,8 @@ export function undoBlock(after: string, block: ChangeBlock): string {
 }
 
 export function sameBlock(a: ChangeBlock, b: ChangeBlock): boolean {
-  const same = (x: ReadonlyArray<string>, y: ReadonlyArray<string>) => x.length === y.length && x.every((l, i) => l === y[i]);
+  const same = (x: ReadonlyArray<string>, y: ReadonlyArray<string>) =>
+    x.length === y.length && x.every((l, i) => l === y[i]);
   return a.oldStart === b.oldStart && a.newStart === b.newStart && same(a.removed, b.removed) && same(a.added, b.added);
 }
 

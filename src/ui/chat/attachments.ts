@@ -2,7 +2,9 @@ import type { Attachment } from "../../chat/protocol";
 import type { Translate } from "../l10n";
 
 export function nameFromUri(uri: string): string {
-  const parts = decodeURIComponent(uri.replace(/[?#].*$/, "")).split("/").filter(Boolean);
+  const parts = decodeURIComponent(uri.replace(/[?#].*$/, ""))
+    .split("/")
+    .filter(Boolean);
   return parts[parts.length - 1] ?? uri;
 }
 

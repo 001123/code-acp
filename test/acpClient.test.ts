@@ -4,7 +4,14 @@ import { assert, describe, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Scope } from "effect";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type AcpAgent, type AgentHandlers, canFork, canLogout, spawnAgent, type UrlElicitation } from "../src/acpClient";
+import {
+  type AcpAgent,
+  type AgentHandlers,
+  canFork,
+  canLogout,
+  spawnAgent,
+  type UrlElicitation,
+} from "../src/acpClient";
 import { __test, Uri, workspace } from "./stubs/vscode";
 import { makeExtensionCtx, makeOutput, type OutputStub, stubLayer } from "./helpers";
 
@@ -42,11 +49,16 @@ const recorder = (pick: (req: acp.RequestPermissionRequest) => acp.RequestPermis
 const allow = recorder(() => ({ outcome: { outcome: "selected", optionId: "allow" } }));
 
 const spawn = (env: Record<string, string>, handlers: AgentHandlers) =>
-  spawnAgent({ command: process.execPath, args: [MOCK_AGENT], env: { ...process.env, ...env } as Record<string, string> }, handlers);
+  spawnAgent(
+    { command: process.execPath, args: [MOCK_AGENT], env: { ...process.env, ...env } as Record<string, string> },
+    handlers,
+  );
 
 const messageText = (rec: Recorder) =>
   rec.updates
-    .map((u) => (u.update.sessionUpdate === "agent_message_chunk" && u.update.content.type === "text" ? u.update.content.text : ""))
+    .map((u) =>
+      u.update.sessionUpdate === "agent_message_chunk" && u.update.content.type === "text" ? u.update.content.text : "",
+    )
     .join("");
 
 const text = (value: string): Array<acp.ContentBlock> => [{ type: "text", text: value }];
@@ -98,9 +110,15 @@ describe("spawnAgent", () => {
         const init = agent.initializeResponse;
         assert.strictEqual(init.agentInfo?.name, "mock-agent");
         assert.strictEqual(init.agentCapabilities?.mcpCapabilities?.http, true);
-        assert.deepStrictEqual(agent.authMethods.map((m) => m.id), ["login"]);
+        assert.deepStrictEqual(
+          agent.authMethods.map((m) => m.id),
+          ["login"],
+        );
         // The mock echoes what the client announced.
-        const meta = init._meta as { clientInfo: { name: string; version: string }; clientCapabilities: acp.ClientCapabilities };
+        const meta = init._meta as {
+          clientInfo: { name: string; version: string };
+          clientCapabilities: acp.ClientCapabilities;
+        };
         assert.deepStrictEqual(meta.clientInfo, { name: "code-acp", version: "1.2.3" });
         assert.deepStrictEqual(meta.clientCapabilities.fs, { readTextFile: true, writeTextFile: true });
         assert.deepStrictEqual(meta.clientCapabilities.session, { notices: {}, compaction: {} });
@@ -126,10 +144,7 @@ describe("spawnAgent", () => {
       const agent = yield* spawn({}, allow.handlers);
       const meta = agent.initializeResponse._meta as { clientInfo: { version: string } };
       assert.strictEqual(meta.clientInfo.version, "0.0.0");
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(stubLayer(output, makeExtensionCtx("/tmp/x", {}))),
-    );
+    }).pipe(Effect.scoped, Effect.provide(stubLayer(output, makeExtensionCtx("/tmp/x", {}))));
   });
 
   it.live("newSession passes cwd and mcpServers through", () => {
@@ -208,7 +223,10 @@ describe("spawnAgent", () => {
         yield* prompt(agent, "permission");
         assert.strictEqual(rec.permissions.length, 1);
         assert.strictEqual(rec.permissions[0]!.toolCall.toolCallId, "t1");
-        assert.deepStrictEqual(rec.permissions[0]!.options.map((o) => o.optionId), ["allow", "deny"]);
+        assert.deepStrictEqual(
+          rec.permissions[0]!.options.map((o) => o.optionId),
+          ["allow", "deny"],
+        );
         assert.deepStrictEqual(JSON.parse(messageText(rec)), { outcome: "selected", optionId: "deny" });
       }),
     );
@@ -230,7 +248,10 @@ describe("spawnAgent", () => {
         yield* prompt(agent, "elicit");
         assert.strictEqual(rec.elicitations.length, 1);
         assert.strictEqual(rec.elicitations[0]!.message, "Which one?");
-        assert.deepStrictEqual(JSON.parse(messageText(rec)), { action: "accept", content: { question_0_custom: "neither" } });
+        assert.deepStrictEqual(JSON.parse(messageText(rec)), {
+          action: "accept",
+          content: { question_0_custom: "neither" },
+        });
         // A mode the client doesn't know is cancelled without asking the user.
         rec.updates.length = 0;
         yield* prompt(agent, "elicit future");
@@ -277,7 +298,10 @@ describe("spawnAgent", () => {
         const option = configOptions![0] as acp.SessionConfigOption & { type: "select" };
         assert.strictEqual(option.category, "mode");
         assert.strictEqual(option.currentValue, "ask");
-        assert.deepStrictEqual(option.options.map((o) => ("value" in o ? o.value : "")), ["ask", "code"]);
+        assert.deepStrictEqual(
+          option.options.map((o) => ("value" in o ? o.value : "")),
+          ["ask", "code"],
+        );
 
         const set = yield* agent.setConfigOption(sessionId, option.id, "code");
         assert.strictEqual((set.configOptions[0] as typeof option).currentValue, "code");
@@ -289,7 +313,10 @@ describe("spawnAgent", () => {
         yield* agent.prompt(sessionId, [{ type: "text", text: "mode ask" }]);
         const update = rec.updates.at(-1)!.update;
         assert.strictEqual(update.sessionUpdate, "config_option_update");
-        assert.strictEqual(update.sessionUpdate === "config_option_update" && (update.configOptions[0] as typeof option).currentValue, "ask");
+        assert.strictEqual(
+          update.sessionUpdate === "config_option_update" && (update.configOptions[0] as typeof option).currentValue,
+          "ask",
+        );
       }),
     );
   });
@@ -299,7 +326,10 @@ describe("spawnAgent", () => {
     return withAgent({ MOCK_MODES: "both" }, rec, (agent) =>
       Effect.gen(function* () {
         const { sessionId, configOptions } = yield* agent.newSession(process.cwd());
-        assert.deepStrictEqual(configOptions?.map((o) => o.id), ["real"]);
+        assert.deepStrictEqual(
+          configOptions?.map((o) => o.id),
+          ["real"],
+        );
         yield* agent.prompt(sessionId, [{ type: "text", text: "mode code" }]);
         assert.strictEqual(rec.updates.at(-1)!.update.sessionUpdate, "current_mode_update");
       }),
@@ -326,12 +356,10 @@ describe("spawnAgent", () => {
       Effect.gen(function* () {
         assert.isFalse(canLogout(agent));
         yield* prompt(agent, "compact");
-        assert.deepStrictEqual(rec.updates.map((u) => u.update.sessionUpdate), [
-          "compaction_update",
-          "compaction_summary_chunk",
-          "compaction_summary_chunk",
-          "compaction_update",
-        ]);
+        assert.deepStrictEqual(
+          rec.updates.map((u) => u.update.sessionUpdate),
+          ["compaction_update", "compaction_summary_chunk", "compaction_summary_chunk", "compaction_update"],
+        );
       }),
     );
   });

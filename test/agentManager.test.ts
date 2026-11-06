@@ -35,7 +35,10 @@ const binaryAgent = (target: Partial<BinaryTarget>, agent: Partial<RegistryAgent
   description: "Binary agent",
   distribution: {
     binary: Object.fromEntries(
-      Platform.literals.map((platform) => [platform, { archive: "https://a/tool", cmd: "./tool", sha256: CHECKSUM, ...target }]),
+      Platform.literals.map((platform) => [
+        platform,
+        { archive: "https://a/tool", cmd: "./tool", sha256: CHECKSUM, ...target },
+      ]),
     ),
   },
   ...agent,
@@ -54,7 +57,11 @@ const makeContext = (storage: string, installed: unknown = {}) => {
 
 /** Runs `body` with storage under a temp dir and a sibling `victim` file the installer must never touch. */
 const withManager = <A, E>(
-  body: (paths: { readonly root: string; readonly victim: string; readonly requests: { count: number } }) => Effect.Effect<A, E, AgentManager>,
+  body: (paths: {
+    readonly root: string;
+    readonly victim: string;
+    readonly requests: { count: number };
+  }) => Effect.Effect<A, E, AgentManager>,
   installed?: unknown,
 ) =>
   Effect.gen(function* () {
@@ -84,8 +91,7 @@ const withManager = <A, E>(
     return yield* body({ root, victim, requests }).pipe(Effect.provide(layer));
   }).pipe(Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)), Effect.scoped);
 
-const install = (agent: RegistryAgent) =>
-  AgentManager.use((manager) => manager.install(agent, () => Effect.void));
+const install = (agent: RegistryAgent) => AgentManager.use((manager) => manager.install(agent, () => Effect.void));
 
 const exists = (file: string) =>
   Effect.gen(function* () {
@@ -118,7 +124,13 @@ describe("AgentManager.install", () => {
     ),
   );
 
-  for (const agent of [{ id: "../../victim" }, { id: "." }, { id: "a/.." }, { version: ".." }, { version: "../../.." }]) {
+  for (const agent of [
+    { id: "../../victim" },
+    { id: "." },
+    { id: "a/.." },
+    { version: ".." },
+    { version: "../../.." },
+  ]) {
     it.live(`rejects ${JSON.stringify(agent)} before touching the disk`, () =>
       withManager(({ victim, root, requests }) =>
         Effect.gen(function* () {
@@ -177,7 +189,15 @@ describe("AgentManager.install", () => {
   }
 
   it.live("does not follow an unsafe previous version when updating", () => {
-    const previous = { id: "tool", name: "Tool", version: "../../../victim", kind: "binary", command: "x", args: [], env: {} };
+    const previous = {
+      id: "tool",
+      name: "Tool",
+      version: "../../../victim",
+      kind: "binary",
+      command: "x",
+      args: [],
+      env: {},
+    };
     return withManager(
       ({ victim }) =>
         Effect.gen(function* () {

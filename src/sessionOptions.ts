@@ -34,7 +34,10 @@ export interface Wanted {
 }
 
 /** What a session starts with: the agent's `defaults`, and `remembered` for what they leave open; undefined when neither sets anything. */
-export const startingOptions = (defaults: Partial<Wanted> | undefined, remembered: Wanted | undefined): Wanted | undefined => {
+export const startingOptions = (
+  defaults: Partial<Wanted> | undefined,
+  remembered: Wanted | undefined,
+): Wanted | undefined => {
   if (!defaults && !remembered) return undefined;
   const fastMode = defaults?.fastMode ?? "default";
   return {
@@ -71,7 +74,8 @@ export const findChoice = (option: Select, wanted: string): Choice | undefined =
 };
 
 /** The real levels of thinking of `option`, the least first: without the agent's own "default" (or "auto") entry. */
-export const levelsOf = (option: Select): Array<Choice> => choicesOf(option).filter((c) => !/^(default|auto)$/i.test(c.value));
+export const levelsOf = (option: Select): Array<Choice> =>
+  choicesOf(option).filter((c) => !/^(default|auto)$/i.test(c.value));
 
 /** The value of a fast mode switch that turns it on (or off). */
 export const fastValue = (option: Select, on: boolean): string | undefined =>
@@ -132,7 +136,12 @@ export const configureSession = Effect.fn("configureSession")(function* (
 });
 
 /** Sets on a new session the selections of the one it replaces, as far as it offers them. Gives its options as set. */
-export const carryOptions = Effect.fn("carryOptions")(function* (agent: AcpAgent, sessionId: string, current: Options, previous: Options) {
+export const carryOptions = Effect.fn("carryOptions")(function* (
+  agent: AcpAgent,
+  sessionId: string,
+  current: Options,
+  previous: Options,
+) {
   let options = current;
   // One by one, in the agent's order: a model may come with its own levels.
   for (const { id, type, currentValue } of previous ?? []) {

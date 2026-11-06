@@ -23,7 +23,10 @@ describe("TurnTraces", () => {
     assert.strictEqual(traces.countMessage(), 3);
     // Taking back the last message goes by the new turns.
     traces.forgetFrom(12);
-    assert.deepStrictEqual(traces.saved?.traces.map((each) => each.turn), [10]);
+    assert.deepStrictEqual(
+      traces.saved?.traces.map((each) => each.turn),
+      [10],
+    );
   });
 
   it("drops the traces when the replayed history has another number of messages", () => {
@@ -55,9 +58,13 @@ describe("TurnTraces", () => {
     tab.used = true;
     tab.traces.add(1, tab.traces.countMessage(), trace("kept"));
     const restored = new TabList(list.saved, () => "/w").active;
-    assert.deepStrictEqual(restored.traces.saved, { messages: 1, traces: [{ turn: 1, message: 0, trace: trace("kept") }] });
+    assert.deepStrictEqual(restored.traces.saved, {
+      messages: 1,
+      traces: [{ turn: 1, message: 0, trace: trace("kept") }],
+    });
 
-    const unreadable = new TabList({ active: 0, tabs: [{ sessionId: "s", traces: { messages: "many" } }] }, () => "/w").active;
+    const unreadable = new TabList({ active: 0, tabs: [{ sessionId: "s", traces: { messages: "many" } }] }, () => "/w")
+      .active;
     assert.strictEqual(unreadable.reopen?.sessionId, "s");
     assert.isUndefined(unreadable.traces.saved);
   });

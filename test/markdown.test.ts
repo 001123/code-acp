@@ -15,11 +15,14 @@ describe("user Markdown", () => {
 
   it("draws tokens outside code, once each", () => {
     assert.strictEqual(html("see @a.png and @a.png", ["@a.png"]), "<div><p>see <b>#0</b> and @a.png</p></div>");
-    assert.strictEqual(html("`@a.png` then _@b.ts_", ["@a.png", "@b.ts"]), "<div><p><code>@a.png</code> then <em><b>#1</b></em></p></div>");
+    assert.strictEqual(
+      html("`@a.png` then _@b.ts_", ["@a.png", "@b.ts"]),
+      "<div><p><code>@a.png</code> then <em><b>#1</b></em></p></div>",
+    );
   });
 
   it("never renders raw HTML", () => {
-    assert.notInclude(html("<mark data-token-index=\"0\">x</mark>", ["y"]), "<b>");
+    assert.notInclude(html('<mark data-token-index="0">x</mark>', ["y"]), "<b>");
   });
 });
 

@@ -23,7 +23,9 @@ export interface TerminalSnapshot {
 export interface AgentTerminals {
   create(request: acp.CreateTerminalRequest): Effect.Effect<acp.CreateTerminalResponse>;
   output(request: acp.TerminalOutputRequest): Effect.Effect<acp.TerminalOutputResponse, TerminalNotFoundError>;
-  waitForExit(request: acp.WaitForTerminalExitRequest): Effect.Effect<acp.WaitForTerminalExitResponse, TerminalNotFoundError>;
+  waitForExit(
+    request: acp.WaitForTerminalExitRequest,
+  ): Effect.Effect<acp.WaitForTerminalExitResponse, TerminalNotFoundError>;
   kill(request: acp.KillTerminalRequest): Effect.Effect<acp.KillTerminalResponse, TerminalNotFoundError>;
   release(request: acp.ReleaseTerminalRequest): Effect.Effect<acp.ReleaseTerminalResponse, TerminalNotFoundError>;
 }
@@ -62,7 +64,10 @@ function trim(terminal: Terminal): void {
   }
   const bytes = Buffer.from(terminal.text, "utf8");
   // A cut inside a character decodes to U+FFFD; drop those leftovers.
-  terminal.text = bytes.subarray(bytes.length - terminal.limit).toString("utf8").replace(/^\uFFFD+/, "");
+  terminal.text = bytes
+    .subarray(bytes.length - terminal.limit)
+    .toString("utf8")
+    .replace(/^\uFFFD+/, "");
   terminal.bytes = Buffer.byteLength(terminal.text, "utf8");
   terminal.truncated = true;
 }

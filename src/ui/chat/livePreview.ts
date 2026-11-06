@@ -32,7 +32,12 @@ export function styleLines(lines: readonly string[]): LineStyle[] {
     const whole: Span[] = [{ from: 0, to: line.length, kind: "marker" }];
     if (fence) {
       const at = fence.line;
-      if (open && open[1]![0] === fence.marker[0] && open[1]!.length >= fence.marker.length && !line.slice(open[0].length).trim()) {
+      if (
+        open &&
+        open[1]![0] === fence.marker[0] &&
+        open[1]!.length >= fence.marker.length &&
+        !line.slice(open[0].length).trim()
+      ) {
         fence = undefined;
         return { block: "fence-close", spans: whole, fence: at };
       }
@@ -42,7 +47,8 @@ export function styleLines(lines: readonly string[]): LineStyle[] {
       fence = { marker: open[1]!, line: i };
       return { block: "fence-open", spans: whole, fence: i };
     }
-    if (/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/.test(line)) return { block: "hr", spans: [{ from: 0, to: line.length, kind: "marker" }] };
+    if (/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/.test(line))
+      return { block: "hr", spans: [{ from: 0, to: line.length, kind: "marker" }] };
     // The space is required so typing `#` alone (an issue number, say) doesn't hide it.
     const heading = /^ {0,3}(#{1,6})[ \t]+/.exec(line);
     if (heading) {
@@ -53,7 +59,13 @@ export function styleLines(lines: readonly string[]): LineStyle[] {
     const quote = /^ {0,3}> /.exec(line);
     if (quote) return { block: "quote", prefix: quote[0].length, spans: inlineSpans(line, quote[0].length) };
     const item = /^\s*(?:[-*+]|\d{1,9}[.)])(?=\s)(?:\s+\[[ xX]\](?=\s))?/.exec(line);
-    if (item) return { spans: [{ from: line.length - line.trimStart().length, to: item[0].length, kind: "bullet" }, ...inlineSpans(line, item[0].length)] };
+    if (item)
+      return {
+        spans: [
+          { from: line.length - line.trimStart().length, to: item[0].length, kind: "bullet" },
+          ...inlineSpans(line, item[0].length),
+        ],
+      };
     return { spans: inlineSpans(line, 0) };
   });
 }
@@ -75,7 +87,11 @@ function inlineSpans(line: string, start: number): Span[] {
     const from = m.index;
     const to = from + m[0].length;
     const around = { from, to };
-    spans.push({ from, to: from + open, kind: "marker", around }, { from: from + open, to: to - open, kind }, { from: to - open, to, kind: "marker", around });
+    spans.push(
+      { from, to: from + open, kind: "marker", around },
+      { from: from + open, to: to - open, kind },
+      { from: to - open, to, kind: "marker", around },
+    );
     if (keepInside) {
       blank(from, from + open);
       blank(to - open, to);
@@ -88,7 +104,11 @@ function inlineSpans(line: string, start: number): Span[] {
     const from = m.index;
     const textEnd = from + 1 + m[1]!.length;
     const around = { from, to: from + m[0].length };
-    spans.push({ from, to: from + 1, kind: "marker", around }, { from: from + 1, to: textEnd, kind: "link" }, { from: textEnd, to: around.to, kind: "marker", around });
+    spans.push(
+      { from, to: from + 1, kind: "marker", around },
+      { from: from + 1, to: textEnd, kind: "link" },
+      { from: textEnd, to: around.to, kind: "marker", around },
+    );
     blank(from, from + 1);
     blank(textEnd, from + m[0].length);
   });

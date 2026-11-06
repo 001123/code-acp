@@ -20,7 +20,8 @@ const inline = (text: string) =>
 
 const quote = (text: string) => text.trim().replace(/^/gm, "> ");
 
-const collapsed = (summary: string, body: string) => `<details>\n<summary>${inline(summary)}</summary>\n\n${body.trim()}\n\n</details>`;
+const collapsed = (summary: string, body: string) =>
+  `<details>\n<summary>${inline(summary)}</summary>\n\n${body.trim()}\n\n</details>`;
 
 /** A tool call as a line of a list, the calls of its subagent below it; what they output is left out. */
 function toolLines(t: Translate, tool: ToolItem, depth = 0): string[] {
@@ -38,18 +39,26 @@ function itemBlock(t: Translate, item: Item): string | undefined {
       return fileLinkTokens(item.text).text.trim();
     case "userMessage": {
       const files = item.attachments.filter((a) => !a.token && a.name).map((a) => inline(a.name!));
-      return [item.text.trim(), ...(files.length > 0 ? [`${t("export.attachments")}: ${files.join(", ")}`] : [])].filter(Boolean).join("\n\n");
+      return [item.text.trim(), ...(files.length > 0 ? [`${t("export.attachments")}: ${files.join(", ")}`] : [])]
+        .filter(Boolean)
+        .join("\n\n");
     }
     case "thought":
       return item.text.trim() && collapsed(t("chat.thought"), item.text);
     case "tool":
       return toolLines(t, item).join("\n");
     case "plan":
-      return [`**${t("chat.plan")}**`, "", ...item.entries.map((e) => `- [${e.status === "completed" ? "x" : " "}] ${inline(e.content)}`)].join("\n");
+      return [
+        `**${t("chat.plan")}**`,
+        "",
+        ...item.entries.map((e) => `- [${e.status === "completed" ? "x" : " "}] ${inline(e.content)}`),
+      ].join("\n");
     case "elicitation":
       return quote(item.message);
     case "compaction":
-      return item.summary.trim() ? collapsed(compactionLabel(t, item), item.summary) : `_${inline(compactionLabel(t, item))}_`;
+      return item.summary.trim()
+        ? collapsed(compactionLabel(t, item), item.summary)
+        : `_${inline(compactionLabel(t, item))}_`;
     case "notice":
       return `_${inline(renderText(t, item.text))}_`;
     case "error":
@@ -62,14 +71,23 @@ function itemBlock(t: Translate, item: Item): string | undefined {
 
 /** The conversation as a Markdown document; empty when nobody has said anything yet. */
 export function conversationMarkdown(t: Translate, items: readonly Item[], info: ConversationInfo): string {
-  if (!items.some((item) => item.kind === "assistant" || item.kind === "user" || item.kind === "userMessage")) return "";
-  const blocks = [`# ${inline(info.title)}`, [...(info.agent ? [inline(info.agent)] : []), inline(info.date)].join(" · ")];
+  if (!items.some((item) => item.kind === "assistant" || item.kind === "user" || item.kind === "userMessage"))
+    return "";
+  const blocks = [
+    `# ${inline(info.title)}`,
+    [...(info.agent ? [inline(info.agent)] : []), inline(info.date)].join(" · "),
+  ];
   let speaker: "user" | "assistant" | undefined;
   let afterTool = false;
   for (const item of items) {
     const block = itemBlock(t, item);
     if (!block) continue;
-    const said = item.kind === "user" || item.kind === "userMessage" ? "user" : item.kind === "notice" || item.kind === "error" ? speaker : "assistant";
+    const said =
+      item.kind === "user" || item.kind === "userMessage"
+        ? "user"
+        : item.kind === "notice" || item.kind === "error"
+          ? speaker
+          : "assistant";
     if (said && said !== speaker) {
       speaker = said;
       afterTool = false;

@@ -86,9 +86,12 @@ export class RegistryError extends Schema.TaggedError<RegistryError>()("Registry
 }) {}
 
 /** The ACP Registry, with the last downloaded copy as an offline fallback. */
-export class AcpRegistry extends Context.Service<AcpRegistry, {
-  readonly fetch: Effect.Effect<Registry, RegistryError>;
-}>()("code-acp/AcpRegistry") {
+export class AcpRegistry extends Context.Service<
+  AcpRegistry,
+  {
+    readonly fetch: Effect.Effect<Registry, RegistryError>;
+  }
+>()("code-acp/AcpRegistry") {
   static readonly layer = Layer.effect(
     AcpRegistry,
     Effect.gen(function* () {
@@ -122,7 +125,9 @@ export class AcpRegistry extends Context.Service<AcpRegistry, {
           fs.readFileString(cache).pipe(
             Effect.flatMap(decodeRegistry),
             Effect.tap(() => Effect.logWarning(`[registry] offline, using cache: ${messageOf(err)}`)),
-            Effect.mapError(() => new RegistryError({ message: t("registry.fetchFailed", messageOf(err)), cause: err })),
+            Effect.mapError(
+              () => new RegistryError({ message: t("registry.fetchFailed", messageOf(err)), cause: err }),
+            ),
           ),
         ),
         Effect.withSpan("AcpRegistry.fetch"),

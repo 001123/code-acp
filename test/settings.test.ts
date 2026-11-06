@@ -44,7 +44,9 @@ describe("readSettings", () => {
 
   it("reads session defaults by agent, and falls back on invalid ones", () => {
     __test.setSetting("codeAcp.sessionDefaults", { claude: { model: "opus", effort: "high", fastMode: "on" } });
-    assert.deepStrictEqual(readSettings().sessionDefaults, { claude: { model: "opus", effort: "high", fastMode: "on" } });
+    assert.deepStrictEqual(readSettings().sessionDefaults, {
+      claude: { model: "opus", effort: "high", fastMode: "on" },
+    });
     __test.setSetting("codeAcp.sessionDefaults", { claude: { fastMode: "maybe" } });
     assert.deepStrictEqual(readSettings().sessionDefaults, {});
   });
@@ -102,7 +104,20 @@ describe("parseHosts", () => {
   });
 
   it("gives the line of what is more than a host", () => {
-    for (const bad of ["http://a", "a:8080", "a:80", "[::1]:8080", "a/b", "a/", "*.internal", "a?b", "a#b", "u@a", "a b", "::1"]) {
+    for (const bad of [
+      "http://a",
+      "a:8080",
+      "a:80",
+      "[::1]:8080",
+      "a/b",
+      "a/",
+      "*.internal",
+      "a?b",
+      "a#b",
+      "u@a",
+      "a b",
+      "::1",
+    ]) {
       assert.strictEqual(parseHosts(`ok\n${bad}`), 2, bad);
     }
   });
@@ -195,38 +210,61 @@ describe("projectSetupCommand", () => {
 
 describe("settings scopes", () => {
   it("shows the user's value and warns of a workspace one, in user scope", () => {
-    assert.deepStrictEqual(scopedSetting("user", "autoScroll", { defaultValue: true }), { value: true, overridden: false });
-    assert.deepStrictEqual(scopedSetting("user", "autoScroll", { defaultValue: true, globalValue: false, workspaceValue: true }), {
-      value: false,
-      overridden: true,
+    assert.deepStrictEqual(scopedSetting("user", "autoScroll", { defaultValue: true }), {
+      value: true,
+      overridden: false,
     });
+    assert.deepStrictEqual(
+      scopedSetting("user", "autoScroll", { defaultValue: true, globalValue: false, workspaceValue: true }),
+      {
+        value: false,
+        overridden: true,
+      },
+    );
   });
 
   it("shows the workspace's value, else what it inherits, in workspace scope", () => {
-    assert.deepStrictEqual(scopedSetting("workspace", "autoScroll", { defaultValue: true, globalValue: false }), { value: false, overridden: false });
-    assert.deepStrictEqual(scopedSetting("workspace", "autoScroll", { defaultValue: true, globalValue: false, workspaceValue: true }), {
-      value: true,
-      overridden: true,
+    assert.deepStrictEqual(scopedSetting("workspace", "autoScroll", { defaultValue: true, globalValue: false }), {
+      value: false,
+      overridden: false,
     });
+    assert.deepStrictEqual(
+      scopedSetting("workspace", "autoScroll", { defaultValue: true, globalValue: false, workspaceValue: true }),
+      {
+        value: true,
+        overridden: true,
+      },
+    );
   });
 
   it("ignores a workspace value of a setting that can't have one", () => {
-    assert.deepStrictEqual(scopedSetting("workspace", "nodePath", { globalValue: "/mine", workspaceValue: "/theirs" }), {
-      value: "/mine",
-      overridden: false,
-    });
+    assert.deepStrictEqual(
+      scopedSetting("workspace", "nodePath", { globalValue: "/mine", workspaceValue: "/theirs" }),
+      {
+        value: "/mine",
+        overridden: false,
+      },
+    );
   });
 
   it("doesn't let a user value stand in for a project's setup command", () => {
-    assert.deepStrictEqual(scopedSetting("workspace", "worktreeProjectSetupCommand", { defaultValue: "", globalValue: "x" }), {
-      value: "",
-      overridden: false,
-    });
-    assert.strictEqual(valueToStore("workspace", "worktreeProjectSetupCommand", "x", { defaultValue: "", globalValue: "x" }), "x");
+    assert.deepStrictEqual(
+      scopedSetting("workspace", "worktreeProjectSetupCommand", { defaultValue: "", globalValue: "x" }),
+      {
+        value: "",
+        overridden: false,
+      },
+    );
+    assert.strictEqual(
+      valueToStore("workspace", "worktreeProjectSetupCommand", "x", { defaultValue: "", globalValue: "x" }),
+      "x",
+    );
   });
 
   it("doesn't warn in user scope of a project's setup command, which overrides nothing there", () => {
-    assert.isFalse(scopedSetting("user", "worktreeProjectSetupCommand", { defaultValue: "", workspaceValue: "x" }).overridden);
+    assert.isFalse(
+      scopedSetting("user", "worktreeProjectSetupCommand", { defaultValue: "", workspaceValue: "x" }).overridden,
+    );
   });
 
   it("removes a user value equal to the default", () => {
@@ -236,8 +274,15 @@ describe("settings scopes", () => {
 
   it("stores in a workspace what differs from what it inherits, even the default", () => {
     assert.strictEqual(valueToStore("workspace", "autoScroll", true, { defaultValue: true, globalValue: false }), true);
-    assert.isUndefined(valueToStore("workspace", "autoScroll", false, { defaultValue: true, globalValue: false, workspaceValue: true }));
-    assert.deepStrictEqual(valueToStore("workspace", "worktreeCopyFiles", [], { defaultValue: [], globalValue: [".env"] }), []);
-    assert.isUndefined(valueToStore("workspace", "worktreeCopyFiles", [".env"], { defaultValue: [], globalValue: [".env"] }));
+    assert.isUndefined(
+      valueToStore("workspace", "autoScroll", false, { defaultValue: true, globalValue: false, workspaceValue: true }),
+    );
+    assert.deepStrictEqual(
+      valueToStore("workspace", "worktreeCopyFiles", [], { defaultValue: [], globalValue: [".env"] }),
+      [],
+    );
+    assert.isUndefined(
+      valueToStore("workspace", "worktreeCopyFiles", [".env"], { defaultValue: [], globalValue: [".env"] }),
+    );
   });
 });

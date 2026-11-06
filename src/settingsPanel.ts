@@ -10,7 +10,16 @@ import { DoctorPage, LOGIN_AGENT_COMMAND, type DoctorMessage, type DoctorState }
 import { onDidChangeLocale, t, webviewL10n } from "./i18n";
 import { runIn, thenable, type AppRuntime, type AppServices } from "./runtime";
 import { LOWEST_EFFORT } from "./sessionOptions";
-import { ApprovalRules, DEFAULT_COMMIT_INSTRUCTIONS, isValidSetting, lockedSettings, SETTING_KEYS, WORKSPACE_ONLY_SETTINGS, type SettingKey, type SettingsScope } from "./settings";
+import {
+  ApprovalRules,
+  DEFAULT_COMMIT_INSTRUCTIONS,
+  isValidSetting,
+  lockedSettings,
+  SETTING_KEYS,
+  WORKSPACE_ONLY_SETTINGS,
+  type SettingKey,
+  type SettingsScope,
+} from "./settings";
 import { UsageLedger, type SessionQuery, type UsageSummary } from "./usageLedger";
 import { webviewHtml, webviewRoots } from "./webview";
 
@@ -85,7 +94,12 @@ export interface SettingInspection {
 }
 
 /** The value to store for `key` in `scope`; undefined removes it. */
-export function valueToStore(scope: SettingsScope, key: SettingKey, value: unknown, info: SettingInspection | undefined): unknown {
+export function valueToStore(
+  scope: SettingsScope,
+  key: SettingKey,
+  value: unknown,
+  info: SettingInspection | undefined,
+): unknown {
   if (scope === "user") {
     return isDefault(key, value) ? undefined : value;
   }
@@ -94,7 +108,11 @@ export function valueToStore(scope: SettingsScope, key: SettingKey, value: unkno
 }
 
 /** What the page shows for `key` in `scope`, and whether a workspace value is worth pointing out. */
-export function scopedSetting(scope: SettingsScope, key: SettingKey, info: SettingInspection | undefined): { value: unknown; overridden: boolean } {
+export function scopedSetting(
+  scope: SettingsScope,
+  key: SettingKey,
+  info: SettingInspection | undefined,
+): { value: unknown; overridden: boolean } {
   const locked = lockedSettings(scope).includes(key);
   if (scope === "workspace") {
     const set = !locked && info?.workspaceValue !== undefined;
@@ -119,7 +137,13 @@ export class SettingsPanel {
   private pickedScope: SettingsScope = "user";
 
   /** Opens the page, on `tab` (e.g. "usage") and its `section` when given. */
-  static show(context: vscode.ExtensionContext, runtime: AppRuntime, manager: AgentManager["Service"], tab?: string, section?: string): void {
+  static show(
+    context: vscode.ExtensionContext,
+    runtime: AppRuntime,
+    manager: AgentManager["Service"],
+    tab?: string,
+    section?: string,
+  ): void {
     const select = tab ? ({ type: "selectTab", tab, section } as const) : undefined;
     const current = SettingsPanel.current;
     if (current) {
@@ -170,7 +194,9 @@ export class SettingsPanel {
         panel.title = t("settings.title");
         void panel.webview.postMessage(webviewL10n());
       }),
-      manager.onDidChange(() => this.run(Effect.all([this.render, this.renderUsage, this.catalog.render], { discard: true }))),
+      manager.onDidChange(() =>
+        this.run(Effect.all([this.render, this.renderUsage, this.catalog.render], { discard: true })),
+      ),
       panel.onDidDispose(() => this.dispose()),
     );
     this.run(
@@ -212,7 +238,9 @@ export class SettingsPanel {
         if (!isCcusageSource(source)) break;
         const result = yield* Ccusage.use((ccusage) => ccusage.report(source, msg.refresh)).pipe(
           Effect.map((view) => ({ view })),
-          Effect.catchTag("CcusageError", (err) => Effect.logError(err.message).pipe(Effect.as({ error: err.message }))),
+          Effect.catchTag("CcusageError", (err) =>
+            Effect.logError(err.message).pipe(Effect.as({ error: err.message })),
+          ),
         );
         void this.panel.webview.postMessage({ type: "ccusage", source: msg.source, ...result });
         break;
@@ -232,10 +260,15 @@ export class SettingsPanel {
         break;
       case "set": {
         const scope = this.scope;
-        if (SETTING_KEYS.includes(msg.key) && !lockedSettings(scope).includes(msg.key) && isValidSetting(msg.key, msg.value)) {
+        if (
+          SETTING_KEYS.includes(msg.key) &&
+          !lockedSettings(scope).includes(msg.key) &&
+          isValidSetting(msg.key, msg.value)
+        ) {
           const config = vscode.workspace.getConfiguration("codeAcp");
           const value = valueToStore(scope, msg.key, msg.value, config.inspect(msg.key));
-          const target = scope === "workspace" ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+          const target =
+            scope === "workspace" ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
           yield* thenable(() => config.update(msg.key, value, target));
         }
         break;

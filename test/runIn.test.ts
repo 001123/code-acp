@@ -33,7 +33,11 @@ describe("runIn", () => {
     Effect.promise(async () => {
       const runtime = makeRuntime();
       const errors: string[] = [];
-      await runIn(runtime, Effect.fail(new AgentStartError({ message: "broken" })), (message) => void errors.push(message));
+      await runIn(
+        runtime,
+        Effect.fail(new AgentStartError({ message: "broken" })),
+        (message) => void errors.push(message),
+      );
       await runtime.dispose();
       assert.deepStrictEqual(errors, ["broken"]);
     }),

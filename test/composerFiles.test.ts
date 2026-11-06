@@ -15,7 +15,13 @@ const transfer = (data: Record<string, string>, items: unknown[] = []) =>
 const intake = (remote = false) => {
   const attached: Attachment[] = [];
   const errors: unknown[][] = [];
-  return { attached, errors, remote, attach: (a: Attachment) => void attached.push(a), error: (...args: unknown[]) => void errors.push(args) };
+  return {
+    attached,
+    errors,
+    remote,
+    attach: (a: Attachment) => void attached.push(a),
+    error: (...args: unknown[]) => void errors.push(args),
+  };
 };
 
 const VSCODE_URIS = "application/vnd.code.uri-list";
@@ -69,19 +75,33 @@ describe("takeTransfer", () => {
       const now = vi.spyOn(Date, "now").mockReturnValue(7);
       assert.isTrue(takeTransfer(transfer({}, [fileItem({ name: "", size: 3, type: "image/png" })]), to));
       now.mockRestore();
-      assert.deepStrictEqual(to.attached, [{ kind: "data", name: "clipboard-7.png", mimeType: "image/png", data: "AAAA" }]);
+      assert.deepStrictEqual(to.attached, [
+        { kind: "data", name: "clipboard-7.png", mimeType: "image/png", data: "AAAA" },
+      ]);
     });
 
     it("sends OS files of a remote window as bytes, though they have URIs", () => {
       stubReader("data:text/plain;base64,QQ==");
       const to = intake(true);
-      assert.isTrue(takeTransfer(transfer({ "text/uri-list": "file:///local/a.txt" }, [fileItem({ name: "a.txt", size: 1, type: "text/plain" })]), to));
+      assert.isTrue(
+        takeTransfer(
+          transfer({ "text/uri-list": "file:///local/a.txt" }, [
+            fileItem({ name: "a.txt", size: 1, type: "text/plain" }),
+          ]),
+          to,
+        ),
+      );
       assert.deepStrictEqual(to.attached, [{ kind: "data", name: "a.txt", mimeType: "text/plain", data: "QQ==" }]);
     });
 
     it("trusts VS Code's own list in a remote window", () => {
       const to = intake(true);
-      assert.isTrue(takeTransfer(transfer({ [VSCODE_URIS]: "vscode-remote://ssh/w/a.ts" }, [fileItem({ name: "a.ts", size: 1 })]), to));
+      assert.isTrue(
+        takeTransfer(
+          transfer({ [VSCODE_URIS]: "vscode-remote://ssh/w/a.ts" }, [fileItem({ name: "a.ts", size: 1 })]),
+          to,
+        ),
+      );
       assert.deepStrictEqual(to.attached, [{ kind: "uri", uri: "vscode-remote://ssh/w/a.ts", name: "a.ts" }]);
     });
   });

@@ -397,7 +397,8 @@
 .compare-note {
   margin-top: 2px;
   padding: 6px 8px 4px;
-  border-top: 1px solid var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+  border-top: 1px solid
+    var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
   color: var(--vscode-descriptionForeground);
   font-size: 0.85em;
   line-height: 1.35;

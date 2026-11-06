@@ -166,7 +166,14 @@ export interface CcusageView {
   models: CcusageModel[];
   /** Most recent first. */
   sessions: Array<
-    CcusageTotals & { id: string; agent?: string; project?: string; firstAt?: number; lastAt?: number; models: string[] }
+    CcusageTotals & {
+      id: string;
+      agent?: string;
+      project?: string;
+      firstAt?: number;
+      lastAt?: number;
+      models: string[];
+    }
   >;
   /** By agent, costliest first; only in the report of all agents. */
   agents?: Array<CcusageTotals & { agent: string; sessions: number }>;
@@ -282,7 +289,10 @@ export function toView(
     days,
     models: [...byModel.values()].sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0) || b.tokens.total - a.tokens.total),
     sessions: rows,
-    agents: source === "all" ? [...byAgent.values()].sort((a, b) => b.cost - a.cost || b.tokens.total - a.tokens.total) : undefined,
+    agents:
+      source === "all"
+        ? [...byAgent.values()].sort((a, b) => b.cost - a.cost || b.tokens.total - a.tokens.total)
+        : undefined,
     block:
       active && start !== undefined && end !== undefined
         ? {
@@ -305,9 +315,12 @@ const TIMEOUT = Duration.minutes(3);
  * Token usage and estimated cost from the local logs of coding agents (Claude Code, Codex, …), read by the ccusage
  * CLI: the one set in `codeAcp.ccusagePath`, or a pinned release through `npx -y`. Reports are kept until refreshed.
  */
-export class Ccusage extends Context.Service<Ccusage, {
-  report(source: CcusageSource, refresh: boolean): Effect.Effect<CcusageView, CcusageError>;
-}>()("code-acp/Ccusage") {
+export class Ccusage extends Context.Service<
+  Ccusage,
+  {
+    report(source: CcusageSource, refresh: boolean): Effect.Effect<CcusageView, CcusageError>;
+  }
+>()("code-acp/Ccusage") {
   static readonly layer = Layer.effect(
     Ccusage,
     Effect.gen(function* () {
@@ -341,7 +354,11 @@ export class Ccusage extends Context.Service<Ccusage, {
             { concurrency: "unbounded" },
           ).pipe(Effect.mapError((err) => fail(t("ccusage.spawnFailed", command, err.message), err)));
           if (code !== 0) {
-            const detail = stderr.trim().split("\n").filter((line) => !line.startsWith("npm notice")).join("\n");
+            const detail = stderr
+              .trim()
+              .split("\n")
+              .filter((line) => !line.startsWith("npm notice"))
+              .join("\n");
             return yield* fail(t("ccusage.failed", label, detail || String(code)), undefined, isLockedError(detail));
           }
           return yield* decode(stdout).pipe(
@@ -369,9 +386,12 @@ export class Ccusage extends Context.Service<Ccusage, {
           [
             source === "all"
               ? run(["daily", "--json", "--sections", "daily,session"], decodeUnified)
-              : Effect.all([run([source, "daily", "--json"], decodeDaily), run([source, "session", "--json"], decodeSessions)], {
-                  concurrency: "unbounded",
-                }),
+              : Effect.all(
+                  [run([source, "daily", "--json"], decodeDaily), run([source, "session", "--json"], decodeSessions)],
+                  {
+                    concurrency: "unbounded",
+                  },
+                ),
             // Billing blocks are a Claude Code thing; ccusage has them for nothing else. Without them the rest still shows.
             source === "all" || source === "claude"
               ? run(["claude", "blocks", "--json", "--active"], decodeBlocks).pipe(

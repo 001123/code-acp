@@ -59,11 +59,24 @@ function Mermaid({ code }: { code: string }) {
         )}
         <div className="mermaid-actions">
           {expand && (
-            <button type="button" className="icon-btn" title={t("chat.mermaidExpand")} aria-label={t("chat.mermaidExpand")} onClick={expand}>
+            <button
+              type="button"
+              className="icon-btn"
+              title={t("chat.mermaidExpand")}
+              aria-label={t("chat.mermaidExpand")}
+              onClick={expand}
+            >
               <Icon svg={maximizeIcon} />
             </button>
           )}
-          <button type="button" className="icon-btn" title={sourceLabel} aria-label={sourceLabel} aria-pressed={source} onClick={() => setSource(!source)}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={sourceLabel}
+            aria-label={sourceLabel}
+            aria-pressed={source}
+            onClick={() => setSource(!source)}
+          >
             <Icon svg={source ? schemaIcon : codeIcon} />
           </button>
         </div>
@@ -208,7 +221,9 @@ function rehypeTokens(tokens: readonly string[]) {
           };
         });
       });
-    tree.children = tree.children.flatMap((child): RootContent[] => (child.type === "doctype" ? [child] : walk([child])));
+    tree.children = tree.children.flatMap((child): RootContent[] =>
+      child.type === "doctype" ? [child] : walk([child]),
+    );
   };
 }
 

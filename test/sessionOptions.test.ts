@@ -4,14 +4,31 @@ import { Effect } from "effect";
 import type { AcpAgent } from "../src/acpClient";
 import { agentOptions, configureSession, startingOptions } from "../src/sessionOptions";
 
-const select = (id: string, category: string | undefined, currentValue: string, values: string[]): acp.SessionConfigOption =>
-  ({ id, name: id, category, type: "select", currentValue, options: values.map((value) => ({ value, name: value.toUpperCase() })) }) as acp.SessionConfigOption;
+const select = (
+  id: string,
+  category: string | undefined,
+  currentValue: string,
+  values: string[],
+): acp.SessionConfigOption =>
+  ({
+    id,
+    name: id,
+    category,
+    type: "select",
+    currentValue,
+    options: values.map((value) => ({ value, name: value.toUpperCase() })),
+  }) as acp.SessionConfigOption;
 
 /** Codex-like options: the efforts depend on the model. */
 const optionsFor = (model: string, effort: string, fast: string) => [
   select("model", "model", model, ["big", "small"]),
   // Like Claude's, the levels start with the agent's own "default".
-  select("reasoning_effort", "thought_level", effort, model === "small" ? ["default", "minimal", "low"] : ["default", "low", "medium", "high"]),
+  select(
+    "reasoning_effort",
+    "thought_level",
+    effort,
+    model === "small" ? ["default", "minimal", "low"] : ["default", "low", "medium", "high"],
+  ),
   select("fast-mode", "model_config", fast, ["off", "on"]),
 ];
 
@@ -36,7 +53,9 @@ describe("configureSession", () => {
     Effect.gen(function* () {
       const { agent, session, calls } = fakeAgent();
       const missing: string[] = [];
-      yield* configureSession(agent, session, { model: "SMALL", effort: "lowest", fastMode: "on" }, (what) => missing.push(what));
+      yield* configureSession(agent, session, { model: "SMALL", effort: "lowest", fastMode: "on" }, (what) =>
+        missing.push(what),
+      );
       assert.deepStrictEqual(calls, [
         ["model", "small"],
         ["reasoning_effort", "minimal"],
@@ -51,7 +70,9 @@ describe("configureSession", () => {
       const { agent, session, calls } = fakeAgent();
       const missing: string[] = [];
       yield* configureSession(agent, session, { model: "", effort: "", fastMode: "default" });
-      yield* configureSession(agent, session, { model: "huge", effort: "ultra", fastMode: "off" }, (what, value) => missing.push(`${what}:${value}`));
+      yield* configureSession(agent, session, { model: "huge", effort: "ultra", fastMode: "off" }, (what, value) =>
+        missing.push(`${what}:${value}`),
+      );
       assert.deepStrictEqual(calls, []);
       assert.deepStrictEqual(missing, ["model:huge", "effort:ultra"]);
     }),
@@ -61,9 +82,15 @@ describe("configureSession", () => {
 describe("agentOptions", () => {
   it("lists the models, the efforts and whether there is a fast mode", () => {
     const options = agentOptions(optionsFor("big", "high", "off"));
-    assert.deepStrictEqual(options.models.map((m) => m.value), ["big", "small"]);
+    assert.deepStrictEqual(
+      options.models.map((m) => m.value),
+      ["big", "small"],
+    );
     assert.strictEqual(options.models[0]!.name, "BIG");
-    assert.deepStrictEqual(options.efforts.map((m) => m.value), ["low", "medium", "high"]);
+    assert.deepStrictEqual(
+      options.efforts.map((m) => m.value),
+      ["low", "medium", "high"],
+    );
     assert.isTrue(options.fastMode);
     assert.isFalse(options.defaultFastMode);
     assert.deepStrictEqual(agentOptions(undefined), { models: [], efforts: [], fastMode: false });
@@ -82,12 +109,24 @@ describe("startingOptions", () => {
   });
 
   it("prefers the defaults, and takes what they leave open from what was last picked", () => {
-    assert.deepStrictEqual(startingOptions({ model: "big" }, remembered), { model: "big", effort: "low", fastMode: "on" });
+    assert.deepStrictEqual(startingOptions({ model: "big" }, remembered), {
+      model: "big",
+      effort: "low",
+      fastMode: "on",
+    });
     assert.deepStrictEqual(startingOptions({ effort: " ", fastMode: "default" }, remembered), remembered);
-    assert.deepStrictEqual(startingOptions({ fastMode: "off" }, remembered), { model: "small", effort: "low", fastMode: "off" });
+    assert.deepStrictEqual(startingOptions({ fastMode: "off" }, remembered), {
+      model: "small",
+      effort: "low",
+      fastMode: "off",
+    });
   });
 
   it("applies defaults when nothing was picked", () => {
-    assert.deepStrictEqual(startingOptions({ model: "big" }, undefined), { model: "big", effort: "", fastMode: "default" });
+    assert.deepStrictEqual(startingOptions({ model: "big" }, undefined), {
+      model: "big",
+      effort: "",
+      fastMode: "default",
+    });
   });
 });

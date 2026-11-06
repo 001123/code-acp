@@ -48,17 +48,21 @@ const vi: Record<MessageKey, string> = {
   "worktree.noRepo": "Thư mục của tab này không nằm trong kho git.",
   "worktree.creating": "Đang tạo worktree…",
   "worktree.settingUp": "Đang thiết lập worktree…",
-  "worktree.projectCommandConfirm": "{0} muốn chạy một lệnh thiết lập trong các worktree mới của repository này. Chỉ cho phép nếu bạn tin tưởng repository.",
-  "worktree.projectCommandDetail": "{0}\n\nCode ACP sẽ không hỏi lại cho tới khi lệnh hoặc file mà lệnh trỏ tới thay đổi. Code ACP không kiểm tra được những gì lệnh nạp theo cách khác, ví dụ script trong package.json.",
+  "worktree.projectCommandConfirm":
+    "{0} muốn chạy một lệnh thiết lập trong các worktree mới của repository này. Chỉ cho phép nếu bạn tin tưởng repository.",
+  "worktree.projectCommandDetail":
+    "{0}\n\nCode ACP sẽ không hỏi lại cho tới khi lệnh hoặc file mà lệnh trỏ tới thay đổi. Code ACP không kiểm tra được những gì lệnh nạp theo cách khác, ví dụ script trong package.json.",
   "worktree.projectCommandAllow": "Cho phép và chạy",
   "worktree.copyFailed": "Không copy được {0} sang worktree: {1}",
   "worktree.setupFailed": "Lệnh thiết lập worktree thất bại với mã thoát {0}: {1}",
   "worktree.setupTimedOut": "Đã dừng lệnh thiết lập worktree sau {0} phút.",
-  "worktree.started": "Đang làm việc trong worktree {0}, trên nhánh riêng. Các thay đổi chưa commit trong bản checkout cục bộ không có ở đây.",
+  "worktree.started":
+    "Đang làm việc trong worktree {0}, trên nhánh riêng. Các thay đổi chưa commit trong bản checkout cục bộ không có ở đây.",
   "worktree.missing": "Worktree của tab này không còn nữa, nên tab đã quay về bản checkout cục bộ.",
   "worktree.folderGone": "Thư mục của phiên đó không còn tồn tại.",
   "worktree.nothingToApply": "Worktree {0} không có thay đổi nào để áp dụng.",
-  "worktree.applyConfirm": "Áp dụng {0} file chưa commit và {1} commit từ worktree {2} vào {3}? Chúng sẽ xuất hiện dưới dạng thay đổi đã stage.",
+  "worktree.applyConfirm":
+    "Áp dụng {0} file chưa commit và {1} commit từ worktree {2} vào {3}? Chúng sẽ xuất hiện dưới dạng thay đổi đã stage.",
   "worktree.applyAction": "Áp dụng thay đổi",
   "worktree.applied": "Đã áp dụng thay đổi của worktree {0} vào {1}.",
   "worktree.appliedConflicts": "Đã áp dụng thay đổi của worktree {0} vào {1}, có xung đột trong: {2}",
@@ -86,7 +90,8 @@ const vi: Record<MessageKey, string> = {
   "worktree.merge": "Merge vào {0}",
   "worktree.mergeDesc": "Giữ nguyên các commit; phần chưa commit sẽ được commit trước",
   "worktree.merging": "Đang merge…",
-  "worktree.mergeConflicts": "Merge worktree {0} vào {1} bị xung đột trong: {2}. Hãy xử lý rồi commit ở đó, hoặc huỷ merge.",
+  "worktree.mergeConflicts":
+    "Merge worktree {0} vào {1} bị xung đột trong: {2}. Hãy xử lý rồi commit ở đó, hoặc huỷ merge.",
   "worktree.openChanges": "Mở Source Control",
   "worktree.abortMerge": "Huỷ merge",
   "worktree.baseDirty": "{0} đang có thay đổi chưa commit. Hãy commit hoặc stash trước khi merge.",
@@ -94,13 +99,15 @@ const vi: Record<MessageKey, string> = {
   "worktree.commitPrompt": "Nội dung commit cho phần worktree chưa commit",
   "worktree.commitEmpty": "Commit cần có nội dung.",
   "worktree.pr": "Tạo pull request",
-  "worktree.prDesc": "Commit phần chưa commit, rồi agent viết nháp mô tả trong chat này; chưa push gì cho đến khi bạn đồng ý",
+  "worktree.prDesc":
+    "Commit phần chưa commit, rồi agent viết nháp mô tả trong chat này; chưa push gì cho đến khi bạn đồng ý",
   "worktree.prChecking": "Đang kiểm tra pull request…",
   "worktree.prPushing": "Đang push…",
   "worktree.prOpen": "Mở",
   "worktree.prUpdateConfirm": "Worktree {0} đã có pull request đang mở: {1}. Push phần việc mới nhất lên đó?",
   "worktree.prUpdateAction": "Push",
-  "worktree.prPrompt": "Hãy viết mô tả pull request cho phần việc trên nhánh này kể từ commit {0}. Dòng đầu là tiêu đề, tiếp theo một dòng trống, rồi đến phần mô tả bằng Markdown: thay đổi gì và vì sao. Chỉ trả lời đúng nội dung đó, theo phong cách và ngôn ngữ của các commit trong repository, và không sửa file nào.",
+  "worktree.prPrompt":
+    "Hãy viết mô tả pull request cho phần việc trên nhánh này kể từ commit {0}. Dòng đầu là tiêu đề, tiếp theo một dòng trống, rồi đến phần mô tả bằng Markdown: thay đổi gì và vì sao. Chỉ trả lời đúng nội dung đó, theo phong cách và ngôn ngữ của các commit trong repository, và không sửa file nào.",
   "worktree.prDraftTitle": "Pull request: {0} → {1}",
   "worktree.prDefaultBase": "nhánh mặc định",
   "worktree.prRemote": "Push lên {0}",
@@ -109,7 +116,8 @@ const vi: Record<MessageKey, string> = {
   "worktree.prCreate": "Push và mở pull request",
   "worktree.prDiscard": "Bỏ",
   "worktree.noRemote": "Repository này không có remote để push.",
-  "worktree.ghMissing": "Mở pull request cần GitHub CLI (gh), nhưng không chạy được. Hãy cài đặt rồi chạy \"gh auth login\".",
+  "worktree.ghMissing":
+    'Mở pull request cần GitHub CLI (gh), nhưng không chạy được. Hãy cài đặt rồi chạy "gh auth login".',
   "worktree.ghFailed": "gh thất bại: {0}",
   "worktree.remoteTimedOut": "Remote không hoàn tất trong {0} phút.",
   "worktree.clean": "Dọn worktree…",
@@ -126,13 +134,17 @@ const vi: Record<MessageKey, string> = {
   "chat.pickWorktree": "Chọn nơi tab này làm việc",
   "chat.tabWorktree": "Worktree: {0}",
   "settings.worktreeForNewTabs": "Mỗi cuộc trò chuyện mới một worktree",
-  "settings.worktreeForNewTabsDesc": "Tick sẵn ô Worktree của mỗi cuộc trò chuyện mới: tin nhắn đầu tiên sẽ tạo một git worktree riêng, trên nhánh mới, để các cuộc trò chuyện không đụng vào file của nhau hay bản checkout cục bộ của bạn. Thư mục ngoài git không bị ảnh hưởng.",
+  "settings.worktreeForNewTabsDesc":
+    "Tick sẵn ô Worktree của mỗi cuộc trò chuyện mới: tin nhắn đầu tiên sẽ tạo một git worktree riêng, trên nhánh mới, để các cuộc trò chuyện không đụng vào file của nhau hay bản checkout cục bộ của bạn. Thư mục ngoài git không bị ảnh hưởng.",
   "settings.worktreeCopyFiles": "File cần copy sang worktree mới",
-  "settings.worktreeCopyFilesDesc": "Các file bị git ignore cần copy từ bản checkout của bạn, mỗi dòng một pattern gitignore, tính từ gốc repository. File không bị git ignore sẽ không bao giờ được copy.",
+  "settings.worktreeCopyFilesDesc":
+    "Các file bị git ignore cần copy từ bản checkout của bạn, mỗi dòng một pattern gitignore, tính từ gốc repository. File không bị git ignore sẽ không bao giờ được copy.",
   "settings.worktreeSetupCommand": "Lệnh thiết lập",
   "settings.worktreeProjectSetupCommand": "Lệnh thiết lập của project",
-  "settings.worktreeProjectSetupCommandDesc": "Lệnh shell chạy ở thư mục gốc của mỗi worktree mới của project này, thay cho lệnh trong user settings. Lệnh có thể được commit cùng repository, nên Code ACP sẽ hỏi trước khi chạy và hỏi lại khi lệnh hoặc file mà lệnh trỏ tới thay đổi.",
-  "settings.worktreeSetupCommandDesc": "Lệnh shell chạy ở thư mục gốc của mỗi worktree mới. Agent chỉ khởi động sau khi lệnh chạy xong. Chỉ user settings của bạn mới đặt được lệnh này, repository thì không.",
+  "settings.worktreeProjectSetupCommandDesc":
+    "Lệnh shell chạy ở thư mục gốc của mỗi worktree mới của project này, thay cho lệnh trong user settings. Lệnh có thể được commit cùng repository, nên Code ACP sẽ hỏi trước khi chạy và hỏi lại khi lệnh hoặc file mà lệnh trỏ tới thay đổi.",
+  "settings.worktreeSetupCommandDesc":
+    "Lệnh shell chạy ở thư mục gốc của mỗi worktree mới. Agent chỉ khởi động sau khi lệnh chạy xong. Chỉ user settings của bạn mới đặt được lệnh này, repository thì không.",
 
   "chat.noAgentSelected": "Chưa chọn agent",
   "chat.starting": "Đang khởi động agent…",
@@ -179,30 +191,38 @@ const vi: Record<MessageKey, string> = {
   "ask.tests.prompt": "Viết test cho đoạn code này, theo cách tổ chức test và quy ước sẵn có của dự án.",
 
   "settings.permissions": "Quyền",
-  "settings.permissionsDesc": "Những yêu cầu của agent được trả lời mà không cần hỏi bạn. Các yêu cầu khác vẫn hỏi, kể cả tool không nói rõ nó làm gì, thao tác xóa và đổi chế độ. Agent tự mô tả tool của mình, nên các quy tắc này giúp bớt thao tác chứ không phải ranh giới bảo mật.",
+  "settings.permissionsDesc":
+    "Những yêu cầu của agent được trả lời mà không cần hỏi bạn. Các yêu cầu khác vẫn hỏi, kể cả tool không nói rõ nó làm gì, thao tác xóa và đổi chế độ. Agent tự mô tả tool của mình, nên các quy tắc này giúp bớt thao tác chứ không phải ranh giới bảo mật.",
   "settings.autoApproveAsk": "Hỏi",
   "settings.autoApproveAllow": "Cho phép",
   "settings.autoApproveInherit": "Theo user settings",
   "settings.autoApproveRead": "Đọc và tìm file",
   "settings.autoApproveReadDesc": "Trong thư mục của cuộc trò chuyện, kể cả thông tin bí mật lưu ở đó như file .env.",
   "settings.autoApproveEdit": "Sửa và di chuyển file",
-  "settings.autoApproveEditDesc": "Trong thư mục của cuộc trò chuyện, trừ .git và .vscode. Các file khác vẫn có thể chạy về sau, như script trong package.json hoặc cấu hình của agent.",
+  "settings.autoApproveEditDesc":
+    "Trong thư mục của cuộc trò chuyện, trừ .git và .vscode. Các file khác vẫn có thể chạy về sau, như script trong package.json hoặc cấu hình của agent.",
   "settings.autoApproveExecute": "Chạy lệnh",
-  "settings.autoApproveExecuteDesc": "Mọi lệnh, ở bất kỳ đâu trên máy này: không giới hạn trong thư mục của cuộc trò chuyện.",
+  "settings.autoApproveExecuteDesc":
+    "Mọi lệnh, ở bất kỳ đâu trên máy này: không giới hạn trong thư mục của cuộc trò chuyện.",
   "settings.autoApproveFetch": "Truy cập mạng",
   "settings.autoApproveFetchDesc": "Mọi địa chỉ, và bất cứ thứ gì agent gửi tới đó.",
   "settings.autoApproveWorktreeTabs": "Mọi thứ trong cuộc trò chuyện worktree",
-  "settings.autoApproveWorktreeTabsDesc": "Trong cuộc trò chuyện có worktree riêng, cho phép cả thao tác xóa và đường dẫn ngoài worktree. Worktree không phải sandbox: lệnh vẫn có thể chạm tới phần còn lại của máy này.",
-  "settings.autoApproveLeakWarning": "Đọc file và truy cập mạng đều đang được phép, nên agent bị nội dung nó đọc đánh lừa có thể gửi thông tin bí mật của bạn ra ngoài mà không hỏi.",
-  "settings.autoApproveWorkspaceNote": "Quy tắc của workspace chỉ nằm trên máy này, không nằm trong file của project, nên repository không thể đặt chúng.",
+  "settings.autoApproveWorktreeTabsDesc":
+    "Trong cuộc trò chuyện có worktree riêng, cho phép cả thao tác xóa và đường dẫn ngoài worktree. Worktree không phải sandbox: lệnh vẫn có thể chạm tới phần còn lại của máy này.",
+  "settings.autoApproveLeakWarning":
+    "Đọc file và truy cập mạng đều đang được phép, nên agent bị nội dung nó đọc đánh lừa có thể gửi thông tin bí mật của bạn ra ngoài mà không hỏi.",
+  "settings.autoApproveWorkspaceNote":
+    "Quy tắc của workspace chỉ nằm trên máy này, không nằm trong file của project, nên repository không thể đặt chúng.",
   "settings.links": "Liên kết",
   "settings.linksDesc": "Những liên kết agent được phép đề nghị bạn mở. Luôn hỏi bạn trước khi mở.",
   "settings.allowedHttpHosts": "Host được phép dùng http",
-  "settings.allowedHttpHostsDesc": "Mỗi dòng một tên hoặc địa chỉ IP, không kèm cổng. Liên kết https và http tới localhost, 127.0.0.1 không cần khai báo. Mọi người trong cùng mạng đều đọc được dữ liệu gửi qua http.",
+  "settings.allowedHttpHostsDesc":
+    "Mỗi dòng một tên hoặc địa chỉ IP, không kèm cổng. Liên kết https và http tới localhost, 127.0.0.1 không cần khai báo. Mọi người trong cùng mạng đều đọc được dữ liệu gửi qua http.",
   "settings.allowedHttpHostsInvalid": "Dòng {0} không phải tên host hoặc địa chỉ IP.",
   "settings.usage": "Mức sử dụng",
   "settings.doctor": "Doctor",
-  "settings.doctorDesc": "Kiểm tra các công cụ mà agent cần, rồi khởi động từng agent để xem agent có chạy được và có cần đăng nhập không. Không gửi prompt nào.",
+  "settings.doctorDesc":
+    "Kiểm tra các công cụ mà agent cần, rồi khởi động từng agent để xem agent có chạy được và có cần đăng nhập không. Không gửi prompt nào.",
   "settings.usageDesc": "Token và chi phí agent báo về, theo ngày và theo cuộc trò chuyện.",
   "usage.today": "Hôm nay",
   "usage.week": "7 ngày qua",
@@ -219,7 +239,8 @@ const vi: Record<MessageKey, string> = {
   "usage.noMatch": "Không có cuộc trò chuyện nào khớp.",
   "usage.showing": "Đang hiện {0} / {1}",
   "usage.showMore": "Xem thêm",
-  "usage.note": "Chỉ tính những gì agent báo về: token của mỗi lượt (ví dụ Claude) và chi phí của session. Agent không báo gì thì chỉ đếm số lượt. Dữ liệu được giữ đến khi bạn xoá.",
+  "usage.note":
+    "Chỉ tính những gì agent báo về: token của mỗi lượt (ví dụ Claude) và chi phí của session. Agent không báo gì thì chỉ đếm số lượt. Dữ liệu được giữ đến khi bạn xoá.",
   "usage.byDay": "Theo ngày",
   "usage.bySession": "Theo cuộc trò chuyện",
   "usage.day": "Ngày",
@@ -249,8 +270,10 @@ const vi: Record<MessageKey, string> = {
   "ccusage.refresh": "Làm mới",
   "ccusage.loading": "Đang chạy ccusage… Lần đầu sẽ tải về qua npx nên có thể hơi lâu.",
   "ccusage.empty": "ccusage không tìm thấy mức sử dụng nào trong log trên máy.",
-  "ccusage.allFailedHint": "Khi đọc tất cả agent, chỉ cần một agent lỗi là cả lệnh dừng; hãy chọn từng agent để xem các agent còn lại.",
-  "ccusage.note": "ccusage đọc từ log mà các coding agent lưu trên máy này, gồm cả các phiên ngoài Code ACP. Chi phí là ước tính theo giá API, không phải số tiền gói thuê bao tính.",
+  "ccusage.allFailedHint":
+    "Khi đọc tất cả agent, chỉ cần một agent lỗi là cả lệnh dừng; hãy chọn từng agent để xem các agent còn lại.",
+  "ccusage.note":
+    "ccusage đọc từ log mà các coding agent lưu trên máy này, gồm cả các phiên ngoài Code ACP. Chi phí là ước tính theo giá API, không phải số tiền gói thuê bao tính.",
   "ccusage.tileDetail": "{0} token",
   "ccusage.block": "Block 5 giờ hiện tại",
   "ccusage.blockCost": "Đã dùng",
@@ -275,9 +298,9 @@ const vi: Record<MessageKey, string> = {
   "chat.compact": "Compact hội thoại",
   "chat.compactTitle": "Để agent tóm tắt hội thoại này nhằm giải phóng context",
 
-  "attention.finished": "\"{0}\" đã xong.",
-  "attention.permission": "\"{0}\" cần bạn cho phép.",
-  "attention.question": "\"{0}\" có câu hỏi cho bạn.",
+  "attention.finished": '"{0}" đã xong.',
+  "attention.permission": '"{0}" cần bạn cho phép.',
+  "attention.question": '"{0}" có câu hỏi cho bạn.',
   "attention.show": "Xem",
   "attention.badge": "{0} cuộc trò chuyện cần bạn",
   "statusBar.name": "Trạng thái Code ACP",
@@ -311,34 +334,45 @@ const vi: Record<MessageKey, string> = {
   "changes.showHunks": "Hiện các thay đổi",
   "changes.noHunks": "Không có thay đổi theo dòng để duyệt. Hãy giữ hoặc hoàn tác cả file.",
   "changes.hunkStale": "Thay đổi này không còn trong file. Hãy xem lại file.",
-  "changes.undoAllConfirm": "Hoàn tác thay đổi của agent trên {0} file? Các chỉnh sửa sau đó trên các file này cũng sẽ mất.",
+  "changes.undoAllConfirm":
+    "Hoàn tác thay đổi của agent trên {0} file? Các chỉnh sửa sau đó trên các file này cũng sẽ mất.",
   "changes.restore": "Khôi phục",
   "changes.restoreTitle": "Đưa các file agent đã sửa về trạng thái trước tin nhắn này",
-  "changes.restoreConfirm": "Đưa {0} file về trạng thái trước tin nhắn này? Các thay đổi sau đó trên các file này sẽ mất. Cuộc hội thoại không bị quay lại.",
+  "changes.restoreConfirm":
+    "Đưa {0} file về trạng thái trước tin nhắn này? Các thay đổi sau đó trên các file này sẽ mất. Cuộc hội thoại không bị quay lại.",
   "changes.restoreBusy": "Hãy đợi agent làm xong, hoặc dừng nó, trước khi khôi phục file.",
   "settings.followAgent": "Theo dõi agent",
   "settings.autoScroll": "Tự động cuộn",
-  "settings.autoScrollDesc": "Tự động cuộn chat xuống nội dung mới nhất khi agent trả lời. Tắt đi để giữ nguyên vị trí bạn đang xem.",
+  "settings.autoScrollDesc":
+    "Tự động cuộn chat xuống nội dung mới nhất khi agent trả lời. Tắt đi để giữ nguyên vị trí bạn đang xem.",
   "settings.tracing": "Tracing",
   "settings.tracingTabDesc": "Chi tiết của từng lượt và các message ACP, dành cho người dùng nâng cao.",
   "settings.tracingEnabled": "Bật tracing",
-  "settings.tracingDesc": "Hiện lý do dừng, thời lượng, token, chi phí và context của mỗi lượt trong chat, đồng thời ghi mọi message ACP vào output channel Code ACP Trace.",
-  "settings.tracingPrivacy": "Log có thể chứa nội dung file, đầu vào và đầu ra của tool: giá trị env, header và các trường có tên giống secret được che, nhưng secret khác vẫn có thể còn sót, và VS Code lưu output channel trong thư mục log của nó.",
+  "settings.tracingDesc":
+    "Hiện lý do dừng, thời lượng, token, chi phí và context của mỗi lượt trong chat, đồng thời ghi mọi message ACP vào output channel Code ACP Trace.",
+  "settings.tracingPrivacy":
+    "Log có thể chứa nội dung file, đầu vào và đầu ra của tool: giá trị env, header và các trường có tên giống secret được che, nhưng secret khác vẫn có thể còn sót, và VS Code lưu output channel trong thư mục log của nó.",
   "settings.showChanges": "Hiện file đã thay đổi",
-  "settings.showChangesDesc": "Hiện thanh phía trên ô nhập tin nhắn liệt kê các file agent đã sửa, kèm nút Hoàn tác tất cả và Giữ tất cả, cùng nút Giữ và Hoàn tác phía trên mỗi thay đổi trong editor.",
+  "settings.showChangesDesc":
+    "Hiện thanh phía trên ô nhập tin nhắn liệt kê các file agent đã sửa, kèm nút Hoàn tác tất cả và Giữ tất cả, cùng nút Giữ và Hoàn tác phía trên mỗi thay đổi trong editor.",
   "settings.showRestore": "Hiện nút Khôi phục",
-  "settings.showRestoreDesc": "Hiện nút Khôi phục trên tin nhắn của bạn, để đưa các file agent đã sửa về trạng thái trước tin nhắn đó.",
+  "settings.showRestoreDesc":
+    "Hiện nút Khôi phục trên tin nhắn của bạn, để đưa các file agent đã sửa về trạng thái trước tin nhắn đó.",
   "settings.worktree": "Worktree",
   "settings.worktreeDesc": "Chạy các cuộc trò chuyện trong git worktree riêng.",
   "settings.notificationsTab": "Thông báo",
   "settings.notificationsTabDesc": "Khi nào Code ACP báo cho bạn về các cuộc trò chuyện bạn không xem.",
   "settings.notifications": "Hiện thông báo",
   "settings.rememberSessionOptions": "Ghi nhớ model và effort",
-  "settings.rememberSessionOptionsDesc": "Bắt đầu và mở lại cuộc trò chuyện với model, effort và fast mode bạn chọn gần nhất cho agent, trừ những gì đã đặt ở trang Agent.",
-  "settings.notificationsDesc": "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
+  "settings.rememberSessionOptionsDesc":
+    "Bắt đầu và mở lại cuộc trò chuyện với model, effort và fast mode bạn chọn gần nhất cho agent, trừ những gì đã đặt ở trang Agent.",
+  "settings.notificationsDesc":
+    "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
   "settings.notifyFinished": "Thông báo khi xong",
-  "settings.notifyFinishedDesc": "Thông báo cả khi một cuộc trò chuyện bạn không xem đã xong. Yêu cầu cho phép và câu hỏi của agent vẫn được thông báo.",
-  "settings.followAgentDesc": "Mở trong editor các file agent đang đọc và sửa, tại dòng agent đang làm việc, và tô sáng trong giây lát những dòng agent vừa sửa.",
+  "settings.notifyFinishedDesc":
+    "Thông báo cả khi một cuộc trò chuyện bạn không xem đã xong. Yêu cầu cho phép và câu hỏi của agent vẫn được thông báo.",
+  "settings.followAgentDesc":
+    "Mở trong editor các file agent đang đọc và sửa, tại dòng agent đang làm việc, và tô sáng trong giây lát những dòng agent vừa sửa.",
   "checkpoints.gitFailed": "git {0} lỗi: {1}",
   "checkpoints.timeout": "Chụp snapshot workspace mất quá {0} giây.",
   "checkpoints.unavailable": "Checkpoint đã tắt cho cuộc trò chuyện này: {0}",
@@ -349,8 +383,10 @@ const vi: Record<MessageKey, string> = {
   "chat.agentSettings": "Cài đặt agent",
   "chat.switchAgent": "Đổi agent",
   "chat.loadingOptions": "Đang tải tùy chọn của agent…",
-  "chat.startOverConfirm": "Bắt đầu phiên mới? Cuộc hội thoại của tab này sẽ bị đóng; các thay đổi file của agent vẫn được giữ.",
-  "chat.startOverBusyConfirm": "Agent vẫn đang làm việc. Dừng lại và bắt đầu phiên mới? Cuộc hội thoại của tab này sẽ bị đóng; các thay đổi file của agent vẫn được giữ.",
+  "chat.startOverConfirm":
+    "Bắt đầu phiên mới? Cuộc hội thoại của tab này sẽ bị đóng; các thay đổi file của agent vẫn được giữ.",
+  "chat.startOverBusyConfirm":
+    "Agent vẫn đang làm việc. Dừng lại và bắt đầu phiên mới? Cuộc hội thoại của tab này sẽ bị đóng; các thay đổi file của agent vẫn được giữ.",
   "chat.startOver": "Bắt đầu phiên mới",
   "chat.switchFolder": "Thư mục agent làm việc; đổi thư mục sẽ bắt đầu phiên mới",
   "chat.manageAgents": "Quản lý agent…",
@@ -359,16 +395,18 @@ const vi: Record<MessageKey, string> = {
   "chat.login": "Đăng nhập",
   "chat.mode": "Chế độ",
   "chat.logout": "Đăng xuất",
-  "chat.logoutConfirm": "Đăng xuất khỏi agent này? Các lượt đang chạy sẽ dừng và các tab của agent cần đăng nhập lại để tiếp tục.",
+  "chat.logoutConfirm":
+    "Đăng xuất khỏi agent này? Các lượt đang chạy sẽ dừng và các tab của agent cần đăng nhập lại để tiếp tục.",
   "chat.logoutUnsupported": "Agent này không hỗ trợ đăng xuất.",
   "chat.deleteSession": "Xoá cuộc trò chuyện",
-  "chat.deleteSessionConfirm": "Xoá \"{0}\"? Không thể khôi phục sau khi xoá.",
+  "chat.deleteSessionConfirm": 'Xoá "{0}"? Không thể khôi phục sau khi xoá.',
   "chat.deleteSessionFailed": "Chưa xoá được cuộc trò chuyện: {0}",
   "chat.elicitation.linkTitle": "Mở liên kết này?",
   "chat.elicitation.open": "Mở liên kết",
   "chat.elicitation.linkOpened": "Đã mở trong trình duyệt",
   "chat.elicitation.linkFinished": "Đã hoàn tất",
-  "chat.elicitation.unsafeUrl": "Đã chặn một liên kết agent yêu cầu mở. Chỉ mở được liên kết không chứa tên người dùng, qua https, hoặc qua http tới localhost, 127.0.0.1 và các host trong Cài đặt > Liên kết: {0}",
+  "chat.elicitation.unsafeUrl":
+    "Đã chặn một liên kết agent yêu cầu mở. Chỉ mở được liên kết không chứa tên người dùng, qua https, hoặc qua http tới localhost, 127.0.0.1 và các host trong Cài đặt > Liên kết: {0}",
   "chat.elicitation.notOpened": "Liên kết chưa được mở.",
   "chat.compaction.inProgress": "Đang compact cuộc trò chuyện…",
   "chat.compaction.completed": "Đã compact cuộc trò chuyện",
@@ -515,7 +553,8 @@ const vi: Record<MessageKey, string> = {
   "bestOf.usualEffort": "Effort mặc định",
   "bestOf.addAttempt": "Thêm lượt thử",
   "bestOf.removeAttempt": "Bỏ lượt thử",
-  "bestOf.note": "Mỗi lượt thử làm việc trong một worktree mới từ commit hiện tại; thay đổi chưa commit không được đưa vào.",
+  "bestOf.note":
+    "Mỗi lượt thử làm việc trong một worktree mới từ commit hiện tại; thay đổi chưa commit không được đưa vào.",
   "bestOf.pickTwo": "Hãy chọn ít nhất hai lượt thử để so sánh.",
   "bestOf.applyBusy": "Agent này vẫn đang làm việc. Hãy dừng hoặc đợi rồi mới áp dụng thay đổi.",
   "bestOf.closeConfirm": "{1} worktree của {0} có thay đổi chưa được áp dụng. Xoá chúng?",
@@ -524,7 +563,8 @@ const vi: Record<MessageKey, string> = {
   "bestOf.closeAndDelete": "Đóng nhóm và xoá các worktree",
   "bestOf.discardAll": "Bỏ tất cả",
   "bestOf.discardTitle": "Không áp dụng gì: đóng nhóm này và xoá toàn bộ worktree của nhóm",
-  "bestOf.discardConfirm": "Bỏ tất cả kết quả của {0}? Các agent đang làm việc sẽ dừng, các cuộc trò chuyện sẽ đóng, và worktree của chúng sẽ bị xoá cùng mọi thay đổi chưa áp dụng. Không thể hoàn tác.",
+  "bestOf.discardConfirm":
+    "Bỏ tất cả kết quả của {0}? Các agent đang làm việc sẽ dừng, các cuộc trò chuyện sẽ đóng, và worktree của chúng sẽ bị xoá cùng mọi thay đổi chưa áp dụng. Không thể hoàn tác.",
   "bestOf.discardAction": "Bỏ tất cả",
   "bestOf.prompt": "Prompt",
   "bestOf.refresh": "Đếm lại thay đổi",
@@ -581,12 +621,13 @@ const vi: Record<MessageKey, string> = {
   "chat.pickFile": "Các file tên {0}",
 
   "drop.label": "Thả file / thư mục vào đây",
-  "drop.tooltip": "**Lỗi đã biết:** từ VS Code 1.140, kéo thả từ Explorer không còn tới được ô chat ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nHãy thả file hoặc thư mục vào đây, hoặc dán vào ô chat.",
+  "drop.tooltip":
+    "**Lỗi đã biết:** từ VS Code 1.140, kéo thả từ Explorer không còn tới được ô chat ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nHãy thả file hoặc thư mục vào đây, hoặc dán vào ô chat.",
 
   "install.unsupported": "{0} không hỗ trợ nền tảng {1}",
   "install.checkUvx": "Kiểm tra uvx…",
   "install.npm": "npm install {0}…",
-  "install.noBin": "{0} không khai báo \"bin\" trong package.json",
+  "install.noBin": '{0} không khai báo "bin" trong package.json',
   "install.download": "Tải {0}…",
   "install.downloadFailed": "Tải {0} thất bại: HTTP {1}",
   "install.checksum": "Sai checksum SHA-256 cho {0}",
@@ -619,21 +660,26 @@ const vi: Record<MessageKey, string> = {
   "settings.activeAgent": "Agent mặc định",
   "settings.activeAgentDesc": "Agent cài từ ACP Registry mà các tab chat mới sử dụng.",
   "settings.noAgents": "Chưa cài agent nào",
-  "settings.defaultModelDesc": "Cuộc trò chuyện mới với agent này bắt đầu bằng model này, bất kể lần trước đã chọn gì. Nếu để mặc định của agent thì theo “Ghi nhớ model và effort”.",
-  "settings.defaultEffortDesc": "Thời gian model suy nghĩ trước khi trả lời trong cuộc trò chuyện mới với agent này. Nếu để mặc định của agent thì theo “Ghi nhớ model và effort”.",
+  "settings.defaultModelDesc":
+    "Cuộc trò chuyện mới với agent này bắt đầu bằng model này, bất kể lần trước đã chọn gì. Nếu để mặc định của agent thì theo “Ghi nhớ model và effort”.",
+  "settings.defaultEffortDesc":
+    "Thời gian model suy nghĩ trước khi trả lời trong cuộc trò chuyện mới với agent này. Nếu để mặc định của agent thì theo “Ghi nhớ model và effort”.",
   "settings.manageAgents": "Quản lý agent",
   "settings.manageDesc": "Cài đặt, cập nhật và gỡ agent từ ACP Registry.",
   "settings.nodePath": "Đường dẫn Node",
   "settings.nodePathDesc": "Node dùng để chạy các agent cài qua npm.",
   "settings.ccusagePath": "Đường dẫn ccusage",
-  "settings.ccusagePathDesc": "File chạy ccusage cho phần log trên máy ở tab Mức sử dụng (ví dụ bản cài global). Để trống thì chạy bản cố định qua npx.",
+  "settings.ccusagePathDesc":
+    "File chạy ccusage cho phần log trên máy ở tab Mức sử dụng (ví dụ bản cài global). Để trống thì chạy bản cố định qua npx.",
   "settings.checkUpdates": "Kiểm tra cập nhật agent",
-  "settings.checkUpdatesDesc": "Khi mở VS Code, tìm phiên bản mới của các agent đã cài trong ACP Registry và đề nghị cài đặt.",
+  "settings.checkUpdatesDesc":
+    "Khi mở VS Code, tìm phiên bản mới của các agent đã cài trong ACP Registry và đề nghị cài đặt.",
   "settings.env": "Biến môi trường",
   "settings.envDesc": "Biến môi trường thêm cho agent, mỗi dòng một KEY=VALUE (vd. ANTHROPIC_API_KEY=…).",
   "settings.envInvalid": "Dòng {0} không đúng dạng KEY=VALUE; chưa lưu.",
   "settings.custom": "Agent tuỳ chỉnh",
-  "settings.customDesc": "Chạy ACP agent của riêng bạn từ lệnh cục bộ. Chúng hiện trong bộ chọn agent của chat cạnh các agent đã cài.",
+  "settings.customDesc":
+    "Chạy ACP agent của riêng bạn từ lệnh cục bộ. Chúng hiện trong bộ chọn agent của chat cạnh các agent đã cài.",
   "settings.customEmpty": "Chưa thêm agent tuỳ chỉnh nào.",
   "settings.customAdd": "Thêm agent",
   "settings.customNameTaken": "Đã có agent tên {0}.",
@@ -641,8 +687,10 @@ const vi: Record<MessageKey, string> = {
   "settings.args": "Tham số",
   "settings.argsDesc": "Mỗi dòng một tham số.",
   "settings.overridden": "Đang bị ghi đè bởi cài đặt workspace.",
-  "settings.setForWorkspace": "Đã đặt riêng cho workspace này. Chọn lại đúng giá trị trong user settings để bỏ phần đặt riêng.",
-  "settings.userOnly": "Chỉ đặt được trong user settings: cài đặt này quyết định những gì được chạy nên workspace không thể đặt.",
+  "settings.setForWorkspace":
+    "Đã đặt riêng cho workspace này. Chọn lại đúng giá trị trong user settings để bỏ phần đặt riêng.",
+  "settings.userOnly":
+    "Chỉ đặt được trong user settings: cài đặt này quyết định những gì được chạy nên workspace không thể đặt.",
   "settings.scope": "Phạm vi cài đặt",
   "settings.scopeUser": "User",
   "settings.scopeUserDesc": "Áp dụng cho mọi project của bạn.",
@@ -650,7 +698,8 @@ const vi: Record<MessageKey, string> = {
   "settings.scopeWorkspaceNamed": "Workspace: {0}",
   "settings.scopeWorkspaceDesc": "Chỉ áp dụng cho workspace này và được lưu cùng workspace.",
   "settings.scopeNotApplicable": "Mục này không có cài đặt.",
-  "settings.scopeWorkspaceNote": "Thay đổi ở đây chỉ áp dụng cho workspace này. Các cài đặt khác vẫn theo user settings.",
+  "settings.scopeWorkspaceNote":
+    "Thay đổi ở đây chỉ áp dụng cho workspace này. Các cài đặt khác vẫn theo user settings.",
   "settings.openNative": "Mở trong VS Code Settings",
   "settings.commit": "Commit message",
   "settings.commitAgent": "Agent",
@@ -662,7 +711,8 @@ const vi: Record<MessageKey, string> = {
   "settings.noModels": "Agent không cho chọn model.",
   "settings.noFastMode": "Agent này không có fast mode.",
   "settings.effortNotOffered": "Model này không có mức “{0}”; agent sẽ dùng mức mặc định.",
-  "settings.commitEffortDesc": "Thời gian model suy nghĩ trước khi trả lời. Thấp thì nhanh và tốn ít credit; cao thì có thể viết commit message tốt hơn.",
+  "settings.commitEffortDesc":
+    "Thời gian model suy nghĩ trước khi trả lời. Thấp thì nhanh và tốn ít credit; cao thì có thể viết commit message tốt hơn.",
   "settings.loadingOptions": "Đang đọc tùy chọn của agent…",
   "settings.reloadOptionsTitle": "Hỏi lại agent danh sách model, effort và fast mode",
   "settings.reloadOptions": "Tải lại",
@@ -674,7 +724,8 @@ const vi: Record<MessageKey, string> = {
   "settings.commitInstructions": "Hướng dẫn",
   "settings.commitInstructionsDesc": "Thêm vào prompt, vd. “Dùng Conventional Commits” hoặc “Viết bằng tiếng Việt”.",
   "settings.mcp": "MCP server",
-  "settings.mcpDesc": "MCP server bổ sung cho mọi phiên chat, ngoài cấu hình MCP riêng của agent. Thay đổi áp dụng cho phiên mới hoặc phiên được mở lại.",
+  "settings.mcpDesc":
+    "MCP server bổ sung cho mọi phiên chat, ngoài cấu hình MCP riêng của agent. Thay đổi áp dụng cho phiên mới hoặc phiên được mở lại.",
   "settings.mcpEmpty": "Chưa thêm MCP server nào.",
   "settings.mcpAdd": "Thêm server",
   "settings.mcpEdit": "Sửa",
@@ -731,7 +782,8 @@ const vi: Record<MessageKey, string> = {
   "doctor.status.skipped": "Chưa kiểm tra",
   "doctor.group.tools": "Công cụ",
   "doctor.group.agents": "Agent",
-  "doctor.node.missing": "Không chạy được {0}. Agent cài qua npm cần Node.js: hãy cài Node.js, hoặc đặt đường dẫn Node trong Cài đặt.",
+  "doctor.node.missing":
+    "Không chạy được {0}. Agent cài qua npm cần Node.js: hãy cài Node.js, hoặc đặt đường dẫn Node trong Cài đặt.",
   "doctor.npm.missing": "Không tìm thấy. Cài agent qua npm cần công cụ này; nó đi kèm Node.js.",
   "doctor.uv.missing": "Không tìm thấy. Các agent chạy qua uvx cần công cụ này.",
   "doctor.git.missing": "Không tìm thấy. Worktree, checkpoint và commit message cần công cụ này.",

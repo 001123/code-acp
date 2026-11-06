@@ -14,7 +14,13 @@ import { ComposerCheckbox } from "./composerParts";
 import { post } from "./post";
 
 /** Picks the workspace folder the tab's session runs in; shown in multi-root workspaces only. */
-export function FolderSelect({ tab, folders }: { tab: TabInfo | undefined; folders: ReadonlyArray<WorkspaceFolderInfo> }) {
+export function FolderSelect({
+  tab,
+  folders,
+}: {
+  tab: TabInfo | undefined;
+  folders: ReadonlyArray<WorkspaceFolderInfo>;
+}) {
   const { t } = useL10n();
   if (!tab || folders.length < 2) return null;
   // A tab in a worktree shows the folder it came from.
@@ -67,10 +73,18 @@ function FinishState({ tab, busy }: { tab: TabInfo; busy: boolean }) {
           <Icon svg={alertIcon} />
           <span>{t("worktree.conflict", conflict)}</span>
         </span>
-        <button type="button" className="workspace-action" onClick={() => post({ type: "showWorktreeConflicts", tab: tab.id })}>
+        <button
+          type="button"
+          className="workspace-action"
+          onClick={() => post({ type: "showWorktreeConflicts", tab: tab.id })}
+        >
           {t("worktree.openChanges")}
         </button>
-        <button type="button" className="workspace-action" onClick={() => post({ type: "abortWorktreeMerge", tab: tab.id })}>
+        <button
+          type="button"
+          className="workspace-action"
+          onClick={() => post({ type: "abortWorktreeMerge", tab: tab.id })}
+        >
           {t("worktree.abortMerge")}
         </button>
       </span>
@@ -108,12 +122,20 @@ function FinishState({ tab, busy }: { tab: TabInfo; busy: boolean }) {
           <span className="workspace-status">{status}</span>
         ))}
       {isPr && (
-        <button type="button" className="workspace-action" onClick={() => post({ type: "openWorktreePr", tab: tab.id })}>
+        <button
+          type="button"
+          className="workspace-action"
+          onClick={() => post({ type: "openWorktreePr", tab: tab.id })}
+        >
           {t("worktree.prOpen")}
         </button>
       )}
       {settled && deletable && !finishable && !busy && (
-        <button type="button" className="workspace-action" onClick={() => post({ type: "deleteWorktree", tab: tab.id })}>
+        <button
+          type="button"
+          className="workspace-action"
+          onClick={() => post({ type: "deleteWorktree", tab: tab.id })}
+        >
           {t("worktree.delete")}
         </button>
       )}
@@ -135,20 +157,41 @@ function WorktreeToggle({ tab, comparing }: { tab: TabInfo | undefined; comparin
   if (comparing) {
     return (
       <div id="worktree">
-        <ComposerCheckbox label={t("worktree.label")} title={t("worktree.toggleCompare")} checked disabled onToggle={() => {}} />
+        <ComposerCheckbox
+          label={t("worktree.label")}
+          title={t("worktree.toggleCompare")}
+          checked
+          disabled
+          onToggle={() => {}}
+        />
       </div>
     );
   }
   const hint = t(tab.worktreeOnSend ? "worktree.toggleCancel" : "worktree.toggleOn");
   return (
     <div id="worktree">
-      <ComposerCheckbox label={t("worktree.label")} title={`${hint}\n${tab.cwd}`} checked={!!tab.worktreeOnSend} onToggle={() => post({ type: "toggleWorktree", tab: tab.id })} />
+      <ComposerCheckbox
+        label={t("worktree.label")}
+        title={`${hint}\n${tab.cwd}`}
+        checked={!!tab.worktreeOnSend}
+        onToggle={() => post({ type: "toggleWorktree", tab: tab.id })}
+      />
     </div>
   );
 }
 
 /** Under the composer: what is checked out where the tab works, which opens the picker of where it works, whether its next message moves to a new worktree, and what became of its worktree's work. Shown in git folders only. */
-export function WorkspaceBar({ tab, busy, comparing, editing }: { tab: TabInfo | undefined; busy: boolean; comparing: boolean; editing: boolean }) {
+export function WorkspaceBar({
+  tab,
+  busy,
+  comparing,
+  editing,
+}: {
+  tab: TabInfo | undefined;
+  busy: boolean;
+  comparing: boolean;
+  editing: boolean;
+}) {
   const { t } = useL10n();
   const branch = tab?.branch ?? tab?.worktree?.branch;
   if (!tab || (!tab.worktree && branch === undefined)) return null;
@@ -177,7 +220,15 @@ export function WorkspaceBar({ tab, busy, comparing, editing }: { tab: TabInfo |
 }
 
 /** Above the composer: the pull request the agent drafted, to change and agree to; nothing is pushed before that. */
-export function PrDraftForm({ tab, draft, onChange }: { tab: number; draft: PrDraft; onChange: (draft: PrDraft) => void }) {
+export function PrDraftForm({
+  tab,
+  draft,
+  onChange,
+}: {
+  tab: number;
+  draft: PrDraft;
+  onChange: (draft: PrDraft) => void;
+}) {
   const { t } = useL10n();
   return (
     <form
@@ -188,7 +239,9 @@ export function PrDraftForm({ tab, draft, onChange }: { tab: number; draft: PrDr
       }}
     >
       <fieldset disabled={draft.pending}>
-        <div className="pr-draft-title">{t("worktree.prDraftTitle", draft.head, draft.base ?? t("worktree.prDefaultBase"))}</div>
+        <div className="pr-draft-title">
+          {t("worktree.prDraftTitle", draft.head, draft.base ?? t("worktree.prDefaultBase"))}
+        </div>
         <label>
           {t("worktree.prTitleLabel")}
           <input value={draft.title} onChange={(e) => onChange({ ...draft, title: e.target.value })} />

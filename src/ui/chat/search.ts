@@ -12,7 +12,8 @@ export function matchesText(text: string, query: string): boolean {
 }
 
 /** Whether every word of `query` is in the session's title or folder. */
-export const matchesSession = (session: acp.SessionInfo, query: string): boolean => matchesText(`${session.title ?? ""} ${session.cwd}`, query);
+export const matchesSession = (session: acp.SessionInfo, query: string): boolean =>
+  matchesText(`${session.title ?? ""} ${session.cwd}`, query);
 
 /** Most matches `findMatches`' callers keep track of; a one-letter query in a long chat would find far more. */
 export const MAX_MATCHES = 10_000;
@@ -48,7 +49,11 @@ export function findMatches(text: string, query: string, limit = MAX_MATCHES): {
   if (!needle) return [];
   const { text: haystack, offsets } = foldWithOffsets(text);
   const matches: { start: number; end: number }[] = [];
-  for (let at = haystack.indexOf(needle); at >= 0 && matches.length < limit; at = haystack.indexOf(needle, at + needle.length)) {
+  for (
+    let at = haystack.indexOf(needle);
+    at >= 0 && matches.length < limit;
+    at = haystack.indexOf(needle, at + needle.length)
+  ) {
     // Up to the next character that folds to something: marks after the match belong to its last letter.
     let next = at + needle.length;
     while (next < haystack.length && offsets[next] === offsets[next - 1]) next++;

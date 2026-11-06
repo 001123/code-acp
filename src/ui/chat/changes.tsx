@@ -42,54 +42,76 @@ export function ChangesBar({
   return (
     <details id="changes">
       <summary>
-        <span className="changes-count">{files.length === 1 ? t("changes.countOne") : t("changes.count", files.length)}</span>
+        <span className="changes-count">
+          {files.length === 1 ? t("changes.countOne") : t("changes.count", files.length)}
+        </span>
         <Stats added={added} removed={removed} />
         <span className="spacer" />
-        <button
-          className="secondary"
-          onClick={(e) => (e.preventDefault(), post({ type: "undoChanges", tab }))}
-        >
+        <button className="secondary" onClick={(e) => (e.preventDefault(), post({ type: "undoChanges", tab }))}>
           {t("changes.undoAll")}
         </button>
-        <button onClick={(e) => (e.preventDefault(), post({ type: "keepChanges", tab }))}>{t("changes.keepAll")}</button>
+        <button onClick={(e) => (e.preventDefault(), post({ type: "keepChanges", tab }))}>
+          {t("changes.keepAll")}
+        </button>
       </summary>
       <div className="changes-list">
         {files.map((f) => (
           <Fragment key={f.path}>
-          <div className={f.deleted ? "changes-file deleted" : "changes-file"}>
-            {hasHunks(f) && (
-              <button
-                className={expanded.has(f.path) ? "icon-btn small changes-toggle open" : "icon-btn small changes-toggle"}
-                title={t("changes.showHunks")}
-                aria-label={t("changes.showHunks")}
-                aria-expanded={expanded.has(f.path)}
-                onClick={() => toggle(f.path)}
+            <div className={f.deleted ? "changes-file deleted" : "changes-file"}>
+              {hasHunks(f) && (
+                <button
+                  className={
+                    expanded.has(f.path) ? "icon-btn small changes-toggle open" : "icon-btn small changes-toggle"
+                  }
+                  title={t("changes.showHunks")}
+                  aria-label={t("changes.showHunks")}
+                  aria-expanded={expanded.has(f.path)}
+                  onClick={() => toggle(f.path)}
+                >
+                  <Icon svg={chevronIcon} />
+                </button>
+              )}
+              <a
+                href="#"
+                title={f.path}
+                onClick={(e) => (e.preventDefault(), post({ type: "openDiff", tab, path: f.path }))}
               >
-                <Icon svg={chevronIcon} />
-              </button>
-            )}
-            <a href="#" title={f.path} onClick={(e) => (e.preventDefault(), post({ type: "openDiff", tab, path: f.path }))}>
-              <span className="changes-base">{baseName(f.name)}</span>
-              {dirName(f.name) && <span className="changes-dir">{dirName(f.name)}</span>}
-            </a>
-            {f.created && <span className="changes-tag created">{t("changes.created")}</span>}
-            {f.deleted && <span className="changes-tag deleted">{t("changes.deleted")}</span>}
-            {f.binary && <span className="changes-tag">{t("changes.binary")}</span>}
-            {!f.binary && <Stats added={f.added} removed={f.removed} />}
-            <span className="spacer" />
-            <span className="changes-actions">
-              <button className="icon-btn small" title={t("chat.openDiff")} aria-label={t("chat.openDiff")} onClick={() => post({ type: "openDiff", tab, path: f.path })}>
-                <Icon svg={diffIcon} />
-              </button>
-              <button className="icon-btn small" title={t("changes.undo")} aria-label={t("changes.undo")} onClick={() => post({ type: "undoChanges", tab, path: f.path })}>
-                <Icon svg={undoIcon} />
-              </button>
-              <button className="icon-btn small" title={t("changes.keep")} aria-label={t("changes.keep")} onClick={() => post({ type: "keepChanges", tab, path: f.path })}>
-                <Icon svg={checkIcon} />
-              </button>
-            </span>
-          </div>
-          {expanded.has(f.path) && hasHunks(f) && <FileHunks tab={tab} path={f.path} hunks={hunks?.[f.path]} />}
+                <span className="changes-base">{baseName(f.name)}</span>
+                {dirName(f.name) && <span className="changes-dir">{dirName(f.name)}</span>}
+              </a>
+              {f.created && <span className="changes-tag created">{t("changes.created")}</span>}
+              {f.deleted && <span className="changes-tag deleted">{t("changes.deleted")}</span>}
+              {f.binary && <span className="changes-tag">{t("changes.binary")}</span>}
+              {!f.binary && <Stats added={f.added} removed={f.removed} />}
+              <span className="spacer" />
+              <span className="changes-actions">
+                <button
+                  className="icon-btn small"
+                  title={t("chat.openDiff")}
+                  aria-label={t("chat.openDiff")}
+                  onClick={() => post({ type: "openDiff", tab, path: f.path })}
+                >
+                  <Icon svg={diffIcon} />
+                </button>
+                <button
+                  className="icon-btn small"
+                  title={t("changes.undo")}
+                  aria-label={t("changes.undo")}
+                  onClick={() => post({ type: "undoChanges", tab, path: f.path })}
+                >
+                  <Icon svg={undoIcon} />
+                </button>
+                <button
+                  className="icon-btn small"
+                  title={t("changes.keep")}
+                  aria-label={t("changes.keep")}
+                  onClick={() => post({ type: "keepChanges", tab, path: f.path })}
+                >
+                  <Icon svg={checkIcon} />
+                </button>
+              </span>
+            </div>
+            {expanded.has(f.path) && hasHunks(f) && <FileHunks tab={tab} path={f.path} hunks={hunks?.[f.path]} />}
           </Fragment>
         ))}
       </div>
@@ -122,10 +144,20 @@ function FileHunks({ tab, path, hunks }: { tab: number; path: string; hunks: Cha
               <Stats added={hunk.added.length} removed={hunk.removed.length} />
               <span className="spacer" />
               <span className="changes-actions">
-                <button className="icon-btn small" title={t("changes.undoHunk")} aria-label={t("changes.undoHunk")} onClick={() => post({ type: "undoHunk", tab, path, hunk })}>
+                <button
+                  className="icon-btn small"
+                  title={t("changes.undoHunk")}
+                  aria-label={t("changes.undoHunk")}
+                  onClick={() => post({ type: "undoHunk", tab, path, hunk })}
+                >
                   <Icon svg={undoIcon} />
                 </button>
-                <button className="icon-btn small" title={t("changes.keepHunk")} aria-label={t("changes.keepHunk")} onClick={() => post({ type: "keepHunk", tab, path, hunk })}>
+                <button
+                  className="icon-btn small"
+                  title={t("changes.keepHunk")}
+                  aria-label={t("changes.keepHunk")}
+                  onClick={() => post({ type: "keepHunk", tab, path, hunk })}
+                >
                   <Icon svg={checkIcon} />
                 </button>
               </span>

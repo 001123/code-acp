@@ -18,7 +18,11 @@ describe("ErrorBoundary", () => {
   let root: Root;
   const draw = (node: ReactNode) => act(() => root.render(node));
   const entry = (text: string) =>
-    createElement(ErrorBoundary, { resetKeys: [text], fallback: (message) => `failed: ${message}`, children: createElement(Item, { text }) });
+    createElement(ErrorBoundary, {
+      resetKeys: [text],
+      fallback: (message) => `failed: ${message}`,
+      children: createElement(Item, { text }),
+    });
 
   beforeEach(() => {
     // React reports what a boundary caught.

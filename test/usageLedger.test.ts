@@ -55,7 +55,13 @@ describe("summarize", () => {
   ].reduce<Ledger>(
     (acc, [day, now]) =>
       addTurn(
-        addCost(acc, { ...ref, sessionId: String(now), title: undefined }, { amount: 1, currency: "USD" }, day as string, now as number),
+        addCost(
+          acc,
+          { ...ref, sessionId: String(now), title: undefined },
+          { amount: 1, currency: "USD" },
+          day as string,
+          now as number,
+        ),
         ref,
         usage,
         day as string,
@@ -100,7 +106,14 @@ describe("summarize", () => {
       found.sessions.map((s) => s.sessionId),
       ["s1"],
     );
-    const byName = summarize(ledger, "2026-10-31", "2026-10-25", "2026-10-02", { text: "sonnet", limit: 10 }, () => "Claude Sonnet");
+    const byName = summarize(
+      ledger,
+      "2026-10-31",
+      "2026-10-25",
+      "2026-10-02",
+      { text: "sonnet", limit: 10 },
+      () => "Claude Sonnet",
+    );
     assert.strictEqual(byName.sessionCount, 4);
   });
 });

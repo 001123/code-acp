@@ -23,7 +23,10 @@ export class SessionModes {
   private readonly bySession = new Map<string, acp.SessionModeState>();
 
   /** `session` with its modes as a config option, when it only has modes. */
-  adopt<S extends { readonly configOptions?: Options; readonly modes?: acp.SessionModeState | null }>(sessionId: string, session: S): S {
+  adopt<S extends { readonly configOptions?: Options; readonly modes?: acp.SessionModeState | null }>(
+    sessionId: string,
+    session: S,
+  ): S {
     if (session.configOptions?.length || !session.modes?.availableModes.length) {
       this.bySession.delete(sessionId);
       return session;
@@ -49,7 +52,10 @@ export class SessionModes {
     if (update.sessionUpdate !== "current_mode_update" || !this.bySession.has(sessionId)) {
       return notification;
     }
-    return { ...notification, update: { sessionUpdate: "config_option_update", configOptions: this.select(sessionId, update.currentModeId) } };
+    return {
+      ...notification,
+      update: { sessionUpdate: "config_option_update", configOptions: this.select(sessionId, update.currentModeId) },
+    };
   }
 
   forget(sessionId: string): void {

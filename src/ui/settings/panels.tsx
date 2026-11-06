@@ -19,7 +19,12 @@ export function LanguageTab({ state }: { state: State }) {
   return (
     <section className="card">
       <div className="field">
-        <select id="language" aria-label={t("settings.language")} value={stringOf(state, "language", "auto")} onChange={(e) => set("language", e.target.value)}>
+        <select
+          id="language"
+          aria-label={t("settings.language")}
+          value={stringOf(state, "language", "auto")}
+          onChange={(e) => set("language", e.target.value)}
+        >
           <option value="auto">{t("settings.languageAuto")}</option>
           <option value="en">{t("settings.languageEn")}</option>
           <option value="vi">{t("settings.languageVi")}</option>
@@ -60,7 +65,11 @@ export function GeneralTab({ state }: { state: State }) {
         overridden={overridden("showChanges")}
         inline
       >
-        <Toggle id="showChanges" checked={v.showChanges !== false} onChange={(checked) => set("showChanges", checked)} />
+        <Toggle
+          id="showChanges"
+          checked={v.showChanges !== false}
+          onChange={(checked) => set("showChanges", checked)}
+        />
       </Field>
       <Field
         id="showRestore"
@@ -100,7 +109,11 @@ export function NotificationsTab({ state }: { state: State }) {
         overridden={overridden("notifications")}
         inline
       >
-        <Toggle id="notifications" checked={v.notifications !== false} onChange={(checked) => set("notifications", checked)} />
+        <Toggle
+          id="notifications"
+          checked={v.notifications !== false}
+          onChange={(checked) => set("notifications", checked)}
+        />
       </Field>
       <Field
         id="notifyFinished"
@@ -156,7 +169,13 @@ export function PermissionsTab({ state }: { state: State }) {
     <section className="card">
       {inWorkspace && <div className="note muted">{t("settings.autoApproveWorkspaceNote")}</div>}
       {APPROVAL_RULES.map(({ key, label, desc }) => (
-        <Field key={key} id={`autoApprove-${key}`} label={label} desc={desc} overridden={!inWorkspace && workspace[key] !== undefined}>
+        <Field
+          key={key}
+          id={`autoApprove-${key}`}
+          label={label}
+          desc={desc}
+          overridden={!inWorkspace && workspace[key] !== undefined}
+        >
           <Segmented
             id={`autoApprove-${key}`}
             value={(inWorkspace ? workspace[key] : user[key]) ?? (inWorkspace ? INHERIT : "ask")}
@@ -187,7 +206,11 @@ export function WorktreeTab({ state }: { state: State }) {
         overridden={overridden("worktreeForNewTabs")}
         inline
       >
-        <Toggle id="worktreeForNewTabs" checked={v.worktreeForNewTabs === true} onChange={(checked) => set("worktreeForNewTabs", checked)} />
+        <Toggle
+          id="worktreeForNewTabs"
+          checked={v.worktreeForNewTabs === true}
+          onChange={(checked) => set("worktreeForNewTabs", checked)}
+        />
       </Field>
       <Field
         id="worktreeCopyFiles"
@@ -203,7 +226,10 @@ export function WorktreeTab({ state }: { state: State }) {
           onCommit={(text) =>
             set(
               "worktreeCopyFiles",
-              text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+              text
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter(Boolean),
             )
           }
         />
@@ -242,7 +268,15 @@ export function WorktreeTab({ state }: { state: State }) {
   );
 }
 
-export function AgentTab({ state, loaded, load }: { state: State; loaded: LoadedOptions; load: (agentId: string, model: string) => void }) {
+export function AgentTab({
+  state,
+  loaded,
+  load,
+}: {
+  state: State;
+  loaded: LoadedOptions;
+  load: (agentId: string, model: string) => void;
+}) {
   const { t } = useL10n();
   const [envError, setEnvError] = useState<string>();
   const v = state.values;
@@ -256,7 +290,9 @@ export function AgentTab({ state, loaded, load }: { state: State; loaded: Loaded
     if (!agentId) return;
     const { [agentId]: _, ...others } = defaults;
     // What is back on the agent's default isn't kept, nor an agent left without any choice.
-    const kept = Object.fromEntries(Object.entries({ ...chosen, ...patch }).filter(([, value]) => value && value !== "default"));
+    const kept = Object.fromEntries(
+      Object.entries({ ...chosen, ...patch }).filter(([, value]) => value && value !== "default"),
+    );
     set("sessionDefaults", Object.keys(kept).length ? { ...others, [agentId]: kept } : others);
   };
   return (
@@ -377,7 +413,11 @@ export function TracingTab({ state }: { state: State }) {
           overridden={isOverridden(state)("tracing")}
           inline
         >
-          <Toggle id="tracing" checked={state.values.tracing === true} onChange={(checked) => set("tracing", checked)} />
+          <Toggle
+            id="tracing"
+            checked={state.values.tracing === true}
+            onChange={(checked) => set("tracing", checked)}
+          />
         </Field>
       </section>
       <div className="note warning">
@@ -423,7 +463,11 @@ export function LinksTab({ state }: { state: State }) {
   );
 }
 
-export function CommitTab(props: { state: State; loaded: LoadedOptions; load: (agentId: string, model: string) => void }) {
+export function CommitTab(props: {
+  state: State;
+  loaded: LoadedOptions;
+  load: (agentId: string, model: string) => void;
+}) {
   const { state, loaded, load } = props;
   const overridden = isOverridden(state);
   return (

@@ -12,7 +12,9 @@ interface Table {
 const inWebview = typeof document !== "undefined";
 
 /** Initial table from the `#l10n-data` block; replaced when the extension posts { type: "l10n" }. */
-let table: Table = JSON.parse((inWebview && document.getElementById("l10n-data")?.textContent) || '{"lang":"en","strings":{}}');
+let table: Table = JSON.parse(
+  (inWebview && document.getElementById("l10n-data")?.textContent) || '{"lang":"en","strings":{}}',
+);
 const listeners = new Set<() => void>();
 
 function apply(): void {

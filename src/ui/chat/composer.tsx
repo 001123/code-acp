@@ -17,7 +17,16 @@ import { takeTransfer } from "./composerFiles";
 import { AttachmentChips, EditingBar, QueuedMessages } from "./composerParts";
 import { SuggestionList, useSuggestions } from "./composerSuggestions";
 import type { Hover, Preview } from "./context";
-import { clipboardText, composerExtensions, flatText, offsetAt, replaceText, setCaret, textOf, tokensIn } from "./editor";
+import {
+  clipboardText,
+  composerExtensions,
+  flatText,
+  offsetAt,
+  replaceText,
+  setCaret,
+  textOf,
+  tokensIn,
+} from "./editor";
 import { useFileDrop } from "./fileDrop";
 import { post } from "./post";
 import type { Trigger } from "./suggestions";
@@ -64,13 +73,47 @@ export interface ComposerOptions {
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
-  const { active, activeRef, tabs, states, attachments, queue, editing, commands, busy, agents, folders, remote, update, error, setPreview, setHover, usage, settings, agentConfig, quickConfig, config, hidden } =
-    options;
+  const {
+    active,
+    activeRef,
+    tabs,
+    states,
+    attachments,
+    queue,
+    editing,
+    commands,
+    busy,
+    agents,
+    folders,
+    remote,
+    update,
+    error,
+    setPreview,
+    setHover,
+    usage,
+    settings,
+    agentConfig,
+    quickConfig,
+    config,
+    hidden,
+  } = options;
   const { t } = useL10n();
   const activeTab = tabs.find((x) => x.id === active);
-  const compare = useCompare({ agentId: activeTab?.agentId ?? agents.activeId, agents: agents.agents, config, editing: editing !== undefined });
+  const compare = useCompare({
+    agentId: activeTab?.agentId ?? agents.activeId,
+    agents: agents.agents,
+    config,
+    editing: editing !== undefined,
+  });
   /** Handlers of the latest render, for the editor's callbacks, which are registered once. */
-  const handlers = useRef<{ update(): void; select(): void; blur(): void; keyDown(e: KeyboardEvent): boolean; copy(): void; paste(e: ClipboardEvent): boolean }>(undefined);
+  const handlers = useRef<{
+    update(): void;
+    select(): void;
+    blur(): void;
+    keyDown(e: KeyboardEvent): boolean;
+    copy(): void;
+    paste(e: ClipboardEvent): boolean;
+  }>(undefined);
   /** What was last copied from the composer, for a paste in any tab: the clipboard has the tokens but not what they stand for. */
   const lastCopy = useRef<{ text: string; tokens: CopiedToken[] }>(undefined);
   const placeholder = useRef(t("chat.placeholder"));
@@ -180,7 +223,11 @@ export function useComposer(options: ComposerOptions) {
     // for nothing would look attached but send as text. Anything else goes in as the Markdown it is.
     const html = dt.getData("text/html");
     const tab = activeRef.current;
-    if (html.includes("data-pm-slice") && htmlTokens(html).every((token) => tab !== undefined && drafts.inlineOf(tab).has(token))) return false;
+    if (
+      html.includes("data-pm-slice") &&
+      htmlTokens(html).every((token) => tab !== undefined && drafts.inlineOf(tab).has(token))
+    )
+      return false;
     const text = dt.getData("text/plain");
     if (!text) return false;
     insertText(text);
@@ -207,7 +254,13 @@ export function useComposer(options: ComposerOptions) {
     const pasted = pastedContent(text, copied, (token) => tokens.has(token));
     for (const { token, attachment } of pasted.inline) tokens.set(token, attachment);
     const { from, to } = selected();
-    replaceText(editor.view, from, to, pasted.text, tokenInfos(new Map(pasted.inline.map((x) => [x.token, x.attachment]))));
+    replaceText(
+      editor.view,
+      from,
+      to,
+      pasted.text,
+      tokenInfos(new Map(pasted.inline.map((x) => [x.token, x.attachment]))),
+    );
   }
 
   /** Pastes what was last copied from the composer with its attachments. True when the clipboard held it. */
@@ -321,7 +374,14 @@ export function useComposer(options: ComposerOptions) {
         submit(false);
       }}
     >
-      {suggest.suggestions.length > 0 && <SuggestionList suggestions={suggest.suggestions} shown={suggest.shown} select={suggest.select} pick={suggest.pick} />}
+      {suggest.suggestions.length > 0 && (
+        <SuggestionList
+          suggestions={suggest.suggestions}
+          shown={suggest.shown}
+          select={suggest.select}
+          pick={suggest.pick}
+        />
+      )}
       {active !== undefined && queue.length > 0 && <QueuedMessages tab={active} queue={queue} />}
       {active !== undefined && editing !== undefined && <EditingBar onCancel={() => drafts.endEdit(active)} />}
       <AttachmentChips

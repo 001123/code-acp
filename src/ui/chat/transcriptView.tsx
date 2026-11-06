@@ -23,7 +23,16 @@ import { ElicitationView, UrlElicitationView } from "./elicitation";
 import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { TurnTraceView } from "./turnTrace";
-import { compactionLabel, contentText, fileLinkTokens, permissionInput, renderText, type ActivityItem, type CompactionItem, type Item } from "./transcript";
+import {
+  compactionLabel,
+  contentText,
+  fileLinkTokens,
+  permissionInput,
+  renderText,
+  type ActivityItem,
+  type CompactionItem,
+  type Item,
+} from "./transcript";
 import { TokenMark, type Token } from "./tokens";
 
 const HOVER_WIDTH = 240;
@@ -35,7 +44,9 @@ export function HoverThumb({ hover }: { hover: Hover }) {
   const { rect } = hover;
   const left = Math.max(HOVER_GAP, Math.min(rect.left, window.innerWidth - HOVER_WIDTH - HOVER_GAP));
   const above = rect.top >= HOVER_HEIGHT + 2 * HOVER_GAP;
-  const style = above ? { left, bottom: window.innerHeight - rect.top + HOVER_GAP } : { left, top: rect.bottom + HOVER_GAP };
+  const style = above
+    ? { left, bottom: window.innerHeight - rect.top + HOVER_GAP }
+    : { left, top: rect.bottom + HOVER_GAP };
   return (
     <div className="hover-thumb" style={style}>
       <img src={hover.src} alt="" />
@@ -122,7 +133,11 @@ function TerminalView({ terminalId }: { terminalId: string }) {
       ? t("terminal.signal", exit.signal)
       : t("terminal.exitCode", exit.exitCode ?? "?");
   return (
-    <div className="terminal" data-running={!exit || undefined} data-failed={(exit && exit.exitCode !== 0) || undefined}>
+    <div
+      className="terminal"
+      data-running={!exit || undefined}
+      data-failed={(exit && exit.exitCode !== 0) || undefined}
+    >
       <div className="terminal-header">
         <code className="terminal-command">$ {terminal.command}</code>
         <span className="terminal-state">{state}</span>
@@ -146,7 +161,11 @@ function TerminalView({ terminalId }: { terminalId: string }) {
             follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
           }}
         >
-          {terminal.truncated && <span className="muted">{t("terminal.truncated")}…{"\n"}</span>}
+          {terminal.truncated && (
+            <span className="muted">
+              {t("terminal.truncated")}…{"\n"}
+            </span>
+          )}
           <LongOutput text={plainOutput(terminal.output)} fromEnd />
         </pre>
       )}
@@ -162,7 +181,12 @@ function DiffView({ diff }: { diff: Extract<acp.ToolCallContent, { type: "diff" 
   return (
     <div className="diff">
       <div className="diff-header">
-        <a className="diff-path" href="#" title={diff.path} onClick={(e) => (e.preventDefault(), openFile({ path: diff.path }))}>
+        <a
+          className="diff-path"
+          href="#"
+          title={diff.path}
+          onClick={(e) => (e.preventDefault(), openFile({ path: diff.path }))}
+        >
           {diff.path.split(/[\\/]/).pop()}
         </a>
         {tab.id !== undefined && (
@@ -170,7 +194,9 @@ function DiffView({ diff }: { diff: Extract<acp.ToolCallContent, { type: "diff" 
             className="icon-btn small"
             title={t("chat.openDiff")}
             aria-label={t("chat.openDiff")}
-            onClick={() => post({ type: "openDiff", tab: tab.id!, path: diff.path, oldText: diff.oldText, newText: diff.newText })}
+            onClick={() =>
+              post({ type: "openDiff", tab: tab.id!, path: diff.path, oldText: diff.oldText, newText: diff.newText })
+            }
           >
             <Icon svg={diffIcon} />
           </button>
@@ -219,7 +245,12 @@ function Locations({ locations }: { locations?: acp.ToolCallLocation[] }) {
       {locations.map((l, i) => {
         const name = `${l.path.split(/[\\/]/).pop()}${l.line ? `:${l.line}` : ""}`;
         return (
-          <a key={i} href="#" title={l.path} onClick={(e) => (e.preventDefault(), openFile({ path: l.path, line: l.line ?? undefined }))}>
+          <a
+            key={i}
+            href="#"
+            title={l.path}
+            onClick={(e) => (e.preventDefault(), openFile({ path: l.path, line: l.line ?? undefined }))}
+          >
             {name}
           </a>
         );
@@ -271,7 +302,6 @@ function MessageActions({ turn, text, tokens }: { turn?: number; text: string; t
     </>
   );
 }
-
 
 const TOOL_ICON: Record<string, string> = {
   pending: circleDashedIcon,
@@ -330,7 +360,14 @@ function SentAttachments({ attachments }: { attachments: SentAttachment[] }) {
     <div className="msg-attachments">
       {attachments.map(({ name, src, path, line }, i) => (
         <span key={i} className="chip" title={path ?? name}>
-          {src && <img className="chip-preview" src={src} title={t("chat.previewImage")} onClick={() => open({ src, name })} />}
+          {src && (
+            <img
+              className="chip-preview"
+              src={src}
+              title={t("chat.previewImage")}
+              onClick={() => open({ src, name })}
+            />
+          )}
           {name &&
             (path ? (
               <a href="#" onClick={(e) => (e.preventDefault(), openFile({ path, line }))}>
@@ -399,7 +436,9 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
         </details>
       );
     case "userMessage": {
-      const tokens = item.attachments.flatMap(({ token, src, path, line }) => (token ? [{ token, src, path, line }] : []));
+      const tokens = item.attachments.flatMap(({ token, src, path, line }) =>
+        token ? [{ token, src, path, line }] : [],
+      );
       return (
         <div className="msg user">
           <UserText text={item.text} tokens={tokens} />
@@ -414,7 +453,9 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
       return (
         <details className="tool" data-status={item.status}>
           <summary>
-            <span className="tool-status">{item.status && TOOL_ICON[item.status] && <Icon svg={TOOL_ICON[item.status]} />}</span>
+            <span className="tool-status">
+              {item.status && TOOL_ICON[item.status] && <Icon svg={TOOL_ICON[item.status]} />}
+            </span>
             {item.subagent && (
               <span className="tool-subagent" title={t("chat.subagent")}>
                 <Icon svg={usersIcon} />

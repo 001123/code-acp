@@ -22,7 +22,15 @@ import { ConfigLoading, ConfigSelect, quickConfig } from "./chat/sessionConfig";
 import { AgentSetup, needsSetup } from "./chat/agentSetup";
 import { UsageMeter } from "./chat/usageMeter";
 import { PrDraftForm, WorkspaceBar } from "./chat/workspaceControls";
-import { clipContent, contentText, groupActivity, noticeItem, stopReasonText, transcript, type Action } from "./chat/transcript";
+import {
+  clipContent,
+  contentText,
+  groupActivity,
+  noticeItem,
+  stopReasonText,
+  transcript,
+  type Action,
+} from "./chat/transcript";
 import { ActivityView, HoverThumb, ItemView } from "./chat/transcriptView";
 import { copySelection } from "./chat/clipboard";
 import { conversationMarkdown } from "./chat/exportMarkdown";
@@ -32,7 +40,10 @@ import { TranscriptSearch } from "./chat/transcriptSearch";
 function EntryBoundary({ items, children }: { items: readonly unknown[]; children: ReactNode }) {
   const { t } = useL10n();
   return (
-    <ErrorBoundary resetKeys={items} fallback={(message) => <div className="error">{t("chat.entryFailed", message)}</div>}>
+    <ErrorBoundary
+      resetKeys={items}
+      fallback={(message) => <div className="error">{t("chat.entryFailed", message)}</div>}
+    >
       {children}
     </ErrorBoundary>
   );
@@ -193,12 +204,7 @@ function App() {
       ) : (
         config.map((opt) =>
           opt.type === "select" ? (
-            <ConfigSelect
-              key={opt.id}
-              tab={active}
-              option={opt}
-              onChange={(value) => setConfigValue(opt.id, value)}
-            />
+            <ConfigSelect key={opt.id} tab={active} option={opt} onChange={(value) => setConfigValue(opt.id, value)} />
           ) : null,
         )
       )),
@@ -228,7 +234,10 @@ function App() {
         update(tab, (s) => (s.status.busy ? { ...s, lastActivity: Date.now() } : s));
         return handleUpdate(tab, msg.update, msg.turn);
       case "userMessage":
-        return dispatch(tab, { type: "add", item: { kind: "userMessage", text: msg.text, attachments: msg.attachments ?? [], turn: msg.turn } });
+        return dispatch(tab, {
+          type: "add",
+          item: { kind: "userMessage", text: msg.text, attachments: msg.attachments ?? [], turn: msg.turn },
+        });
       case "terminal": {
         const snapshot: TerminalSnapshot = msg.snapshot;
         return update(tab, (s) => ({ ...s, terminals: { ...s.terminals, [snapshot.terminalId]: snapshot } }));
@@ -399,7 +408,6 @@ function App() {
   // After useMessages, so the listener is in place before the extension answers.
   useEffect(() => post({ type: "ready" }), []);
 
-
   function handleUpdate(tab: number | undefined, u: acp.SessionUpdate, turn?: number): void {
     switch (u.sessionUpdate) {
       case "agent_message_chunk":
@@ -410,7 +418,13 @@ function App() {
         return dispatch(
           tab,
           u.content.type === "image"
-            ? { type: "chunk", kind: "user", text: "", image: `data:${u.content.mimeType};base64,${u.content.data}`, turn }
+            ? {
+                type: "chunk",
+                kind: "user",
+                text: "",
+                image: `data:${u.content.mimeType};base64,${u.content.data}`,
+                turn,
+              }
             : { type: "chunk", kind: "user", text: contentText(u.content), turn },
         );
       case "tool_call":
@@ -448,11 +462,13 @@ function App() {
     post({ type: "selectGroup", group: id });
   }
 
-
   // The list is per agent and leaves out the conversations in tabs, so these changes outdate it. Only once it's wanted:
   // the sidebar doesn't list anything before it first opens.
   const activeAgentId = tabs.find((x) => x.id === active)?.agentId;
-  const openSessions = tabs.flatMap((x) => x.sessionId ?? []).sort().join();
+  const openSessions = tabs
+    .flatMap((x) => x.sessionId ?? [])
+    .sort()
+    .join();
   const historySource = useRef({ agent: activeAgentId, sessions: openSessions });
   useEffect(() => {
     const { agent, sessions } = historySource.current;
@@ -544,109 +560,138 @@ function App() {
   }, []);
   return (
     <OpenDiagram.Provider value={openDiagram}>
-    <OpenPreview.Provider value={setPreview}>
-      <HoverPreview.Provider value={setHover}>
-      <ShownTab.Provider value={shownTab}>
-      <Terminals.Provider value={agentTerminals}>
-        <div id="chat-body">
-          <div id="chat-main">
-            {agentsKnown && setup && <AgentSetup catalog={catalog} doctor={setupDoctor} />}
-            {chatShown && group && (
-              <GroupPanel group={group} members={tabs.filter((tab) => tab.group === group.id)} states={states} agents={agents.agents} onOpen={selectTab} />
-            )}
-            {chatShown && !group && findRequest > 0 && (
-              <TranscriptSearch
-                root={messages}
-                resetKey={active}
-                request={findRequest}
-                messagesOnly={findMessagesOnly}
-                onMessagesOnlyChange={setFindMessagesOnly}
-                onReveal={stopFollowing}
-                onClose={() => {
-                  setFindRequest(0);
-                  composer.focus();
-                }}
-              />
-            )}
-            <div id="messages" ref={messages} hidden={!!group || !chatShown}>
-              {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
-              {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map((entry) =>
-                Array.isArray(entry) ? (
-                  <EntryBoundary key={entry[0]!.id} items={entry}>
-                    <ActivityView items={entry} />
-                  </EntryBoundary>
-                ) : (
-                  <EntryBoundary key={entry.id} items={[entry]}>
-                    <ItemView item={entry} />
-                  </EntryBoundary>
-                ),
-              )}
-              {busySince !== undefined && silent >= WAITING_AFTER_MS && (
-                <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
-              )}
-            </div>
-            {chatShown && !group && showChanges && active !== undefined && <ChangesBar tab={active} changes={changes} hunks={hunks} />}
-            {chatShown && !group && active !== undefined && prDraft && (
-              <PrDraftForm tab={active} draft={prDraft} onChange={(draft) => update(active, (s) => ({ ...s, prDraft: draft }))} />
-            )}
-            {chatShown && !group && (status.needsLogin || status.needsAgent) && (
-              <div id="status">
-                <span id="status-text">{status.text}</span>
-                {status.needsLogin && <button onClick={() => post({ type: "login" })}>{t("chat.login")}</button>}
-                {status.needsAgent && <button onClick={() => post({ type: "selectAgent" })}>{t("chat.installAgent")}</button>}
+      <OpenPreview.Provider value={setPreview}>
+        <HoverPreview.Provider value={setHover}>
+          <ShownTab.Provider value={shownTab}>
+            <Terminals.Provider value={agentTerminals}>
+              <div id="chat-body">
+                <div id="chat-main">
+                  {agentsKnown && setup && <AgentSetup catalog={catalog} doctor={setupDoctor} />}
+                  {chatShown && group && (
+                    <GroupPanel
+                      group={group}
+                      members={tabs.filter((tab) => tab.group === group.id)}
+                      states={states}
+                      agents={agents.agents}
+                      onOpen={selectTab}
+                    />
+                  )}
+                  {chatShown && !group && findRequest > 0 && (
+                    <TranscriptSearch
+                      root={messages}
+                      resetKey={active}
+                      request={findRequest}
+                      messagesOnly={findMessagesOnly}
+                      onMessagesOnlyChange={setFindMessagesOnly}
+                      onReveal={stopFollowing}
+                      onClose={() => {
+                        setFindRequest(0);
+                        composer.focus();
+                      }}
+                    />
+                  )}
+                  <div id="messages" ref={messages} hidden={!!group || !chatShown}>
+                    {state.items.length === 0 && <div className="empty">{t("chat.empty")}</div>}
+                    {groupActivity(tracing ? state.items : state.items.filter((item) => item.kind !== "trace")).map(
+                      (entry) =>
+                        Array.isArray(entry) ? (
+                          <EntryBoundary key={entry[0]!.id} items={entry}>
+                            <ActivityView items={entry} />
+                          </EntryBoundary>
+                        ) : (
+                          <EntryBoundary key={entry.id} items={[entry]}>
+                            <ItemView item={entry} />
+                          </EntryBoundary>
+                        ),
+                    )}
+                    {busySince !== undefined && silent >= WAITING_AFTER_MS && (
+                      <div className="waiting">{t("chat.waiting", formatDuration(silent))}</div>
+                    )}
+                  </div>
+                  {chatShown && !group && showChanges && active !== undefined && (
+                    <ChangesBar tab={active} changes={changes} hunks={hunks} />
+                  )}
+                  {chatShown && !group && active !== undefined && prDraft && (
+                    <PrDraftForm
+                      tab={active}
+                      draft={prDraft}
+                      onChange={(draft) => update(active, (s) => ({ ...s, prDraft: draft }))}
+                    />
+                  )}
+                  {chatShown && !group && (status.needsLogin || status.needsAgent) && (
+                    <div id="status">
+                      <span id="status-text">{status.text}</span>
+                      {status.needsLogin && <button onClick={() => post({ type: "login" })}>{t("chat.login")}</button>}
+                      {status.needsAgent && (
+                        <button onClick={() => post({ type: "selectAgent" })}>{t("chat.installAgent")}</button>
+                      )}
+                    </div>
+                  )}
+                  {composer.element}
+                  {chatShown && !group && (
+                    <WorkspaceBar
+                      tab={tabs.find((x) => x.id === active)}
+                      busy={!!status.busy}
+                      comparing={composer.comparing}
+                      editing={editing !== undefined}
+                    />
+                  )}
+                </div>
+                {chatShown && (
+                  <TabSidebar
+                    tabs={tabs}
+                    groups={groups}
+                    states={states}
+                    active={active}
+                    shownGroup={shownGroup}
+                    agents={agents.agents}
+                    showChanges={showChanges}
+                    onSelect={selectTab}
+                    onSelectGroup={selectGroup}
+                    renaming={renaming}
+                    onRename={setRenaming}
+                    history={history}
+                    onNeedHistory={loadHistory}
+                    searchRequest={searchRequest}
+                    onLeaveSearch={composer.focus}
+                  />
+                )}
               </div>
-            )}
-            {composer.element}
-            {chatShown && !group && <WorkspaceBar tab={tabs.find((x) => x.id === active)} busy={!!status.busy} comparing={composer.comparing} editing={editing !== undefined} />}
-          </div>
-          {chatShown && (
-            <TabSidebar
-              tabs={tabs}
-              groups={groups}
-              states={states}
-              active={active}
-              shownGroup={shownGroup}
-              agents={agents.agents}
-              showChanges={showChanges}
-              onSelect={selectTab}
-              onSelectGroup={selectGroup}
-              renaming={renaming}
-              onRename={setRenaming}
-              history={history}
-              onNeedHistory={loadHistory}
-              searchRequest={searchRequest}
-              onLeaveSearch={composer.focus}
-            />
-          )}
-        </div>
-        <div id="drop-overlay" className={composer.dragging && chatShown ? "visible" : undefined}>
-          {t("chat.dropHint")}
-        </div>
-        {preview && (
-          <Lightbox
-            key={preview.src}
-            src={preview.src}
-            alt={preview.name}
-            onClose={closePreview}
-            saveLabel={t(preview.replace ? "lightbox.save" : "lightbox.attach")}
-            onSave={(src) => {
-              const data = src.slice(src.indexOf(",") + 1);
-              if (preview.replace) preview.replace({ kind: "data", name: preview.name, mimeType: "image/png", data });
-              else composer.addAttachment({ kind: "data", name: `${preview.name.replace(/\.[^.]*$/, "") || "image"}-annotated.png`, mimeType: "image/png", data });
-              closePreview();
-              composer.focus();
-            }}
-            onPopOut={() => {
-              post({ type: "openImage", src: preview.src, name: preview.name });
-              closePreview();
-            }}
-          />
-        )}
-        {hover && !preview && <HoverThumb hover={hover} />}
-      </Terminals.Provider>
-      </ShownTab.Provider>
-      </HoverPreview.Provider>
-    </OpenPreview.Provider>
+              <div id="drop-overlay" className={composer.dragging && chatShown ? "visible" : undefined}>
+                {t("chat.dropHint")}
+              </div>
+              {preview && (
+                <Lightbox
+                  key={preview.src}
+                  src={preview.src}
+                  alt={preview.name}
+                  onClose={closePreview}
+                  saveLabel={t(preview.replace ? "lightbox.save" : "lightbox.attach")}
+                  onSave={(src) => {
+                    const data = src.slice(src.indexOf(",") + 1);
+                    if (preview.replace)
+                      preview.replace({ kind: "data", name: preview.name, mimeType: "image/png", data });
+                    else
+                      composer.addAttachment({
+                        kind: "data",
+                        name: `${preview.name.replace(/\.[^.]*$/, "") || "image"}-annotated.png`,
+                        mimeType: "image/png",
+                        data,
+                      });
+                    closePreview();
+                    composer.focus();
+                  }}
+                  onPopOut={() => {
+                    post({ type: "openImage", src: preview.src, name: preview.name });
+                    closePreview();
+                  }}
+                />
+              )}
+              {hover && !preview && <HoverThumb hover={hover} />}
+            </Terminals.Provider>
+          </ShownTab.Provider>
+        </HoverPreview.Provider>
+      </OpenPreview.Provider>
     </OpenDiagram.Provider>
   );
 }

@@ -43,7 +43,8 @@ describe("useComposerDrafts", () => {
 
   const lastDraft = (tab: number) => {
     act(() => void vi.advanceTimersByTime(300));
-    return posted.filter((message) => message.type === "draft" && message.tab === tab).at(-1)?.draft as Draft | undefined;
+    return posted.filter((message) => message.type === "draft" && message.tab === tab).at(-1)?.draft as
+      Draft | undefined;
   };
 
   beforeEach(() => {
@@ -69,7 +70,14 @@ describe("useComposerDrafts", () => {
   });
 
   it("saves it after what the tab held", () => {
-    act(() => drafts.seed([{ ...tabs[1]!, draft: { text: "typed @a.ts", inline: [{ token: "@a.ts", attachment: file }], attachments: [] } }]));
+    act(() =>
+      drafts.seed([
+        {
+          ...tabs[1]!,
+          draft: { text: "typed @a.ts", inline: [{ token: "@a.ts", attachment: file }], attachments: [] },
+        },
+      ]),
+    );
     act(() => drafts.load(2, ["message"]));
     assert.deepStrictEqual(lastDraft(2), {
       text: "typed @a.ts\n\nmessage",

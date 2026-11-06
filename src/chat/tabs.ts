@@ -237,7 +237,9 @@ export class TabList {
   /** Recreates the tabs saved for the workspace (`saved` is untrusted); their sessions reopen when first used. */
   constructor(saved: unknown, defaultCwd: () => string) {
     const decoded = Option.getOrUndefined(Schema.decodeUnknownOption(SavedTabs)(saved));
-    const groups = new Map((decoded?.groups ?? []).map((group) => [group.id, { ...group, collapsed: group.collapsed ?? false }]));
+    const groups = new Map(
+      (decoded?.groups ?? []).map((group) => [group.id, { ...group, collapsed: group.collapsed ?? false }]),
+    );
     for (const entry of decoded?.tabs ?? []) {
       const tab = this.add(entry.cwd ?? defaultCwd());
       tab.pinned = entry.pinned ?? false;
@@ -490,7 +492,10 @@ export class TabList {
       finishable: tab.finishable,
       settled: tab.settled?.root === tab.worktree?.root ? tab.settled : undefined,
       conflict: tab.conflict?.root === tab.worktree?.root ? tab.conflict?.target : undefined,
-      deletable: tab.worktree !== undefined && isManaged(tab.worktree.root) && !this.all.some((other) => other !== tab && other.worktree?.root === tab.worktree?.root),
+      deletable:
+        tab.worktree !== undefined &&
+        isManaged(tab.worktree.root) &&
+        !this.all.some((other) => other !== tab && other.worktree?.root === tab.worktree?.root),
     }));
   }
 
@@ -509,23 +514,94 @@ export class TabList {
   get saved(): SavedTabs {
     return {
       active: this.tabs.indexOf(this.active),
-      groups: this.tabGroups.map(({ id, title, name, prompt, createdAt, collapsed }) => ({ id, title, name, prompt, createdAt, collapsed })),
+      groups: this.tabGroups.map(({ id, title, name, prompt, createdAt, collapsed }) => ({
+        id,
+        title,
+        name,
+        prompt,
+        createdAt,
+        collapsed,
+      })),
       shownGroup: this.shown?.id,
       tabs: this.tabs.map((tab) => {
-        const { pinned, name, savedDraft: draft, title, createdAt, worktree, worktreeOnSend, applied, settled, wanted, attemptLabel } = tab;
+        const {
+          pinned,
+          name,
+          savedDraft: draft,
+          title,
+          createdAt,
+          worktree,
+          worktreeOnSend,
+          applied,
+          settled,
+          wanted,
+          attemptLabel,
+        } = tab;
         const changes = tab.changes.saved;
         const group = tab.group?.id;
         // An unused tab's session is empty: a fresh one is just as good.
         if (tab.sessionId && tab.used) {
           const { sessionId, cwd } = tab;
           const agentId = tab.running?.agentId;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, traces: tab.traces.saved, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
+          return {
+            title,
+            createdAt,
+            sessionId,
+            cwd,
+            agentId,
+            usage: usageOf(tab, sessionId),
+            pinned,
+            name,
+            draft,
+            changes,
+            traces: tab.traces.saved,
+            worktree,
+            worktreeOnSend,
+            group,
+            applied,
+            settled,
+            wanted,
+            attemptLabel,
+          };
         }
         if (tab.reopen) {
           const { sessionId, cwd, agentId } = tab.reopen;
-          return { title, createdAt, sessionId, cwd, agentId, usage: usageOf(tab, sessionId), pinned, name, draft, changes, traces: tab.traces.saved, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
+          return {
+            title,
+            createdAt,
+            sessionId,
+            cwd,
+            agentId,
+            usage: usageOf(tab, sessionId),
+            pinned,
+            name,
+            draft,
+            changes,
+            traces: tab.traces.saved,
+            worktree,
+            worktreeOnSend,
+            group,
+            applied,
+            settled,
+            wanted,
+            attemptLabel,
+          };
         }
-        return { cwd: tab.cwd, pinned, name, agentId: tab.agentId, draft, changes, worktree, worktreeOnSend, group, applied, settled, wanted, attemptLabel };
+        return {
+          cwd: tab.cwd,
+          pinned,
+          name,
+          agentId: tab.agentId,
+          draft,
+          changes,
+          worktree,
+          worktreeOnSend,
+          group,
+          applied,
+          settled,
+          wanted,
+          attemptLabel,
+        };
       }),
     };
   }

@@ -70,7 +70,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       } else {
         const { request } = ask;
         const toolCallId = "toolCallId" in request ? request.toolCallId : undefined;
-        const asked = request.mode === "url" ? { url: request.url, elicitationId: request.elicitationId } : { schema: request.requestedSchema };
+        const asked =
+          request.mode === "url"
+            ? { url: request.url, elicitationId: request.elicitationId }
+            : { schema: request.requestedSchema };
         this.postTab(tab, { type: "elicitationRequest", id, message: request.message, toolCallId, ...asked });
       }
       this.attention.raise(tab, ask.kind === "permission" ? "permission" : "question");
@@ -89,7 +92,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   });
   /** Tabs that finished or wait for a permission while the user looked elsewhere: the view's badge and notifications. */
   private readonly attention = new Attention<Tab>({
-    sees: (tab) => vscode.window.state.focused && this.view?.visible === true && this.tabs.active === tab && this.tabs.shownGroup === undefined,
+    sees: (tab) =>
+      vscode.window.state.focused &&
+      this.view?.visible === true &&
+      this.tabs.active === tab &&
+      this.tabs.shownGroup === undefined,
     badge: () => this.indicators.showBadge(),
     notify: (tab, reason) => this.indicators.notify(tab, reason),
   });
@@ -144,7 +151,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
    * Shows the chat with the caret in the composer. The message follows the focus command because
    * that command moves focus to the webview's outer frame, away from a composer focused before it.
    */
-  private readonly focusComposer = this.focus.pipe(Effect.andThen(Effect.sync(() => this.post({ type: "focusComposer" }))));
+  private readonly focusComposer = this.focus.pipe(
+    Effect.andThen(Effect.sync(() => this.post({ type: "focusComposer" }))),
+  );
   /** What VS Code's commands add to the composer. */
   readonly composer = new ComposerCommands(this.attachments, this.focusComposer);
   /** The first-run panel's agents; an install can outlast the view. */
@@ -272,7 +281,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       closeGroup: (group, fate) => this.tabActions.closeGroup(group, fate),
     });
     // Raw bytes of draft attachments, which are too big for workspaceState.
-    this.drafts = new DraftStore(path.join((context.storageUri ?? context.globalStorageUri).fsPath, "drafts"), () => this.tabs.all);
+    this.drafts = new DraftStore(
+      path.join((context.storageUri ?? context.globalStorageUri).fsPath, "drafts"),
+      () => this.tabs.all,
+    );
     this.run(pruneTempFiles);
     this.disposables.push(
       this.indicators,
@@ -351,7 +363,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     this.view = view;
     const root = this.context.extensionUri;
     view.webview.options = { enableScripts: true, localResourceRoots: webviewRoots(root) };
-    view.webview.html = webviewHtml(view.webview, root, "chat", `${view.webview.cspSource} data: https://cdn.agentclientprotocol.com`);
+    view.webview.html = webviewHtml(
+      view.webview,
+      root,
+      "chat",
+      `${view.webview.cspSource} data: https://cdn.agentclientprotocol.com`,
+    );
     view.webview.onDidReceiveMessage((msg: FromWebview) => this.run(this.onMessage(msg), this.tabOf(msg)));
     view.onDidChangeVisibility(() => this.attention.refresh());
     view.onDidDispose(() => (this.view = undefined));
@@ -379,7 +396,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   private postTabs(): void {
-    this.post({ type: "tabs", tabs: this.tabs.info, groups: this.tabs.groupsInfo, active: this.tabs.active.id, shownGroup: this.tabs.shownGroup?.id });
+    this.post({
+      type: "tabs",
+      tabs: this.tabs.info,
+      groups: this.tabs.groupsInfo,
+      active: this.tabs.active.id,
+      shownGroup: this.tabs.shownGroup?.id,
+    });
     // Answers with another post only when the branch changed.
     this.run(this.refreshBranch(this.tabs.active));
     this.run(this.tabWorktrees.refreshFinishable(this.tabs.active));
@@ -448,7 +471,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   /** Keeps the tab's unsent content (a string updates only its text) and saves it. */
-  private readonly setDraft = Effect.fn("ChatView.setDraft")(function* (this: ChatViewProvider, tab: Tab, update: Draft | string) {
+  private readonly setDraft = Effect.fn("ChatView.setDraft")(function* (
+    this: ChatViewProvider,
+    tab: Tab,
+    update: Draft | string,
+  ) {
     // The tab may have closed while the files were written.
     yield* this.drafts.set(tab, update, () => this.tabs.has(tab));
     if (this.tabs.has(tab)) {
@@ -548,7 +575,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   });
 
-  private readonly onGroupMessage = Effect.fn("ChatView.onGroupMessage")(function* (this: ChatViewProvider, msg: GroupMessage) {
+  private readonly onGroupMessage = Effect.fn("ChatView.onGroupMessage")(function* (
+    this: ChatViewProvider,
+    msg: GroupMessage,
+  ) {
     const group = this.tabs.groupById(msg.group);
     if (!group) {
       return;
@@ -582,7 +612,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   });
 
-  private readonly onTabMessage = Effect.fn("ChatView.onTabMessage")(function* (this: ChatViewProvider, tab: Tab, msg: TabMessage) {
+  private readonly onTabMessage = Effect.fn("ChatView.onTabMessage")(function* (
+    this: ChatViewProvider,
+    tab: Tab,
+    msg: TabMessage,
+  ) {
     switch (msg.type) {
       case "send":
       case "sendQueuedNow":
@@ -601,7 +635,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         yield* this.groups.apply(tab).pipe(Effect.catchTag("WorktreeError", (err) => this.groupFailed(err.message)));
         break;
       case "openWorktreeDiff":
-        yield* this.groups.openDiff(tab, msg.path).pipe(Effect.catchTag("WorktreeError", (err) => this.groupFailed(err.message)));
+        yield* this.groups
+          .openDiff(tab, msg.path)
+          .pipe(Effect.catchTag("WorktreeError", (err) => this.groupFailed(err.message)));
         break;
       case "cancel":
         yield* this.sessions.cancelTab(tab);
@@ -719,7 +755,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   /** Opens the find box above the transcript; the message follows the focus command, as in `focusComposer`. */
-  readonly findInConversation = this.focus.pipe(Effect.andThen(Effect.sync(() => this.post({ type: "findInConversation" }))));
+  readonly findInConversation = this.focus.pipe(
+    Effect.andThen(Effect.sync(() => this.post({ type: "findInConversation" }))),
+  );
 
   /** Exports the active tab's conversation. Without a webview there is no transcript yet. */
   readonly exportConversation = Effect.suspend(() => {
@@ -758,7 +796,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
   /** The commands of the lenses, which keep or undo a change of the tab that offered it. */
   hunkCommands(): vscode.Disposable[] {
-    const register = <E>(command: string, review: (tab: Tab, file: string, hunk: ChangeHunk) => Effect.Effect<void, E, AppServices>) =>
+    const register = <E>(
+      command: string,
+      review: (tab: Tab, file: string, hunk: ChangeHunk) => Effect.Effect<void, E, AppServices>,
+    ) =>
       vscode.commands.registerCommand(command, (tabId: number, file: string, hunk: ChangeHunk) => {
         const tab = this.tabs.byId(tabId);
         if (tab) {
@@ -772,7 +813,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   }
 
   /** Takes the user to the conversations in the sidebar; the message follows the focus command, as in `focusComposer`. */
-  readonly showConversations = this.focus.pipe(Effect.andThen(Effect.sync(() => this.post({ type: "searchConversations" }))));
+  readonly showConversations = this.focus.pipe(
+    Effect.andThen(Effect.sync(() => this.post({ type: "searchConversations" }))),
+  );
 
   /**
    * Lists the active tab's agent's past sessions in the workspace folders. The sidebar asks when it opens, on hover:
@@ -786,12 +829,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       }
     };
     post({ loading: true, sessions: [] });
-    const listed = yield* this.readConversations().pipe(Effect.catch((err) => Effect.succeed({ error: err.message, sessions: [] })));
+    const listed = yield* this.readConversations().pipe(
+      Effect.catch((err) => Effect.succeed({ error: err.message, sessions: [] })),
+    );
     post(listed);
   });
 
   private readonly readConversations = Effect.fn("ChatView.readConversations")(function* (this: ChatViewProvider) {
-    const running = yield* this.tabAgents.getAgent(this.tabs.active).pipe(Effect.catchTag("NoAgentError", () => Effect.undefined));
+    const running = yield* this.tabAgents
+      .getAgent(this.tabs.active)
+      .pipe(Effect.catchTag("NoAgentError", () => Effect.undefined));
     const worktrees = yield* Worktrees;
     const roots = workspaceFolders().map((f) => f.path);
     const kept = yield* Effect.forEach(roots, (root) => worktrees.list(root).pipe(Effect.orElseSucceed(() => [])));
@@ -804,7 +851,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   });
 
   /** Deletes a session of the history; a failure can't go in the transcript, which the history covers. */
-  private readonly deleteSession = Effect.fn("ChatView.deleteSession")(function* (this: ChatViewProvider, sessionId: string, title: string | undefined) {
+  private readonly deleteSession = Effect.fn("ChatView.deleteSession")(function* (
+    this: ChatViewProvider,
+    sessionId: string,
+    title: string | undefined,
+  ) {
     const deleted = yield* this.sessions.deleteSession(sessionId, title).pipe(
       Effect.catchTag("NoAgentError", () => Effect.succeed(false)),
       Effect.catchTags({

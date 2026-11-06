@@ -26,7 +26,10 @@ export class ComposerCommands {
   });
 
   /** Adds files/folders to the composer (Explorer / editor tab context menu). */
-  readonly attach = Effect.fn("ComposerCommands.attach")(function* (this: ComposerCommands, uris: ReadonlyArray<vscode.Uri>) {
+  readonly attach = Effect.fn("ComposerCommands.attach")(function* (
+    this: ComposerCommands,
+    uris: ReadonlyArray<vscode.Uri>,
+  ) {
     yield* this.queueAndFocus(uriAttachments(uris));
   });
 
@@ -51,7 +54,9 @@ export class ComposerCommands {
   });
 
   /** Adds the active terminal's selection to the composer (terminal context menu). */
-  readonly attachTerminalSelection = Effect.fn("ComposerCommands.attachTerminalSelection")(function* (this: ComposerCommands) {
+  readonly attachTerminalSelection = Effect.fn("ComposerCommands.attachTerminalSelection")(function* (
+    this: ComposerCommands,
+  ) {
     const selection = yield* (yield* TerminalContext).selection;
     if (Option.isNone(selection)) {
       void vscode.window.showInformationMessage(t("terminal.noSelection"));
@@ -64,15 +69,22 @@ export class ComposerCommands {
    * Adds the output of the active terminal's last command, or last failed one, to the composer
    * (terminal context menu).
    */
-  readonly attachTerminalOutput = Effect.fn("ComposerCommands.attachTerminalOutput")(function* (this: ComposerCommands, failed: boolean) {
+  readonly attachTerminalOutput = Effect.fn("ComposerCommands.attachTerminalOutput")(function* (
+    this: ComposerCommands,
+    failed: boolean,
+  ) {
     const terminal = vscode.window.activeTerminal;
     if (!terminal) {
       return;
     }
     const terminals = yield* TerminalContext;
-    const command = yield* (failed ? terminals.lastFailed(terminal) : terminals.lastCommand(terminal));
+    const command = yield* failed ? terminals.lastFailed(terminal) : terminals.lastCommand(terminal);
     if (Option.isNone(command)) {
-      const reason = !terminal.shellIntegration ? "terminal.noShellIntegration" : failed ? "terminal.noFailed" : "terminal.noCommands";
+      const reason = !terminal.shellIntegration
+        ? "terminal.noShellIntegration"
+        : failed
+          ? "terminal.noFailed"
+          : "terminal.noCommands";
       void vscode.window.showInformationMessage(t(reason));
       return;
     }
@@ -80,7 +92,10 @@ export class ComposerCommands {
   });
 
   /** Adds the problems of the active editor's file, or of the workspace, to the composer. */
-  readonly attachProblems = Effect.fn("ComposerCommands.attachProblems")(function* (this: ComposerCommands, scope: ProblemScope) {
+  readonly attachProblems = Effect.fn("ComposerCommands.attachProblems")(function* (
+    this: ComposerCommands,
+    scope: ProblemScope,
+  ) {
     const attachment = yield* (yield* Problems).attachment(scope);
     if (Option.isNone(attachment)) {
       void vscode.window.showInformationMessage(t(scope === "file" ? "problems.noneInFile" : "problems.none"));

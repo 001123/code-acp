@@ -57,7 +57,11 @@ export function AgentPicker({ catalog }: { catalog: CatalogState }) {
                 <span className="setup-agent-name">{agent.name}</span>
                 <span className="setup-agent-desc">{agent.busy ?? agent.description}</span>
               </span>
-              {agent.busy && <span className="setup-busy"><Icon svg={loaderIcon} /></span>}
+              {agent.busy && (
+                <span className="setup-busy">
+                  <Icon svg={loaderIcon} />
+                </span>
+              )}
               {!agent.busy && agent.installedVersion && <Icon svg={checkIcon} />}
             </label>
           ))}
@@ -125,7 +129,12 @@ function CheckRow({ row }: { row: DoctorRow }) {
 function SetupChecks({ doctor, onContinue }: { doctor: DoctorState; onContinue: () => void }) {
   const { t } = useL10n();
   const outcome = checkOutcome(doctor);
-  const message = { checking: "doctor.checking", failed: "chat.setup.checkFailed", warned: "chat.setup.checkWarned", passed: "doctor.allGood" } as const;
+  const message = {
+    checking: "doctor.checking",
+    failed: "chat.setup.checkFailed",
+    warned: "chat.setup.checkWarned",
+    passed: "doctor.allGood",
+  } as const;
   return (
     <div id="agent-setup">
       <h2>{t("chat.setup.checkTitle")}</h2>
@@ -144,7 +153,11 @@ function SetupChecks({ doctor, onContinue }: { doctor: DoctorState; onContinue: 
           </button>
         )}
         {(outcome === "failed" || outcome === "warned") && (
-          <button type="button" className={outcome === "warned" ? "secondary" : undefined} onClick={() => post({ type: "doctorRun" })}>
+          <button
+            type="button"
+            className={outcome === "warned" ? "secondary" : undefined}
+            onClick={() => post({ type: "doctorRun" })}
+          >
             {t("doctor.runAgain")}
           </button>
         )}
@@ -157,5 +170,9 @@ function SetupChecks({ doctor, onContinue }: { doctor: DoctorState; onContinue: 
 export function AgentSetup({ catalog, doctor }: { catalog: CatalogState; doctor: DoctorState }) {
   const [continued, setContinued] = useState(false);
   useEffect(() => post({ type: "doctorRun" }), []);
-  return continued || checkOutcome(doctor) === "passed" ? <AgentPicker catalog={catalog} /> : <SetupChecks doctor={doctor} onContinue={() => setContinued(true)} />;
+  return continued || checkOutcome(doctor) === "passed" ? (
+    <AgentPicker catalog={catalog} />
+  ) : (
+    <SetupChecks doctor={doctor} onContinue={() => setContinued(true)} />
+  );
 }

@@ -74,18 +74,21 @@ const isCommitTarget = (arg: unknown): arg is CommitTarget =>
   Predicate.hasProperty(arg.inputBox, "value");
 
 /** Generates a commit message for the pending changes with the selected ACP agent. */
-export class CommitMessage extends Context.Service<CommitMessage, {
-  /** `arg` is what the `scm/title` menu passes (the SourceControl); without one, picks a git repository. */
-  generate(arg: unknown): Effect.Effect<void, CommitMessageError>;
-  /** Commits with the message in the box (generating one when it is empty), then pushes. */
-  commitAndPush(arg: unknown): Effect.Effect<void, CommitMessageError>;
-  readonly cancel: Effect.Effect<void>;
-  /**
-   * What the agent `agentId` (empty: the default agent) offers to pick, read from a throwaway session; the efforts
-   * are those of `model` (empty: the agent's default one).
-   */
-  options(agentId: string, model: string): Effect.Effect<AgentOptions, CommitMessageError>;
-}>()("code-acp/CommitMessage") {
+export class CommitMessage extends Context.Service<
+  CommitMessage,
+  {
+    /** `arg` is what the `scm/title` menu passes (the SourceControl); without one, picks a git repository. */
+    generate(arg: unknown): Effect.Effect<void, CommitMessageError>;
+    /** Commits with the message in the box (generating one when it is empty), then pushes. */
+    commitAndPush(arg: unknown): Effect.Effect<void, CommitMessageError>;
+    readonly cancel: Effect.Effect<void>;
+    /**
+     * What the agent `agentId` (empty: the default agent) offers to pick, read from a throwaway session; the efforts
+     * are those of `model` (empty: the agent's default one).
+     */
+    options(agentId: string, model: string): Effect.Effect<AgentOptions, CommitMessageError>;
+  }
+>()("code-acp/CommitMessage") {
   static readonly layer = Layer.effect(
     CommitMessage,
     Effect.gen(function* () {
@@ -111,7 +114,10 @@ export class CommitMessage extends Context.Service<CommitMessage, {
             Stream.runDrain,
           );
           return text;
-        }).pipe(Effect.scoped, Effect.orElseSucceed(() => ""));
+        }).pipe(
+          Effect.scoped,
+          Effect.orElseSucceed(() => ""),
+        );
       const diff = (cwd: string, ...args: Array<string>) =>
         gitHead(cwd, MAX_DIFF_CHARS + 1, "diff", "--no-color", ...args, "--", ".", ...DIFF_EXCLUDES);
       const setGenerating = (value: boolean) =>
@@ -131,8 +137,7 @@ export class CommitMessage extends Context.Service<CommitMessage, {
         }
         const repositories = (yield* gitApi)?.repositories ?? [];
         const active = vscode.window.activeTextEditor?.document.uri.fsPath;
-        const target =
-          repositories.find((repo) => active?.startsWith(repo.rootUri.fsPath)) ?? repositories[0];
+        const target = repositories.find((repo) => active?.startsWith(repo.rootUri.fsPath)) ?? repositories[0];
         if (!target) {
           return yield* fail(t("commit.noRepository"));
         }
@@ -149,7 +154,8 @@ export class CommitMessage extends Context.Service<CommitMessage, {
           return yield* fail(t("commit.noChanges"));
         }
         const log = yield* git(cwd, "log", "-n", "10", "--format=%s");
-        const truncated = changes.length > MAX_DIFF_CHARS ? `${changes.slice(0, MAX_DIFF_CHARS)}\n[diff truncated]` : changes;
+        const truncated =
+          changes.length > MAX_DIFF_CHARS ? `${changes.slice(0, MAX_DIFF_CHARS)}\n[diff truncated]` : changes;
         return { staged, status, diff: truncated, log };
       });
 
@@ -177,7 +183,11 @@ export class CommitMessage extends Context.Service<CommitMessage, {
           "Diff:",
           changes.diff.trim() || "(no diff for tracked files; see the status above)",
           ...(instructions.trim()
-            ? ["", "Additional instructions from the user; they take precedence over the rules above:", instructions.trim()]
+            ? [
+                "",
+                "Additional instructions from the user; they take precedence over the rules above:",
+                instructions.trim(),
+              ]
             : []),
         ].join("\n");
 
@@ -200,7 +210,11 @@ export class CommitMessage extends Context.Service<CommitMessage, {
           const agent = yield* spawnAgent(command, {
             onUpdate: (n) => {
               const update = n.update;
-              if (n.sessionId === sessionId && update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
+              if (
+                n.sessionId === sessionId &&
+                update.sessionUpdate === "agent_message_chunk" &&
+                update.content.type === "text"
+              ) {
                 text += update.content.text;
                 target.inputBox.value = clean(text);
               }
@@ -213,13 +227,20 @@ export class CommitMessage extends Context.Service<CommitMessage, {
           yield* configureSession(
             agent,
             session,
-            { model: settings["commitMessage.model"], effort: settings["commitMessage.effort"], fastMode: settings["commitMessage.fastMode"] },
-            (what, value) => output.appendLine(`[commit] ${t(what === "model" ? "commit.modelNotFound" : "commit.effortNotFound", value)}`),
+            {
+              model: settings["commitMessage.model"],
+              effort: settings["commitMessage.effort"],
+              fastMode: settings["commitMessage.fastMode"],
+            },
+            (what, value) =>
+              output.appendLine(
+                `[commit] ${t(what === "model" ? "commit.modelNotFound" : "commit.effortNotFound", value)}`,
+              ),
           );
           const prompt = buildPrompt(changes, settings["commitMessage.instructions"]);
-          yield* agent.prompt(sessionId, [{ type: "text", text: prompt }]).pipe(
-            Effect.onInterrupt(() => Effect.sync(() => (target.inputBox.value = previous))),
-          );
+          yield* agent
+            .prompt(sessionId, [{ type: "text", text: prompt }])
+            .pipe(Effect.onInterrupt(() => Effect.sync(() => (target.inputBox.value = previous))));
           const message = clean(text);
           if (!message) {
             target.inputBox.value = previous;

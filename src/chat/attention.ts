@@ -4,7 +4,10 @@ import type { Settings } from "../settings";
 export type AttentionReason = "permission" | "question" | "finished";
 
 /** Whether `reason` gets a notification: codeAcp.notifications covers all of them, codeAcp.notifyFinished the finished ones. */
-export function shouldNotify(reason: AttentionReason, settings: Pick<Settings, "notifications" | "notifyFinished">): boolean {
+export function shouldNotify(
+  reason: AttentionReason,
+  settings: Pick<Settings, "notifications" | "notifyFinished">,
+): boolean {
   return settings.notifications && (reason !== "finished" || settings.notifyFinished);
 }
 

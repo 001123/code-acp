@@ -1,6 +1,16 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from "react";
-import type { Attachment, ChangeHunk, ChangesMessage, PrDraft, QueuedInfo, TabGroupInfo, TabInfo, TerminalSnapshot, WorktreeDiff } from "../../chat/protocol";
+import type {
+  Attachment,
+  ChangeHunk,
+  ChangesMessage,
+  PrDraft,
+  QueuedInfo,
+  TabGroupInfo,
+  TabInfo,
+  TerminalSnapshot,
+  WorktreeDiff,
+} from "../../chat/protocol";
 import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
@@ -23,7 +33,23 @@ import { post } from "./post";
 import { useDockable, useSidebarPrefs } from "./sidebarPrefs";
 import type { Usage } from "./usageMeter";
 import type { AgentChoices } from "./agentPanel";
-import { allRows, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, rowKey, rowsInHand, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow, type TabChanges } from "./tabRows";
+import {
+  allRows,
+  dropIndex,
+  matchingRows,
+  memberTitle,
+  openRequests,
+  requestsLabel,
+  rowKey,
+  rowsInHand,
+  sumChanges,
+  tabChanges,
+  tabRows,
+  tabWorking,
+  workingRowKeys,
+  type ShownRow,
+  type TabChanges,
+} from "./tabRows";
 import { EMPTY, type Transcript } from "./transcript";
 
 export interface Status {
@@ -95,7 +121,10 @@ export function tabStates(state: Record<number, TabState>, action: TabsAction): 
     case "fork": {
       const from = state[action.from] ?? NEW_TAB;
       const tab = state[action.tab] ?? NEW_TAB;
-      return { ...state, [action.tab]: { ...tab, transcript: from.transcript, commands: from.commands, config: from.config } };
+      return {
+        ...state,
+        [action.tab]: { ...tab, transcript: from.transcript, commands: from.commands, config: from.config },
+      };
     }
   }
 }
@@ -103,7 +132,8 @@ export function tabStates(state: Record<number, TabState>, action: TabsAction): 
 /** Drag data type of a tab being reordered; the view's file drop ignores it. */
 export const TAB_DRAG_TYPE = "application/x-code-acp-tab";
 
-export const isTabDrag = (e: { dataTransfer: DataTransfer | null }) => e.dataTransfer?.types.includes(TAB_DRAG_TYPE) ?? false;
+export const isTabDrag = (e: { dataTransfer: DataTransfer | null }) =>
+  e.dataTransfer?.types.includes(TAB_DRAG_TYPE) ?? false;
 
 /** Tells tabs apart in the collapsed rail. */
 const tabInitial = (title: string) => Array.from(title.trim())[0]?.toUpperCase() ?? "";
@@ -196,7 +226,8 @@ export function TabSidebar({
   const needHistory = () => {
     if (searching || !prefs.historyCollapsed) onNeedHistory();
   };
-  const titleOf = (tab: TabInfo, member: boolean) => (member ? memberTitle(tab, agents) : tab.title) || t("chat.newTab");
+  const titleOf = (tab: TabInfo, member: boolean) =>
+    (member ? memberTitle(tab, agents) : tab.title) || t("chat.newTab");
   /** Results lead to a conversation, which ends the search. */
   const select = (id: number) => {
     setQuery("");
@@ -237,7 +268,8 @@ export function TabSidebar({
         e.dataTransfer.dropEffect = "move";
         const box = e.currentTarget.getBoundingClientRect();
         const after = e.clientY > box.top + box.height / 2;
-        if (dropLine?.key !== key || dropLine.after !== after) setDropLine({ key, after, at: first + (after ? ids.length : 0) });
+        if (dropLine?.key !== key || dropLine.after !== after)
+          setDropLine({ key, after, at: first + (after ? ids.length : 0) });
       },
       onDrop: (e: DragEvent) => {
         if (!isTabDrag(e)) return;
@@ -333,7 +365,8 @@ export function TabSidebar({
               initial={member ? title : (tab.title ?? "")}
               onDone={(name) => {
                 onRename(undefined);
-                if (name !== undefined && name !== (member ? title : (tab.title ?? ""))) post({ type: "renameTab", tab: tab.id, title: name });
+                if (name !== undefined && name !== (member ? title : (tab.title ?? "")))
+                  post({ type: "renameTab", tab: tab.id, title: name });
               }}
             />
           ) : (
@@ -383,7 +416,10 @@ export function TabSidebar({
     const running = members.filter((tab) => states[tab.id]?.status.busy || tab.attempt === "running").length;
     const open = members.map((tab) => openRequests(states[tab.id]));
     const requests = requestsLabel(
-      { permissions: open.reduce((sum, each) => sum + each.permissions, 0), questions: open.reduce((sum, each) => sum + each.questions, 0) },
+      {
+        permissions: open.reduce((sum, each) => sum + each.permissions, 0),
+        questions: open.reduce((sum, each) => sum + each.questions, 0),
+      },
       t,
     );
     const waiting = requests !== undefined;
@@ -421,7 +457,11 @@ export function TabSidebar({
           onAuxClick={(e) => {
             if (e.button === 1 && !pinned) post({ type: "closeGroup", group: group.id });
           }}
-          {...dragProps(key, members.map((tab) => tab.id), group.id)}
+          {...dragProps(
+            key,
+            members.map((tab) => tab.id),
+            group.id,
+          )}
         >
           <span className="tab-marker" aria-hidden="true">
             <span className="tab-initial">{tabInitial(group.title)}</span>
@@ -434,7 +474,8 @@ export function TabSidebar({
                 initial={group.title}
                 onDone={(name) => {
                   setRenamingGroup(undefined);
-                  if (name !== undefined && name !== group.title) post({ type: "renameGroup", group: group.id, title: name });
+                  if (name !== undefined && name !== group.title)
+                    post({ type: "renameGroup", group: group.id, title: name });
                 }}
               />
             ) : (
@@ -501,8 +542,12 @@ export function TabSidebar({
   const isWorkingRow = (row: ShownRow) => !searching && workingKeys.current.has(rowKey(row));
   const workingRows = shownRows.filter(isWorkingRow);
   /** The section stays out of the way when collapsed, but the conversation on screen stays in the sidebar. */
-  const isOnScreen = (row: ShownRow) => (row.kind === "tab" ? row.tab.id === active : row.group.id === shownGroup || row.members.some((tab) => tab.id === active));
-  const shownRow = (row: ShownRow) => (row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members, row.shown));
+  const isOnScreen = (row: ShownRow) =>
+    row.kind === "tab"
+      ? row.tab.id === active
+      : row.group.id === shownGroup || row.members.some((tab) => tab.id === active);
+  const shownRow = (row: ShownRow) =>
+    row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members, row.shown);
   useEffect(() => {
     panel.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" });
   }, [active, shownGroup, tabs.length, workingRows.length]);
@@ -532,7 +577,9 @@ export function TabSidebar({
           <HistorySortMenu menu={sortMenu} sort={prefs.sort} onSort={(sort) => setPrefs({ sort })} />
         </SidebarSection>
       )}
-      {(searching || !prefs.historyCollapsed) && <HistoryList history={history} groups={past} searching={searching} onOpened={() => setQuery("")} />}
+      {(searching || !prefs.historyCollapsed) && (
+        <HistoryList history={history} groups={past} searching={searching} onOpened={() => setQuery("")} />
+      )}
     </>
   );
   return (
@@ -578,7 +625,9 @@ export function TabSidebar({
               {shownRows.filter((row) => !isWorkingRow(row)).map(shownRow)}
             </div>
             {searching && historySection}
-            {noMatch && <div className="history-message">{t(historyWaited ? "chat.historyLoading" : "chat.historyNoMatch")}</div>}
+            {noMatch && (
+              <div className="history-message">{t(historyWaited ? "chat.historyLoading" : "chat.historyNoMatch")}</div>
+            )}
           </div>
           {!searching && (
             <div id="new-tab-row">
@@ -598,7 +647,9 @@ export function TabSidebar({
               collapsed={prefs.workingCollapsed}
               onToggle={() => setPrefs({ workingCollapsed: !prefs.workingCollapsed })}
             />
-            <div role="tablist">{(prefs.workingCollapsed ? workingRows.filter(isOnScreen) : workingRows).map(shownRow)}</div>
+            <div role="tablist">
+              {(prefs.workingCollapsed ? workingRows.filter(isOnScreen) : workingRows).map(shownRow)}
+            </div>
           </div>
         )}
         {!searching && <div id="tab-history">{historySection}</div>}
@@ -608,7 +659,15 @@ export function TabSidebar({
 }
 
 /** Edits a name in place: Enter or leaving the field keeps it, Escape drops it (`undefined`). */
-function TabNameInput({ label, initial, onDone }: { label: string; initial: string; onDone: (name: string | undefined) => void }) {
+function TabNameInput({
+  label,
+  initial,
+  onDone,
+}: {
+  label: string;
+  initial: string;
+  onDone: (name: string | undefined) => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const done = useRef(false);
   const finish = (name: string | undefined) => {

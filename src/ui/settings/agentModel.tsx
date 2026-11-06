@@ -29,12 +29,16 @@ export function SessionOptionFields(props: {
 }) {
   const { t } = useL10n();
   const { id, agent, model, effort, fastMode } = props;
-  const overridden = typeof props.overridden === "boolean" ? { model: props.overridden, effort: props.overridden, fastMode: props.overridden } : props.overridden;
+  const overridden =
+    typeof props.overridden === "boolean"
+      ? { model: props.overridden, effort: props.overridden, fastMode: props.overridden }
+      : props.overridden;
   const loaded = props.loaded[optionsKey(agent, model)];
   const loading = !loaded || (!loaded.options && loaded.error === undefined);
   const options = loaded?.options;
   // The agent's models don't depend on the model picked: those listed stay while another model's efforts load.
-  const models = options?.models ?? Object.values(props.loaded).find((l) => l.agentId === agent && l.options)?.options?.models;
+  const models =
+    options?.models ?? Object.values(props.loaded).find((l) => l.agentId === agent && l.options)?.options?.models;
 
   // The agent's options are read as soon as the page shows them, then whenever another agent or model is picked.
   useEffect(() => {
@@ -61,7 +65,13 @@ export function SessionOptionFields(props: {
 
   return (
     <>
-      <Field id={`${id}-model`} label="settings.commitModel" desc={props.modelDesc} overridden={overridden.model} error={loaded?.error}>
+      <Field
+        id={`${id}-model`}
+        label="settings.commitModel"
+        desc={props.modelDesc}
+        overridden={overridden.model}
+        error={loaded?.error}
+      >
         <div className="row">
           <select id={`${id}-model`} value={model} onChange={(e) => props.onModel(e.target.value)}>
             <option value="">{t("settings.commitModelDefault")}</option>
@@ -72,7 +82,12 @@ export function SessionOptionFields(props: {
             ))}
             {model && !models?.some((m) => m.value === model) && <option value={model}>{model}</option>}
           </select>
-          <button className="secondary" disabled={loading} title={t("settings.reloadOptionsTitle")} onClick={() => props.load(agent, model)}>
+          <button
+            className="secondary"
+            disabled={loading}
+            title={t("settings.reloadOptionsTitle")}
+            onClick={() => props.load(agent, model)}
+          >
             {t("settings.reloadOptions")}
           </button>
         </div>
@@ -83,7 +98,13 @@ export function SessionOptionFields(props: {
         {efforts?.length === 0 ? (
           <div className="note muted">{t("settings.noEfforts")}</div>
         ) : (
-          <Segmented id={`${id}-effort`} value={pickedEffort} options={effortChoices} onChange={props.onEffort} disabled={!efforts} />
+          <Segmented
+            id={`${id}-effort`}
+            value={pickedEffort}
+            options={effortChoices}
+            onChange={props.onEffort}
+            disabled={!efforts}
+          />
         )}
         {effortNote && <div className="note muted">{effortNote}</div>}
         {unknownEffort && <div className="note warning">{t("settings.effortNotOffered", effort)}</div>}
@@ -101,7 +122,9 @@ export function SessionOptionFields(props: {
           // Left on while set, so it can be turned off.
           disabled={noFastMode && !fastOn}
           // Back to the agent's own state, nothing is kept in settings.json.
-          onChange={(checked) => props.onFastMode(checked === (options?.defaultFastMode ?? false) ? "default" : checked ? "on" : "off")}
+          onChange={(checked) =>
+            props.onFastMode(checked === (options?.defaultFastMode ?? false) ? "default" : checked ? "on" : "off")
+          }
         />
       </Field>
     </>
@@ -129,7 +152,12 @@ export function AgentModelFields(props: {
 
   return (
     <>
-      <Field id={`${id}-agent`} label="settings.commitAgent" desc={props.agentDesc} overridden={state.overridden.includes(agentKey)}>
+      <Field
+        id={`${id}-agent`}
+        label="settings.commitAgent"
+        desc={props.agentDesc}
+        overridden={state.overridden.includes(agentKey)}
+      >
         <select
           id={`${id}-agent`}
           value={agent}

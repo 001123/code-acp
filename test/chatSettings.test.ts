@@ -26,7 +26,11 @@ describe("placeSubMenu", () => {
   it("goes beside the menu when a side has room", () => {
     viewport(1000, 800);
     assert.deepStrictEqual(placeSubMenu(row, menu, 280, 200), { left: 264, top: 295, opens: "right" });
-    assert.deepStrictEqual(placeSubMenu(rect(650, 300, 850, 330), rect(640, 295, 860, 420), 280, 200), { left: 356, top: 295, opens: "left" });
+    assert.deepStrictEqual(placeSubMenu(rect(650, 300, 850, 330), rect(640, 295, 860, 420), 280, 200), {
+      left: 356,
+      top: 295,
+      opens: "left",
+    });
   });
 
   it("goes above the menu in a narrow view, without covering it", () => {
@@ -83,13 +87,17 @@ describe("ChatSettings", () => {
   const trigger = () => document.querySelector<HTMLElement>("#chat-settings-menu .submenu-trigger")!;
   const submenu = () => document.querySelector<HTMLElement>("#chat-settings-menu .submenu");
   const hover = (el: Element) => act(() => void el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
-  const mouseClick = (el: Element) => act(() => void el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })));
-  const keyClick = (el: Element) => act(() => void el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 })));
+  const mouseClick = (el: Element) =>
+    act(() => void el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })));
+  const keyClick = (el: Element) =>
+    act(() => void el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 })));
 
   it("gives every row of the menu and of the General sub-menu an icon", () => {
     open(false);
     hover(trigger());
-    const rows = document.querySelectorAll("#chat-settings-menu > button, #chat-settings-menu .submenu-trigger, #chat-settings-menu .submenu > button");
+    const rows = document.querySelectorAll(
+      "#chat-settings-menu > button, #chat-settings-menu .submenu-trigger, #chat-settings-menu .submenu > button",
+    );
     assert.strictEqual(rows.length, 8);
     for (const row of rows) assert.isNotNull(row.querySelector(":scope .svg-icon"), row.textContent ?? "");
   });

@@ -39,7 +39,8 @@ const en = {
   "worktree.openWindow": "Open in new window",
   "worktree.openTerminal": "Open terminal here",
   "worktree.delete": "Delete worktree",
-  "worktree.deleteConfirm": "Worktree {0} has {1} uncommitted file(s) and {2} commit(s) that are not in {3}. Delete them?",
+  "worktree.deleteConfirm":
+    "Worktree {0} has {1} uncommitted file(s) and {2} commit(s) that are not in {3}. Delete them?",
   "worktree.deleteConfirmUnknown": "Couldn't check what worktree {0} holds. Delete it and its branch?",
   "worktree.deleteAction": "Delete Worktree",
   "worktree.keepAction": "Keep Worktree",
@@ -47,17 +48,21 @@ const en = {
   "worktree.noRepo": "This tab's folder is not in a git repository.",
   "worktree.creating": "Creating worktree…",
   "worktree.settingUp": "Setting up worktree…",
-  "worktree.projectCommandConfirm": "{0} wants to run a setup command in its new worktrees. Allow it only if you trust this repository.",
-  "worktree.projectCommandDetail": "{0}\n\nCode ACP won't ask again until the command or a file it names changes. It can't check what the command loads by other means, such as package.json scripts.",
+  "worktree.projectCommandConfirm":
+    "{0} wants to run a setup command in its new worktrees. Allow it only if you trust this repository.",
+  "worktree.projectCommandDetail":
+    "{0}\n\nCode ACP won't ask again until the command or a file it names changes. It can't check what the command loads by other means, such as package.json scripts.",
   "worktree.projectCommandAllow": "Allow and Run",
   "worktree.copyFailed": "Couldn't copy {0} into the worktree: {1}",
   "worktree.setupFailed": "The worktree setup command failed with exit code {0}: {1}",
   "worktree.setupTimedOut": "The worktree setup command was stopped after {0} minutes.",
-  "worktree.started": "Working in worktree {0}, on its own branch. Uncommitted changes in your local checkout are not here.",
+  "worktree.started":
+    "Working in worktree {0}, on its own branch. Uncommitted changes in your local checkout are not here.",
   "worktree.missing": "The worktree of this tab is gone, so it is back in your local checkout.",
   "worktree.folderGone": "The folder of that session no longer exists.",
   "worktree.nothingToApply": "Worktree {0} has no changes to apply.",
-  "worktree.applyConfirm": "Apply {0} uncommitted file(s) and {1} commit(s) from worktree {2} to {3}? They arrive as staged changes.",
+  "worktree.applyConfirm":
+    "Apply {0} uncommitted file(s) and {1} commit(s) from worktree {2} to {3}? They arrive as staged changes.",
   "worktree.applyAction": "Apply Changes",
   "worktree.applied": "Applied the changes of worktree {0} to {1}.",
   "worktree.appliedConflicts": "Applied the changes of worktree {0} to {1}, with conflicts in: {2}",
@@ -86,7 +91,8 @@ const en = {
   "worktree.merge": "Merge into {0}",
   "worktree.mergeDesc": "Keeps the commits; anything uncommitted gets committed first",
   "worktree.merging": "Merging…",
-  "worktree.mergeConflicts": "Merging worktree {0} into {1} left conflicts in: {2}. Resolve and commit them there, or abort the merge.",
+  "worktree.mergeConflicts":
+    "Merging worktree {0} into {1} left conflicts in: {2}. Resolve and commit them there, or abort the merge.",
   "worktree.openChanges": "Open Source Control",
   "worktree.abortMerge": "Abort Merge",
   "worktree.baseDirty": "{0} has uncommitted changes. Commit or stash them before merging.",
@@ -94,13 +100,15 @@ const en = {
   "worktree.commitPrompt": "Commit message for what the worktree hasn't committed yet",
   "worktree.commitEmpty": "A commit needs a message.",
   "worktree.pr": "Create pull request",
-  "worktree.prDesc": "Commits anything uncommitted, then the agent drafts the description in this chat; nothing is pushed until you agree",
+  "worktree.prDesc":
+    "Commits anything uncommitted, then the agent drafts the description in this chat; nothing is pushed until you agree",
   "worktree.prChecking": "Checking pull requests…",
   "worktree.prPushing": "Pushing…",
   "worktree.prOpen": "Open",
   "worktree.prUpdateConfirm": "Worktree {0} already has an open pull request, {1}. Push its latest work there?",
   "worktree.prUpdateAction": "Push",
-  "worktree.prPrompt": "Write a pull request description for the work on this branch since commit {0}. Reply with the title on the first line, a blank line, then the description in Markdown: what changed and why. Reply with nothing else, follow the style and language of the repository's commit messages, and don't change any files.",
+  "worktree.prPrompt":
+    "Write a pull request description for the work on this branch since commit {0}. Reply with the title on the first line, a blank line, then the description in Markdown: what changed and why. Reply with nothing else, follow the style and language of the repository's commit messages, and don't change any files.",
   "worktree.prDraftTitle": "Pull request: {0} → {1}",
   "worktree.prDefaultBase": "default branch",
   "worktree.prRemote": "Pushes to {0}",
@@ -109,7 +117,8 @@ const en = {
   "worktree.prCreate": "Push and Open Pull Request",
   "worktree.prDiscard": "Discard",
   "worktree.noRemote": "This repository has no remote to push to.",
-  "worktree.ghMissing": "Opening a pull request needs the GitHub CLI (gh), which couldn't be started. Install it and run \"gh auth login\".",
+  "worktree.ghMissing":
+    'Opening a pull request needs the GitHub CLI (gh), which couldn\'t be started. Install it and run "gh auth login".',
   "worktree.ghFailed": "gh failed: {0}",
   "worktree.remoteTimedOut": "The remote didn't finish within {0} minutes.",
   "worktree.clean": "Clean up worktrees…",
@@ -125,13 +134,17 @@ const en = {
   "chat.pickWorktree": "Choose where this tab works",
   "chat.tabWorktree": "Worktree: {0}",
   "settings.worktreeForNewTabs": "A worktree for each new chat",
-  "settings.worktreeForNewTabsDesc": "Tick the Worktree box of each new chat: its first message creates a git worktree of its own, on a new branch, so chats don't touch each other's files or your local checkout. Folders outside git are not affected.",
+  "settings.worktreeForNewTabsDesc":
+    "Tick the Worktree box of each new chat: its first message creates a git worktree of its own, on a new branch, so chats don't touch each other's files or your local checkout. Folders outside git are not affected.",
   "settings.worktreeCopyFiles": "Files to copy into new worktrees",
-  "settings.worktreeCopyFilesDesc": "Ignored files to copy from your checkout, one gitignore pattern per line, relative to the repository. Files git doesn't ignore are never copied.",
+  "settings.worktreeCopyFilesDesc":
+    "Ignored files to copy from your checkout, one gitignore pattern per line, relative to the repository. Files git doesn't ignore are never copied.",
   "settings.worktreeSetupCommand": "Setup command",
   "settings.worktreeProjectSetupCommand": "Project setup command",
-  "settings.worktreeProjectSetupCommandDesc": "Shell command to run at the top of each new worktree of this project, instead of the one in your user settings. It can be committed with the repository, so Code ACP asks before running it, and asks again when the command or a file it names changes.",
-  "settings.worktreeSetupCommandDesc": "Shell command to run at the top of each new worktree. The agent starts once it finishes. Only your user settings can set it, so a repository can't.",
+  "settings.worktreeProjectSetupCommandDesc":
+    "Shell command to run at the top of each new worktree of this project, instead of the one in your user settings. It can be committed with the repository, so Code ACP asks before running it, and asks again when the command or a file it names changes.",
+  "settings.worktreeSetupCommandDesc":
+    "Shell command to run at the top of each new worktree. The agent starts once it finishes. Only your user settings can set it, so a repository can't.",
 
   "chat.noAgentSelected": "No agent selected",
   "chat.starting": "Starting agent…",
@@ -178,30 +191,37 @@ const en = {
   "ask.tests.prompt": "Write tests for this code, following the project's existing test setup and conventions.",
 
   "settings.permissions": "Permissions",
-  "settings.permissionsDesc": "Which agent requests are answered without asking you. Everything else still asks, including tools that don't say what they do, deletes, and mode changes. Agents describe their own tools, so these rules save clicks but are no security boundary.",
+  "settings.permissionsDesc":
+    "Which agent requests are answered without asking you. Everything else still asks, including tools that don't say what they do, deletes, and mode changes. Agents describe their own tools, so these rules save clicks but are no security boundary.",
   "settings.autoApproveAsk": "Ask",
   "settings.autoApproveAllow": "Allow",
   "settings.autoApproveInherit": "As in user settings",
   "settings.autoApproveRead": "Read and search files",
   "settings.autoApproveReadDesc": "Inside the chat's folder. Includes secrets stored there, such as .env files.",
   "settings.autoApproveEdit": "Edit and move files",
-  "settings.autoApproveEditDesc": "Inside the chat's folder, except .git and .vscode. Files elsewhere can still run later, such as package.json scripts or agent configuration.",
+  "settings.autoApproveEditDesc":
+    "Inside the chat's folder, except .git and .vscode. Files elsewhere can still run later, such as package.json scripts or agent configuration.",
   "settings.autoApproveExecute": "Run commands",
   "settings.autoApproveExecuteDesc": "Any command, anywhere on this machine: it is not limited to the chat's folder.",
   "settings.autoApproveFetch": "Access the network",
   "settings.autoApproveFetchDesc": "Any address, and whatever the agent sends to it.",
   "settings.autoApproveWorktreeTabs": "Everything in worktree chats",
-  "settings.autoApproveWorktreeTabsDesc": "In chats with a worktree of their own, also allows deletes and paths outside the worktree. A worktree is no sandbox: commands can still reach the rest of this machine.",
-  "settings.autoApproveLeakWarning": "Reading files and network access are both allowed, so an agent misled by what it reads could send your secrets out without asking.",
-  "settings.autoApproveWorkspaceNote": "A workspace's rules stay on this machine rather than in the project's files, so a repository can't set them.",
+  "settings.autoApproveWorktreeTabsDesc":
+    "In chats with a worktree of their own, also allows deletes and paths outside the worktree. A worktree is no sandbox: commands can still reach the rest of this machine.",
+  "settings.autoApproveLeakWarning":
+    "Reading files and network access are both allowed, so an agent misled by what it reads could send your secrets out without asking.",
+  "settings.autoApproveWorkspaceNote":
+    "A workspace's rules stay on this machine rather than in the project's files, so a repository can't set them.",
   "settings.links": "Links",
   "settings.linksDesc": "Which links an agent may ask you to open. You are always asked first.",
   "settings.allowedHttpHosts": "Hosts allowed over http",
-  "settings.allowedHttpHostsDesc": "One name or IP address per line, without a port. Links over https, and http to localhost and 127.0.0.1, need no entry. Anyone on the network can read what is sent over http.",
+  "settings.allowedHttpHostsDesc":
+    "One name or IP address per line, without a port. Links over https, and http to localhost and 127.0.0.1, need no entry. Anyone on the network can read what is sent over http.",
   "settings.allowedHttpHostsInvalid": "Line {0} is not a host name or IP address.",
   "settings.usage": "Usage",
   "settings.doctor": "Doctor",
-  "settings.doctorDesc": "Check the tools agents depend on, then start each agent to see that it runs and whether it needs a login. No prompts are sent.",
+  "settings.doctorDesc":
+    "Check the tools agents depend on, then start each agent to see that it runs and whether it needs a login. No prompts are sent.",
   "settings.usageDesc": "Tokens and cost the agents reported, by day and by conversation.",
   "usage.today": "Today",
   "usage.week": "Last 7 days",
@@ -218,7 +238,8 @@ const en = {
   "usage.noMatch": "No conversation matches.",
   "usage.showing": "Showing {0} of {1}",
   "usage.showMore": "Show more",
-  "usage.note": "Counts what agents report: tokens per turn (e.g. Claude) and session cost. Agents that report neither only count turns. Everything is kept until you clear it.",
+  "usage.note":
+    "Counts what agents report: tokens per turn (e.g. Claude) and session cost. Agents that report neither only count turns. Everything is kept until you clear it.",
   "usage.byDay": "By day",
   "usage.bySession": "By session",
   "usage.day": "Day",
@@ -248,8 +269,10 @@ const en = {
   "ccusage.refresh": "Refresh",
   "ccusage.loading": "Running ccusage… The first run downloads it through npx, which may take a while.",
   "ccusage.empty": "ccusage found no usage in the local logs.",
-  "ccusage.allFailedHint": "Reading every agent stops at the first one that fails; pick a single agent to see the others.",
-  "ccusage.note": "Read by ccusage from the logs coding agents keep on this machine, including sessions outside Code ACP. Costs are estimates at API prices, not what a subscription bills.",
+  "ccusage.allFailedHint":
+    "Reading every agent stops at the first one that fails; pick a single agent to see the others.",
+  "ccusage.note":
+    "Read by ccusage from the logs coding agents keep on this machine, including sessions outside Code ACP. Costs are estimates at API prices, not what a subscription bills.",
   "ccusage.tileDetail": "{0} tokens",
   "ccusage.block": "Current 5-hour block",
   "ccusage.blockCost": "Spent",
@@ -274,9 +297,9 @@ const en = {
   "chat.compact": "Compact conversation",
   "chat.compactTitle": "Have the agent summarize this conversation to free up context",
 
-  "attention.finished": "\"{0}\" is done.",
-  "attention.permission": "\"{0}\" needs your approval.",
-  "attention.question": "\"{0}\" has a question for you.",
+  "attention.finished": '"{0}" is done.',
+  "attention.permission": '"{0}" needs your approval.',
+  "attention.question": '"{0}" has a question for you.',
   "attention.show": "Show",
   "attention.badge": "{0} conversations need you",
   "statusBar.name": "Code ACP Status",
@@ -313,31 +336,41 @@ const en = {
   "changes.undoAllConfirm": "Undo the agent's changes to {0} file(s)? Edits made to them since are lost too.",
   "changes.restore": "Restore",
   "changes.restoreTitle": "Restore the files the agent changed to how they were before this message",
-  "changes.restoreConfirm": "Restore {0} file(s) to how they were before this message? Changes made to them since are lost. The conversation itself is not rewound.",
+  "changes.restoreConfirm":
+    "Restore {0} file(s) to how they were before this message? Changes made to them since are lost. The conversation itself is not rewound.",
   "changes.restoreBusy": "Wait for the agent to finish, or stop it, before restoring files.",
   "settings.followAgent": "Follow the agent",
   "settings.autoScroll": "Auto-scroll",
-  "settings.autoScrollDesc": "Keep the chat scrolled to the newest content while the agent replies. Turn off to stay where you scrolled.",
+  "settings.autoScrollDesc":
+    "Keep the chat scrolled to the newest content while the agent replies. Turn off to stay where you scrolled.",
   "settings.tracing": "Tracing",
   "settings.tracingTabDesc": "Details of each turn and of the ACP messages, for advanced users.",
   "settings.tracingEnabled": "Turn on tracing",
-  "settings.tracingDesc": "Show each turn's stop reason, duration, tokens, cost and context in the chat, and log every ACP message in the Code ACP Trace output channel.",
-  "settings.tracingPrivacy": "The log can contain file contents, tool input and output: env and header values and fields named like secrets are masked, but other secrets may remain, and VS Code keeps output channels in its log folder.",
+  "settings.tracingDesc":
+    "Show each turn's stop reason, duration, tokens, cost and context in the chat, and log every ACP message in the Code ACP Trace output channel.",
+  "settings.tracingPrivacy":
+    "The log can contain file contents, tool input and output: env and header values and fields named like secrets are masked, but other secrets may remain, and VS Code keeps output channels in its log folder.",
   "settings.showChanges": "Show changed files",
-  "settings.showChangesDesc": "Show the bar above the message box that lists the files the agent changed, with Undo all and Keep all, and Keep and Undo above each change in the editor.",
+  "settings.showChangesDesc":
+    "Show the bar above the message box that lists the files the agent changed, with Undo all and Keep all, and Keep and Undo above each change in the editor.",
   "settings.showRestore": "Show Restore button",
-  "settings.showRestoreDesc": "Show the Restore button on your messages, which puts the files the agent changed back to how they were before that message.",
+  "settings.showRestoreDesc":
+    "Show the Restore button on your messages, which puts the files the agent changed back to how they were before that message.",
   "settings.worktree": "Worktree",
   "settings.worktreeDesc": "Run conversations in isolated git worktrees.",
   "settings.notificationsTab": "Notifications",
   "settings.notificationsTabDesc": "When Code ACP tells you about conversations you aren't looking at.",
   "settings.notifications": "Show notifications",
   "settings.rememberSessionOptions": "Remember model and effort",
-  "settings.rememberSessionOptionsDesc": "Start and reopen chats with the model, effort and fast mode you last picked for the agent, except where the Agent page sets them.",
-  "settings.notificationsDesc": "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
+  "settings.rememberSessionOptionsDesc":
+    "Start and reopen chats with the model, effort and fast mode you last picked for the agent, except where the Agent page sets them.",
+  "settings.notificationsDesc":
+    "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
   "settings.notifyFinished": "Notify when finished",
-  "settings.notifyFinishedDesc": "Also notify when a conversation you aren't looking at finishes. Approval requests and questions from the agent still notify.",
-  "settings.followAgentDesc": "Open the files the agent reads and edits in the editor, at the line it is working on, and briefly highlight the lines it changes.",
+  "settings.notifyFinishedDesc":
+    "Also notify when a conversation you aren't looking at finishes. Approval requests and questions from the agent still notify.",
+  "settings.followAgentDesc":
+    "Open the files the agent reads and edits in the editor, at the line it is working on, and briefly highlight the lines it changes.",
   "checkpoints.gitFailed": "git {0} failed: {1}",
   "checkpoints.timeout": "Taking a snapshot of the workspace took over {0} seconds.",
   "checkpoints.unavailable": "Checkpoints are off for this chat: {0}",
@@ -348,8 +381,10 @@ const en = {
   "chat.agentSettings": "Agent settings",
   "chat.switchAgent": "Switch agent",
   "chat.loadingOptions": "Loading the agent's options…",
-  "chat.startOverConfirm": "Start a new session? This tab's conversation will be closed; the agent's file changes stay.",
-  "chat.startOverBusyConfirm": "The agent is still working. Stop it and start a new session? This tab's conversation will be closed; the agent's file changes stay.",
+  "chat.startOverConfirm":
+    "Start a new session? This tab's conversation will be closed; the agent's file changes stay.",
+  "chat.startOverBusyConfirm":
+    "The agent is still working. Stop it and start a new session? This tab's conversation will be closed; the agent's file changes stay.",
   "chat.startOver": "Start New Session",
   "chat.switchFolder": "Folder the agent works in; another one starts a new session",
   "chat.manageAgents": "Manage agents…",
@@ -361,13 +396,14 @@ const en = {
   "chat.logoutConfirm": "Log out of this agent? Its running turns stop, and its tabs need a login to go on.",
   "chat.logoutUnsupported": "This agent doesn't support logging out.",
   "chat.deleteSession": "Delete Conversation",
-  "chat.deleteSessionConfirm": "Delete \"{0}\"? It can't be brought back.",
+  "chat.deleteSessionConfirm": 'Delete "{0}"? It can\'t be brought back.',
   "chat.deleteSessionFailed": "The conversation wasn't deleted: {0}",
   "chat.elicitation.linkTitle": "Open this link?",
   "chat.elicitation.open": "Open Link",
   "chat.elicitation.linkOpened": "Opened in your browser",
   "chat.elicitation.linkFinished": "Finished",
-  "chat.elicitation.unsafeUrl": "The agent asked to open a link that was blocked. Only links without a user name can open, over https, or over http to localhost, 127.0.0.1 and the hosts in Settings > Links: {0}",
+  "chat.elicitation.unsafeUrl":
+    "The agent asked to open a link that was blocked. Only links without a user name can open, over https, or over http to localhost, 127.0.0.1 and the hosts in Settings > Links: {0}",
   "chat.elicitation.notOpened": "The link wasn't opened.",
   "chat.compaction.inProgress": "Compacting the conversation…",
   "chat.compaction.completed": "Conversation compacted",
@@ -468,7 +504,8 @@ const en = {
   "chat.previewImage": "Click to preview",
   "chat.tooLarge": "{0} is too large (limit 20 MB).",
   "chat.readFailed": "Could not read {0}.",
-  "chat.externalFolder": "Folders dragged from outside VS Code can't be read; drag them from the VS Code Explorer instead.",
+  "chat.externalFolder":
+    "Folders dragged from outside VS Code can't be read; drag them from the VS Code Explorer instead.",
   "chat.empty": "Start a new conversation",
   "chat.setup.checkTitle": "Checking your setup",
   "chat.setup.checkFailed": "Install what's missing, then check again to continue.",
@@ -523,7 +560,8 @@ const en = {
   "bestOf.closeAndDelete": "Close Group and Delete Its Worktrees",
   "bestOf.discardAll": "Discard all",
   "bestOf.discardTitle": "Apply nothing: close this group and delete all its worktrees",
-  "bestOf.discardConfirm": "Discard all attempts of {0}? Agents still working stop, the chats close, and their worktrees are deleted with any changes that weren't applied. This can't be undone.",
+  "bestOf.discardConfirm":
+    "Discard all attempts of {0}? Agents still working stop, the chats close, and their worktrees are deleted with any changes that weren't applied. This can't be undone.",
   "bestOf.discardAction": "Discard All",
   "bestOf.prompt": "Prompt",
   "bestOf.refresh": "Count the changes again",
@@ -580,12 +618,13 @@ const en = {
   "chat.pickFile": "Files named {0}",
 
   "drop.label": "Drop files / folders here",
-  "drop.tooltip": "**Known issue:** since VS Code 1.140, dragging from the Explorer no longer reaches the chat box ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nDrop files or folders here instead, or paste them into the chat.",
+  "drop.tooltip":
+    "**Known issue:** since VS Code 1.140, dragging from the Explorer no longer reaches the chat box ([microsoft/vscode#339036](https://github.com/microsoft/vscode/issues/339036)).\n\nDrop files or folders here instead, or paste them into the chat.",
 
   "install.unsupported": "{0} does not support platform {1}",
   "install.checkUvx": "Checking uvx…",
   "install.npm": "npm install {0}…",
-  "install.noBin": "{0} does not declare \"bin\" in package.json",
+  "install.noBin": '{0} does not declare "bin" in package.json',
   "install.download": "Downloading {0}…",
   "install.downloadFailed": "Failed to download {0}: HTTP {1}",
   "install.checksum": "SHA-256 checksum mismatch for {0}",
@@ -618,21 +657,26 @@ const en = {
   "settings.activeAgent": "Default agent",
   "settings.activeAgentDesc": "Agent installed from the ACP Registry that new chat tabs use.",
   "settings.noAgents": "No agent installed",
-  "settings.defaultModelDesc": "New chats with this agent start on this model, whatever was picked in an earlier chat. On the agent's default, they follow “Remember model and effort”.",
-  "settings.defaultEffortDesc": "How long the model thinks before it answers in new chats with this agent. On the agent's default, they follow “Remember model and effort”.",
+  "settings.defaultModelDesc":
+    "New chats with this agent start on this model, whatever was picked in an earlier chat. On the agent's default, they follow “Remember model and effort”.",
+  "settings.defaultEffortDesc":
+    "How long the model thinks before it answers in new chats with this agent. On the agent's default, they follow “Remember model and effort”.",
   "settings.manageAgents": "Manage agents",
   "settings.manageDesc": "Install, update and remove agents from the ACP Registry.",
   "settings.nodePath": "Node path",
   "settings.nodePathDesc": "Node used to run agents installed via npm.",
   "settings.ccusagePath": "ccusage path",
-  "settings.ccusagePathDesc": "The ccusage executable for the Usage tab's local logs (e.g. a global install). Empty runs a pinned release through npx.",
+  "settings.ccusagePathDesc":
+    "The ccusage executable for the Usage tab's local logs (e.g. a global install). Empty runs a pinned release through npx.",
   "settings.checkUpdates": "Check for agent updates",
-  "settings.checkUpdatesDesc": "When VS Code starts, look for newer versions of installed agents in the ACP Registry and offer to install them.",
+  "settings.checkUpdatesDesc":
+    "When VS Code starts, look for newer versions of installed agents in the ACP Registry and offer to install them.",
   "settings.env": "Environment variables",
   "settings.envDesc": "Extra environment variables for the agent, one KEY=VALUE per line (e.g. ANTHROPIC_API_KEY=…).",
   "settings.envInvalid": "Line {0} is not in KEY=VALUE form; not saved.",
   "settings.custom": "Custom agent",
-  "settings.customDesc": "Run your own ACP agents from local commands. They appear in the chat's agent picker next to the installed agents.",
+  "settings.customDesc":
+    "Run your own ACP agents from local commands. They appear in the chat's agent picker next to the installed agents.",
   "settings.customEmpty": "No custom agents added.",
   "settings.customAdd": "Add agent",
   "settings.customNameTaken": "An agent named {0} already exists.",
@@ -661,7 +705,8 @@ const en = {
   "settings.noModels": "The agent offers no model choice.",
   "settings.noFastMode": "This agent has no fast mode.",
   "settings.effortNotOffered": "This model has no “{0}” level; the agent's default is used.",
-  "settings.commitEffortDesc": "How long the model thinks before it answers. Lower is faster and uses fewer credits; higher may write better messages.",
+  "settings.commitEffortDesc":
+    "How long the model thinks before it answers. Lower is faster and uses fewer credits; higher may write better messages.",
   "settings.loadingOptions": "Reading the agent's options…",
   "settings.reloadOptionsTitle": "Ask the agent again for its models, efforts and fast mode",
   "settings.reloadOptions": "Reload",
@@ -673,7 +718,8 @@ const en = {
   "settings.commitInstructions": "Instructions",
   "settings.commitInstructionsDesc": "Added to the prompt, e.g. “Use Conventional Commits” or “Write in Vietnamese”.",
   "settings.mcp": "MCP servers",
-  "settings.mcpDesc": "Extra MCP servers passed to every chat session, on top of the agent's own MCP config. Changes apply to new or reopened sessions.",
+  "settings.mcpDesc":
+    "Extra MCP servers passed to every chat session, on top of the agent's own MCP config. Changes apply to new or reopened sessions.",
   "settings.mcpEmpty": "No MCP servers added.",
   "settings.mcpAdd": "Add server",
   "settings.mcpEdit": "Edit",
@@ -730,7 +776,8 @@ const en = {
   "doctor.status.skipped": "Not checked",
   "doctor.group.tools": "Tools",
   "doctor.group.agents": "Agents",
-  "doctor.node.missing": "Can't run {0}. Agents installed with npm need Node.js: install it, or set the Node path in Settings.",
+  "doctor.node.missing":
+    "Can't run {0}. Agents installed with npm need Node.js: install it, or set the Node path in Settings.",
   "doctor.npm.missing": "Not found. Installing agents with npm needs it; it comes with Node.js.",
   "doctor.uv.missing": "Not found. Agents that run through uvx need it.",
   "doctor.git.missing": "Not found. Worktrees, checkpoints and commit messages need it.",

@@ -22,19 +22,27 @@ export function tabRows(tabs: ReadonlyArray<TabInfo>, groups: ReadonlyArray<TabG
 }
 
 /** A row as the sidebar shows it: a group may show only some of its tabs. */
-export type ShownRow = { kind: "tab"; tab: TabInfo } | { kind: "group"; group: TabGroupInfo; members: TabInfo[]; shown: TabInfo[] };
+export type ShownRow =
+  { kind: "tab"; tab: TabInfo } | { kind: "group"; group: TabGroupInfo; members: TabInfo[]; shown: TabInfo[] };
 
 /** The rows as they are. */
-export const allRows = (rows: ReadonlyArray<TabRow>): ShownRow[] => rows.map((row) => (row.kind === "tab" ? row : { ...row, shown: row.members }));
+export const allRows = (rows: ReadonlyArray<TabRow>): ShownRow[] =>
+  rows.map((row) => (row.kind === "tab" ? row : { ...row, shown: row.members }));
 
 export const rowKey = (row: TabRow | ShownRow) => (row.kind === "tab" ? `tab-${row.tab.id}` : `group-${row.group.id}`);
 
 /** A turn is under way in the tab; reopening its session doesn't count. */
-export const tabWorking = (tab: TabInfo, state: TabState | undefined) => (!!state?.status.busy && !state.status.loading) || tab.attempt === "running";
+export const tabWorking = (tab: TabInfo, state: TabState | undefined) =>
+  (!!state?.status.busy && !state.status.loading) || tab.attempt === "running";
 
 /** The rows of the sidebar's working section: something runs in them, and they are neither pinned nor waiting on the user. */
-export function workingRowKeys(rows: ReadonlyArray<TabRow>, working: (tab: TabInfo) => boolean, waiting: (tab: TabInfo) => boolean): Set<string> {
-  const isWorking = (members: ReadonlyArray<TabInfo>) => members.some(working) && !members.some((tab) => tab.pinned || waiting(tab));
+export function workingRowKeys(
+  rows: ReadonlyArray<TabRow>,
+  working: (tab: TabInfo) => boolean,
+  waiting: (tab: TabInfo) => boolean,
+): Set<string> {
+  const isWorking = (members: ReadonlyArray<TabInfo>) =>
+    members.some(working) && !members.some((tab) => tab.pinned || waiting(tab));
   return new Set(rows.filter((row) => isWorking(row.kind === "tab" ? [row.tab] : row.members)).map(rowKey));
 }
 
@@ -46,13 +54,25 @@ export interface RowsInHand {
 }
 
 /** Whether a drag or a rename is under way. A row that goes takes its drag or name input along, and neither says it ended, so one on rows now gone is over. */
-export function rowsInHand(tabs: ReadonlyArray<TabInfo>, groups: ReadonlyArray<TabGroupInfo>, { dragged, renaming, renamingGroup }: RowsInHand): boolean {
+export function rowsInHand(
+  tabs: ReadonlyArray<TabInfo>,
+  groups: ReadonlyArray<TabGroupInfo>,
+  { dragged, renaming, renamingGroup }: RowsInHand,
+): boolean {
   const isTab = (id: number) => tabs.some((tab) => tab.id === id);
-  return dragged?.some(isTab) === true || (renaming !== undefined && isTab(renaming)) || groups.some((group) => group.id === renamingGroup);
+  return (
+    dragged?.some(isTab) === true ||
+    (renaming !== undefined && isTab(renaming)) ||
+    groups.some((group) => group.id === renamingGroup)
+  );
 }
 
 /** The rows matching `query`: a group whose title doesn't match shows just the tabs that do. `titleOf` names a tab, `member` when in a group. */
-export function matchingRows(rows: ReadonlyArray<TabRow>, query: string, titleOf: (tab: TabInfo, member: boolean) => string): ShownRow[] {
+export function matchingRows(
+  rows: ReadonlyArray<TabRow>,
+  query: string,
+  titleOf: (tab: TabInfo, member: boolean) => string,
+): ShownRow[] {
   const matches = (tab: TabInfo, member: boolean) => matchesText(`${titleOf(tab, member)} ${tab.cwd}`, query);
   return allRows(rows).flatMap((row): ShownRow[] => {
     if (row.kind === "tab") return matches(row.tab, false) ? [row] : [];
@@ -60,7 +80,6 @@ export function matchingRows(rows: ReadonlyArray<TabRow>, query: string, titleOf
     return shown.length > 0 ? [{ ...row, shown }] : [];
   });
 }
-
 
 /** Where tabs being moved end up, for a drop line at position `at` of the tabs as they are. */
 export function dropIndex(tabs: ReadonlyArray<TabInfo>, moved: ReadonlyArray<number>, at: number): number | undefined {

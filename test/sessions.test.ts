@@ -19,7 +19,8 @@ type RequestError = AuthRequiredError | AgentRequestError;
 
 const requestError = new AgentRequestError({ method: "session/load", message: "no", cause: undefined });
 
-const runFork = (effect: Effect.Effect<void, unknown, any>) => void Effect.runFork(effect as Effect.Effect<void, unknown>);
+const runFork = (effect: Effect.Effect<void, unknown, any>) =>
+  void Effect.runFork(effect as Effect.Effect<void, unknown>);
 
 const until = (ready: () => boolean) =>
   Effect.gen(function* () {
@@ -38,7 +39,10 @@ const makeSessions = Effect.fnUntraced(function* (
   const created: string[] = [];
   const closed: string[] = [];
   const agent = {
-    initializeResponse: { protocolVersion: 1, agentCapabilities: { sessionCapabilities: { close: {} }, ...capabilities } },
+    initializeResponse: {
+      protocolVersion: 1,
+      agentCapabilities: { sessionCapabilities: { close: {} }, ...capabilities },
+    },
     newSession: () =>
       Effect.sync(() => {
         const sessionId = `new-${created.length + 1}`;
@@ -68,9 +72,18 @@ const makeSessions = Effect.fnUntraced(function* (
     run: (effect) => runFork(effect),
   };
   const tabs = new TabList(undefined, () => "/w");
-  const changes = new ChangeReview({ postTab: ui.postTab, saveTabs: ui.saveTabs, run: () => {}, openFile: () => Effect.void });
+  const changes = new ChangeReview({
+    postTab: ui.postTab,
+    saveTabs: ui.saveTabs,
+    run: () => {},
+    openFile: () => Effect.void,
+  });
   const usage = { postSaved: () => {}, recordTurn: () => Effect.void } as unknown as TabUsage;
-  const tabWorktrees = { ensure: () => Effect.void, prepare: () => Effect.succeed(true), nameAfter: () => Effect.void } as unknown as TabWorktrees;
+  const tabWorktrees = {
+    ensure: () => Effect.void,
+    prepare: () => Effect.succeed(true),
+    nameAfter: () => Effect.void,
+  } as unknown as TabWorktrees;
   const parts = { tabs, changes, usage, tabWorktrees };
   const turns: TabTurns = new TabTurns(
     {
@@ -103,7 +116,8 @@ const makeSessions = Effect.fnUntraced(function* (
   return { tabs, tab: tabs.active, sessions, turns, running, posted, statuses, created, closed, run };
 });
 
-const ofType = (posted: ReadonlyArray<Record<string, unknown>>, type: string) => posted.filter((message) => message.type === type);
+const ofType = (posted: ReadonlyArray<Record<string, unknown>>, type: string) =>
+  posted.filter((message) => message.type === type);
 
 beforeEach(() => __test.reset());
 
@@ -111,7 +125,9 @@ describe("TabSessions", () => {
   it.effect("shares one session start between concurrent callers", () =>
     Effect.gen(function* () {
       const { tab, sessions, created, run, statuses } = yield* makeSessions();
-      const ids = yield* run(Effect.all([sessions.ensureSession(tab), sessions.ensureSession(tab)], { concurrency: "unbounded" }));
+      const ids = yield* run(
+        Effect.all([sessions.ensureSession(tab), sessions.ensureSession(tab)], { concurrency: "unbounded" }),
+      );
       assert.deepStrictEqual(ids, ["new-1", "new-1"]);
       assert.deepStrictEqual(created, ["new-1"]);
       assert.strictEqual(tab.sessionId, "new-1");
@@ -122,7 +138,16 @@ describe("TabSessions", () => {
   it.effect("starts a moved tab's session again, keeping what was picked in it", () =>
     Effect.gen(function* () {
       const select = (value: string): Array<acp.SessionConfigOption> => [
-        { id: "model", name: "Model", type: "select", currentValue: value, options: [{ value: "small", name: "Small" }, { value: "big", name: "Big" }] },
+        {
+          id: "model",
+          name: "Model",
+          type: "select",
+          currentValue: value,
+          options: [
+            { value: "small", name: "Small" },
+            { value: "big", name: "Big" },
+          ],
+        },
       ];
       const set: Array<string> = [];
       let starts = 0;
@@ -239,7 +264,14 @@ describe("TabSessions", () => {
         { loadSession: true },
       );
       replayed.tab = tab;
-      const trace = { stopReason: "end_turn", durationMs: 1, waiting: { asks: 0, ms: 0 }, tools: { total: 0, failed: 0, kinds: {} }, subagents: 0, sessionId: "saved" };
+      const trace = {
+        stopReason: "end_turn",
+        durationMs: 1,
+        waiting: { asks: 0, ms: 0 },
+        tools: { total: 0, failed: 0, kinds: {} },
+        subagents: 0,
+        sessionId: "saved",
+      };
       tab.traces = TurnTraces.fromSaved({ messages: 2, traces: [{ turn: 1, message: 1, trace }] });
       tab.reopen = { sessionId: "saved", cwd: "/w", agentId: "a" };
       yield* run(sessions.ensureSession(tab));
@@ -263,7 +295,9 @@ describe("TabSessions", () => {
       const made = yield* makeSessions({
         prompt: (sessionId) => {
           prompts.push(sessionId);
-          return prompts.length === 1 ? Deferred.await(fail).pipe(Effect.andThen(Effect.fail(requestError))) : Effect.succeed({ stopReason: "end_turn" as const });
+          return prompts.length === 1
+            ? Deferred.await(fail).pipe(Effect.andThen(Effect.fail(requestError)))
+            : Effect.succeed({ stopReason: "end_turn" as const });
         },
       });
       const { tab, running, turns, run } = made;

@@ -8,7 +8,20 @@ import { t, type MessageKey } from "../i18n";
 import { thenable, type ExtensionCtx, type Output, type VscodeError } from "../runtime";
 import type { UsageLedger } from "../usageLedger";
 import { folderOf, workspaceFolders } from "../workspace";
-import { attemptBranchName, branchSlug, fallbackPrText, intoWorktree, isManaged, parsePrText, Worktrees, type PlacedWorktree, type ProjectCommand, type TabWorktree, type WorktreeError, type WorktreeSettled } from "../worktrees";
+import {
+  attemptBranchName,
+  branchSlug,
+  fallbackPrText,
+  intoWorktree,
+  isManaged,
+  parsePrText,
+  Worktrees,
+  type PlacedWorktree,
+  type ProjectCommand,
+  type TabWorktree,
+  type WorktreeError,
+  type WorktreeSettled,
+} from "../worktrees";
 import { confirm } from "./changes";
 import type { Attachment, PrDraft } from "./protocol";
 import type { Tab, TabGroup, TabList } from "./tabs";
@@ -38,7 +51,10 @@ interface OpenDraft {
 }
 
 /** Where the tab goes: its base folder, a new worktree there, or a worktree that exists. */
-type Target = { readonly kind: "local" } | { readonly kind: "new"; readonly name?: string } | { readonly kind: "existing"; readonly placed: PlacedWorktree };
+type Target =
+  | { readonly kind: "local" }
+  | { readonly kind: "new"; readonly name?: string }
+  | { readonly kind: "existing"; readonly placed: PlacedWorktree };
 
 /** What the worktrees of tabs need from the chat view. */
 export interface WorktreesHost {
@@ -48,11 +64,23 @@ export interface WorktreesHost {
   postTabs(): void;
   status(tab: Tab, key: MessageKey): void;
   confirmStartOver(tab: Tab): Effect.Effect<boolean, VscodeError>;
-  startOver(tab: Tab, change: (tab: Tab) => void): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
+  startOver(
+    tab: Tab,
+    change: (tab: Tab) => void,
+  ): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
   /** Starts the session of an unused tab again, in the folder it moved to. */
-  restartSession(tab: Tab): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
+  restartSession(
+    tab: Tab,
+  ): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
   /** Runs a turn on the tab's agent; its last message, or undefined when there is none to use. */
-  ask(tab: Tab, text: string): Effect.Effect<string | undefined, never, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit | FileSystem.FileSystem | UsageLedger>;
+  ask(
+    tab: Tab,
+    text: string,
+  ): Effect.Effect<
+    string | undefined,
+    never,
+    Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit | FileSystem.FileSystem | UsageLedger
+  >;
 }
 
 const nameOf = (worktree: TabWorktree) => worktree.branch ?? path.basename(worktree.root);
@@ -62,7 +90,9 @@ const withProgress = <A, E, R>(title: string, effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     const done = yield* Deferred.make<void>();
     const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
-    void vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title }, () => runPromise(Deferred.await(done)));
+    void vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title }, () =>
+      runPromise(Deferred.await(done)),
+    );
     return yield* effect.pipe(Effect.ensuring(Deferred.succeed(done, undefined)));
   });
 
@@ -81,7 +111,10 @@ export class TabWorktrees {
   /** Git is asked for one new worktree at a time: the tabs of a group ask at once. */
   private readonly creating = Semaphore.makeUnsafe(1);
   /** Per group: its tabs set up at once, and the project's command is one question for all of them. */
-  private readonly groupApprovals = new WeakMap<TabGroup, { readonly lock: Semaphore.Semaphore; readonly answers: Map<string, boolean> }>();
+  private readonly groupApprovals = new WeakMap<
+    TabGroup,
+    { readonly lock: Semaphore.Semaphore; readonly answers: Map<string, boolean> }
+  >();
   /** The pull requests whose draft the user is looking at. */
   private readonly drafts = new WeakMap<Tab, OpenDraft>();
   /** Tabs getting a pull request ready; another request in that time is dropped. */
@@ -116,7 +149,11 @@ export class TabWorktrees {
    * when it stays where it is, so the message goes back to the composer. Outside git there is no worktree to have, and
    * the message goes on. An unused tab keeps what was picked in its session; a used one starts over, after asking.
    */
-  readonly enterOnSend = Effect.fn("TabWorktrees.enterOnSend")(function* (this: TabWorktrees, tab: Tab, prompt: string) {
+  readonly enterOnSend = Effect.fn("TabWorktrees.enterOnSend")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    prompt: string,
+  ) {
     const base = yield* this.repoBase(tab);
     if (base === undefined) {
       tab.worktreeOnSend = false;
@@ -147,14 +184,22 @@ export class TabWorktrees {
     const others = yield* worktrees.list(base);
     const separator = (label: string): Item => ({ label, kind: vscode.QuickPickItemKind.Separator });
     const items: Item[] = [
-      ...(current ? [{ label: `$(arrow-left) ${t("worktree.back", baseName)}`, choice: { kind: "local" } } satisfies Item] : []),
-      { label: `$(add) ${t("worktree.new")}`, description: t(current ? "worktree.newDesc" : "worktree.toggleOn"), choice: { kind: "new" } },
+      ...(current
+        ? [{ label: `$(arrow-left) ${t("worktree.back", baseName)}`, choice: { kind: "local" } } satisfies Item]
+        : []),
+      {
+        label: `$(add) ${t("worktree.new")}`,
+        description: t(current ? "worktree.newDesc" : "worktree.toggleOn"),
+        choice: { kind: "new" },
+      },
     ];
     if (others.length > 0) {
       items.push(separator(t("worktree.existing")));
       for (const placed of others) {
         const isCurrent = placed.worktree.root === current?.root;
-        const user = this.host.tabs().all.find((other) => other !== tab && other.worktree?.root === placed.worktree.root);
+        const user = this.host
+          .tabs()
+          .all.find((other) => other !== tab && other.worktree?.root === placed.worktree.root);
         items.push({
           label: `$(git-branch) ${nameOf(placed.worktree)}`,
           description: isCurrent ? t("worktree.current") : placed.worktree.root,
@@ -177,7 +222,10 @@ export class TabWorktrees {
       items.push(separator(""), { label: `$(clear-all) ${t("worktree.clean")}`, choice: { kind: "clean" } });
     }
     const picked = yield* thenable(() =>
-      vscode.window.showQuickPick(items, { title: t("worktree.pickTitle"), placeHolder: t("worktree.pickPlaceholder") }),
+      vscode.window.showQuickPick(items, {
+        title: t("worktree.pickTitle"),
+        placeHolder: t("worktree.pickPlaceholder"),
+      }),
     );
     switch (picked?.choice?.kind) {
       case "local":
@@ -200,7 +248,11 @@ export class TabWorktrees {
         return;
       case "window":
         if (current) {
-          yield* thenable(() => vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(current.root), { forceNewWindow: true }));
+          yield* thenable(() =>
+            vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(current.root), {
+              forceNewWindow: true,
+            }),
+          );
         }
         return;
       case "terminal":
@@ -215,7 +267,11 @@ export class TabWorktrees {
   });
 
   /** The ways to finish the work in the tab's worktree, and where a merge would go. */
-  private readonly finishItems = Effect.fn("TabWorktrees.finishItems")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  private readonly finishItems = Effect.fn("TabWorktrees.finishItems")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+  ) {
     const worktrees = yield* Worktrees;
     const baseName = path.basename(worktree.base);
     const target = (yield* worktrees.branchOf(worktree.base)) ?? baseName;
@@ -224,15 +280,23 @@ export class TabWorktrees {
     const items: Item[] = [
       ...(worktree.branch === undefined
         ? []
-        : [
+        : ([
             {
               label: `$(git-merge) ${t("worktree.merge", target)}`,
               description: baseDirty ? `$(warning) ${t("worktree.mergeBaseDirty", baseName)}` : t("worktree.mergeDesc"),
               choice: { kind: "merge" },
             },
-            { label: `$(git-pull-request) ${t(hasPr ? "worktree.prPush" : "worktree.pr")}`, description: t(hasPr ? "worktree.prPushDesc" : "worktree.prDesc"), choice: { kind: "pr" } },
-          ] satisfies Item[]),
-      { label: `$(diff-added) ${t("worktree.apply", baseName)}`, description: t("worktree.applyDesc"), choice: { kind: "apply" } },
+            {
+              label: `$(git-pull-request) ${t(hasPr ? "worktree.prPush" : "worktree.pr")}`,
+              description: t(hasPr ? "worktree.prPushDesc" : "worktree.prDesc"),
+              choice: { kind: "pr" },
+            },
+          ] satisfies Item[])),
+      {
+        label: `$(diff-added) ${t("worktree.apply", baseName)}`,
+        description: t("worktree.applyDesc"),
+        choice: { kind: "apply" },
+      },
     ];
     if (isManaged(worktree.root) && !this.shared(tab, worktree)) {
       items.push({ label: `$(trash) ${t("worktree.delete")}`, choice: { kind: "delete" } });
@@ -254,7 +318,11 @@ export class TabWorktrees {
     }
     const status = yield* worktrees.status(worktree);
     const { items, target } = yield* this.finishItems(tab, worktree);
-    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("worktree.finishTitle", status.changed, status.commits, nameOf(worktree), target) }));
+    const picked = yield* thenable(() =>
+      vscode.window.showQuickPick(items, {
+        title: t("worktree.finishTitle", status.changed, status.commits, nameOf(worktree), target),
+      }),
+    );
     switch (picked?.choice?.kind) {
       case "merge":
         yield* this.merge(tab, worktree);
@@ -272,7 +340,13 @@ export class TabWorktrees {
   });
 
   /** Says where the work of the worktree went, for the tabs running in it; newer work starts over. */
-  readonly settle = Effect.fn("TabWorktrees.settle")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree, how: WorktreeSettled["how"], target: string) {
+  readonly settle = Effect.fn("TabWorktrees.settle")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+    how: WorktreeSettled["how"],
+    target: string,
+  ) {
     const content = yield* (yield* Worktrees).contentId(worktree);
     const settled: WorktreeSettled = { how, root: worktree.root, target, content };
     for (const other of this.host.tabs().all) {
@@ -307,13 +381,19 @@ export class TabWorktrees {
     }
     const name = nameOf(worktree);
     const status = yield* (yield* Worktrees).status(worktree).pipe(Effect.option);
-    const safe = Option.isSome(status) && ((status.value.changed === 0 && status.value.commits === 0) || (yield* this.settledNow(tab, worktree)) !== undefined);
+    const safe =
+      Option.isSome(status) &&
+      ((status.value.changed === 0 && status.value.commits === 0) ||
+        (yield* this.settledNow(tab, worktree)) !== undefined);
     const holds = Option.isNone(status)
       ? t("worktree.deleteConfirmUnknown", name)
       : safe
         ? t("worktree.deleteConfirmSafe", name)
         : t("worktree.deleteConfirm", name, status.value.changed, status.value.commits, path.basename(worktree.base));
-    if ((!safe || tab.used) && !(yield* confirm(`${holds} ${t("worktree.deleteClosesChat")}`, t("worktree.deleteAction")))) {
+    if (
+      (!safe || tab.used) &&
+      !(yield* confirm(`${holds} ${t("worktree.deleteClosesChat")}`, t("worktree.deleteAction")))
+    ) {
       return;
     }
     // Asking took a while.
@@ -350,7 +430,10 @@ export class TabWorktrees {
     const target = merging ? ((yield* worktrees.branchOf(worktree.base)) ?? path.basename(worktree.base)) : undefined;
     const wasMerging = tab.conflict?.root === worktree.root ? tab.conflict.target : undefined;
     // It hashes what isn't committed: only when there is something to compare it with.
-    const content = tab.settled?.root === worktree.root || wasMerging !== undefined ? yield* worktrees.contentId(worktree).pipe(Effect.option) : Option.none<string>();
+    const content =
+      tab.settled?.root === worktree.root || wasMerging !== undefined
+        ? yield* worktrees.contentId(worktree).pipe(Effect.option)
+        : Option.none<string>();
     // The tab may have moved on while git ran, or something newer may have happened to it.
     if (tab.worktree?.root !== worktree.root || this.reads.get(tab) !== read) {
       return;
@@ -394,7 +477,11 @@ export class TabWorktrees {
     }
     const worktrees = yield* Worktrees;
     // The merge may have ended while the button showed.
-    if ((yield* worktrees.isMerging(worktree)) && (yield* confirm(t("worktree.abortConfirm"), t("worktree.abortMerge"))) && (yield* worktrees.isMerging(worktree))) {
+    if (
+      (yield* worktrees.isMerging(worktree)) &&
+      (yield* confirm(t("worktree.abortConfirm"), t("worktree.abortMerge"))) &&
+      (yield* worktrees.isMerging(worktree))
+    ) {
       yield* worktrees.abortMerge(worktree);
     }
     yield* this.refreshFinishable(tab);
@@ -409,7 +496,12 @@ export class TabWorktrees {
   }
 
   /** Asks for a commit message and commits what isn't committed yet; false when the user backs out. */
-  private readonly commitPending = Effect.fn("TabWorktrees.commitPending")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree, changed: number) {
+  private readonly commitPending = Effect.fn("TabWorktrees.commitPending")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+    changed: number,
+  ) {
     if (changed === 0) {
       return true;
     }
@@ -430,7 +522,11 @@ export class TabWorktrees {
   });
 
   /** Merges the worktree's branch into its base folder; the bar under the composer shows how that went. */
-  private readonly merge = Effect.fn("TabWorktrees.merge")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  private readonly merge = Effect.fn("TabWorktrees.merge")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+  ) {
     if (this.isBusy(worktree)) {
       return;
     }
@@ -467,7 +563,11 @@ export class TabWorktrees {
   });
 
   /** Gets a pull request of the worktree's branch ready; another request while one is on its way is dropped. */
-  private readonly preparePrOnce = Effect.fn("TabWorktrees.preparePrOnce")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  private readonly preparePrOnce = Effect.fn("TabWorktrees.preparePrOnce")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+  ) {
     if (this.preparing.has(tab) || this.isBusy(worktree)) {
       return;
     }
@@ -476,7 +576,11 @@ export class TabWorktrees {
   });
 
   /** Updates the branch's open pull request, after asking; without one, has the agent write one for the user to look at. */
-  private readonly preparePr = Effect.fn("TabWorktrees.preparePr")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  private readonly preparePr = Effect.fn("TabWorktrees.preparePr")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+  ) {
     const worktrees = yield* Worktrees;
     const name = nameOf(worktree);
     const target = yield* withProgress(t("worktree.prChecking"), worktrees.prTarget(worktree));
@@ -514,15 +618,31 @@ export class TabWorktrees {
     if (!this.host.tabs().has(tab) || tab.worktree?.root !== worktree.root) {
       return;
     }
-    const text = (reply === undefined ? undefined : parsePrText(reply)) ?? fallbackPrText(summary, tab.name ?? tab.title ?? name);
-    this.drafts.set(tab, { worktree, remote: target.remote, ...(target.base === undefined ? {} : { base: target.base }), pending: false });
-    const draft: PrDraft = { ...text, head: worktree.branch ?? name, remote: target.remote, ...(target.base === undefined ? {} : { base: target.base }) };
+    const text =
+      (reply === undefined ? undefined : parsePrText(reply)) ?? fallbackPrText(summary, tab.name ?? tab.title ?? name);
+    this.drafts.set(tab, {
+      worktree,
+      remote: target.remote,
+      ...(target.base === undefined ? {} : { base: target.base }),
+      pending: false,
+    });
+    const draft: PrDraft = {
+      ...text,
+      head: worktree.branch ?? name,
+      remote: target.remote,
+      ...(target.base === undefined ? {} : { base: target.base }),
+    };
     this.host.postTabs();
     this.host.postTab(tab, { type: "prDraft", draft });
   });
 
   /** Pushes the branch and opens the pull request the user agreed to; the draft stays for another try when that fails. */
-  readonly createPr = Effect.fn("TabWorktrees.createPr")(function* (this: TabWorktrees, tab: Tab, title: string, body: string) {
+  readonly createPr = Effect.fn("TabWorktrees.createPr")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    title: string,
+    body: string,
+  ) {
     const draft = this.drafts.get(tab);
     if (draft && tab.worktree?.root !== draft.worktree.root) {
       // The tab moved on without the draft's branch.
@@ -541,7 +661,9 @@ export class TabWorktrees {
     yield* setPending(true);
     const url = yield* withProgress(
       t("worktree.prPushing"),
-      worktrees.push(draft.worktree, draft.remote).pipe(Effect.andThen(worktrees.createPr(draft.worktree, { title: title.trim(), body }, draft.base))),
+      worktrees
+        .push(draft.worktree, draft.remote)
+        .pipe(Effect.andThen(worktrees.createPr(draft.worktree, { title: title.trim(), body }, draft.base))),
     ).pipe(Effect.ensuring(setPending(false)));
     this.clearDraft(tab);
     yield* this.settle(tab, draft.worktree, "pr", url);
@@ -558,10 +680,17 @@ export class TabWorktrees {
   readonly cleanUp = Effect.fn("TabWorktrees.cleanUp")(function* (this: TabWorktrees) {
     const worktrees = yield* Worktrees;
     const inUse = (root: string) => this.host.tabs().all.some((tab) => tab.worktree?.root === root);
-    const folders = new Set([...workspaceFolders().map((folder) => folder.path), ...this.host.tabs().all.flatMap((tab) => (tab.worktree ? [tab.worktree.base] : []))]);
-    const listed = yield* Effect.forEach([...folders], (folder) => worktrees.list(folder).pipe(Effect.orElseSucceed((): ReadonlyArray<PlacedWorktree> => [])));
+    const folders = new Set([
+      ...workspaceFolders().map((folder) => folder.path),
+      ...this.host.tabs().all.flatMap((tab) => (tab.worktree ? [tab.worktree.base] : [])),
+    ]);
+    const listed = yield* Effect.forEach([...folders], (folder) =>
+      worktrees.list(folder).pipe(Effect.orElseSucceed((): ReadonlyArray<PlacedWorktree> => [])),
+    );
     // Two folders of one repository list the same worktrees.
-    const placed = [...new Map(listed.flat().map((each) => [each.worktree.root, each])).values()].filter(({ worktree }) => isManaged(worktree.root) && !inUse(worktree.root));
+    const placed = [...new Map(listed.flat().map((each) => [each.worktree.root, each])).values()].filter(
+      ({ worktree }) => isManaged(worktree.root) && !inUse(worktree.root),
+    );
     if (placed.length === 0) {
       void vscode.window.showInformationMessage(t("worktree.cleanNone"));
       return;
@@ -576,11 +705,24 @@ export class TabWorktrees {
             : empty
               ? t("worktree.cleanEmpty")
               : t("worktree.cleanHolds", status.value.changed, status.value.commits);
-          return { label: `$(git-branch) ${nameOf(each.worktree)}`, description: holds, detail: each.worktree.root, picked: empty, each, empty };
+          return {
+            label: `$(git-branch) ${nameOf(each.worktree)}`,
+            description: holds,
+            detail: each.worktree.root,
+            picked: empty,
+            each,
+            empty,
+          };
         }),
       ),
     );
-    const picked = yield* thenable(() => vscode.window.showQuickPick(items, { title: t("worktree.cleanTitle"), placeHolder: t("worktree.cleanPlaceholder"), canPickMany: true }));
+    const picked = yield* thenable(() =>
+      vscode.window.showQuickPick(items, {
+        title: t("worktree.cleanTitle"),
+        placeHolder: t("worktree.cleanPlaceholder"),
+        canPickMany: true,
+      }),
+    );
     if (!picked || picked.length === 0) {
       return;
     }
@@ -659,19 +801,28 @@ export class TabWorktrees {
   }
 
   /** Readies a new worktree, before the agent starts there; returns what went wrong, which doesn't stop the tab. */
-  private readonly setUp = Effect.fn("TabWorktrees.setUp")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  private readonly setUp = Effect.fn("TabWorktrees.setUp")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+  ) {
     this.host.status(tab, "worktree.settingUp");
-    return yield* (yield* Worktrees).setup(worktree, (request) => (tab.group ? this.approveOnce(tab.group, worktree, request) : this.approve(worktree, request))).pipe(
-      Effect.as(undefined),
-      Effect.catch((err) => Effect.succeed(err.message)),
-    );
+    return yield* (yield* Worktrees)
+      .setup(worktree, (request) =>
+        tab.group ? this.approveOnce(tab.group, worktree, request) : this.approve(worktree, request),
+      )
+      .pipe(
+        Effect.as(undefined),
+        Effect.catch((err) => Effect.succeed(err.message)),
+      );
   });
 
   /** Whether a project's setup command may run: asks the first time, and again once its fingerprint changes. */
   private readonly approve = Effect.fn("TabWorktrees.approve")(
     function* (this: TabWorktrees, worktree: TabWorktree, request: ProjectCommand) {
       const globalState = this.host.globalState();
-      const approved = () => Option.getOrElse(decodeApproved(globalState.get(APPROVED_COMMANDS_KEY)), (): ReadonlyArray<string> => []);
+      const approved = () =>
+        Option.getOrElse(decodeApproved(globalState.get(APPROVED_COMMANDS_KEY)), (): ReadonlyArray<string> => []);
       if (approved().includes(request.fingerprint)) {
         return true;
       }
@@ -700,7 +851,10 @@ export class TabWorktrees {
       this.groupApprovals.set(group, (shared = { lock: Semaphore.makeUnsafe(1), answers: new Map() }));
     }
     const { lock, answers } = shared;
-    return Semaphore.withPermits(lock, 1)(
+    return Semaphore.withPermits(
+      lock,
+      1,
+    )(
       Effect.gen({ self: this }, function* () {
         const known = answers.get(request.fingerprint);
         if (known !== undefined) {
@@ -749,9 +903,14 @@ export class TabWorktrees {
     }
     this.host.status(tab, "worktree.creating");
     // A comparison's prompt is known by now, and so is that of a tab moving for its message; any other tab's branch gets its name with the first prompt.
-    const name = tab.group ? attemptBranchName(tab.group.prompt, tab.attemptLabel ?? tab.agentId ?? "") : tab.worktreeName;
+    const name = tab.group
+      ? attemptBranchName(tab.group.prompt, tab.attemptLabel ?? tab.agentId ?? "")
+      : tab.worktreeName;
     tab.worktreeName = undefined;
-    const created = yield* Semaphore.withPermits(this.creating, 1)(worktrees.create(base, name)).pipe(Effect.catch((err) => refuse(err.message)));
+    const created = yield* Semaphore.withPermits(
+      this.creating,
+      1,
+    )(worktrees.create(base, name)).pipe(Effect.catch((err) => refuse(err.message)));
     if (Option.isNone(created)) {
       return !required;
     }
@@ -780,7 +939,10 @@ export class TabWorktrees {
       return;
     }
     const worktrees = yield* Worktrees;
-    const named = yield* Semaphore.withPermits(this.creating, 1)(worktrees.nameAfter(worktree, text, !this.shared(tab, worktree))).pipe(
+    const named = yield* Semaphore.withPermits(
+      this.creating,
+      1,
+    )(worktrees.nameAfter(worktree, text, !this.shared(tab, worktree))).pipe(
       Effect.catch((err) => Effect.logWarning(`[worktrees] ${err.message}`).pipe(Effect.as(worktree))),
     );
     if (named.branch === worktree.branch) {
@@ -853,11 +1015,12 @@ export class TabWorktrees {
       return "delete" as Fate;
     }
     const name = nameOf(worktree);
-    const message = settled !== undefined
-      ? t("worktree.deleteConfirmPr", name, settled.target)
-      : Option.isSome(status)
-        ? t("worktree.deleteConfirm", name, status.value.changed, status.value.commits, path.basename(worktree.base))
-        : t("worktree.deleteConfirmUnknown", name);
+    const message =
+      settled !== undefined
+        ? t("worktree.deleteConfirmPr", name, settled.target)
+        : Option.isSome(status)
+          ? t("worktree.deleteConfirm", name, status.value.changed, status.value.commits, path.basename(worktree.base))
+          : t("worktree.deleteConfirmUnknown", name);
     const remove = t("worktree.deleteAction");
     const keep = t("worktree.keepAction");
     const picked = yield* thenable(() => vscode.window.showWarningMessage(message, { modal: true }, remove, keep));
@@ -865,7 +1028,11 @@ export class TabWorktrees {
   });
 
   /** Deletes a worktree no tab runs in any more, with its snapshots; a failure doesn't stop what the user was doing. */
-  readonly discard = Effect.fn("TabWorktrees.discard")(function* (this: TabWorktrees, worktree: TabWorktree, cwd: string) {
+  readonly discard = Effect.fn("TabWorktrees.discard")(function* (
+    this: TabWorktrees,
+    worktree: TabWorktree,
+    cwd: string,
+  ) {
     yield* (yield* Worktrees).remove(worktree).pipe(
       Effect.andThen(ShadowGit.use((shadow) => shadow.forget(cwd))),
       Effect.catch((err: WorktreeError) =>
@@ -894,7 +1061,10 @@ export class TabWorktrees {
   });
 
   /** Brings what the worktree holds into its base folder; true when that went cleanly. */
-  private readonly bringOver = Effect.fn("TabWorktrees.bringOver")(function* (this: TabWorktrees, worktree: TabWorktree) {
+  private readonly bringOver = Effect.fn("TabWorktrees.bringOver")(function* (
+    this: TabWorktrees,
+    worktree: TabWorktree,
+  ) {
     const name = nameOf(worktree);
     const applied = yield* (yield* Worktrees).apply(worktree);
     if (!applied.applied) {
@@ -902,7 +1072,9 @@ export class TabWorktrees {
       return false;
     }
     if (applied.conflicts.length > 0) {
-      warnWithSourceControl(t("worktree.appliedConflicts", name, path.basename(worktree.base), applied.conflicts.join(", ")));
+      warnWithSourceControl(
+        t("worktree.appliedConflicts", name, path.basename(worktree.base), applied.conflicts.join(", ")),
+      );
       return false;
     }
     return true;
@@ -921,7 +1093,11 @@ export class TabWorktrees {
   });
 
   /** Brings what the worktree holds into its base folder; the bar under the composer shows how that went. */
-  private readonly apply = Effect.fn("TabWorktrees.apply")(function* (this: TabWorktrees, tab: Tab, worktree: TabWorktree) {
+  private readonly apply = Effect.fn("TabWorktrees.apply")(function* (
+    this: TabWorktrees,
+    tab: Tab,
+    worktree: TabWorktree,
+  ) {
     if (this.isBusy(worktree) || !(yield* this.bringOver(worktree))) {
       return;
     }
@@ -932,7 +1108,11 @@ export class TabWorktrees {
    * The attachment as the tab's agent should see it: files of the base folder are picked in the workspace, but the
    * agent must read and edit its worktree's copy. A file only the base folder has (ignored ones) stays there.
    */
-  readonly localize = Effect.fn("TabWorktrees.localize")(function* <A extends Attachment>(this: TabWorktrees, tab: Tab, attachment: A) {
+  readonly localize = Effect.fn("TabWorktrees.localize")(function* <A extends Attachment>(
+    this: TabWorktrees,
+    tab: Tab,
+    attachment: A,
+  ) {
     if (!tab.worktree || (attachment.kind !== "uri" && attachment.kind !== "snippet")) {
       return attachment;
     }

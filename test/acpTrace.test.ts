@@ -15,7 +15,11 @@ import en from "../src/l10n/en";
 
 const posted = vi.hoisted(() => {
   const posted: unknown[] = [];
-  (globalThis as { acquireVsCodeApi?: unknown }).acquireVsCodeApi = () => ({ postMessage: (message: unknown) => void posted.push(message), getState: () => undefined, setState: () => {} });
+  (globalThis as { acquireVsCodeApi?: unknown }).acquireVsCodeApi = () => ({
+    postMessage: (message: unknown) => void posted.push(message),
+    getState: () => undefined,
+    setState: () => {},
+  });
   return posted;
 });
 
@@ -53,13 +57,16 @@ describe("sanitize", () => {
   });
 
   it("masks strings named like secrets, and keeps token counts", () => {
-    assert.deepStrictEqual(sanitize({ apiKey: "s3cret", access_token: "s3cret", totalTokens: 12, title: "hi", none: null }), {
-      apiKey: "***",
-      access_token: "***",
-      totalTokens: 12,
-      title: "hi",
-      none: null,
-    });
+    assert.deepStrictEqual(
+      sanitize({ apiKey: "s3cret", access_token: "s3cret", totalTokens: 12, title: "hi", none: null }),
+      {
+        apiKey: "***",
+        access_token: "***",
+        totalTokens: 12,
+        title: "hi",
+        none: null,
+      },
+    );
   });
 
   it("cuts long strings and says how much is left out", () => {
@@ -99,22 +106,32 @@ describe("makeTraceLog", () => {
     log.record("←", chunk("hmm", "agent_thought_chunk"));
     log.record("←", chunk("hello"));
     log.flush();
-    assert.deepStrictEqual(lines.map((line) => bodyOf(line).params.update.sessionUpdate), ["agent_thought_chunk", "agent_message_chunk"]);
+    assert.deepStrictEqual(
+      lines.map((line) => bodyOf(line).params.update.sessionUpdate),
+      ["agent_thought_chunk", "agent_message_chunk"],
+    );
   });
 
   it("does not join a chunk carrying anything else, which would lose it", () => {
     const { lines, log } = logOf();
     log.record("←", chunk("a"));
     const withMeta = chunk("b");
-    log.record("←", { ...withMeta, params: { ...withMeta.params, update: { ...withMeta.params.update, _meta: { x: 1 } } } });
+    log.record("←", {
+      ...withMeta,
+      params: { ...withMeta.params, update: { ...withMeta.params.update, _meta: { x: 1 } } },
+    });
     assert.strictEqual(lines.length, 2);
     assert.deepStrictEqual(bodyOf(lines[1]!).params.update._meta, { x: 1 });
   });
 
   it("survives a write that fails", () => {
-    const log = makeTraceLog(() => {
-      throw new Error("channel closed");
-    }, () => true, "agent");
+    const log = makeTraceLog(
+      () => {
+        throw new Error("channel closed");
+      },
+      () => true,
+      "agent",
+    );
     log.record("→", { id: 1 });
     log.record("←", chunk("a"));
     log.flush();
@@ -124,7 +141,11 @@ describe("makeTraceLog", () => {
 describe("tapStream", () => {
   it("passes messages through both ways and records them", async () => {
     const lines: string[] = [];
-    const log = makeTraceLog((line) => void lines.push(line), () => true, "a");
+    const log = makeTraceLog(
+      (line) => void lines.push(line),
+      () => true,
+      "a",
+    );
     const sent: unknown[] = [];
     let closed = false;
     const tapped = tapStream(
@@ -150,12 +171,16 @@ describe("tapStream", () => {
     assert.isTrue((await reader.read()).done);
     assert.deepStrictEqual(sent, [{ id: 1, method: "initialize" }]);
     assert.isTrue(closed);
-    assert.deepStrictEqual(lines.map((line) => line.split(" ")[2]), ["→", "←"]);
+    assert.deepStrictEqual(
+      lines.map((line) => line.split(" ")[2]),
+      ["→", "←"],
+    );
   });
 });
 
 describe("TurnStats", () => {
-  const tool = (toolCallId: string, more: Record<string, unknown> = {}) => ({ sessionUpdate: "tool_call", toolCallId, title: "t", ...more }) as acp.SessionUpdate;
+  const tool = (toolCallId: string, more: Record<string, unknown> = {}) =>
+    ({ sessionUpdate: "tool_call", toolCallId, title: "t", ...more }) as acp.SessionUpdate;
   const update = (toolCallId: string, more: Record<string, unknown> = {}) =>
     ({ sessionUpdate: "tool_call_update", toolCallId, ...more }) as acp.SessionUpdate;
   const text = { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "hi" } } as acp.SessionUpdate;
@@ -237,19 +262,36 @@ describe("turnTrace", () => {
   it("reads the turn's tokens, keeping those not reported apart from zero", () => {
     const usage = { totalTokens: 3, inputTokens: 1, outputTokens: 2, cachedReadTokens: 0, thoughtTokens: null };
     const { tokens } = turnTrace(tabWith(), "s", { stopReason: "end_turn", usage } as never, measured());
-    assert.deepStrictEqual(tokens, { total: 3, input: 1, output: 2, cachedRead: 0, cachedWrite: undefined, thought: undefined });
+    assert.deepStrictEqual(tokens, {
+      total: 3,
+      input: 1,
+      output: 2,
+      cachedRead: 0,
+      cachedWrite: undefined,
+      thought: undefined,
+    });
   });
 
   it("works out the turn's cost from the session's total", () => {
     const tab = tabWith({ used: 10, size: 100, cost: { amount: 0.5, currency: "USD" } });
     const before = { amount: 0.25, currency: "USD" };
-    assert.deepStrictEqual(turnTrace(tab, "s", { stopReason: "end_turn" }, measured(before)).cost, { turn: 0.25, session: 0.5, currency: "USD" });
-    assert.deepStrictEqual(turnTrace(tab, "s", { stopReason: "end_turn" }, measured(before)).context, { used: 10, size: 100 });
+    assert.deepStrictEqual(turnTrace(tab, "s", { stopReason: "end_turn" }, measured(before)).cost, {
+      turn: 0.25,
+      session: 0.5,
+      currency: "USD",
+    });
+    assert.deepStrictEqual(turnTrace(tab, "s", { stopReason: "end_turn" }, measured(before)).context, {
+      used: 10,
+      size: 100,
+    });
   });
 
   it("counts all of the cost when the agent started over", () => {
     const tab = tabWith({ used: 10, size: 100, cost: { amount: 0.1, currency: "USD" } });
-    assert.strictEqual(turnTrace(tab, "s", { stopReason: "end_turn" }, measured({ amount: 0.5, currency: "USD" })).cost?.turn, 0.1);
+    assert.strictEqual(
+      turnTrace(tab, "s", { stopReason: "end_turn" }, measured({ amount: 0.5, currency: "USD" })).cost?.turn,
+      0.1,
+    );
   });
 });
 
@@ -259,7 +301,13 @@ describe("TurnTraceView", () => {
   const base = { waiting: { asks: 0, ms: 0 }, tools: { total: 0, failed: 0, kinds: {} }, subagents: 0 };
   const draw = (trace: Omit<TurnTrace, keyof typeof base> & Partial<typeof base>) =>
     act(() => root.render(createElement(TurnTraceView, { trace: { ...base, ...trace } as TurnTrace })));
-  const rows = () => Object.fromEntries([...container.querySelectorAll("dl > div")].map((row) => [row.children[0]!.textContent, row.children[1]!.textContent]));
+  const rows = () =>
+    Object.fromEntries(
+      [...container.querySelectorAll("dl > div")].map((row) => [
+        row.children[0]!.textContent,
+        row.children[1]!.textContent,
+      ]),
+    );
 
   beforeEach(() => {
     window.dispatchEvent(new MessageEvent("message", { data: { type: "l10n", lang: "en", strings: en } }));

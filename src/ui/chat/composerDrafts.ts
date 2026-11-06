@@ -118,7 +118,9 @@ export function useComposerDrafts({
   function saveContent(tab: number, { text, inline, attachments }: Content): void {
     const draft: Draft = {
       text,
-      inline: [...inline].filter(([token]) => text.includes(token)).map(([token, attachment]) => ({ token, attachment })),
+      inline: [...inline]
+        .filter(([token]) => text.includes(token))
+        .map(([token, attachment]) => ({ token, attachment })),
       attachments,
     };
     sender.current.save(tab, draft);

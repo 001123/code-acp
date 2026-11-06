@@ -7,7 +7,14 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AgentManager, type AgentChoice, type InstalledAgent } from "../src/agentManager";
-import { Doctor, DoctorPage, LOGIN_AGENT_COMMAND, type DoctorCheck, type DoctorResult, type DoctorState } from "../src/doctor";
+import {
+  Doctor,
+  DoctorPage,
+  LOGIN_AGENT_COMMAND,
+  type DoctorCheck,
+  type DoctorResult,
+  type DoctorState,
+} from "../src/doctor";
 import { makeRuntime } from "../src/runtime";
 import { SettingsPanel } from "../src/settingsPanel";
 import type * as vscode from "vscode";
@@ -25,7 +32,11 @@ const onPath = (...names: ReadonlyArray<string>) => {
   process.env.PATH = bin;
 };
 
-const managerWith = (agents: ReadonlyArray<AgentChoice>, kinds: ReadonlyArray<InstalledAgent["kind"]> = [], env: Record<string, string> = {}) =>
+const managerWith = (
+  agents: ReadonlyArray<AgentChoice>,
+  kinds: ReadonlyArray<InstalledAgent["kind"]> = [],
+  env: Record<string, string> = {},
+) =>
   ({
     agents: Effect.succeed(agents),
     list: Effect.succeed(kinds.map((kind) => ({ kind }) as InstalledAgent)),
@@ -47,7 +58,9 @@ const doctorLayer = (manager: AgentManager["Service"]) =>
 const runChecks = (manager: AgentManager["Service"]) =>
   Effect.gen(function* () {
     const checks = yield* Doctor.use((doctor) => doctor.checks);
-    return new Map(yield* Effect.forEach(checks, (check) => check.run.pipe(Effect.map((result) => [check.id, result] as const))));
+    return new Map(
+      yield* Effect.forEach(checks, (check) => check.run.pipe(Effect.map((result) => [check.id, result] as const))),
+    );
   }).pipe(Effect.provide(doctorLayer(manager)));
 
 const PATH = process.env.PATH;
@@ -64,7 +77,12 @@ describe("tools", () => {
     Effect.gen(function* () {
       onPath("node", "npm", "uvx", "git");
       const results = yield* runChecks(managerWith([]));
-      for (const [id, command] of [["node", "node"], ["npm", "npm"], ["uv", "uvx"], ["git", "git"]] as const) {
+      for (const [id, command] of [
+        ["node", "node"],
+        ["npm", "npm"],
+        ["uv", "uvx"],
+        ["git", "git"],
+      ] as const) {
         assert.deepStrictEqual(results.get(id), { status: "ok", description: `${command} 1.2.3` });
       }
     }),
@@ -86,7 +104,10 @@ describe("tools", () => {
       const free = yield* runChecks(managerWith([]));
       assert.strictEqual(free.get("uv")?.status, "warning");
       assert.strictEqual(free.get("node")?.status, "warning");
-      assert.deepStrictEqual(free.get("uv")?.fix, { type: "open", url: "https://docs.astral.sh/uv/getting-started/installation/" });
+      assert.deepStrictEqual(free.get("uv")?.fix, {
+        type: "open",
+        url: "https://docs.astral.sh/uv/getting-started/installation/",
+      });
 
       const needed = yield* runChecks(managerWith([], ["uvx", "npx"]));
       assert.strictEqual(needed.get("uv")?.status, "error");
@@ -156,7 +177,11 @@ describe("agents", () => {
   );
 });
 
-const check = (id: string, group: DoctorCheck["group"], run: Effect.Effect<DoctorResult> = Effect.never): DoctorCheck => ({
+const check = (
+  id: string,
+  group: DoctorCheck["group"],
+  run: Effect.Effect<DoctorResult> = Effect.never,
+): DoctorCheck => ({
   id,
   group,
   label: id,
@@ -166,7 +191,9 @@ const check = (id: string, group: DoctorCheck["group"], run: Effect.Effect<Docto
 describe("Doctor.setupChecks", () => {
   const runSetupChecks = Effect.gen(function* () {
     const checks = yield* Doctor.use((doctor) => doctor.setupChecks);
-    return new Map(yield* Effect.forEach(checks, (check) => check.run.pipe(Effect.map((result) => [check.id, result] as const))));
+    return new Map(
+      yield* Effect.forEach(checks, (check) => check.run.pipe(Effect.map((result) => [check.id, result] as const))),
+    );
   }).pipe(Effect.provide(doctorLayer(managerWith([]))));
 
   it.live("checks the tools alone: there is no agent to start yet", () =>
@@ -200,7 +227,8 @@ describe("Doctor.setupChecks", () => {
 });
 
 describe("DoctorPage", () => {
-  const withChecks = (checks: ReadonlyArray<DoctorCheck>) => Layer.succeed(Doctor, Doctor.of({ checks: Effect.succeed(checks), setupChecks: Effect.succeed([]) }));
+  const withChecks = (checks: ReadonlyArray<DoctorCheck>) =>
+    Layer.succeed(Doctor, Doctor.of({ checks: Effect.succeed(checks), setupChecks: Effect.succeed([]) }));
   const fix = { type: "showLog" } as const;
   const makePage = () => {
     const states: Array<DoctorState> = [];
@@ -214,23 +242,48 @@ describe("DoctorPage", () => {
         (state) => void states.push(state),
         Doctor.use((doctor) => doctor.setupChecks),
       );
-      const setup = Layer.succeed(Doctor, Doctor.of({ checks: Effect.succeed([]), setupChecks: Effect.succeed([check("node", "tools", Effect.succeed({ status: "ok" }))]) }));
+      const setup = Layer.succeed(
+        Doctor,
+        Doctor.of({
+          checks: Effect.succeed([]),
+          setupChecks: Effect.succeed([check("node", "tools", Effect.succeed({ status: "ok" }))]),
+        }),
+      );
       yield* page.run().pipe(Effect.provide(setup));
-      assert.deepStrictEqual(states.at(-1)?.rows.map((row) => row.id), ["node"]);
+      assert.deepStrictEqual(
+        states.at(-1)?.rows.map((row) => row.id),
+        ["node"],
+      );
     }),
   );
 
   it.live("shows each result as it comes, then that it finished", () =>
     Effect.gen(function* () {
       const { states, page } = makePage();
-      yield* page.run().pipe(
-        Effect.provide(withChecks([check("git", "tools", Effect.succeed({ status: "warning", fix })), check("claude", "agents", Effect.succeed({ status: "ok" }))])),
+      yield* page
+        .run()
+        .pipe(
+          Effect.provide(
+            withChecks([
+              check("git", "tools", Effect.succeed({ status: "warning", fix })),
+              check("claude", "agents", Effect.succeed({ status: "ok" })),
+            ]),
+          ),
+        );
+      assert.deepStrictEqual(
+        states[0]?.rows.map((row) => [row.id, row.group, row.result]),
+        [
+          ["git", "tools", undefined],
+          ["claude", "agents", undefined],
+        ],
       );
-      assert.deepStrictEqual(states[0]?.rows.map((row) => [row.id, row.group, row.result]), [["git", "tools", undefined], ["claude", "agents", undefined]]);
       assert.isTrue(states[0]?.running);
       const last = states.at(-1)!;
       assert.isFalse(last.running);
-      assert.deepStrictEqual(last.rows.map((row) => row.result?.status), ["warning", "ok"]);
+      assert.deepStrictEqual(
+        last.rows.map((row) => row.result?.status),
+        ["warning", "ok"],
+      );
       assert.deepStrictEqual(page.fixOf("git"), fix);
       assert.isUndefined(page.fixOf("claude"));
     }),
@@ -241,10 +294,14 @@ describe("DoctorPage", () => {
       const { states, page } = makePage();
       let stopped = false;
       const slow = Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(() => void (stopped = true))));
-      const run = yield* page.run().pipe(
-        Effect.provide(withChecks([check("git", "tools", Effect.succeed({ status: "ok" })), check("claude", "agents", slow)])),
-        Effect.forkChild,
-      );
+      const run = yield* page
+        .run()
+        .pipe(
+          Effect.provide(
+            withChecks([check("git", "tools", Effect.succeed({ status: "ok" })), check("claude", "agents", slow)]),
+          ),
+          Effect.forkChild,
+        );
       yield* Effect.sleep("10 millis");
       assert.isTrue(states.at(-1)?.running);
       yield* page.stop;
@@ -252,7 +309,10 @@ describe("DoctorPage", () => {
       assert.isTrue(stopped);
       const last = states.at(-1)!;
       assert.isFalse(last.running);
-      assert.deepStrictEqual(last.rows.map((row) => row.result?.status), ["ok", undefined]);
+      assert.deepStrictEqual(
+        last.rows.map((row) => row.result?.status),
+        ["ok", undefined],
+      );
     }),
   );
 
@@ -274,7 +334,10 @@ describe("DoctorPage", () => {
       assert.strictEqual(states.at(-1)?.rows[0]?.result?.status, "error");
 
       yield* page.run().pipe(Effect.provide(withChecks([check("claude", "agents", Effect.succeed({ status: "ok" }))])));
-      assert.deepStrictEqual(states.at(-1)?.rows.map((row) => row.id), ["claude"]);
+      assert.deepStrictEqual(
+        states.at(-1)?.rows.map((row) => row.id),
+        ["claude"],
+      );
       assert.isUndefined(page.fixOf("git"));
     }),
   );
@@ -291,7 +354,10 @@ describe("the Doctor tab of the settings page", () => {
         __test.setSetting("codeAcp.customAgents", customAgents);
         const root = fs.mkdtempSync(path.join(os.tmpdir(), "code-acp-doctor-page-"));
         const store = new Map<string, unknown>();
-        const memento = { get: (key: string) => store.get(key), update: async (key: string, value: unknown) => void store.set(key, value) };
+        const memento = {
+          get: (key: string) => store.get(key),
+          update: async (key: string, value: unknown) => void store.set(key, value),
+        };
         const context = {
           extensionUri: Uri.file(root),
           globalStorageUri: Uri.file(path.join(root, "global")),
@@ -332,7 +398,10 @@ describe("the Doctor tab of the settings page", () => {
       const { panel, state } = yield* openPage({}, { tab: "doctor", section: "run" });
       panel.receive({ type: "ready" });
       yield* until(() => state() !== undefined, "the page's state");
-      assert.deepInclude(panel.posted.find((m) => m.type === "selectTab"), { tab: "doctor", section: "run" });
+      assert.deepInclude(
+        panel.posted.find((m) => m.type === "selectTab"),
+        { tab: "doctor", section: "run" },
+      );
       assert.deepStrictEqual(state(), { rows: [], running: false });
     }),
   );
@@ -374,7 +443,10 @@ describe("the Doctor tab of the settings page", () => {
       yield* until(() => !!state()?.rows.length && !state()?.running, "the checks");
       panel.receive({ type: "doctorFix", id: "agents" });
       yield* until(() => panel.posted.some((m) => m.type === "selectTab"), "the Agent tab");
-      assert.deepInclude(panel.posted.find((m) => m.type === "selectTab"), { tab: "agent", section: "manage" });
+      assert.deepInclude(
+        panel.posted.find((m) => m.type === "selectTab"),
+        { tab: "agent", section: "manage" },
+      );
     }),
   );
 

@@ -7,17 +7,46 @@ import * as path from "node:path";
 import { AgentRequestError, type AcpAgent } from "../src/acpClient";
 import { DraftStore, type DraftHolder } from "../src/chat/drafts";
 import { canReopen, HistoryRequests, listHistory } from "../src/chat/history";
-import { CANCELLED, ELICITATION_CANCELLED, parseElicitationUrl, Permissions, type Answer } from "../src/chat/permissions";
+import {
+  CANCELLED,
+  ELICITATION_CANCELLED,
+  parseElicitationUrl,
+  Permissions,
+  type Answer,
+} from "../src/chat/permissions";
 import type { Attachment } from "../src/chat/protocol";
 import { replayedParts } from "../src/chat/replay";
 import type { TabGroupInfo, TabInfo } from "../src/chat/protocol";
 import { messageText, resetConversation, SavedTabs, TabList } from "../src/chat/tabs";
 import { attemptKey, attemptPick, modelsIn, nextRow, type AttemptRow } from "../src/ui/chat/compareAttempts";
 import { folderName, historyGroups, shortTime, type HistoryGroup, type HistorySort } from "../src/ui/chat/historyList";
-import { attemptStatus, diffTotals, dropIndex, matchingRows, memberTitle, openRequests, requestsLabel, rowsInHand, sumChanges, tabChanges, tabRows, tabWorking, workingRowKeys, type ShownRow } from "../src/ui/chat/tabRows";
+import {
+  attemptStatus,
+  diffTotals,
+  dropIndex,
+  matchingRows,
+  memberTitle,
+  openRequests,
+  requestsLabel,
+  rowsInHand,
+  sumChanges,
+  tabChanges,
+  tabRows,
+  tabWorking,
+  workingRowKeys,
+  type ShownRow,
+} from "../src/ui/chat/tabRows";
 import type { TabState } from "../src/ui/chat/tabs";
 import { matchesSession } from "../src/ui/chat/search";
-import { transcript, EMPTY, fileLinkTokens, noticeItem, permissionInput, stopReasonText, type Action } from "../src/ui/chat/transcript";
+import {
+  transcript,
+  EMPTY,
+  fileLinkTokens,
+  noticeItem,
+  permissionInput,
+  stopReasonText,
+  type Action,
+} from "../src/ui/chat/transcript";
 import { cwdForNewTab, defaultCwd, folderOf, isWorkspaceFolder, resolvePath, workspaceFolders } from "../src/workspace";
 import { __test, Uri, window, workspace } from "./stubs/vscode";
 
@@ -163,16 +192,14 @@ describe("TabList groups", () => {
         { id: 9, title: "no tabs", prompt: "", createdAt: 1 },
       ],
       shownGroup: 9,
-      tabs: [
-        { cwd: "/a", group: 1, pinned: true },
-        { cwd: "/x" },
-        { cwd: "/b", group: 1 },
-        { cwd: "/y", group: 77 },
-      ],
+      tabs: [{ cwd: "/a", group: 1, pinned: true }, { cwd: "/x" }, { cwd: "/b", group: 1 }, { cwd: "/y", group: 77 }],
     };
     const repaired = new TabList(scattered, () => "/d");
     assert.deepStrictEqual(order(repaired), ["/a", "/b", "/x", "/y"]);
-    assert.deepStrictEqual(repaired.all.map((tab) => tab.pinned), [true, true, false, false]);
+    assert.deepStrictEqual(
+      repaired.all.map((tab) => tab.pinned),
+      [true, true, false, false],
+    );
     assert.strictEqual(repaired.active.cwd, "/b");
     assert.strictEqual(repaired.groups.length, 1);
     assert.isUndefined(repaired.shownGroup);
@@ -181,7 +208,15 @@ describe("TabList groups", () => {
 });
 
 describe("the sidebar's groups", () => {
-  const info = (id: number, group?: number): TabInfo => ({ id, group, named: false, pinned: false, cwd: "/", used: false, canFork: false });
+  const info = (id: number, group?: number): TabInfo => ({
+    id,
+    group,
+    named: false,
+    pinned: false,
+    cwd: "/",
+    used: false,
+    canFork: false,
+  });
   const group = (id: number): TabGroupInfo => ({ id, title: "g", prompt: "", createdAt: 0, collapsed: false });
 
   it("puts a group's tabs under one row, and stands alone what has no known group", () => {
@@ -205,14 +240,26 @@ describe("the sidebar's groups", () => {
   it("names a tab of a group after its agent, unless the user named it", () => {
     const agents = [{ id: "a", name: "Agent A" }];
     assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "From the session" }, agents), "Agent A");
-    assert.strictEqual(memberTitle({ ...info(1), agentId: "a", attemptLabel: "Big · High" }, agents), "Agent A · Big · High");
-    assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "Mine", named: true, attemptLabel: "Big" }, agents), "Mine");
+    assert.strictEqual(
+      memberTitle({ ...info(1), agentId: "a", attemptLabel: "Big · High" }, agents),
+      "Agent A · Big · High",
+    );
+    assert.strictEqual(
+      memberTitle({ ...info(1), agentId: "a", title: "Mine", named: true, attemptLabel: "Big" }, agents),
+      "Mine",
+    );
     assert.strictEqual(memberTitle({ ...info(1), agentId: "a", title: "Mine", named: true }, agents), "Mine");
-    assert.strictEqual(memberTitle({ ...info(1), agentId: "gone", title: "From the session" }, agents), "From the session");
+    assert.strictEqual(
+      memberTitle({ ...info(1), agentId: "gone", title: "From the session" }, agents),
+      "From the session",
+    );
   });
 
   it("adds up what a worktree changed, with no lines for binary files", () => {
-    assert.deepStrictEqual(diffTotals({ files: [{ path: "a", added: 2, removed: 1 }, { path: "b" }, { path: "c", added: 3, removed: 0 }] }), { added: 5, removed: 1 });
+    assert.deepStrictEqual(
+      diffTotals({ files: [{ path: "a", added: 2, removed: 1 }, { path: "b" }, { path: "c", added: 3, removed: 0 }] }),
+      { added: 5, removed: 1 },
+    );
   });
 
   it("says where a tab of a group stands", () => {
@@ -232,18 +279,35 @@ describe("the sidebar's groups", () => {
 
     it("counts the requests still open, by kind", () => {
       assert.deepStrictEqual(openRequests(undefined), { permissions: 0, questions: 0 });
-      assert.deepStrictEqual(openRequests(withItems(permission(true), question("accept"))), { permissions: 0, questions: 0 });
-      assert.deepStrictEqual(openRequests(withItems(permission(false), permission(false), permission(true), question())), { permissions: 2, questions: 1 });
+      assert.deepStrictEqual(openRequests(withItems(permission(true), question("accept"))), {
+        permissions: 0,
+        questions: 0,
+      });
+      assert.deepStrictEqual(
+        openRequests(withItems(permission(false), permission(false), permission(true), question())),
+        { permissions: 2, questions: 1 },
+      );
     });
 
     it("names one request, counts several and says nothing without any", () => {
       assert.strictEqual(requestsLabel({ permissions: 0, questions: 0 }, t), undefined);
       assert.strictEqual(requestsLabel({ permissions: 1, questions: 0 }, t), "chat.tabPermission");
       assert.strictEqual(requestsLabel({ permissions: 0, questions: 1 }, t), "chat.tabQuestion");
-      assert.strictEqual(requestsLabel({ permissions: 3, questions: 2 }, t), "chat.tabPermissions 3 · chat.tabQuestions 2");
+      assert.strictEqual(
+        requestsLabel({ permissions: 3, questions: 2 }, t),
+        "chat.tabPermissions 3 · chat.tabQuestions 2",
+      );
     });
 
-    const file = (added: number, removed: number) => ({ path: "a", name: "a", added, removed, created: false, deleted: false, binary: false });
+    const file = (added: number, removed: number) => ({
+      path: "a",
+      name: "a",
+      added,
+      removed,
+      created: false,
+      deleted: false,
+      binary: false,
+    });
 
     it("counts the files awaiting review unless the setting hides them", () => {
       const state = { changes: { files: [file(2, 1), file(0, 4)], turns: [] } } as unknown as TabState;
@@ -256,14 +320,27 @@ describe("the sidebar's groups", () => {
     it("prefers a worktree's diff, whatever the setting, unless it couldn't be read", () => {
       const changes = { files: [file(9, 9)], turns: [] };
       const diff = { files: [{ path: "b", added: 1, removed: 0 }, { path: "c" }] };
-      assert.deepStrictEqual(tabChanges({ changes, worktreeDiff: diff } as unknown as TabState, false), { files: 2, added: 1, removed: 0 });
+      assert.deepStrictEqual(tabChanges({ changes, worktreeDiff: diff } as unknown as TabState, false), {
+        files: 2,
+        added: 1,
+        removed: 0,
+      });
       assert.strictEqual(tabChanges({ changes, worktreeDiff: { files: [] } } as unknown as TabState, true), undefined);
-      assert.deepStrictEqual(tabChanges({ changes, worktreeDiff: { files: [], error: "no" } } as unknown as TabState, true), { files: 1, added: 9, removed: 9 });
+      assert.deepStrictEqual(
+        tabChanges({ changes, worktreeDiff: { files: [], error: "no" } } as unknown as TabState, true),
+        { files: 1, added: 9, removed: 9 },
+      );
     });
 
     it("adds up a group's changes", () => {
       assert.strictEqual(sumChanges([]), undefined);
-      assert.deepStrictEqual(sumChanges([{ files: 1, added: 2, removed: 3 }, { files: 4, added: 5, removed: 6 }]), { files: 5, added: 7, removed: 9 });
+      assert.deepStrictEqual(
+        sumChanges([
+          { files: 1, added: 2, removed: 3 },
+          { files: 4, added: 5, removed: 6 },
+        ]),
+        { files: 5, added: 7, removed: 9 },
+      );
     });
   });
 });
@@ -330,13 +407,22 @@ describe("TabList", () => {
     const list = new TabList(undefined, () => "/d");
     const [a, b, c] = [list.active, list.add("/d"), list.add("/d")];
     assert.isTrue(list.pin(c, true));
-    assert.deepStrictEqual(list.all.map((t) => t.id), [c.id, a.id, b.id]);
+    assert.deepStrictEqual(
+      list.all.map((t) => t.id),
+      [c.id, a.id, b.id],
+    );
     assert.isFalse(list.pin(c, true));
     // An unpinned tab can't move into the pinned group.
     list.move(b, 0);
-    assert.deepStrictEqual(list.all.map((t) => t.id), [c.id, b.id, a.id]);
+    assert.deepStrictEqual(
+      list.all.map((t) => t.id),
+      [c.id, b.id, a.id],
+    );
     list.pin(c, false);
-    assert.deepStrictEqual(list.all.map((t) => t.id), [c.id, b.id, a.id]);
+    assert.deepStrictEqual(
+      list.all.map((t) => t.id),
+      [c.id, b.id, a.id],
+    );
     assert.strictEqual(list.remove(b), 1);
     assert.strictEqual(list.remove(b), -1);
     assert.isFalse(list.has(b));
@@ -372,7 +458,12 @@ describe("history search", () => {
 });
 
 describe("sidebar history", () => {
-  const session = (sessionId: string, title: string | undefined, cwd: string, updatedAt: string): acp.SessionInfo => ({ sessionId, title, cwd, updatedAt });
+  const session = (sessionId: string, title: string | undefined, cwd: string, updatedAt: string): acp.SessionInfo => ({
+    sessionId,
+    title,
+    cwd,
+    updatedAt,
+  });
   const sessions = [
     session("old", "Zebra", "/work/b", "2026-01-01T00:00:00Z"),
     session("new", "Đổi tên", "/work/a", "2026-03-01T00:00:00Z"),
@@ -380,7 +471,8 @@ describe("sidebar history", () => {
     session("open", "Apple", "/work/a", "2026-04-01T00:00:00Z"),
   ];
   const ids = (groups: ReadonlyArray<HistoryGroup>) => groups.map((group) => group.sessions.map((s) => s.sessionId));
-  const list = (sort: HistorySort, query = "") => historyGroups(sessions, { openIds: new Set(["open"]), query, sort, lang: "en" });
+  const list = (sort: HistorySort, query = "") =>
+    historyGroups(sessions, { openIds: new Set(["open"]), query, sort, lang: "en" });
 
   it("leaves out conversations in tabs and sorts the rest", () => {
     assert.deepStrictEqual(ids(list("updated")), [["new", "none", "old"]]);
@@ -389,7 +481,10 @@ describe("sidebar history", () => {
 
   it("groups by folder, the latest first in each", () => {
     const groups = list("folder");
-    assert.deepStrictEqual(groups.map((group) => group.folder), ["/work/a", "/work/b"]);
+    assert.deepStrictEqual(
+      groups.map((group) => group.folder),
+      ["/work/a", "/work/b"],
+    );
     assert.deepStrictEqual(ids(groups), [["new"], ["none", "old"]]);
   });
 
@@ -401,7 +496,10 @@ describe("sidebar history", () => {
   it("labels the time in short, never with months", () => {
     const now = Date.parse("2026-11-04T12:00:00Z");
     const ago = (seconds: number) => shortTime("en", new Date(now - seconds * 1000).toISOString(), now);
-    assert.deepStrictEqual([ago(5), ago(5 * 60), ago(2 * 3600), ago(3 * 86400), ago(60 * 86400), ago(400 * 86400)], ["1m", "5m", "2h", "3d", "8w", "1y"]);
+    assert.deepStrictEqual(
+      [ago(5), ago(5 * 60), ago(2 * 3600), ago(3 * 86400), ago(60 * 86400), ago(400 * 86400)],
+      ["1m", "5m", "2h", "3d", "8w", "1y"],
+    );
     assert.strictEqual(shortTime("en", undefined, now), "");
   });
 
@@ -412,12 +510,14 @@ describe("sidebar history", () => {
 });
 
 describe("sidebar rows", () => {
-  const tab = (id: number, title: string, group?: number) => ({ id, title, group, cwd: "/work", pinned: false, used: true, canFork: false }) as TabInfo;
+  const tab = (id: number, title: string, group?: number) =>
+    ({ id, title, group, cwd: "/work", pinned: false, used: true, canFork: false }) as TabInfo;
   const group = { id: 1, title: "Compare", prompt: "", collapsed: true } as unknown as TabGroupInfo;
   const tabs = [tab(1, "Alpha"), tab(2, "Beta", 1), tab(3, "Gamma", 1), tab(4, "Delta")];
   const rows = tabRows(tabs, [group]);
   const titleOf = (each: TabInfo) => each.title ?? "";
-  const shown = (each: ReadonlyArray<ShownRow>) => each.map((row) => (row.kind === "tab" ? row.tab.id : row.shown.map((member) => member.id)));
+  const shown = (each: ReadonlyArray<ShownRow>) =>
+    each.map((row) => (row.kind === "tab" ? row.tab.id : row.shown.map((member) => member.id)));
 
   it("finds tabs, and shows only the tabs of a group that match", () => {
     assert.deepStrictEqual(shown(matchingRows(rows, "alpha", titleOf)), [1]);
@@ -432,8 +532,13 @@ describe("sidebar rows", () => {
   });
 
   describe("working section", () => {
-    const keys = (working: number[], waiting: number[] = [], list = rows) =>
-      [...workingRowKeys(list, (each) => working.includes(each.id), (each) => waiting.includes(each.id))];
+    const keys = (working: number[], waiting: number[] = [], list = rows) => [
+      ...workingRowKeys(
+        list,
+        (each) => working.includes(each.id),
+        (each) => waiting.includes(each.id),
+      ),
+    ];
 
     it("takes the tabs and groups with something running", () => {
       assert.deepStrictEqual(keys([1, 3]), ["tab-1", "group-1"]);
@@ -472,12 +577,19 @@ describe("sidebar rows", () => {
 });
 
 describe("Permissions", () => {
-  const request = { sessionId: "s", toolCall: { toolCallId: "t" }, options: [] } as unknown as acp.RequestPermissionRequest;
+  const request = {
+    sessionId: "s",
+    toolCall: { toolCallId: "t" },
+    options: [],
+  } as unknown as acp.RequestPermissionRequest;
 
   const make = () => {
     const shown: number[] = [];
     const done: number[] = [];
-    const permissions = new Permissions<string>({ shown: (_, id) => void shown.push(id), done: (_, id) => void done.push(id) });
+    const permissions = new Permissions<string>({
+      shown: (_, id) => void shown.push(id),
+      done: (_, id) => void done.push(id),
+    });
     return { permissions, shown, done };
   };
   // The agent's own signals come from outside Effect.
@@ -544,7 +656,11 @@ describe("Permissions with questions", () => {
     assert.strictEqual(input({ a: 1 }), '{\n  "a": 1\n}');
   });
 
-  const permission = { sessionId: "s", toolCall: { toolCallId: "t" }, options: [] } as unknown as acp.RequestPermissionRequest;
+  const permission = {
+    sessionId: "s",
+    toolCall: { toolCallId: "t" },
+    options: [],
+  } as unknown as acp.RequestPermissionRequest;
   const question = {
     sessionId: "s",
     mode: "form",
@@ -572,17 +688,32 @@ describe("Permissions with questions", () => {
       assert.deepStrictEqual(yield* Fiber.join(allowed), CANCELLED);
       permissions.cancel();
       assert.deepStrictEqual(yield* Fiber.join(other), ELICITATION_CANCELLED);
-      assert.deepStrictEqual(done.map((a) => a.kind), ["elicitation", "permission", "elicitation"]);
+      assert.deepStrictEqual(
+        done.map((a) => a.kind),
+        ["elicitation", "permission", "elicitation"],
+      );
     }),
   );
 
   it("shows an open question on the subagent call that asked it, until it is answered", () => {
     const actions: Action[] = [
-      { type: "toolCall", update: { toolCallId: "agent", title: "Agent", _meta: { claudeCode: { toolName: "Agent" } } } },
-      { type: "toolCall", update: { toolCallId: "ask", title: "Ask", _meta: { claudeCode: { parentToolUseId: "agent" } } } },
+      {
+        type: "toolCall",
+        update: { toolCallId: "agent", title: "Agent", _meta: { claudeCode: { toolName: "Agent" } } },
+      },
+      {
+        type: "toolCall",
+        update: { toolCallId: "ask", title: "Ask", _meta: { claudeCode: { parentToolUseId: "agent" } } },
+      },
       {
         type: "add",
-        item: { kind: "elicitation", requestId: 7, message: "Which one?", schema: { type: "object" }, toolCallId: "ask" },
+        item: {
+          kind: "elicitation",
+          requestId: 7,
+          message: "Which one?",
+          schema: { type: "object" },
+          toolCallId: "ask",
+        },
       },
     ];
     const state = actions.reduce(transcript, EMPTY);
@@ -600,8 +731,15 @@ describe("Permissions with questions", () => {
       type: "add",
       item: { kind: "elicitation", requestId, message: "Sign in", url: "https://example.com/", elicitationId },
     });
-    const state = [link(1, "a"), link(2, "b"), { type: "elicitationComplete", elicitationId: "b" } satisfies Action].reduce(transcript, EMPTY);
-    assert.deepStrictEqual(state.items.map((i) => i.kind === "elicitation" && "url" in i && i.completed), [undefined, true]);
+    const state = [
+      link(1, "a"),
+      link(2, "b"),
+      { type: "elicitationComplete", elicitationId: "b" } satisfies Action,
+    ].reduce(transcript, EMPTY);
+    assert.deepStrictEqual(
+      state.items.map((i) => i.kind === "elicitation" && "url" in i && i.completed),
+      [undefined, true],
+    );
   });
 
   describe("compaction", () => {
@@ -609,7 +747,10 @@ describe("Permissions with questions", () => {
       const item = state.items.find((i) => i.kind === "compaction");
       return item?.kind === "compaction" ? item : undefined;
     };
-    const update = (fields: Omit<acp.CompactionUpdate, "compactionId">): Action => ({ type: "compaction", update: { compactionId: "c", ...fields } });
+    const update = (fields: Omit<acp.CompactionUpdate, "compactionId">): Action => ({
+      type: "compaction",
+      update: { compactionId: "c", ...fields },
+    });
     const chunk = (text: string): Action => ({ type: "compactionChunk", compactionId: "c", text });
 
     it("stays where it started, and updates in place", () => {
@@ -619,7 +760,10 @@ describe("Permissions with questions", () => {
         { type: "chunk", kind: "assistant", text: "after" } satisfies Action,
         update({ status: "completed" }),
       ].reduce(transcript, EMPTY);
-      assert.deepStrictEqual(state.items.map((i) => i.kind), ["assistant", "compaction", "assistant"]);
+      assert.deepStrictEqual(
+        state.items.map((i) => i.kind),
+        ["assistant", "compaction", "assistant"],
+      );
       assert.strictEqual(compaction(state)?.status, "completed");
     });
 
@@ -637,7 +781,10 @@ describe("Permissions with questions", () => {
       const kept = transcript(withBoth, update({ status: "failed" }));
       assert.strictEqual(compaction(kept)?.summary, "old");
       assert.strictEqual(compaction(kept)?.error, "boom");
-      const replaced = transcript(kept, update({ status: "completed", summary: [{ type: "text", text: "new" }], error: null }));
+      const replaced = transcript(
+        kept,
+        update({ status: "completed", summary: [{ type: "text", text: "new" }], error: null }),
+      );
       assert.strictEqual(compaction(replaced)?.summary, "new");
       assert.isUndefined(compaction(replaced)?.error);
       assert.strictEqual(compaction(transcript(replaced, update({ status: "completed", summary: null })))?.summary, "");
@@ -646,15 +793,25 @@ describe("Permissions with questions", () => {
 
     it("ends what is running when the agent stops, and leaves what already ended", () => {
       const stopped: Action = { type: "agentStopped" };
-      assert.strictEqual(compaction([update({ status: "in_progress" }), stopped].reduce(transcript, EMPTY))?.status, "cancelled");
-      assert.strictEqual(compaction([update({ status: "completed" }), stopped].reduce(transcript, EMPTY))?.status, "completed");
-      assert.strictEqual(compaction([update({ status: "failed", error: "boom" }), stopped].reduce(transcript, EMPTY))?.status, "failed");
+      assert.strictEqual(
+        compaction([update({ status: "in_progress" }), stopped].reduce(transcript, EMPTY))?.status,
+        "cancelled",
+      );
+      assert.strictEqual(
+        compaction([update({ status: "completed" }), stopped].reduce(transcript, EMPTY))?.status,
+        "completed",
+      );
+      assert.strictEqual(
+        compaction([update({ status: "failed", error: "boom" }), stopped].reduce(transcript, EMPTY))?.status,
+        "failed",
+      );
     });
   });
 });
 
 describe("parseElicitationUrl", () => {
-  const href = (url: string, httpHosts: ReadonlyArray<string> = []) => Option.getOrUndefined(parseElicitationUrl(url, httpHosts))?.href;
+  const href = (url: string, httpHosts: ReadonlyArray<string> = []) =>
+    Option.getOrUndefined(parseElicitationUrl(url, httpHosts))?.href;
 
   it("takes https links, normalized, keeping what is encoded in them", () => {
     assert.strictEqual(href("https://example.com/a?next=a%26b"), "https://example.com/a?next=a%26b");
@@ -664,7 +821,10 @@ describe("parseElicitationUrl", () => {
   it("takes http only to this machine and the hosts the user listed", () => {
     assert.strictEqual(href("http://localhost:8123/callback?code=1"), "http://localhost:8123/callback?code=1");
     assert.strictEqual(href("http://127.0.0.1:8123/"), "http://127.0.0.1:8123/");
-    assert.strictEqual(href("http://gitlab.internal:8080/login", ["gitlab.internal"]), "http://gitlab.internal:8080/login");
+    assert.strictEqual(
+      href("http://gitlab.internal:8080/login", ["gitlab.internal"]),
+      "http://gitlab.internal:8080/login",
+    );
     assert.strictEqual(href("http://192.168.1.10/", ["192.168.1.10"]), "http://192.168.1.10/");
     assert.strictEqual(href("http://gitlab.internal/", ["GitLab.Internal"]), "http://gitlab.internal/");
     assert.strictEqual(href("http://xn--mnchen-3ya.example/", ["münchen.example"]), "http://xn--mnchen-3ya.example/");
@@ -700,7 +860,12 @@ describe("parseElicitationUrl", () => {
 });
 
 describe("DraftStore", () => {
-  const image: Attachment = { kind: "data", name: "a.png", mimeType: "image/png", data: Buffer.from("png bytes").toString("base64") };
+  const image: Attachment = {
+    kind: "data",
+    name: "a.png",
+    mimeType: "image/png",
+    data: Buffer.from("png bytes").toString("base64"),
+  };
 
   it.effect("stores raw bytes in files, reads them back and removes the unused ones", () =>
     Effect.gen(function* () {
@@ -708,7 +873,11 @@ describe("DraftStore", () => {
       const dir = yield* fs.makeTempDirectoryScoped();
       const holders: DraftHolder[] = [{}];
       const store = new DraftStore(dir, () => holders);
-      yield* store.set(holders[0]!, { text: "look", inline: [{ token: "@a.png", attachment: image }], attachments: [] }, () => true);
+      yield* store.set(
+        holders[0]!,
+        { text: "look", inline: [{ token: "@a.png", attachment: image }], attachments: [] },
+        () => true,
+      );
       const saved = holders[0]!.savedDraft!;
       assert.strictEqual(saved.inline[0]!.attachment.kind, "stored");
       assert.lengthOf(yield* fs.readDirectory(dir), 1);
@@ -721,7 +890,11 @@ describe("DraftStore", () => {
       // After a reload only the saved form is known.
       const reloaded: DraftHolder[] = [{ savedDraft: holders[0]!.savedDraft }];
       yield* new DraftStore(dir, () => reloaded).load();
-      assert.deepStrictEqual(reloaded[0]!.draft, { text: "look here", inline: [{ token: "@a.png", attachment: image }], attachments: [] });
+      assert.deepStrictEqual(reloaded[0]!.draft, {
+        text: "look here",
+        inline: [{ token: "@a.png", attachment: image }],
+        attachments: [],
+      });
 
       // Emptying the draft drops its file.
       yield* store.set(holders[0]!, { text: "", inline: [], attachments: [] }, () => true);
@@ -740,7 +913,11 @@ describe("DraftStore", () => {
       assert.isUndefined(holder.savedDraft);
 
       const missing: DraftHolder = {
-        savedDraft: { text: "t", inline: [], attachments: [{ kind: "stored", name: "a.png", mimeType: "image/png", file: "nope" }] },
+        savedDraft: {
+          text: "t",
+          inline: [],
+          attachments: [{ kind: "stored", name: "a.png", mimeType: "image/png", file: "nope" }],
+        },
       };
       yield* new DraftStore(dir, () => [missing]).load();
       assert.deepStrictEqual(missing.draft, { text: "t", inline: [], attachments: [] });
@@ -775,10 +952,17 @@ describe("history", () => {
       const listing = yield* listHistory(agent, ["/w/a", "/w/b"]);
       assert.isFalse(listing.unsupported);
       if (!listing.unsupported) {
-        assert.deepStrictEqual(listing.sessions.map((s) => s.sessionId), ["1", "2", "3"]);
+        assert.deepStrictEqual(
+          listing.sessions.map((s) => s.sessionId),
+          ["1", "2", "3"],
+        );
         assert.isTrue(listing.canOpen);
       }
-      assert.deepStrictEqual(calls, [["/w/a", undefined], ["/w/a", "1"], ["/w/b", undefined]]);
+      assert.deepStrictEqual(calls, [
+        ["/w/a", undefined],
+        ["/w/a", "1"],
+        ["/w/b", undefined],
+      ]);
     }),
   );
 
@@ -801,7 +985,9 @@ describe("history", () => {
         ({
           initializeResponse: { protocolVersion: 1, agentCapabilities: { sessionCapabilities: { list: {} } } },
           listSessions: (cwd: string) =>
-            ok.includes(cwd) ? Effect.succeed({ sessions: [session("1", cwd)] }) : Effect.fail(new AgentRequestError({ method: "session/list", message: `no ${cwd}`, cause: undefined })),
+            ok.includes(cwd)
+              ? Effect.succeed({ sessions: [session("1", cwd)] })
+              : Effect.fail(new AgentRequestError({ method: "session/list", message: `no ${cwd}`, cause: undefined })),
         }) as unknown as AcpAgent;
       const partial = yield* listHistory(failing(["/w/b"]), ["/w/a", "/w/b"]);
       assert.isFalse(partial.unsupported);
@@ -840,7 +1026,14 @@ describe("rewind and fork state", () => {
   });
 
   it("puts a replayed session's traces back at the end of their turns", () => {
-    const trace = (stopReason: string) => ({ stopReason, durationMs: 1, waiting: { asks: 0, ms: 0 }, tools: { total: 0, failed: 0, kinds: {} }, subagents: 0, sessionId: "s" });
+    const trace = (stopReason: string) => ({
+      stopReason,
+      durationMs: 1,
+      waiting: { asks: 0, ms: 0 },
+      tools: { total: 0, failed: 0, kinds: {} },
+      subagents: 0,
+      sessionId: "s",
+    });
     const actions: Action[] = [
       { type: "chunk", kind: "user", text: "one", turn: 1 },
       { type: "chunk", kind: "assistant", text: "reply one" },
@@ -907,13 +1100,18 @@ describe("turn end and notices", () => {
       kind: "notice",
       text: { raw: "Slow down — Rate limited" },
     });
-    assert.deepStrictEqual(noticeItem({ severity: "error", title: "Failed" }), { kind: "error", text: { raw: "Failed" } });
+    assert.deepStrictEqual(noticeItem({ severity: "error", title: "Failed" }), {
+      kind: "error",
+      text: { raw: "Failed" },
+    });
   });
 });
 
 describe("fileLinkTokens", () => {
   it("turns the file links of a replayed user message into tokens", () => {
-    const { text, tokens } = fileLinkTokens("see[@READ ME.md](file:///a/READ%20ME.md)and [@x.ts](file:///C:/b/x.ts). [y](https://y)");
+    const { text, tokens } = fileLinkTokens(
+      "see[@READ ME.md](file:///a/READ%20ME.md)and [@x.ts](file:///C:/b/x.ts). [y](https://y)",
+    );
     assert.strictEqual(text, "see @READ ME.md and @x.ts. [y](https://y)");
     assert.deepStrictEqual(tokens, [
       { token: "@READ ME.md", path: "/a/READ ME.md" },
@@ -961,10 +1159,22 @@ describe("comparison attempts", () => {
   const row = (agentId: string, model = "", effort = ""): AttemptRow => ({ id: 1, agentId, model, effort });
 
   it("adds an agent not in the comparison yet, then another model of the last one", () => {
-    assert.deepStrictEqual(nextRow(2, [row("a", "big", "high")], ["a", "b"], () => models), { id: 2, agentId: "b", model: "", effort: "" });
-    assert.deepStrictEqual(nextRow(2, [row("a", "big", "high")], ["a"], () => models), { id: 2, agentId: "a", model: "small", effort: "" });
-    assert.deepStrictEqual(nextRow(3, [row("a", "big"), row("a", "small")], ["a"], () => models), { id: 3, agentId: "a", model: "", effort: "" });
-    assert.deepStrictEqual(nextRow(2, [row("a")], ["a"], () => undefined), { id: 2, agentId: "a", model: "", effort: "" });
+    assert.deepStrictEqual(
+      nextRow(2, [row("a", "big", "high")], ["a", "b"], () => models),
+      { id: 2, agentId: "b", model: "", effort: "" },
+    );
+    assert.deepStrictEqual(
+      nextRow(2, [row("a", "big", "high")], ["a"], () => models),
+      { id: 2, agentId: "a", model: "small", effort: "" },
+    );
+    assert.deepStrictEqual(
+      nextRow(3, [row("a", "big"), row("a", "small")], ["a"], () => models),
+      { id: 3, agentId: "a", model: "", effort: "" },
+    );
+    assert.deepStrictEqual(
+      nextRow(2, [row("a")], ["a"], () => undefined),
+      { id: 2, agentId: "a", model: "", effort: "" },
+    );
   });
 
   it("labels an attempt with the names of its picks, leaving out an effort the model doesn't have", () => {
@@ -972,10 +1182,23 @@ describe("comparison attempts", () => {
     const options = { models, efforts, fastMode: false };
     const loaded = { [attemptKey("a", "big")]: { agentId: "a", model: "big", options } };
     const modelsOf = (id: string) => modelsIn(loaded, id);
-    assert.deepStrictEqual(attemptPick(row("a", "big", "high"), loaded, modelsOf), { agentId: "a", model: "big", effort: "high", label: "Big · High" });
-    assert.deepStrictEqual(attemptPick(row("a", "big", "max"), loaded, modelsOf), { agentId: "a", model: "big", effort: "max", label: "Big" });
+    assert.deepStrictEqual(attemptPick(row("a", "big", "high"), loaded, modelsOf), {
+      agentId: "a",
+      model: "big",
+      effort: "high",
+      label: "Big · High",
+    });
+    assert.deepStrictEqual(attemptPick(row("a", "big", "max"), loaded, modelsOf), {
+      agentId: "a",
+      model: "big",
+      effort: "max",
+      label: "Big",
+    });
     assert.deepStrictEqual(attemptPick(row("a"), loaded, modelsOf), { agentId: "a", model: "", effort: "" });
     // Not read yet: the values are all there is.
-    assert.deepStrictEqual(attemptPick(row("b", "m", "e"), {}, () => undefined), { agentId: "b", model: "m", effort: "e", label: "m · e" });
+    assert.deepStrictEqual(
+      attemptPick(row("b", "m", "e"), {}, () => undefined),
+      { agentId: "b", model: "m", effort: "e", label: "m · e" },
+    );
   });
 });

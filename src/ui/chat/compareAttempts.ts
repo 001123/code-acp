@@ -42,7 +42,11 @@ export function nextRow(
 }
 
 /** The row as the host takes it, with a label from the names the agent gives its model and effort. */
-export function attemptPick(row: AttemptRow, loaded: LoadedAttempts, modelsOf: (agentId: string) => ReadonlyArray<Choice> | undefined): AttemptPick {
+export function attemptPick(
+  row: AttemptRow,
+  loaded: LoadedAttempts,
+  modelsOf: (agentId: string) => ReadonlyArray<Choice> | undefined,
+): AttemptPick {
   const { agentId, model, effort } = row;
   const options = loaded[attemptKey(agentId, model)]?.options;
   const modelName = model && (modelsOf(agentId)?.find((m) => m.value === model)?.name ?? model);

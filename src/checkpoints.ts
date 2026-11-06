@@ -24,22 +24,30 @@ export class CheckpointError extends Schema.TaggedError<CheckpointError>()("Chec
  * repository is never touched; files their .gitignore excludes are not tracked. Snapshots are git trees,
  * named by hash and kept as long as the repository is.
  */
-export class ShadowGit extends Context.Service<ShadowGit, {
-  /** Snapshots `root` as it is on disk now. */
-  snapshot(root: string): Effect.Effect<string, CheckpointError>;
-  /** What differs from snapshot `from` to snapshot `to`. */
-  diff(root: string, from: string, to: string): Effect.Effect<ReadonlyArray<TreeChange>, CheckpointError>;
-  /** A file's content in a snapshot; null when it is not in it. */
-  show(root: string, tree: string, file: string): Effect.Effect<string | null, CheckpointError>;
-  /** Puts `files` back on disk as they are in snapshot `tree`; files not in it are deleted. */
-  restore(root: string, tree: string, files: ReadonlyArray<string>): Effect.Effect<void, CheckpointError>;
-  /** Snapshot `base` with `files` taken from snapshot `from`. */
-  merge(root: string, base: string, from: string, files: ReadonlyArray<string>): Effect.Effect<string, CheckpointError>;
-  /** Snapshot `base` with `file`, which is in it, holding `content`. */
-  withFile(root: string, base: string, file: string, content: string): Effect.Effect<string, CheckpointError>;
-  /** Deletes the snapshots of `root`, when the work tree itself is gone for good. */
-  forget(root: string): Effect.Effect<void>;
-}>()("code-acp/ShadowGit") {
+export class ShadowGit extends Context.Service<
+  ShadowGit,
+  {
+    /** Snapshots `root` as it is on disk now. */
+    snapshot(root: string): Effect.Effect<string, CheckpointError>;
+    /** What differs from snapshot `from` to snapshot `to`. */
+    diff(root: string, from: string, to: string): Effect.Effect<ReadonlyArray<TreeChange>, CheckpointError>;
+    /** A file's content in a snapshot; null when it is not in it. */
+    show(root: string, tree: string, file: string): Effect.Effect<string | null, CheckpointError>;
+    /** Puts `files` back on disk as they are in snapshot `tree`; files not in it are deleted. */
+    restore(root: string, tree: string, files: ReadonlyArray<string>): Effect.Effect<void, CheckpointError>;
+    /** Snapshot `base` with `files` taken from snapshot `from`. */
+    merge(
+      root: string,
+      base: string,
+      from: string,
+      files: ReadonlyArray<string>,
+    ): Effect.Effect<string, CheckpointError>;
+    /** Snapshot `base` with `file`, which is in it, holding `content`. */
+    withFile(root: string, base: string, file: string, content: string): Effect.Effect<string, CheckpointError>;
+    /** Deletes the snapshots of `root`, when the work tree itself is gone for good. */
+    forget(root: string): Effect.Effect<void>;
+  }
+>()("code-acp/ShadowGit") {
   static readonly layer = Layer.effect(
     ShadowGit,
     Effect.gen(function* () {
@@ -75,7 +83,9 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         },
         Effect.scoped,
         Effect.mapError((err) =>
-          err._tag === "CheckpointError" ? err : new CheckpointError({ message: t("checkpoints.gitFailed", "git", messageOf(err)) }),
+          err._tag === "CheckpointError"
+            ? err
+            : new CheckpointError({ message: t("checkpoints.gitFailed", "git", messageOf(err)) }),
         ),
       );
 
@@ -142,7 +152,9 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         if (from === to) {
           return [];
         }
-        const statuses = (yield* git(root, ["diff-tree", "-r", "-z", "--no-renames", "--name-status", from, to])).split("\0");
+        const statuses = (yield* git(root, ["diff-tree", "-r", "-z", "--no-renames", "--name-status", from, to])).split(
+          "\0",
+        );
         const status = new Map<string, TreeChange["status"]>();
         for (let i = 0; i + 1 < statuses.length; i += 2) {
           const code = statuses[i]!;
@@ -150,7 +162,9 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         }
         const changes: TreeChange[] = [];
         // "<added>\t<removed>\t<file>\0"; binary files count "-".
-        for (const entry of (yield* git(root, ["diff-tree", "-r", "-z", "--no-renames", "--numstat", from, to])).split("\0")) {
+        for (const entry of (yield* git(root, ["diff-tree", "-r", "-z", "--no-renames", "--numstat", from, to])).split(
+          "\0",
+        )) {
           const match = /^(-|\d+)\t(-|\d+)\t(.*)$/s.exec(entry);
           if (!match) {
             continue;
@@ -184,7 +198,11 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         return out;
       };
 
-      const restore = Effect.fn("ShadowGit.restore")(function* (root: string, tree: string, files: ReadonlyArray<string>) {
+      const restore = Effect.fn("ShadowGit.restore")(function* (
+        root: string,
+        tree: string,
+        files: ReadonlyArray<string>,
+      ) {
         yield* init(root);
         // Files created since the snapshot must be in the index for restore to delete them.
         yield* addAll(root);
@@ -235,7 +253,12 @@ export class ShadowGit extends Context.Service<ShadowGit, {
         );
       });
 
-      const withFile = Effect.fn("ShadowGit.withFile")(function* (root: string, base: string, file: string, content: string) {
+      const withFile = Effect.fn("ShadowGit.withFile")(function* (
+        root: string,
+        base: string,
+        file: string,
+        content: string,
+      ) {
         const mode = entryOf(yield* git(root, ["ls-tree", "-z", base, "--", file]))?.mode ?? "100644";
         // No --path: the bytes go in as they are, without the work tree's filters.
         const hash = (yield* git(root, ["hash-object", "-w", "--stdin"], undefined, content)).trim();

@@ -96,7 +96,9 @@ button {
   border-radius: 6px;
   font: inherit;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
 }
 button:hover {
   background: var(--vscode-button-hoverBackground);

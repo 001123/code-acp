@@ -9,7 +9,11 @@ export const TurnTrace = Schema.Struct({
   /** The time the turn waited for the user to allow a tool call or answer a question. */
   waiting: Schema.Struct({ asks: Schema.Finite, ms: Schema.Finite }),
   /** The tool calls made, subagents' too; `kinds` counts them by ACP's `ToolKind`. */
-  tools: Schema.Struct({ total: Schema.Finite, failed: Schema.Finite, kinds: Schema.Record(Schema.String, Schema.Finite) }),
+  tools: Schema.Struct({
+    total: Schema.Finite,
+    failed: Schema.Finite,
+    kinds: Schema.Record(Schema.String, Schema.Finite),
+  }),
   subagents: Schema.Finite,
   /** What changed in the work tree during the turn, whoever did it; left out when there are no checkpoints. */
   changes: Schema.optional(Schema.Struct({ files: Schema.Finite, added: Schema.Finite, removed: Schema.Finite })),

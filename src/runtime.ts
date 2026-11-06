@@ -67,7 +67,19 @@ const appLayer = (context: vscode.ExtensionContext, channel: vscode.OutputChanne
     Logger.layer([outputLogger(channel)]),
     AcpTrace.layer,
   );
-  const services = Layer.mergeAll(AgentManager.layer, AutoApprove.layer, AcpRegistry.layer, ClaudeSettings.layer, Completions.layer, Problems.layer, TerminalContext.layer, ShadowGit.layer, Worktrees.layer, UsageLedger.layer, Ccusage.layer).pipe(Layer.provideMerge(base));
+  const services = Layer.mergeAll(
+    AgentManager.layer,
+    AutoApprove.layer,
+    AcpRegistry.layer,
+    ClaudeSettings.layer,
+    Completions.layer,
+    Problems.layer,
+    TerminalContext.layer,
+    ShadowGit.layer,
+    Worktrees.layer,
+    UsageLedger.layer,
+    Ccusage.layer,
+  ).pipe(Layer.provideMerge(base));
   return Layer.mergeAll(CommitMessage.layer, AgentUpdates.layer, Doctor.layer).pipe(Layer.provideMerge(services));
 };
 

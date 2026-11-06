@@ -30,14 +30,28 @@ describe("composer content", () => {
   });
 
   it("appends to an empty composer without a gap", () => {
-    assert.strictEqual(appendContent({ text: " \n", inline: new Map(), attachments: [] }, { text: "two", inline: new Map(), attachments: [] }).text, "two");
+    assert.strictEqual(
+      appendContent(
+        { text: " \n", inline: new Map(), attachments: [] },
+        { text: "two", inline: new Map(), attachments: [] },
+      ).text,
+      "two",
+    );
   });
 
   it("marks image tokens", () => {
-    assert.deepStrictEqual(tokenInfos(new Map([["@a.ts", file("a.ts")], ["@b.png", image("b.png")]])), [
-      { token: "@a.ts", image: false },
-      { token: "@b.png", image: true },
-    ]);
+    assert.deepStrictEqual(
+      tokenInfos(
+        new Map([
+          ["@a.ts", file("a.ts")],
+          ["@b.png", image("b.png")],
+        ]),
+      ),
+      [
+        { token: "@a.ts", image: false },
+        { token: "@b.png", image: true },
+      ],
+    );
   });
 });
 
@@ -67,7 +81,10 @@ describe("tokens", () => {
   });
 
   it("forgets the tokens no longer shown", () => {
-    const tokens = new Map<string, Attachment>([["@a.ts", file("a.ts")], ["@b.ts", file("b.ts")]]);
+    const tokens = new Map<string, Attachment>([
+      ["@a.ts", file("a.ts")],
+      ["@b.ts", file("b.ts")],
+    ]);
     pruneTokens(tokens, new Set(["@b.ts"]));
     assert.deepStrictEqual([...tokens.keys()], ["@b.ts"]);
   });

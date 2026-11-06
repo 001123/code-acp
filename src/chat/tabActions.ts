@@ -31,7 +31,8 @@ export interface TabActionsHost {
 }
 
 /** A tab context menu action. */
-export type TabAction = "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeBelow" | "fork" | "worktree" | "export";
+export type TabAction =
+  "pin" | "unpin" | "rename" | "close" | "closeOthers" | "closeBelow" | "fork" | "worktree" | "export";
 
 /** What the user does to tabs as a whole: opening, selecting, closing and the context menu. */
 export class TabActions {
@@ -60,7 +61,11 @@ export class TabActions {
   });
 
   /** Ends the tab's session and takes it off the list, its worktree going as `fate` says; where it was, or -1 if gone. */
-  private readonly detach = Effect.fn("TabActions.detach")(function* (this: TabActions, tab: Tab, fate: "keep" | "delete") {
+  private readonly detach = Effect.fn("TabActions.detach")(function* (
+    this: TabActions,
+    tab: Tab,
+    fate: "keep" | "delete",
+  ) {
     const { tabs, sessions, tabWorktrees } = this.host;
     if (tab.busy) {
       yield* sessions.cancelTab(tab).pipe(Effect.ignore);
@@ -117,7 +122,11 @@ export class TabActions {
    * Closes the tabs of a group. One question covers their worktrees, unless `fate` is given; applied ones have nothing
    * left to lose, and neither do those without changes.
    */
-  readonly closeGroup = Effect.fn("TabActions.closeGroup")(function* (this: TabActions, group: TabGroup, fate?: "keep" | "delete") {
+  readonly closeGroup = Effect.fn("TabActions.closeGroup")(function* (
+    this: TabActions,
+    group: TabGroup,
+    fate?: "keep" | "delete",
+  ) {
     const { tabs } = this.host;
     const members = tabs.members(group);
     if (members.length === 0) {
@@ -141,14 +150,20 @@ export class TabActions {
   /** Drops every attempt of the group, none being applied: asks first when an agent is still working or changes would go. */
   readonly discardGroup = Effect.fn("TabActions.discardGroup")(function* (this: TabActions, group: TabGroup) {
     const working = this.host.tabs.members(group).some((tab) => tab.busy || tab.attempt === "running");
-    if ((working || (yield* this.holdingChanges(group)) > 0) && !(yield* confirm(t("bestOf.discardConfirm", group.name ?? group.title), t("bestOf.discardAction")))) {
+    if (
+      (working || (yield* this.holdingChanges(group)) > 0) &&
+      !(yield* confirm(t("bestOf.discardConfirm", group.name ?? group.title), t("bestOf.discardAction")))
+    ) {
       return;
     }
     yield* this.closeGroup(group, "delete");
   });
 
   /** How many of the group's worktrees would lose something if deleted. */
-  private readonly holdingChanges = Effect.fn("TabActions.holdingChanges")(function* (this: TabActions, group: TabGroup) {
+  private readonly holdingChanges = Effect.fn("TabActions.holdingChanges")(function* (
+    this: TabActions,
+    group: TabGroup,
+  ) {
     const { tabs, tabWorktrees } = this.host;
     const worktrees = yield* Worktrees;
     let holding = 0;
@@ -165,7 +180,10 @@ export class TabActions {
     return holding;
   });
 
-  private readonly askReleaseGroup = Effect.fn("TabActions.askReleaseGroup")(function* (this: TabActions, group: TabGroup) {
+  private readonly askReleaseGroup = Effect.fn("TabActions.askReleaseGroup")(function* (
+    this: TabActions,
+    group: TabGroup,
+  ) {
     const holding = yield* this.holdingChanges(group);
     if (holding === 0) {
       return "delete" as const;
@@ -173,7 +191,12 @@ export class TabActions {
     const remove = t("bestOf.deleteWorktrees");
     const keep = t("bestOf.keepWorktrees");
     const picked = yield* thenable(() =>
-      vscode.window.showWarningMessage(t("bestOf.closeConfirm", group.name ?? group.title, holding), { modal: true }, remove, keep),
+      vscode.window.showWarningMessage(
+        t("bestOf.closeConfirm", group.name ?? group.title, holding),
+        { modal: true },
+        remove,
+        keep,
+      ),
     );
     return picked === remove ? ("delete" as const) : picked === keep ? ("keep" as const) : ("cancel" as const);
   });
@@ -216,7 +239,9 @@ export class TabActions {
         // A group counts as one: its tabs stay with `tab`, or close with one question.
         const siblings = tab.group ? tabs.members(tab.group) : [tab];
         const last = tabs.indexOf(siblings.at(-1)!);
-        const targets = tabs.all.filter((each, i) => !each.pinned && !siblings.includes(each) && (action === "closeOthers" || i > last));
+        const targets = tabs.all.filter(
+          (each, i) => !each.pinned && !siblings.includes(each) && (action === "closeOthers" || i > last),
+        );
         if (targets.length && tabs.active !== tab && targets.includes(tabs.active)) {
           yield* this.selectTab(tab);
         }
@@ -252,7 +277,11 @@ export class TabActions {
   readonly showAttention = Effect.fn("TabActions.showAttention")(function* (this: TabActions) {
     const { tabs, permissions, attention } = this.host;
     const active = tabs.active;
-    const tab = permissions.owners[0] ?? attention.owners("finished")[0] ?? (active.busy ? undefined : tabs.all.find((t) => t.busy)) ?? active;
+    const tab =
+      permissions.owners[0] ??
+      attention.owners("finished")[0] ??
+      (active.busy ? undefined : tabs.all.find((t) => t.busy)) ??
+      active;
     yield* this.reveal(tab);
   });
 }

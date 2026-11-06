@@ -16,7 +16,14 @@ const memento = (): vscode.Memento => {
 };
 
 const select = (id: string, category: string | undefined, values: string[]) =>
-  ({ id, name: id, category, type: "select", currentValue: values[0], options: values.map((value) => ({ value, name: value })) }) as acp.SessionConfigOption;
+  ({
+    id,
+    name: id,
+    category,
+    type: "select",
+    currentValue: values[0],
+    options: values.map((value) => ({ value, name: value })),
+  }) as acp.SessionConfigOption;
 
 const options = [
   select("model", "model", ["opus", "sonnet"]),

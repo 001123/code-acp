@@ -81,7 +81,11 @@ export class TabAgents {
     return yield* this.host.agents.get(agentId, this.startAgent(agentId, tab));
   });
 
-  private readonly startAgent = Effect.fn("TabAgents.startAgent")(function* (this: TabAgents, agentId: string, tab: Tab) {
+  private readonly startAgent = Effect.fn("TabAgents.startAgent")(function* (
+    this: TabAgents,
+    agentId: string,
+    tab: Tab,
+  ) {
     const command = yield* this.host.manager.command(agentId);
     if (!command) {
       return yield* new NoAgentError();
@@ -107,7 +111,9 @@ export class TabAgents {
           return Effect.succeed(CANCELLED);
         }
         const known = this.host.follower.known(tab, req.toolCall.toolCallId);
-        const approval = AutoApprove.use((rules) => rules.approval(req, { cwd: tab.cwd, inWorktree: tab.worktree !== undefined, known }));
+        const approval = AutoApprove.use((rules) =>
+          rules.approval(req, { cwd: tab.cwd, inWorktree: tab.worktree !== undefined, known }),
+        );
         return Effect.promise(() => this.host.runtime.runPromise(approval)).pipe(
           Effect.flatMap(
             Option.match({
@@ -163,10 +169,7 @@ export class TabAgents {
     const started: RunningAgent = { agent, scope, agentId };
     running = started;
     // Interrupted when the scope closes, so only exits we did not cause are reported.
-    yield* agent.exited.pipe(
-      Effect.andThen(Effect.sync(() => this.onAgentExit(started))),
-      Effect.forkIn(scope),
-    );
+    yield* agent.exited.pipe(Effect.andThen(Effect.sync(() => this.onAgentExit(started))), Effect.forkIn(scope));
     return started;
   });
 
@@ -174,7 +177,12 @@ export class TabAgents {
    * Asks the user before opening a link the agent sent: an agent never opens one by itself, and one that isn't safe is
    * refused unseen. Accepting tells the agent the link was opened, not that what it is for is done.
    */
-  private readonly elicitUrl = Effect.fn("TabAgents.elicitUrl")(function* (this: TabAgents, tab: Tab, request: UrlElicitation, signal: AbortSignal) {
+  private readonly elicitUrl = Effect.fn("TabAgents.elicitUrl")(function* (
+    this: TabAgents,
+    tab: Tab,
+    request: UrlElicitation,
+    signal: AbortSignal,
+  ) {
     const url = Option.getOrUndefined(parseElicitationUrl(request.url, readSettings().allowedHttpHosts));
     if (!url) {
       this.host.postTab(tab, { type: "notice", key: "chat.elicitation.unsafeUrl", args: [request.url] });
@@ -357,7 +365,10 @@ export class TabAgents {
   });
 
   /** Installs the updates, then offers to restart the updated agents that are running on the old version. */
-  readonly updateAgents = Effect.fn("TabAgents.updateAgents")(function* (this: TabAgents, updates: ReadonlyArray<AgentUpdate>) {
+  readonly updateAgents = Effect.fn("TabAgents.updateAgents")(function* (
+    this: TabAgents,
+    updates: ReadonlyArray<AgentUpdate>,
+  ) {
     const updated = yield* this.host.updates.install(updates);
     if (!updated.length) {
       return;

@@ -59,10 +59,13 @@ function rank(query: string, name: string, path: string): number | undefined {
 }
 
 /** What the composer offers after "@" (workspace files) and "$" (skills). */
-export class Completions extends Context.Service<Completions, {
-  readonly files: (query: string) => Effect.Effect<ReadonlyArray<FileSuggestion>, VscodeError>;
-  readonly skills: Effect.Effect<ReadonlyArray<SkillSuggestion>>;
-}>()("code-acp/Completions") {
+export class Completions extends Context.Service<
+  Completions,
+  {
+    readonly files: (query: string) => Effect.Effect<ReadonlyArray<FileSuggestion>, VscodeError>;
+    readonly skills: Effect.Effect<ReadonlyArray<SkillSuggestion>>;
+  }
+>()("code-acp/Completions") {
   static readonly layer = Layer.effect(
     Completions,
     Effect.gen(function* () {
@@ -79,7 +82,12 @@ export class Completions extends Context.Service<Completions, {
             let dir = path.dirname(rel);
             let folder = vscode.Uri.joinPath(uri, "..");
             while (dir !== "." && dir !== "/" && !entries.has(`${dir}/`)) {
-              entries.set(`${dir}/`, { uri: folder.toString(), name: path.basename(dir), path: `${dir}/`, folder: true });
+              entries.set(`${dir}/`, {
+                uri: folder.toString(),
+                name: path.basename(dir),
+                path: `${dir}/`,
+                folder: true,
+              });
               dir = path.dirname(dir);
               folder = vscode.Uri.joinPath(folder, "..");
             }
@@ -125,7 +133,9 @@ export class Completions extends Context.Service<Completions, {
       // Where Claude Code, Codex and other agents look for skills; the first one with a name wins.
       const skillRoots = () => {
         const home = os.homedir();
-        const workspace = (vscode.workspace.workspaceFolders ?? []).filter((f) => f.uri.scheme === "file").map((f) => f.uri.fsPath);
+        const workspace = (vscode.workspace.workspaceFolders ?? [])
+          .filter((f) => f.uri.scheme === "file")
+          .map((f) => f.uri.fsPath);
         return [
           ...workspace.flatMap((dir) => [".claude", ".agents", ".codex"].map((d) => path.join(dir, d, "skills"))),
           path.join(process.env.CLAUDE_CONFIG_DIR || path.join(home, ".claude"), "skills"),

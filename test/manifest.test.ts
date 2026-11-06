@@ -12,8 +12,14 @@ describe("localized manifest strings", () => {
   const used = [...manifestText.matchAll(/"%([^%"]+)%"/g)].map((match) => match[1]!);
 
   it("every %key% in package.json exists in both languages", () => {
-    assert.deepStrictEqual(used.filter((key) => !(key in en)), []);
-    assert.deepStrictEqual(used.filter((key) => !(key in vi)), []);
+    assert.deepStrictEqual(
+      used.filter((key) => !(key in en)),
+      [],
+    );
+    assert.deepStrictEqual(
+      used.filter((key) => !(key in vi)),
+      [],
+    );
   });
 
   it("both languages have the same keys", () => {
@@ -22,11 +28,18 @@ describe("localized manifest strings", () => {
 });
 
 describe("walkthrough", () => {
-  const steps: ReadonlyArray<Record<string, any>> = contributes.walkthroughs.flatMap((walkthrough: any) => walkthrough.steps);
+  const steps: ReadonlyArray<Record<string, any>> = contributes.walkthroughs.flatMap(
+    (walkthrough: any) => walkthrough.steps,
+  );
   const commands = new Set<string>(contributes.commands.map((command: any) => command.command));
-  const views = new Set<string>(Object.values<any[]>(contributes.views).flat().map((view) => view.id));
+  const views = new Set<string>(
+    Object.values<any[]>(contributes.views)
+      .flat()
+      .map((view) => view.id),
+  );
   // VS Code generates "<view id>.focus" for each view.
-  const runnable = (command: string) => commands.has(command) || (command.endsWith(".focus") && views.has(command.slice(0, -".focus".length)));
+  const runnable = (command: string) =>
+    commands.has(command) || (command.endsWith(".focus") && views.has(command.slice(0, -".focus".length)));
 
   it("the extension's command opens a walkthrough it contributes", () => {
     assert.isTrue(commands.has("codeAcp.openWalkthrough"));
@@ -44,7 +57,10 @@ describe("walkthrough", () => {
       for (const text of [en[key]!, vi[key]!]) {
         const links = [...text.matchAll(/\]\(command:([^)]+)\)/g)].map((match) => match[1]!);
         assert.isNotEmpty(links);
-        assert.deepStrictEqual(links.filter((command) => !runnable(command)), []);
+        assert.deepStrictEqual(
+          links.filter((command) => !runnable(command)),
+          [],
+        );
       }
     });
 

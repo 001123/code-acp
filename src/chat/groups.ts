@@ -37,7 +37,12 @@ export class TabGroups {
   constructor(private readonly host: GroupsHost) {}
 
   /** Sends the prompt to each of `attempts`; what `from` held goes back to its composer if there aren't two to compare. */
-  readonly start = Effect.fn("TabGroups.start")(function* (this: TabGroups, from: Tab, parts: ReadonlyArray<PromptPart>, attempts: ReadonlyArray<AttemptPick>) {
+  readonly start = Effect.fn("TabGroups.start")(function* (
+    this: TabGroups,
+    from: Tab,
+    parts: ReadonlyArray<PromptPart>,
+    attempts: ReadonlyArray<AttemptPick>,
+  ) {
     const giveBack = () => this.host.turns.loadComposer(from, { parts: [...parts] });
     const base = from.worktree?.base ?? folderOf(from.cwd)?.path;
     if (base === undefined || !(yield* (yield* Worktrees).isRepo(base))) {
@@ -117,7 +122,10 @@ export class TabGroups {
 
   /** Counts what each of the group's tabs changed. */
   readonly postDiffs = Effect.fn("TabGroups.postDiffs")(function* (this: TabGroups, group: TabGroup) {
-    yield* Effect.forEach(this.host.tabs.members(group), (tab) => this.postDiff(tab), { concurrency: DIFF_CONCURRENCY, discard: true });
+    yield* Effect.forEach(this.host.tabs.members(group), (tab) => this.postDiff(tab), {
+      concurrency: DIFF_CONCURRENCY,
+      discard: true,
+    });
   });
 
   readonly select = Effect.fn("TabGroups.select")(function* (this: TabGroups, group: TabGroup) {
@@ -156,7 +164,9 @@ export class TabGroups {
     yield* this.host.tabWorktrees.settle(tab, worktree, "applied", path.basename(worktree.base));
     const close = t("bestOf.closeAndDelete");
     const name = worktree.branch ?? path.basename(worktree.root);
-    const picked = yield* thenable(() => vscode.window.showInformationMessage(t("worktree.applied", name, path.basename(worktree.base)), close));
+    const picked = yield* thenable(() =>
+      vscode.window.showInformationMessage(t("worktree.applied", name, path.basename(worktree.base)), close),
+    );
     if (picked === close) {
       yield* this.host.closeGroup(group, "delete");
     }

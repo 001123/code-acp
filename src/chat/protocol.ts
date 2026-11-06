@@ -201,8 +201,7 @@ export type ViewMessage = Extract<
  * the link, declined, or dismissed it (the agent stops what asked).
  */
 export type ElicitationAnswer =
-  | { action: "accept"; content?: Record<string, ElicitationValue> }
-  | { action: "decline" | "cancel" };
+  { action: "accept"; content?: Record<string, ElicitationValue> } | { action: "decline" | "cancel" };
 
 export type ElicitationValue = string | number | boolean | string[];
 
@@ -342,7 +341,16 @@ export type Attachment =
   /** Lines selected in an editor; `startLine`/`endLine` are 1-based and inclusive. */
   | { kind: "snippet"; uri: string; name: string; languageId: string; startLine: number; endLine: number; text: string }
   /** Terminal text: a command's output, or a selection (no `commandLine`). */
-  | { kind: "terminal"; name: string; terminal: string; shell?: string; commandLine?: string; cwd?: string; exitCode?: number; text: string }
+  | {
+      kind: "terminal";
+      name: string;
+      terminal: string;
+      shell?: string;
+      commandLine?: string;
+      cwd?: string;
+      exitCode?: number;
+      text: string;
+    }
   /** Problems VS Code reports (errors, warnings), one per line. */
   | { kind: "problems"; name: string; text: string };
 

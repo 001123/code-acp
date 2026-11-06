@@ -21,7 +21,17 @@ const picks = new Map();
 const pickedOptions = (sessionId) => {
   const pick = picks.get(sessionId) ?? { model: "small", effort: "low" };
   return [
-    { type: "select", id: "model", name: "Model", category: "model", currentValue: pick.model, options: [{ value: "small", name: "Small" }, { value: "big", name: "Big" }] },
+    {
+      type: "select",
+      id: "model",
+      name: "Model",
+      category: "model",
+      currentValue: pick.model,
+      options: [
+        { value: "small", name: "Small" },
+        { value: "big", name: "Big" },
+      ],
+    },
     {
       type: "select",
       id: "effort",
@@ -32,11 +42,21 @@ const pickedOptions = (sessionId) => {
     },
   ];
 };
-const MODES = { currentModeId: "ask", availableModes: [{ id: "ask", name: "Ask" }, { id: "code", name: "Code", description: "Edits files" }] };
+const MODES = {
+  currentModeId: "ask",
+  availableModes: [
+    { id: "ask", name: "Ask" },
+    { id: "code", name: "Code", description: "Edits files" },
+  ],
+};
 const sessionOptions = () => ({
   ...(process.env.MOCK_MODES ? { modes: { ...MODES, currentModeId: mode } } : {}),
   ...(process.env.MOCK_MODES === "both"
-    ? { configOptions: [{ type: "select", id: "real", name: "Real", currentValue: "x", options: [{ value: "x", name: "X" }] }] }
+    ? {
+        configOptions: [
+          { type: "select", id: "real", name: "Real", currentValue: "x", options: [{ value: "x", name: "X" }] },
+        ],
+      }
     : {}),
 });
 
@@ -56,7 +76,11 @@ acp
       },
       ...(process.env.MOCK_LOGOUT === "1" ? { auth: { logout: {} } } : {}),
     },
-    authMethods: [process.env.MOCK_TERMINAL_AUTH === "1" ? { id: "login", name: "Log in", type: "terminal", args: ["--login"] } : { id: "login", name: "Log in" }],
+    authMethods: [
+      process.env.MOCK_TERMINAL_AUTH === "1"
+        ? { id: "login", name: "Log in", type: "terminal", args: ["--login"] }
+        : { id: "login", name: "Log in" },
+    ],
     _meta: { clientInfo: params.clientInfo, clientCapabilities: params.clientCapabilities, pid: process.pid },
   }))
   .onRequest(acp.methods.agent.session.new, ({ params }) => {
@@ -65,7 +89,12 @@ acp
     }
     const sessionId = `s${++sessions}`;
     record(`new ${sessionId} ${params.cwd}`);
-    return { sessionId, ...sessionOptions(), ...(process.env.MOCK_MODELS ? { configOptions: pickedOptions(sessionId) } : {}), _meta: { cwd: params.cwd, mcpServers: params.mcpServers } };
+    return {
+      sessionId,
+      ...sessionOptions(),
+      ...(process.env.MOCK_MODELS ? { configOptions: pickedOptions(sessionId) } : {}),
+      _meta: { cwd: params.cwd, mcpServers: params.mcpServers },
+    };
   })
   .onRequest(acp.methods.agent.session.setConfigOption, ({ params }) => {
     const pick = picks.get(params.sessionId) ?? { model: "small", effort: "low" };
@@ -76,7 +105,9 @@ acp
     if (process.env.MOCK_LIST_FAIL === "1") {
       throw acp.RequestError.internalError(undefined, "cannot list");
     }
-    return { sessions: [...past].map((sessionId) => ({ sessionId, cwd: process.cwd(), title: `Session ${sessionId}` })) };
+    return {
+      sessions: [...past].map((sessionId) => ({ sessionId, cwd: process.cwd(), title: `Session ${sessionId}` })),
+    };
   })
   .onRequest(acp.methods.agent.session.delete, ({ params }) => {
     record(`delete ${params.sessionId}`);
@@ -162,18 +193,27 @@ acp
           mode: link ? "url" : arg === "future" ? "_future" : "form",
           message: "Which one?",
           ...(link
-            ? { elicitationId: "e1", url: arg === "unsafe" ? "http://example.com/login" : "https://example.com/login?next=a%26b" }
+            ? {
+                elicitationId: "e1",
+                url: arg === "unsafe" ? "http://example.com/login" : "https://example.com/login?next=a%26b",
+              }
             : arg === "future"
               ? {}
               : {
-                requestedSchema: {
-                  type: "object",
-                  properties: {
-                    question_0: { type: "string", oneOf: [{ const: "a", title: "A" }, { const: "b", title: "B" }] },
-                    question_0_custom: { type: "string", title: "Other" },
+                  requestedSchema: {
+                    type: "object",
+                    properties: {
+                      question_0: {
+                        type: "string",
+                        oneOf: [
+                          { const: "a", title: "A" },
+                          { const: "b", title: "B" },
+                        ],
+                      },
+                      question_0_custom: { type: "string", title: "Other" },
+                    },
                   },
-                },
-              }),
+                }),
         });
         // Done some other way, e.g. signed in from another window, while the question is still open.
         if (arg === "finished") {
@@ -199,10 +239,19 @@ acp
         }
         return { stopReason: "end_turn" };
       case "compact": {
-        const update = (update) => client.notify(acp.methods.client.session.update, { sessionId: params.sessionId, update });
+        const update = (update) =>
+          client.notify(acp.methods.client.session.update, { sessionId: params.sessionId, update });
         await update({ sessionUpdate: "compaction_update", compactionId: "c1", status: "in_progress" });
-        await update({ sessionUpdate: "compaction_summary_chunk", compactionId: "c1", content: { type: "text", text: "the " } });
-        await update({ sessionUpdate: "compaction_summary_chunk", compactionId: "c1", content: { type: "text", text: "summary" } });
+        await update({
+          sessionUpdate: "compaction_summary_chunk",
+          compactionId: "c1",
+          content: { type: "text", text: "the " },
+        });
+        await update({
+          sessionUpdate: "compaction_summary_chunk",
+          compactionId: "c1",
+          content: { type: "text", text: "summary" },
+        });
         await update({ sessionUpdate: "compaction_update", compactionId: "c1", status: "completed" });
         return { stopReason: "end_turn" };
       }

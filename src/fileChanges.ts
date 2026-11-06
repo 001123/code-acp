@@ -298,7 +298,11 @@ const savedDocument = Effect.fn("savedDocument")(function* (file: string) {
 });
 
 /** Accepts one change to `file`: it is no longer listed. False when the file no longer has that change. */
-export const keepHunk = Effect.fn("ChangeSet.keepHunk")(function* (changes: ChangeSet, file: string, hunk: ChangeBlock) {
+export const keepHunk = Effect.fn("ChangeSet.keepHunk")(function* (
+  changes: ChangeSet,
+  file: string,
+  hunk: ChangeBlock,
+) {
   const document = yield* savedDocument(file);
   const { root, base } = changes;
   const rel = changes.relative(file);
@@ -314,7 +318,11 @@ export const keepHunk = Effect.fn("ChangeSet.keepHunk")(function* (changes: Chan
 });
 
 /** Takes one change out of `file`. False when the file no longer has that change. */
-export const undoHunk = Effect.fn("ChangeSet.undoHunk")(function* (changes: ChangeSet, file: string, hunk: ChangeBlock) {
+export const undoHunk = Effect.fn("ChangeSet.undoHunk")(function* (
+  changes: ChangeSet,
+  file: string,
+  hunk: ChangeBlock,
+) {
   const document = yield* savedDocument(file);
   const rel = changes.relative(file);
   const text = document.getText();
@@ -411,7 +419,9 @@ export class BeforeDocuments implements vscode.TextDocumentContentProvider, vsco
     const right = after === undefined ? vscode.Uri.file(file) : this.add(file, after);
     const title = t("changes.diffTitle", path.basename(file));
     const selection = line === undefined ? undefined : new vscode.Range(line - 1, 0, line - 1, 0);
-    yield* thenable(() => vscode.commands.executeCommand("vscode.diff", left, right, title, { preview: true, selection }));
+    yield* thenable(() =>
+      vscode.commands.executeCommand("vscode.diff", left, right, title, { preview: true, selection }),
+    );
   });
 
   private add(file: string, content: string): vscode.Uri {

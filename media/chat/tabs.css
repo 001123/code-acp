@@ -267,7 +267,9 @@
     var(--vscode-progressBar-background) 25%,
     color-mix(in srgb, var(--vscode-progressBar-background) 20%, transparent) 50%
   );
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
   animation: tab-sweep 2.4s linear infinite;
 }
 @keyframes tab-sweep {

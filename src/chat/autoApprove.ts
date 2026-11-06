@@ -27,7 +27,11 @@ const PROTECTED_FOLDERS: ReadonlyArray<string> = [".git", ".vscode"];
 export type Verdict = "allow" | "ifPathsSafe" | "ask";
 
 /** What the rules say about a tool call of `kind`. */
-export const verdictOf = (rules: ApprovalRules, kind: acp.ToolKind | null | undefined, inWorktree: boolean): Verdict => {
+export const verdictOf = (
+  rules: ApprovalRules,
+  kind: acp.ToolKind | null | undefined,
+  inWorktree: boolean,
+): Verdict => {
   if (!kind) {
     return "ask";
   }
@@ -103,7 +107,10 @@ export class AutoApprove extends Context.Service<
     readonly workspaceRules: Effect.Effect<ApprovalRules>;
     setWorkspaceRules(rules: ApprovalRules): Effect.Effect<void, VscodeError>;
     /** The answer the rules give to `request`, if any. Picks `allow_once`, so that the agent keeps no rule of its own. */
-    approval(request: acp.RequestPermissionRequest, context: ApprovalContext): Effect.Effect<Option.Option<AutoApproval>>;
+    approval(
+      request: acp.RequestPermissionRequest,
+      context: ApprovalContext,
+    ): Effect.Effect<Option.Option<AutoApproval>>;
   }
 >()("code-acp/AutoApprove") {
   static readonly layer = Layer.effect(

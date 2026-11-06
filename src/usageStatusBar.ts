@@ -18,7 +18,10 @@ export function usageStatusView(tab: Totals | undefined, today: Totals): UsageSt
     "",
     t("chat.showUsage"),
   ];
-  return { text: `$(graph) ${t("usage.tileDetail", compact.format(tokens), exact.format(turns))}`, tooltip: lines.join("\n") };
+  return {
+    text: `$(graph) ${t("usage.tileDetail", compact.format(tokens), exact.format(turns))}`,
+    tooltip: lines.join("\n"),
+  };
 }
 
 /** The status bar item with the active tab's tokens and turns; clicking it runs `command`, which opens the usage page. */

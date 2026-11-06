@@ -34,7 +34,9 @@ export const saveConversation = Effect.fn("saveConversation")(function* (tab: Ta
   }
   yield* thenable(() => vscode.workspace.fs.writeFile(target, new TextEncoder().encode(markdown)));
   const open = t("chat.exportOpen");
-  const picked = yield* thenable(() => vscode.window.showInformationMessage(t("chat.exported", path.basename(target.path)), open));
+  const picked = yield* thenable(() =>
+    vscode.window.showInformationMessage(t("chat.exported", path.basename(target.path)), open),
+  );
   if (picked === open) {
     yield* thenable(() => vscode.commands.executeCommand("vscode.open", target));
   }

@@ -8,7 +8,17 @@ import { post } from "./post";
 import { attemptStatus, diffTotals, memberTitle } from "./tabRows";
 import type { TabState } from "./tabs";
 
-function Attempt({ tab, state, agents, onOpen }: { tab: TabInfo; state: TabState | undefined; agents: AgentChoices["agents"]; onOpen: (id: number) => void }) {
+function Attempt({
+  tab,
+  state,
+  agents,
+  onOpen,
+}: {
+  tab: TabInfo;
+  state: TabState | undefined;
+  agents: AgentChoices["agents"];
+  onOpen: (id: number) => void;
+}) {
   const { t } = useL10n();
   const diff = state?.worktreeDiff;
   const status = attemptStatus(tab, state);
@@ -30,18 +40,25 @@ function Attempt({ tab, state, agents, onOpen }: { tab: TabInfo; state: TabState
       ) : (
         <details className="attempt-files">
           <summary>
-            {t("bestOf.files", files.length)} <span className="diff-added">+{totals!.added}</span> <span className="diff-removed">−{totals!.removed}</span>
+            {t("bestOf.files", files.length)} <span className="diff-added">+{totals!.added}</span>{" "}
+            <span className="diff-removed">−{totals!.removed}</span>
           </summary>
           <ul>
             {files.map((file) => (
               <li key={file.path}>
-                <button type="button" title={file.path} disabled={file.added === undefined} onClick={() => post({ type: "openWorktreeDiff", tab: tab.id, path: file.path })}>
+                <button
+                  type="button"
+                  title={file.path}
+                  disabled={file.added === undefined}
+                  onClick={() => post({ type: "openWorktreeDiff", tab: tab.id, path: file.path })}
+                >
                   <span className="attempt-path">{file.path}</span>
                   {file.added === undefined ? (
                     <span className="attempt-count">{t("bestOf.binary")}</span>
                   ) : (
                     <span className="attempt-count">
-                      <span className="diff-added">+{file.added}</span> <span className="diff-removed">−{file.removed}</span>
+                      <span className="diff-added">+{file.added}</span>{" "}
+                      <span className="diff-removed">−{file.removed}</span>
                     </span>
                   )}
                 </button>
@@ -86,10 +103,20 @@ export function GroupPanel({
     <div id="group-panel">
       <div id="group-header">
         <span id="group-title">{group.title}</span>
-        <button className="icon-btn" title={t("bestOf.refresh")} aria-label={t("bestOf.refresh")} onClick={() => post({ type: "refreshGroup", group: group.id })}>
+        <button
+          className="icon-btn"
+          title={t("bestOf.refresh")}
+          aria-label={t("bestOf.refresh")}
+          onClick={() => post({ type: "refreshGroup", group: group.id })}
+        >
           <Icon svg={refreshIcon} />
         </button>
-        <button className="icon-btn" title={t("bestOf.closeGroup")} aria-label={t("bestOf.closeGroup")} onClick={() => post({ type: "closeGroup", group: group.id })}>
+        <button
+          className="icon-btn"
+          title={t("bestOf.closeGroup")}
+          aria-label={t("bestOf.closeGroup")}
+          onClick={() => post({ type: "closeGroup", group: group.id })}
+        >
           <Icon svg={xIcon} />
         </button>
       </div>
@@ -106,7 +133,12 @@ export function GroupPanel({
       </div>
       {!members.some((tab) => tab.applied) && (
         <div id="group-actions">
-          <button type="button" className="secondary" title={t("bestOf.discardTitle")} onClick={() => post({ type: "discardGroup", group: group.id })}>
+          <button
+            type="button"
+            className="secondary"
+            title={t("bestOf.discardTitle")}
+            onClick={() => post({ type: "discardGroup", group: group.id })}
+          >
             {t("bestOf.discardAll")}
           </button>
         </div>

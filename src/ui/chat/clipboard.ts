@@ -54,7 +54,10 @@ export function pastedContent(
     names.set(token, next);
     inline.push({ token: next, attachment });
   }
-  const parts = splitTokens(text, [...names.keys()].map((token) => ({ token })));
+  const parts = splitTokens(
+    text,
+    [...names.keys()].map((token) => ({ token })),
+  );
   return { text: parts.map((p) => (typeof p === "string" ? p : names.get(p.token)!)).join(""), inline };
 }
 
@@ -108,7 +111,11 @@ function copiedHtml(root: HTMLElement): string {
  * Copies a user message: its Markdown as plain text and, when it has images, its rendered `body` as HTML with the
  * images in it; a single image also goes as PNG, for apps that only take an image.
  */
-export async function copyMessage(text: string, tokens: readonly Token[], body: Element | null | undefined): Promise<void> {
+export async function copyMessage(
+  text: string,
+  tokens: readonly Token[],
+  body: Element | null | undefined,
+): Promise<void> {
   const images = new Map(tokens.flatMap((x) => (x.src?.startsWith("data:image/") ? [[x.token, x.src] as const] : [])));
   if (!body || images.size === 0) return navigator.clipboard.writeText(text);
   const root = body.cloneNode(true) as HTMLElement;
@@ -135,13 +142,20 @@ export async function copyMessage(text: string, tokens: readonly Token[], body: 
 /** On copying a selection in `within` that takes in images, puts them in the copied HTML. True when it did. */
 export function copySelection(e: ClipboardEvent, within: Element): boolean {
   const sel = window.getSelection();
-  if (!e.clipboardData || !sel || sel.isCollapsed || sel.rangeCount === 0 || !within.contains(sel.anchorNode)) return false;
+  if (!e.clipboardData || !sel || sel.isCollapsed || sel.rangeCount === 0 || !within.contains(sel.anchorNode))
+    return false;
   const range = sel.getRangeAt(0);
   const marks = [...within.querySelectorAll("mark.token")].filter((m) => range.intersectsNode(m));
   if (!marks.some((m) => tokenImages.has(m))) return false;
   const root = document.createElement("div");
   root.append(range.cloneContents());
-  if (inlineImages(root, marks.map((m) => tokenImages.get(m))).length === 0) return false;
+  if (
+    inlineImages(
+      root,
+      marks.map((m) => tokenImages.get(m)),
+    ).length === 0
+  )
+    return false;
   e.clipboardData.setData("text/plain", sel.toString());
   e.clipboardData.setData("text/html", copiedHtml(root));
   e.preventDefault();

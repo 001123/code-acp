@@ -13,7 +13,20 @@ import { TabList, type Tab } from "../src/chat/tabs";
 import { TabWorktrees } from "../src/chat/worktrees";
 import { ShadowGit } from "../src/checkpoints";
 import { ExtensionCtx } from "../src/runtime";
-import { attemptBranchName, branchSlug, fallbackPrText, freeBranchName, intoWorktree, isManaged, outermostEntries, parseNumstat, parsePrText, parseWorktreeList, Worktrees, type ProjectCommand } from "../src/worktrees";
+import {
+  attemptBranchName,
+  branchSlug,
+  fallbackPrText,
+  freeBranchName,
+  intoWorktree,
+  isManaged,
+  outermostEntries,
+  parseNumstat,
+  parsePrText,
+  parseWorktreeList,
+  Worktrees,
+  type ProjectCommand,
+} from "../src/worktrees";
 import { makeExtensionCtx } from "./helpers";
 import { __test, Uri, workspace } from "./stubs/vscode";
 
@@ -21,13 +34,16 @@ const PROJECT_COMMAND = "codeAcp.worktreeProjectSetupCommand";
 const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "code-acp-worktrees-")));
 const realHome = process.env.HOME;
 
-const platform = NodeChildProcessSpawner.layer.pipe(Layer.provideMerge(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)));
+const platform = NodeChildProcessSpawner.layer.pipe(
+  Layer.provideMerge(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+);
 const layer = Layer.mergeAll(
   Worktrees.layer,
   ShadowGit.layer.pipe(Layer.provide(Layer.succeed(ExtensionCtx, makeExtensionCtx(path.join(scratch, "storage"))))),
 ).pipe(Layer.provideMerge(platform));
 
-const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" });
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd, encoding: "utf8" });
 
 let count = 0;
 /** A repository with one commit holding `a.txt`, `sub/b.txt` and a `.gitignore`. */
@@ -73,12 +89,10 @@ describe("worktree helpers", () => {
   });
 
   it("keeps the outermost entries of a listing, without their slashes", () => {
-    assert.deepStrictEqual(outermostEntries([".env", "ignored/deep/", "ignored/deep/.env", "ignored/deeper", "node_modules/"]), [
-      ".env",
-      "ignored/deep",
-      "ignored/deeper",
-      "node_modules",
-    ]);
+    assert.deepStrictEqual(
+      outermostEntries([".env", "ignored/deep/", "ignored/deep/.env", "ignored/deeper", "node_modules/"]),
+      [".env", "ignored/deep", "ignored/deeper", "node_modules"],
+    );
   });
 
   it("maps a file of the base folder into the worktree", () => {
@@ -120,7 +134,10 @@ describe("branch names", () => {
   });
 
   it("puts the branches of a comparison in a folder of their own", () => {
-    assert.strictEqual(attemptBranchName("Fix login", "Gemini 4 Argon · High"), "compare/fix-login-gemini-4-argon-high");
+    assert.strictEqual(
+      attemptBranchName("Fix login", "Gemini 4 Argon · High"),
+      "compare/fix-login-gemini-4-argon-high",
+    );
     assert.strictEqual(attemptBranchName("", "gemini"), "compare/gemini");
     assert.strictEqual(attemptBranchName("Fix login", ""), "compare/fix-login");
     assert.strictEqual(attemptBranchName("", ""), "compare/attempt");
@@ -145,7 +162,10 @@ describe("Worktrees", () => {
       assert.isFalse(fs.existsSync(cwd));
       assert.strictEqual(git(named.root, "symbolic-ref", "--short", "HEAD").trim(), named.branch);
       // Named once; a later prompt doesn't change it.
-      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(named, "something else", true)), named);
+      assert.deepStrictEqual(
+        yield* Worktrees.use((worktrees) => worktrees.nameAfter(named, "something else", true)),
+        named,
+      );
       yield* Worktrees.use((worktrees) => worktrees.remove(named));
       assert.notInclude(git(dir, "branch"), "sua-loi");
     }).pipe(Effect.provide(layer)),
@@ -154,7 +174,9 @@ describe("Worktrees", () => {
   it.effect("numbers the branch when the name is taken", () =>
     Effect.gen(function* () {
       const dir = makeRepo();
-      const nameNew = created(dir).pipe(Effect.flatMap(({ worktree }) => Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true))));
+      const nameNew = created(dir).pipe(
+        Effect.flatMap(({ worktree }) => Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true))),
+      );
       const first = yield* nameNew;
       const second = yield* nameNew;
       assert.strictEqual(first.branch, "code-acp/fix-it");
@@ -187,7 +209,9 @@ describe("Worktrees", () => {
   it.effect("names a comparison's folder after its branch", () =>
     Effect.gen(function* () {
       const dir = makeRepo();
-      const { worktree } = yield* Worktrees.use((worktrees) => worktrees.create(dir, "compare/fix-gemini")).pipe(Effect.map(Option.getOrThrow));
+      const { worktree } = yield* Worktrees.use((worktrees) => worktrees.create(dir, "compare/fix-gemini")).pipe(
+        Effect.map(Option.getOrThrow),
+      );
       assert.strictEqual(path.basename(worktree.root), "fix-gemini");
     }).pipe(Effect.provide(layer)),
   );
@@ -200,7 +224,10 @@ describe("Worktrees", () => {
       fs.writeFileSync(path.join(cwd, "new.txt"), "x\n");
       git(cwd, "add", "--all");
       git(cwd, "commit", "--quiet", "-m", "work");
-      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true)), worktree);
+      assert.deepStrictEqual(
+        yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true)),
+        worktree,
+      );
     }).pipe(Effect.provide(layer)),
   );
 
@@ -210,14 +237,19 @@ describe("Worktrees", () => {
       const root = path.join(scratch, `own-${count++}`);
       git(dir, "worktree", "add", "--quiet", "-b", "code-acp/abc123", root);
       const worktree = { root: fs.realpathSync(root), branch: "code-acp/abc123", base: dir };
-      assert.deepStrictEqual(yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true)), worktree);
+      assert.deepStrictEqual(
+        yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true)),
+        worktree,
+      );
     }).pipe(Effect.provide(layer)),
   );
 
   it.effect("creates a worktree on a branch of the given name, in a folder of its own", () =>
     Effect.gen(function* () {
       const dir = makeRepo();
-      const create = Worktrees.use((worktrees) => worktrees.create(dir, "compare/fix-gemini")).pipe(Effect.map(Option.getOrThrow));
+      const create = Worktrees.use((worktrees) => worktrees.create(dir, "compare/fix-gemini")).pipe(
+        Effect.map(Option.getOrThrow),
+      );
       const first = yield* create;
       const second = yield* create;
       assert.strictEqual(first.worktree.branch, "code-acp/compare/fix-gemini");
@@ -324,7 +356,10 @@ describe("Worktrees", () => {
   );
 
   it("reads git's list of changed files", () => {
-    assert.deepStrictEqual(parseNumstat("1\t2\ta b.txt\0-\t-\tpic.png\0"), [{ path: "a b.txt", added: 1, removed: 2 }, { path: "pic.png" }]);
+    assert.deepStrictEqual(parseNumstat("1\t2\ta b.txt\0-\t-\tpic.png\0"), [
+      { path: "a b.txt", added: 1, removed: 2 },
+      { path: "pic.png" },
+    ]);
     assert.deepStrictEqual(parseNumstat(""), []);
   });
 
@@ -497,7 +532,9 @@ describe("Worktrees", () => {
       const repo = makeRepo();
       __test.setSetting("codeAcp.worktreeSetupCommand", "sleep 30; touch finished.txt");
       const { worktree } = yield* created(repo);
-      const result = yield* (yield* Worktrees).setup(worktree).pipe(Effect.timeoutOption("500 millis"), Effect.timeoutOption("10 seconds"));
+      const result = yield* (yield* Worktrees)
+        .setup(worktree)
+        .pipe(Effect.timeoutOption("500 millis"), Effect.timeoutOption("10 seconds"));
       assert.deepStrictEqual(result, Option.some(Option.none()));
       assert.isFalse(fs.existsSync(path.join(worktree.root, "finished.txt")));
     }).pipe(Effect.provide(layer)),
@@ -509,7 +546,8 @@ describe("Worktrees", () => {
       __test.setSetting("codeAcp.worktreeSetupCommand", "touch user.txt");
       __test.setWorkspaceSetting(PROJECT_COMMAND, "touch project.txt");
       const worktrees = yield* Worktrees;
-      const ran = (worktree: { root: string }) => ["user.txt", "project.txt"].filter((file) => fs.existsSync(path.join(worktree.root, file)));
+      const ran = (worktree: { root: string }) =>
+        ["user.txt", "project.txt"].filter((file) => fs.existsSync(path.join(worktree.root, file)));
 
       const allowed = (yield* created(repo)).worktree;
       const asked: ProjectCommand[] = [];
@@ -631,7 +669,8 @@ describe("TabWorktrees", () => {
   };
 
   /** The agent's services only matter to `restartSession`, stubbed here. */
-  const nameAfter = (controller: TabWorktrees, tab: Tab, text: string) => controller.nameAfter(tab, text) as Effect.Effect<void, never, Worktrees>;
+  const nameAfter = (controller: TabWorktrees, tab: Tab, text: string) =>
+    controller.nameAfter(tab, text) as Effect.Effect<void, never, Worktrees>;
 
   it.effect("moves the folder of a tab alone in its worktree, and starts its session there", () =>
     Effect.gen(function* () {
@@ -662,7 +701,11 @@ describe("TabWorktrees", () => {
       assert.strictEqual(fork.worktree.branch, "code-acp/fix-it");
       assert.isUndefined(other.worktree);
 
-      const lost = { root: path.join(os.homedir(), ".code-acp", "worktrees", "gone", "abc123"), branch: "code-acp/abc123", base: path.join(scratch, "gone") };
+      const lost = {
+        root: path.join(os.homedir(), ".code-acp", "worktrees", "gone", "abc123"),
+        branch: "code-acp/abc123",
+        base: path.join(scratch, "gone"),
+      };
       tab.worktree = lost;
       yield* nameAfter(controller, tab, "fix it");
       assert.deepStrictEqual(tab.worktree, lost);
@@ -829,7 +872,8 @@ describe("TabWorktrees", () => {
     });
 
     /** What the host stands in for needs no services here: its `startOver` and `ask` are fakes. */
-    const withoutHost = <A, E>(effect: Effect.Effect<A, E, any>) => effect as Effect.Effect<A, E, Worktrees | ShadowGit>;
+    const withoutHost = <A, E>(effect: Effect.Effect<A, E, any>) =>
+      effect as Effect.Effect<A, E, Worktrees | ShadowGit>;
 
     /** Puts a `gh` on PATH that writes down how it was called and answers as told; `failCreate` makes `pr create` fail. */
     const fakeGh = (list = "[]", failCreate = false) => {
@@ -866,8 +910,14 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
     });
 
     it("reads a title and description from an agent's reply", () => {
-      assert.deepStrictEqual(parsePrText("Fix it\n\nBecause.\n\n- one\n"), { title: "Fix it", body: "Because.\n\n- one" });
-      assert.deepStrictEqual(parsePrText("```markdown\n# Fix it\n\nBecause.\n```"), { title: "Fix it", body: "Because." });
+      assert.deepStrictEqual(parsePrText("Fix it\n\nBecause.\n\n- one\n"), {
+        title: "Fix it",
+        body: "Because.\n\n- one",
+      });
+      assert.deepStrictEqual(parsePrText("```markdown\n# Fix it\n\nBecause.\n```"), {
+        title: "Fix it",
+        body: "Because.",
+      });
       assert.deepStrictEqual(parsePrText("Only a title"), { title: "Only a title", body: "" });
       assert.isUndefined(parsePrText("  \n"));
     });
@@ -950,7 +1000,8 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
     );
 
     const pickFinish = (kind: string) => {
-      vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === kind)) as never;
+      vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+        items.find((item) => item.choice?.kind === kind)) as never;
     };
 
     it.effect("merges after just the commit message, says so, and deletes the worktree after one question", () =>
@@ -964,7 +1015,10 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         fs.writeFileSync(path.join(worktree.root, "new.txt"), "x\n");
         vscode.window.showInputBox = (async () => "add new") as never;
         let title = "";
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>, options: { title: string }) => {
+        vscode.window.showQuickPick = (async (
+          items: ReadonlyArray<{ choice?: { kind: string } }>,
+          options: { title: string },
+        ) => {
           title = options.title;
           return items.find((item) => item.choice?.kind === "merge");
         }) as never;
@@ -1187,7 +1241,8 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         const { controller, tab, asked } = makeController("Merge");
         tab.worktree = worktree;
         fs.writeFileSync(path.join(worktree.root, "new.txt"), "x\n");
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "merge")) as never;
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "merge")) as never;
         const told: string[] = [];
         vscode.window.showInformationMessage = (async (message: string) => void told.push(message)) as never;
 
@@ -1213,7 +1268,8 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         tab.worktree = worktree;
         fs.writeFileSync(path.join(worktree.root, "new.txt"), "x\n");
         vscode.window.showInputBox = (async () => undefined) as never;
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "merge")) as never;
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "merge")) as never;
         yield* withoutHost(controller.finish(tab));
         assert.isFalse(fs.existsSync(path.join(repo, "new.txt")));
         assert.include(git(worktree.root, "status", "--porcelain"), "new.txt");
@@ -1243,7 +1299,8 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         const { controller, tab, posted } = makeController(undefined, "Add new\n\nWhy it matters.");
         tab.worktree = worktree;
         tab.cwd = cwd;
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "pr")) as never;
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "pr")) as never;
         yield* withoutHost(controller.finish(tab));
         assert.deepInclude(posted, {
           type: "prDraft",
@@ -1277,7 +1334,8 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         fakeGh();
         const { controller, tab, posted } = makeController();
         tab.worktree = worktree;
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "pr")) as never;
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "pr")) as never;
         yield* withoutHost(controller.finish(tab));
         const draft = posted.find((message) => message.type === "prDraft")?.draft as { title: string; body: string };
         assert.strictEqual(draft.title, "add new");
@@ -1292,7 +1350,8 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         fakeGh("[]", true);
         const { controller, tab, posted } = makeController(undefined, "Title");
         tab.worktree = worktree;
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "pr")) as never;
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "pr")) as never;
         yield* withoutHost(controller.finish(tab));
         const error = yield* Effect.flip(controller.createPr(tab, "Title", ""));
         assert.include(error.message, "no access");
@@ -1307,7 +1366,8 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         const gh = fakeGh(`[{"url":"https://example.test/pr/7","state":"OPEN","headRefOid":"older"}]`);
         const { controller, tab, posted, asked } = makeController("Push");
         tab.worktree = worktree;
-        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) => items.find((item) => item.choice?.kind === "pr")) as never;
+        vscode.window.showQuickPick = (async (items: ReadonlyArray<{ choice?: { kind: string } }>) =>
+          items.find((item) => item.choice?.kind === "pr")) as never;
         yield* withoutHost(controller.finish(tab));
         assert.include(asked[0]!, "https://example.test/pr/7");
         assert.notStrictEqual(git(remote, "branch", "--list", worktree.branch!), "");
@@ -1352,7 +1412,9 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         const bin = path.join(scratch, `bin-${count++}`);
         fs.mkdirSync(bin);
         // A PATH with git on it and no gh; git itself gets the real one.
-        fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh\nPATH='${realPath}' exec '${realGit}' "$@"\n`, { mode: 0o755 });
+        fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh\nPATH='${realPath}' exec '${realGit}' "$@"\n`, {
+          mode: 0o755,
+        });
         process.env.PATH = bin;
         assert.include((yield* Effect.flip(worktrees.prTarget(pushable))).message, "GitHub CLI");
       }).pipe(Effect.provide(layer)),
@@ -1379,8 +1441,14 @@ ${failCreate ? 'echo "no access" >&2; exit 1' : "echo https://example.test/pr/1"
         const told: string[] = [];
         vscode.window.showInformationMessage = (async (message: string) => void told.push(message)) as never;
         yield* controller.cleanUp();
-        assert.sameMembers(offered.map((item) => item.detail), [empty.worktree.root, holding.worktree.root]);
-        assert.deepStrictEqual(offered.filter((item) => item.picked).map((item) => item.detail), [empty.worktree.root]);
+        assert.sameMembers(
+          offered.map((item) => item.detail),
+          [empty.worktree.root, holding.worktree.root],
+        );
+        assert.deepStrictEqual(
+          offered.filter((item) => item.picked).map((item) => item.detail),
+          [empty.worktree.root],
+        );
         assert.deepStrictEqual(asked, []);
         assert.isFalse(fs.existsSync(empty.worktree.root));
         assert.isTrue(fs.existsSync(holding.worktree.root));

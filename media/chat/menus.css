@@ -128,7 +128,8 @@
   gap: 6px;
   padding: 4px 4px 6px;
   margin-bottom: 2px;
-  border-bottom: 1px solid var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+  border-bottom: 1px solid
+    var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
 }
 .panel-head .agent-switch {
   flex: 1;
@@ -285,7 +286,9 @@
   height: 12px;
   border-radius: 50%;
   background: var(--vscode-foreground);
-  transition: transform 0.15s, background 0.15s;
+  transition:
+    transform 0.15s,
+    background 0.15s;
 }
 [aria-checked="true"] > .switch {
   background: var(--vscode-button-background);

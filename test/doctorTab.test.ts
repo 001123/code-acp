@@ -20,7 +20,12 @@ describe("DoctorTab", () => {
   const draw = (doctor: DoctorState) => act(() => root.render(createElement(DoctorTab, { doctor })));
   const buttons = () => [...container.querySelectorAll("button")];
   const summary = () => container.querySelector(".doctor-summary")?.textContent;
-  const click = (label: string) => act(() => buttons().find((button) => button.textContent?.endsWith(label))!.click());
+  const click = (label: string) =>
+    act(() =>
+      buttons()
+        .find((button) => button.textContent?.endsWith(label))!
+        .click(),
+    );
 
   beforeEach(() => {
     posted.length = 0;
@@ -50,8 +55,14 @@ describe("DoctorTab", () => {
       ],
       running: true,
     });
-    assert.deepStrictEqual([...container.querySelectorAll("h3")].map((h) => h.textContent), ["doctor.group.tools", "doctor.group.agents"]);
-    assert.deepStrictEqual([...container.querySelectorAll(".doctor-row")].map((row) => row.className), ["doctor-row ok", "doctor-row pending"]);
+    assert.deepStrictEqual(
+      [...container.querySelectorAll("h3")].map((h) => h.textContent),
+      ["doctor.group.tools", "doctor.group.agents"],
+    );
+    assert.deepStrictEqual(
+      [...container.querySelectorAll(".doctor-row")].map((row) => row.className),
+      ["doctor-row ok", "doctor-row pending"],
+    );
     assert.include(container.querySelector(".doctor-version")?.textContent, "v24.0.0");
     assert.strictEqual(summary(), "doctor.checking");
     click("doctor.stop");
@@ -62,8 +73,18 @@ describe("DoctorTab", () => {
     draw({
       rows: [
         { id: "node", group: "tools", label: "Node.js", result: { status: "ok" } },
-        { id: "uv", group: "tools", label: "uv", result: { status: "warning", detail: "Not found.", fix: { type: "open", url: "https://a" } } },
-        { id: "agent:claude", group: "agents", label: "Claude", result: { status: "error", detail: "Login required.", fix: { type: "login", agentId: "claude" } } },
+        {
+          id: "uv",
+          group: "tools",
+          label: "uv",
+          result: { status: "warning", detail: "Not found.", fix: { type: "open", url: "https://a" } },
+        },
+        {
+          id: "agent:claude",
+          group: "agents",
+          label: "Claude",
+          result: { status: "error", detail: "Login required.", fix: { type: "login", agentId: "claude" } },
+        },
       ],
       running: false,
     });

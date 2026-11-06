@@ -191,13 +191,17 @@ export class WorkspaceEdit {
 const noDisposable = { dispose() {} };
 
 const toError = (e: unknown, p: string) =>
-  (e as NodeJS.ErrnoException).code === "ENOENT"
-    ? new FileSystemError(p, "FileNotFound")
-    : (e as Error);
+  (e as NodeJS.ErrnoException).code === "ENOENT" ? new FileSystemError(p, "FileNotFound") : (e as Error);
 
 export const workspace = {
   workspaceFolders: undefined as ReadonlyArray<{ name?: string; uri: Uri }> | undefined,
-  textDocuments: [] as Array<{ uri: Uri; isClosed: boolean; lineCount: number; save(): Promise<boolean>; getText?(): string }>,
+  textDocuments: [] as Array<{
+    uri: Uri;
+    isClosed: boolean;
+    lineCount: number;
+    save(): Promise<boolean>;
+    getText?(): string;
+  }>,
   getConfiguration(section?: string, scope?: Uri) {
     const full = (key: string) => (section ? `${section}.${key}` : key);
     return {
@@ -277,7 +281,8 @@ export const window = {
     __test.outputChannels.set(name, lines);
     return { name, appendLine: (line: string) => void lines.push(line), show: () => {}, dispose: () => {} };
   },
-  showWarningMessage: async (_message: string, _options: unknown, ..._actions: string[]): Promise<string | undefined> => undefined,
+  showWarningMessage: async (_message: string, _options: unknown, ..._actions: string[]): Promise<string | undefined> =>
+    undefined,
   showInformationMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   showErrorMessage: async (_message: string, ..._actions: string[]): Promise<string | undefined> => undefined,
   showSaveDialog: async (_options?: unknown): Promise<Uri | undefined> => undefined,
@@ -306,7 +311,10 @@ export const window = {
     };
   },
   showInputBox: async (_options?: unknown): Promise<string | undefined> => undefined,
-  withProgress: async <R>(_options: unknown, task: (progress: { report(value: unknown): void }) => Thenable<R>): Promise<R> => task({ report: () => {} }),
+  withProgress: async <R>(
+    _options: unknown,
+    task: (progress: { report(value: unknown): void }) => Thenable<R>,
+  ): Promise<R> => task({ report: () => {} }),
   state: { focused: true },
   onDidChangeWindowState: () => noDisposable,
   onDidStartTerminalShellExecution: () => noDisposable,
@@ -324,6 +332,8 @@ export const window = {
   createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
 };
 
-export const commands: { executeCommand: (...args: unknown[]) => Promise<unknown> } = { executeCommand: async () => undefined };
+export const commands: { executeCommand: (...args: unknown[]) => Promise<unknown> } = {
+  executeCommand: async () => undefined,
+};
 
 export const FileType = { File: 1, Directory: 2 } as const;

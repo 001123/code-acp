@@ -44,7 +44,10 @@ describe("DraftSender", () => {
     drafts.flush();
     drafts.save(1, draft("a"));
     drafts.flush();
-    assert.deepStrictEqual(sent.map((m) => m.type), ["draft", "draft"]);
+    assert.deepStrictEqual(
+      sent.map((m) => m.type),
+      ["draft", "draft"],
+    );
   });
 
   it("does not lose a tab's draft when another tab's comes next", () => {
@@ -72,6 +75,9 @@ describe("DraftSender", () => {
     drafts.prune(() => false);
     drafts.save(1, draft("a", [a]));
     drafts.flush();
-    assert.deepStrictEqual(sent.map((m) => m.type), ["draft", "draft"]);
+    assert.deepStrictEqual(
+      sent.map((m) => m.type),
+      ["draft", "draft"],
+    );
   });
 });

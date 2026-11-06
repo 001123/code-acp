@@ -11,7 +11,13 @@ import { ExtensionCtx } from "../src/runtime";
 import { changeBlocks, keepBlock, replacement, undoBlock } from "../src/ui/lineDiff";
 import { makeExtensionCtx } from "./helpers";
 
-const checkpoint = (turn: number, message: number | undefined) => ({ turn, tree: `t${turn}`, label: "", at: 0, message });
+const checkpoint = (turn: number, message: number | undefined) => ({
+  turn,
+  tree: `t${turn}`,
+  label: "",
+  at: 0,
+  message,
+});
 
 describe("checkpoints across a reload", () => {
   it("moves checkpoints onto the turns of their replayed messages", () => {
@@ -79,8 +85,14 @@ describe("reviewing changes one by one", () => {
     ] as const) {
       const blocks = changeBlocks(a, b);
       assert.isAbove(blocks.length, 0);
-      assert.strictEqual(blocks.reduceRight<string>((text, block) => undoBlock(text, block), b), a);
-      assert.strictEqual(blocks.reduceRight<string>((text, block) => keepBlock(text, block), a), b);
+      assert.strictEqual(
+        blocks.reduceRight<string>((text, block) => undoBlock(text, block), b),
+        a,
+      );
+      assert.strictEqual(
+        blocks.reduceRight<string>((text, block) => keepBlock(text, block), a),
+        b,
+      );
     }
   });
 
@@ -104,7 +116,10 @@ describe("reviewing changes one by one", () => {
       Effect.scoped,
       Effect.provide(
         Layer.provideMerge(
-          Layer.mergeAll(NodeChildProcessSpawner.layer, Layer.succeed(ExtensionCtx, makeExtensionCtx(path.join(os.tmpdir(), `code-acp-hunks-${process.pid}`)))),
+          Layer.mergeAll(
+            NodeChildProcessSpawner.layer,
+            Layer.succeed(ExtensionCtx, makeExtensionCtx(path.join(os.tmpdir(), `code-acp-hunks-${process.pid}`))),
+          ),
           Layer.mergeAll(NodeFileSystem.layer, NodePath.layer),
         ),
       ),
@@ -137,12 +152,18 @@ describe("reviewing changes one by one", () => {
         yield* beginTurn(changes, root, 1, "edit", 0);
         yield* fs.writeFileString(file, after);
         yield* refresh(changes);
-        assert.deepStrictEqual(changes.files.map((f) => [f.added, f.removed]), [[2, 1]]);
+        assert.deepStrictEqual(
+          changes.files.map((f) => [f.added, f.removed]),
+          [[2, 1]],
+        );
 
         const [first, second] = yield* hunksOf(changes, file, after);
         assert.isTrue(yield* keepHunk(changes, file, first!));
         yield* refresh(changes);
-        assert.deepStrictEqual(changes.files.map((f) => [f.added, f.removed]), [[1, 0]]);
+        assert.deepStrictEqual(
+          changes.files.map((f) => [f.added, f.removed]),
+          [[1, 0]],
+        );
         assert.strictEqual(yield* fs.readFileString(file), after);
 
         // The change kept is gone, so it can't be kept twice.

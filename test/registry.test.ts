@@ -96,7 +96,10 @@ describe("currentPlatform / binaryTarget", () => {
   });
 
   it("returns undefined when the platform has no build", () => {
-    const only: RegistryAgent = { ...agent, distribution: { binary: { "freebsd-riscv64": { archive: "a", cmd: "c" } } } };
+    const only: RegistryAgent = {
+      ...agent,
+      distribution: { binary: { "freebsd-riscv64": { archive: "a", cmd: "c" } } },
+    };
     assert.isUndefined(binaryTarget(only));
   });
 });
@@ -115,7 +118,10 @@ describe("AcpRegistry", () => {
 
   const withRegistry = <A, E>(
     respond: () => Response | Error,
-    body: (storage: string, requests: { count: number }) => Effect.Effect<A, E, AcpRegistry | FileSystem.FileSystem | Path.Path>,
+    body: (
+      storage: string,
+      requests: { count: number },
+    ) => Effect.Effect<A, E, AcpRegistry | FileSystem.FileSystem | Path.Path>,
   ) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -201,7 +207,7 @@ describe("AcpRegistry", () => {
 
   it.live("rejects an invalid download and uses the cache instead", () =>
     withRegistry(
-      () => new Response("{\"version\":1}", { status: 200 }),
+      () => new Response('{"version":1}', { status: 200 }),
       (storage) =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;

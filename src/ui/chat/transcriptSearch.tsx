@@ -168,7 +168,15 @@ interface TranscriptSearchProps {
 }
 
 /** The find box above the transcript. It only marks the text (CSS highlights), so React's DOM stays untouched. */
-export function TranscriptSearch({ root, resetKey, request, messagesOnly, onMessagesOnlyChange, onReveal, onClose }: TranscriptSearchProps) {
+export function TranscriptSearch({
+  root,
+  resetKey,
+  request,
+  messagesOnly,
+  onMessagesOnlyChange,
+  onReveal,
+  onClose,
+}: TranscriptSearchProps) {
   const { t } = useL10n();
   const [query, setQuery] = useState("");
   const [found, setFound] = useState({ current: -1, count: 0 });
@@ -307,10 +315,22 @@ export function TranscriptSearch({ root, resetKey, request, messagesOnly, onMess
       >
         <Icon svg={messagesIcon} />
       </button>
-      <button className="icon-btn small" title={t("chat.findPrevious")} aria-label={t("chat.findPrevious")} disabled={found.count === 0} onClick={() => step(-1)}>
+      <button
+        className="icon-btn small"
+        title={t("chat.findPrevious")}
+        aria-label={t("chat.findPrevious")}
+        disabled={found.count === 0}
+        onClick={() => step(-1)}
+      >
         <Icon svg={chevronUpIcon} />
       </button>
-      <button className="icon-btn small" title={t("chat.findNext")} aria-label={t("chat.findNext")} disabled={found.count === 0} onClick={() => step(1)}>
+      <button
+        className="icon-btn small"
+        title={t("chat.findNext")}
+        aria-label={t("chat.findNext")}
+        disabled={found.count === 0}
+        onClick={() => step(1)}
+      >
         <Icon svg={chevronDownIcon} />
       </button>
       <button className="icon-btn small" title={t("chat.findClose")} aria-label={t("chat.findClose")} onClick={onClose}>

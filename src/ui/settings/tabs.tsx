@@ -15,14 +15,56 @@ import linkIcon from "@tabler/icons/outline/link.svg";
 import activityIcon from "@tabler/icons/outline/activity.svg";
 import stethoscopeIcon from "@tabler/icons/outline/stethoscope.svg";
 
-export type Tab = "general" | "language" | "notifications" | "permissions" | "worktree" | "agent" | "commit" | "mcp" | "links" | "tracing" | "usage" | "doctor";
+export type Tab =
+  | "general"
+  | "language"
+  | "notifications"
+  | "permissions"
+  | "worktree"
+  | "agent"
+  | "commit"
+  | "mcp"
+  | "links"
+  | "tracing"
+  | "usage"
+  | "doctor";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
-  { id: "general", label: "settings.general", desc: "settings.generalDesc", icon: settingsIcon, keys: ["followAgent", "autoScroll", "showChanges", "showRestore", "rememberSessionOptions"] },
-  { id: "language", label: "settings.language", desc: "settings.languageTabDesc", icon: languageIcon, keys: ["language"] },
-  { id: "notifications", label: "settings.notificationsTab", desc: "settings.notificationsTabDesc", icon: bellIcon, keys: ["notifications", "notifyFinished"] },
-  { id: "permissions", label: "settings.permissions", desc: "settings.permissionsDesc", icon: shieldIcon, keys: ["autoApprove"] },
-  { id: "worktree", label: "settings.worktree", desc: "settings.worktreeDesc", icon: branchIcon, keys: ["worktreeForNewTabs", "worktreeCopyFiles", "worktreeSetupCommand", "worktreeProjectSetupCommand"] },
+  {
+    id: "general",
+    label: "settings.general",
+    desc: "settings.generalDesc",
+    icon: settingsIcon,
+    keys: ["followAgent", "autoScroll", "showChanges", "showRestore", "rememberSessionOptions"],
+  },
+  {
+    id: "language",
+    label: "settings.language",
+    desc: "settings.languageTabDesc",
+    icon: languageIcon,
+    keys: ["language"],
+  },
+  {
+    id: "notifications",
+    label: "settings.notificationsTab",
+    desc: "settings.notificationsTabDesc",
+    icon: bellIcon,
+    keys: ["notifications", "notifyFinished"],
+  },
+  {
+    id: "permissions",
+    label: "settings.permissions",
+    desc: "settings.permissionsDesc",
+    icon: shieldIcon,
+    keys: ["autoApprove"],
+  },
+  {
+    id: "worktree",
+    label: "settings.worktree",
+    desc: "settings.worktreeDesc",
+    icon: branchIcon,
+    keys: ["worktreeForNewTabs", "worktreeCopyFiles", "worktreeSetupCommand", "worktreeProjectSetupCommand"],
+  },
   {
     id: "agent",
     label: "settings.agent",
@@ -35,7 +77,13 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     label: "settings.commit",
     desc: "settings.commitDesc",
     icon: commitIcon,
-    keys: ["commitMessage.agent", "commitMessage.model", "commitMessage.effort", "commitMessage.fastMode", "commitMessage.instructions"],
+    keys: [
+      "commitMessage.agent",
+      "commitMessage.model",
+      "commitMessage.effort",
+      "commitMessage.fastMode",
+      "commitMessage.instructions",
+    ],
   },
   { id: "mcp", label: "settings.mcp", desc: "settings.mcpDesc", icon: plugIcon, keys: ["mcpServers"] },
   { id: "links", label: "settings.links", desc: "settings.linksDesc", icon: linkIcon, keys: ["allowedHttpHosts"] },

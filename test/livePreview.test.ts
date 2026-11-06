@@ -17,7 +17,10 @@ describe("composer live preview", () => {
     assert.strictEqual(styleLines(["## Sub"])[0]!.prefix, 3);
     assert.strictEqual(styleLines(["#1 issue"])[0]!.block, undefined);
     assert.strictEqual(styleLines(["> quote"])[0]!.prefix, 2);
-    assert.deepStrictEqual(styleLines([">", ">quote", "#", "#1"]).map((s) => s.block), [undefined, undefined, undefined, undefined]);
+    assert.deepStrictEqual(
+      styleLines([">", ">quote", "#", "#1"]).map((s) => s.block),
+      [undefined, undefined, undefined, undefined],
+    );
     assert.deepStrictEqual(kinds("- [ ] task"), ["bullet:- [ ]"]);
   });
 
@@ -25,7 +28,12 @@ describe("composer live preview", () => {
     const styles = styleLines(["```ts", "# not a heading **x**", "```", "**bold**"]);
     assert.deepStrictEqual(
       styles.map((s) => [s.block, s.fence]),
-      [["fence-open", 0], ["codeblock", 0], ["fence-close", 0], [undefined, undefined]],
+      [
+        ["fence-open", 0],
+        ["codeblock", 0],
+        ["fence-close", 0],
+        [undefined, undefined],
+      ],
     );
     assert.deepStrictEqual(styles[1]!.spans, []);
     assert.deepStrictEqual(kinds("**bold**"), ["marker:**", "strong:bold", "marker:**"]);
@@ -56,7 +64,7 @@ describe("composer live preview", () => {
 
 describe("composer code highlighting", () => {
   it("reads the fence language", () => {
-    assert.deepStrictEqual(fenceLanguage("ts title=\"a.ts\""), { grammar: "tsx", name: "TypeScript" });
+    assert.deepStrictEqual(fenceLanguage('ts title="a.ts"'), { grammar: "tsx", name: "TypeScript" });
     assert.deepStrictEqual(fenceLanguage(" JS"), { grammar: "javascript", name: "JavaScript" });
     assert.strictEqual(fenceLanguage(""), undefined);
     assert.strictEqual(fenceLanguage("brainfuck"), undefined);
@@ -65,7 +73,8 @@ describe("composer code highlighting", () => {
   it("colors each line", () => {
     const lines = highlight("javascript", 'const a = "x";\n// hi');
     assert.strictEqual(lines.length, 2);
-    const colored = (n: number, text: string) => lines[n]!.find((t) => 'const a = "x";\n// hi'.split("\n")[n]!.slice(t.from, t.to) === text)?.style;
+    const colored = (n: number, text: string) =>
+      lines[n]!.find((t) => 'const a = "x";\n// hi'.split("\n")[n]!.slice(t.from, t.to) === text)?.style;
     assert.include(colored(0, "const"), "--hl-token-keyword");
     assert.include(colored(0, '"x"') ?? colored(0, "x"), "--hl-token-string");
     assert.include(colored(1, "// hi"), "--hl-token-comment");
@@ -75,7 +84,11 @@ describe("composer code highlighting", () => {
 describe("composer editor text", () => {
   const schema = getSchema(composerExtensions(() => ""));
   const doc = schema.nodes.doc!.create(null, [
-    schema.nodes.paragraph!.create(null, [schema.text("see "), schema.nodes.token!.create({ token: "@a.ts" }), schema.text(" ok")]),
+    schema.nodes.paragraph!.create(null, [
+      schema.text("see "),
+      schema.nodes.token!.create({ token: "@a.ts" }),
+      schema.text(" ok"),
+    ]),
     schema.nodes.paragraph!.create(),
     schema.nodes.paragraph!.create(null, [schema.text("end")]),
   ]);

@@ -12,7 +12,9 @@ const chosenName = (option: Select) => option && choicesOf(option).find((c) => c
 
 /** What the turn cost: ACP reports the session's total, which starts over when the agent restarts. */
 function turnCost(cost: acp.Cost, before: acp.Cost | null | undefined): number {
-  return before && before.currency === cost.currency && cost.amount >= before.amount ? cost.amount - before.amount : cost.amount;
+  return before && before.currency === cost.currency && cost.amount >= before.amount
+    ? cost.amount - before.amount
+    : cost.amount;
 }
 
 /** Tool calls that don't say what kind they are, as in ACP. */
@@ -32,7 +34,11 @@ export class TurnStats {
 
   onUpdate(update: acp.SessionUpdate, now = Date.now()): void {
     const { sessionUpdate } = update;
-    if (sessionUpdate === "agent_message_chunk" || sessionUpdate === "agent_thought_chunk" || sessionUpdate === "tool_call") {
+    if (
+      sessionUpdate === "agent_message_chunk" ||
+      sessionUpdate === "agent_thought_chunk" ||
+      sessionUpdate === "tool_call"
+    ) {
       this.firstResponseAt ??= now;
     }
     if (sessionUpdate !== "tool_call" && sessionUpdate !== "tool_call_update") {
@@ -104,7 +110,9 @@ export function turnTrace(
   const model = chosenName(modelOption(tab.configOptions));
   const effort = chosenName(thoughtOption(tab.configOptions));
   // `usage` is unstable in ACP, so the stable PromptResponse leaves it out.
-  const usage = Predicate.hasProperty(response, "usage") ? Option.getOrUndefined(decodeTurnUsage(response.usage)) : undefined;
+  const usage = Predicate.hasProperty(response, "usage")
+    ? Option.getOrUndefined(decodeTurnUsage(response.usage))
+    : undefined;
   const reported = usageOf(tab, sessionId);
   return {
     stopReason: response.stopReason,
@@ -130,7 +138,13 @@ export function turnTrace(
       : {}),
     ...(reported ? { context: { used: reported.used, size: reported.size } } : {}),
     ...(reported?.cost
-      ? { cost: { turn: turnCost(reported.cost, costBefore), session: reported.cost.amount, currency: reported.cost.currency } }
+      ? {
+          cost: {
+            turn: turnCost(reported.cost, costBefore),
+            session: reported.cost.amount,
+            currency: reported.cost.currency,
+          },
+        }
       : {}),
   };
 }

@@ -34,8 +34,16 @@ export class ViewMessages {
   constructor(private readonly host: ViewMessagesHost) {}
 
   /** What the agent offers: from a session already on that model, else from a throwaway one on the model asked for or its usual one. */
-  private attemptOptions(agentId: string, model: string): Effect.Effect<AgentOptions, CommitMessageError, CommitMessage> {
-    const live = this.host.liveTabs().find((tab) => tab.running?.agentId === agentId && model !== "" && modelOption(tab.configOptions)?.currentValue === model);
+  private attemptOptions(
+    agentId: string,
+    model: string,
+  ): Effect.Effect<AgentOptions, CommitMessageError, CommitMessage> {
+    const live = this.host
+      .liveTabs()
+      .find(
+        (tab) =>
+          tab.running?.agentId === agentId && model !== "" && modelOption(tab.configOptions)?.currentValue === model,
+      );
     return live
       ? Effect.succeed(agentOptions(live.configOptions))
       : CommitMessage.use((commit) => commit.options(agentId, model || (this.host.usualOptions(agentId)?.model ?? "")));

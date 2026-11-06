@@ -38,10 +38,13 @@ function windowIn(file: ClaudeSettingsFile, model: string): Option.Option<number
 }
 
 /** Claude Code's own settings files, read to show where it will auto-compact. */
-export class ClaudeSettings extends Context.Service<ClaudeSettings, {
-  /** The auto-compact window set for `model` in a session at `cwd`; none when unset or "auto". */
-  readonly autoCompactWindow: (model: string, cwd: string) => Effect.Effect<Option.Option<number>>;
-}>()("code-acp/ClaudeSettings") {
+export class ClaudeSettings extends Context.Service<
+  ClaudeSettings,
+  {
+    /** The auto-compact window set for `model` in a session at `cwd`; none when unset or "auto". */
+    readonly autoCompactWindow: (model: string, cwd: string) => Effect.Effect<Option.Option<number>>;
+  }
+>()("code-acp/ClaudeSettings") {
   static readonly layer = Layer.effect(
     ClaudeSettings,
     Effect.gen(function* () {

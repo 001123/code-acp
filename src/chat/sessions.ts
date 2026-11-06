@@ -36,9 +36,17 @@ export interface SessionsHost extends ChatUi {
   readonly usage: TabUsage;
   readonly tabWorktrees: TabWorktrees;
   readonly turns: TabTurns;
-  selectTab(tab: Tab): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
+  selectTab(
+    tab: Tab,
+  ): Effect.Effect<void, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
   /** The process of the agent `tab` runs on, started on first use. */
-  getAgent(tab: Tab): Effect.Effect<RunningAgent, NoAgentError | AgentStartError | AuthRequiredError | AgentRequestError, Output | ExtensionCtx | AcpTrace>;
+  getAgent(
+    tab: Tab,
+  ): Effect.Effect<
+    RunningAgent,
+    NoAgentError | AgentStartError | AuthRequiredError | AgentRequestError,
+    Output | ExtensionCtx | AcpTrace
+  >;
 }
 
 /** The ACP sessions of chat tabs: starting, reopening, forking and ending them. */
@@ -187,9 +195,13 @@ export class TabSessions {
               ),
             );
           }).pipe(Effect.ensuring(Effect.sync(() => void (tab.replaying = undefined))))
-        : agent.resumeSession(sessionId, cwd).pipe(
-            Effect.tap(() => Effect.sync(() => this.host.postTab(tab, { type: "notice", key: "chat.resumedNoHistory" }))),
-          )
+        : agent
+            .resumeSession(sessionId, cwd)
+            .pipe(
+              Effect.tap(() =>
+                Effect.sync(() => this.host.postTab(tab, { type: "notice", key: "chat.resumedNoHistory" })),
+              ),
+            )
     ).pipe(
       Effect.tapError(() =>
         Effect.sync(() => {
@@ -216,7 +228,13 @@ export class TabSessions {
   });
 
   /** The tab's session, created when missing; undefined when the user has to act first. */
-  ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit> {
+  ensureSession(
+    tab: Tab,
+  ): Effect.Effect<
+    string | undefined,
+    AgentStartError | AgentRequestError,
+    Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit
+  > {
     return this.createSession(tab).pipe(
       Effect.catchTags({
         NoAgentError: () => Effect.sync(() => void this.host.status(tab, "chat.noAgent", { needsAgent: true })),
@@ -242,7 +260,11 @@ export class TabSessions {
   }
 
   /** Ends the tab's conversation so it starts over in a fresh session, e.g. on another agent or in another folder. */
-  readonly startOver = Effect.fn("TabSessions.startOver")(function* (this: TabSessions, tab: Tab, change: (tab: Tab) => void) {
+  readonly startOver = Effect.fn("TabSessions.startOver")(function* (
+    this: TabSessions,
+    tab: Tab,
+    change: (tab: Tab) => void,
+  ) {
     if (tab.busy) {
       yield* this.cancelTab(tab).pipe(Effect.ignore);
     }
@@ -317,7 +339,9 @@ export class TabSessions {
       tab.worktree = undefined;
       // A tab of a group may never work in the folder itself. Any other that had a worktree of its own, or would have had one, gets one in the new folder with its next message.
       tab.wantsWorktree = tab.group !== undefined;
-      tab.worktreeOnSend = tab.group === undefined && (left !== undefined || tab.worktreeOnSend === true || readSettings().worktreeForNewTabs);
+      tab.worktreeOnSend =
+        tab.group === undefined &&
+        (left !== undefined || tab.worktreeOnSend === true || readSettings().worktreeForNewTabs);
     });
     if (left && fate === "delete") {
       yield* this.host.tabWorktrees.discard(left, leftCwd);
@@ -353,7 +377,10 @@ export class TabSessions {
     const replacedOn = tab.running;
     const replacedWorktree = tab.worktree;
     const replacedCwd = tab.cwd;
-    tab.worktree = yield* worktrees.locate(workspaceFolders().map((f) => f.path), cwd);
+    tab.worktree = yield* worktrees.locate(
+      workspaceFolders().map((f) => f.path),
+      cwd,
+    );
     tab.wantsWorktree = false;
     tab.worktreeOnSend = false;
     this.host.tabs.active = tab;
@@ -387,12 +414,18 @@ export class TabSessions {
    * Deletes a past session of the active tab's agent, after asking; tells whether it did. The session of an open tab
    * stays, so a conversation on screen can't vanish: the history only offers this for the others.
    */
-  readonly deleteSession = Effect.fn("TabSessions.deleteSession")(function* (this: TabSessions, sessionId: string, title: string | undefined) {
+  readonly deleteSession = Effect.fn("TabSessions.deleteSession")(function* (
+    this: TabSessions,
+    sessionId: string,
+    title: string | undefined,
+  ) {
     const { agent } = yield* this.host.getAgent(this.host.tabs.active);
     if (!canDeleteSessions(agent) || this.host.tabs.showing(sessionId)) {
       return false;
     }
-    if (!(yield* confirm(t("chat.deleteSessionConfirm", title?.trim() || t("chat.untitled")), t("chat.deleteSession")))) {
+    if (
+      !(yield* confirm(t("chat.deleteSessionConfirm", title?.trim() || t("chat.untitled")), t("chat.deleteSession")))
+    ) {
       return false;
     }
     // The tab may have opened it while the question was up.
@@ -460,14 +493,21 @@ export class TabSessions {
   });
 
   /** Sets a config option of the tab's session, remembering it for the agent's next sessions (codeAcp.rememberSessionOptions). */
-  readonly setConfig = Effect.fn("TabSessions.setConfig")(function* (this: TabSessions, tab: Tab, configId: string, value: string) {
+  readonly setConfig = Effect.fn("TabSessions.setConfig")(function* (
+    this: TabSessions,
+    tab: Tab,
+    configId: string,
+    value: string,
+  ) {
     if (!tab.running || !tab.sessionId) {
       return;
     }
     const { agentId } = tab.running;
     const before = tab.configOptions;
     const res = yield* tab.running.agent.setConfigOption(tab.sessionId, configId, value);
-    const picked = readSettings().rememberSessionOptions ? this.host.lastOptions.picked(agentId, before, configId, value) : undefined;
+    const picked = readSettings().rememberSessionOptions
+      ? this.host.lastOptions.picked(agentId, before, configId, value)
+      : undefined;
     if (picked) {
       yield* thenable(() => picked);
     }

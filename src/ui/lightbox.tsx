@@ -29,7 +29,11 @@ interface View {
 const FIT: View = { scale: 1, x: 0, y: 0 };
 
 type Tool = "pen" | "arrow" | "rect" | "text";
-const TOOLS: Array<{ tool: Tool; icon: string; label: "lightbox.pen" | "lightbox.arrow" | "lightbox.rect" | "lightbox.text" }> = [
+const TOOLS: Array<{
+  tool: Tool;
+  icon: string;
+  label: "lightbox.pen" | "lightbox.arrow" | "lightbox.rect" | "lightbox.text";
+}> = [
   { tool: "pen", icon: scribbleIcon, label: "lightbox.pen" },
   { tool: "arrow", icon: arrowIcon, label: "lightbox.arrow" },
   { tool: "rect", icon: rectangleIcon, label: "lightbox.rect" },
@@ -145,7 +149,10 @@ export function Lightbox({
   /** Pointer position in image pixels. */
   const imagePoint = (e: { clientX: number; clientY: number }): [number, number] => {
     const r = overlay.current!.getBoundingClientRect();
-    return [Math.round(((e.clientX - r.left) / r.width) * natural!.w), Math.round(((e.clientY - r.top) / r.height) * natural!.h)];
+    return [
+      Math.round(((e.clientX - r.left) / r.width) * natural!.w),
+      Math.round(((e.clientY - r.top) / r.height) * natural!.h),
+    ];
   };
 
   /** Turns the text being typed into a shape; empty text is dropped. */
@@ -417,16 +424,34 @@ export function Lightbox({
         <span className="lightbox-name" title={alt}>
           {alt}
         </span>
-        <button type="button" className="icon-btn" title={t("lightbox.zoomOut")} aria-label={t("lightbox.zoomOut")} onClick={() => zoom(1 / STEP)}>
+        <button
+          type="button"
+          className="icon-btn"
+          title={t("lightbox.zoomOut")}
+          aria-label={t("lightbox.zoomOut")}
+          onClick={() => zoom(1 / STEP)}
+        >
           <Icon svg={zoomOutIcon} />
         </button>
         <button type="button" className="lightbox-scale" title={t("lightbox.reset")} onClick={() => setView(FIT)}>
           {Math.round(view.scale * 100)}%
         </button>
-        <button type="button" className="icon-btn" title={t("lightbox.zoomIn")} aria-label={t("lightbox.zoomIn")} onClick={() => zoom(STEP)}>
+        <button
+          type="button"
+          className="icon-btn"
+          title={t("lightbox.zoomIn")}
+          aria-label={t("lightbox.zoomIn")}
+          onClick={() => zoom(STEP)}
+        >
           <Icon svg={zoomInIcon} />
         </button>
-        <button type="button" className="icon-btn" title={t("lightbox.reset")} aria-label={t("lightbox.reset")} onClick={() => setView(FIT)}>
+        <button
+          type="button"
+          className="icon-btn"
+          title={t("lightbox.reset")}
+          aria-label={t("lightbox.reset")}
+          onClick={() => setView(FIT)}
+        >
           <Icon svg={zoomResetIcon} />
         </button>
         {onSave && (
@@ -442,11 +467,23 @@ export function Lightbox({
           </button>
         )}
         {onPopOut && (
-          <button type="button" className="icon-btn" title={t("lightbox.popOut")} aria-label={t("lightbox.popOut")} onClick={onPopOut}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={t("lightbox.popOut")}
+            aria-label={t("lightbox.popOut")}
+            onClick={onPopOut}
+          >
             <Icon svg={appWindowIcon} />
           </button>
         )}
-        <button type="button" className="icon-btn" title={t("lightbox.close")} aria-label={t("lightbox.close")} onClick={onClose}>
+        <button
+          type="button"
+          className="icon-btn"
+          title={t("lightbox.close")}
+          aria-label={t("lightbox.close")}
+          onClick={onClose}
+        >
           <Icon svg={xIcon} />
         </button>
       </div>
@@ -483,10 +520,24 @@ export function Lightbox({
               <span className="lightbox-sep" />
             </>
           )}
-          <button type="button" className="icon-btn" title={t("lightbox.undo")} aria-label={t("lightbox.undo")} disabled={shapes.length === 0} onClick={undo}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={t("lightbox.undo")}
+            aria-label={t("lightbox.undo")}
+            disabled={shapes.length === 0}
+            onClick={undo}
+          >
             <Icon svg={arrowBackIcon} />
           </button>
-          <button type="button" className="icon-btn" title={t("lightbox.redo")} aria-label={t("lightbox.redo")} disabled={undone.length === 0} onClick={redo}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={t("lightbox.redo")}
+            aria-label={t("lightbox.redo")}
+            disabled={undone.length === 0}
+            onClick={redo}
+          >
             <Icon svg={arrowForwardIcon} />
           </button>
           <button
@@ -503,7 +554,13 @@ export function Lightbox({
             <Icon svg={trashIcon} />
           </button>
           <span className="lightbox-spacer" />
-          <button type="button" className="lightbox-save" title={`${saveLabel} (Enter)`} disabled={shapes.length === 0} onClick={save}>
+          <button
+            type="button"
+            className="lightbox-save"
+            title={`${saveLabel} (Enter)`}
+            disabled={shapes.length === 0}
+            onClick={save}
+          >
             <Icon svg={checkIcon} />
             <span>{saveLabel}</span>
           </button>

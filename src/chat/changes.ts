@@ -1,6 +1,18 @@
 import { Effect } from "effect";
 import * as vscode from "vscode";
-import { beforeOf, beginTurn, BeforeDocuments, hunksOf, keep, keepHunk, refresh, restore, restorePlan, undo, undoHunk } from "../fileChanges";
+import {
+  beforeOf,
+  beginTurn,
+  BeforeDocuments,
+  hunksOf,
+  keep,
+  keepHunk,
+  refresh,
+  restore,
+  restorePlan,
+  undo,
+  undoHunk,
+} from "../fileChanges";
 import { t } from "../i18n";
 import { thenable, type AppServices, type VscodeError } from "../runtime";
 import { readSettings } from "../settings";
@@ -47,7 +59,10 @@ export class ChangeReview implements vscode.Disposable {
         Effect.gen({ self: this }, function* () {
           yield* refresh(tab.changes).pipe(Effect.catch((err) => this.disable(tab, err.message)));
           // A turn the webview isn't told about has no Restore button.
-          const message: ChangesMessage = { files: tab.changes.files, turns: readSettings().showRestore ? tab.changes.turns : [] };
+          const message: ChangesMessage = {
+            files: tab.changes.files,
+            turns: readSettings().showRestore ? tab.changes.turns : [],
+          };
           this.host.postTab(tab, { type: "changes", ...message });
           this.refreshLenses();
         }),
@@ -72,7 +87,11 @@ export class ChangeReview implements vscode.Disposable {
    * Keep and Undo above each change in `document`, for the tab shown in the chat. The diff editor only shows them with
    * `diffEditor.codeLens` on, and has no stable API for actions of its own: the changes bar offers them there.
    */
-  readonly lenses = Effect.fn("ChangeReview.lenses")(function* (this: ChangeReview, tab: Tab, document: vscode.TextDocument) {
+  readonly lenses = Effect.fn("ChangeReview.lenses")(function* (
+    this: ChangeReview,
+    tab: Tab,
+    document: vscode.TextDocument,
+  ) {
     if (!readSettings().showChanges) {
       return [];
     }
@@ -98,11 +117,21 @@ export class ChangeReview implements vscode.Disposable {
     this.host.postTab(tab, { type: "hunks", path: file, hunks });
   });
 
-  readonly keepHunk = Effect.fn("ChangeReview.keepHunk")(function* (this: ChangeReview, tab: Tab, file: string, hunk: ChangeHunk) {
+  readonly keepHunk = Effect.fn("ChangeReview.keepHunk")(function* (
+    this: ChangeReview,
+    tab: Tab,
+    file: string,
+    hunk: ChangeHunk,
+  ) {
     this.reviewed(tab, yield* keepHunk(tab.changes, file, hunk));
   });
 
-  readonly undoHunk = Effect.fn("ChangeReview.undoHunk")(function* (this: ChangeReview, tab: Tab, file: string, hunk: ChangeHunk) {
+  readonly undoHunk = Effect.fn("ChangeReview.undoHunk")(function* (
+    this: ChangeReview,
+    tab: Tab,
+    file: string,
+    hunk: ChangeHunk,
+  ) {
     this.reviewed(tab, yield* undoHunk(tab.changes, file, hunk));
   });
 
@@ -130,13 +159,20 @@ export class ChangeReview implements vscode.Disposable {
   }
 
   /** Takes the checkpoint before a turn. Outside the workspace (e.g. in the home folder) there are none. */
-  readonly beginTurn = Effect.fn("ChangeReview.beginTurn")(function* (this: ChangeReview, tab: Tab, turn: number, label: string) {
+  readonly beginTurn = Effect.fn("ChangeReview.beginTurn")(function* (
+    this: ChangeReview,
+    tab: Tab,
+    turn: number,
+    label: string,
+  ) {
     const position = tab.changes.countMessage();
     if (tab.worktree === undefined && folderOf(tab.cwd) === undefined) {
       this.host.saveTabs();
       return;
     }
-    yield* beginTurn(tab.changes, tab.cwd, turn, label, position).pipe(Effect.catch((err) => this.disable(tab, err.message)));
+    yield* beginTurn(tab.changes, tab.cwd, turn, label, position).pipe(
+      Effect.catch((err) => this.disable(tab, err.message)),
+    );
     this.host.saveTabs();
   });
 
@@ -171,7 +207,10 @@ export class ChangeReview implements vscode.Disposable {
   });
 
   readonly undo = Effect.fn("ChangeReview.undo")(function* (this: ChangeReview, tab: Tab, file: string | undefined) {
-    if (file === undefined && !(yield* confirm(t("changes.undoAllConfirm", tab.changes.files.length), t("changes.undoAll")))) {
+    if (
+      file === undefined &&
+      !(yield* confirm(t("changes.undoAllConfirm", tab.changes.files.length), t("changes.undoAll")))
+    ) {
       return;
     }
     yield* undo(tab.changes, file);
@@ -223,7 +262,11 @@ export class ChangeReview implements vscode.Disposable {
   }
 
   /** Answers the webview's messages about the tab's changes. */
-  readonly onMessage = Effect.fn("ChangeReview.onMessage")(function* (this: ChangeReview, tab: Tab, msg: ChangeMessage) {
+  readonly onMessage = Effect.fn("ChangeReview.onMessage")(function* (
+    this: ChangeReview,
+    tab: Tab,
+    msg: ChangeMessage,
+  ) {
     switch (msg.type) {
       case "openDiff":
         yield* this.openDiff(tab, msg.path, msg.oldText, msg.newText, msg.line);

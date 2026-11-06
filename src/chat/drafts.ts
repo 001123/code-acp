@@ -66,7 +66,10 @@ export class DraftStore {
     update: Draft | string,
     commit: () => boolean,
   ) {
-    yield* Semaphore.withPermits(this.lock, 1)(
+    yield* Semaphore.withPermits(
+      this.lock,
+      1,
+    )(
       Effect.gen({ self: this }, function* () {
         // Inside the lock: a "draft" sent just before has set the attachments by now.
         const textOnly = Predicate.isString(update);
@@ -112,7 +115,10 @@ export class DraftStore {
 
   /** Removes files of the drafts folder that no draft refers to. */
   get prune(): Effect.Effect<void, never, FileSystem.FileSystem> {
-    return Semaphore.withPermits(this.lock, 1)(
+    return Semaphore.withPermits(
+      this.lock,
+      1,
+    )(
       Effect.gen({ self: this }, function* () {
         const fs = yield* FileSystem.FileSystem;
         const used = new Set(
@@ -155,7 +161,9 @@ export class DraftStore {
     return Effect.gen({ self: this }, function* () {
       const fs = yield* FileSystem.FileSystem;
       return yield* fs.readFile(path.join(this.dir, a.file)).pipe(
-        Effect.map((bytes): Attachment[] => [{ kind: "data", name: a.name, mimeType: a.mimeType, data: Buffer.from(bytes).toString("base64") }]),
+        Effect.map((bytes): Attachment[] => [
+          { kind: "data", name: a.name, mimeType: a.mimeType, data: Buffer.from(bytes).toString("base64") },
+        ]),
         Effect.orElseSucceed((): Attachment[] => []),
       );
     });

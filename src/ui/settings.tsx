@@ -10,7 +10,17 @@ import { AgentCatalogTab } from "./settings/catalog";
 import { DoctorTab } from "./settings/doctor";
 import { EntryList, serversOf } from "./settings/entries";
 import { ScopeContext, Segmented } from "./settings/fields";
-import { AgentTab, CommitTab, GeneralTab, LanguageTab, LinksTab, NotificationsTab, PermissionsTab, TracingTab, WorktreeTab } from "./settings/panels";
+import {
+  AgentTab,
+  CommitTab,
+  GeneralTab,
+  LanguageTab,
+  LinksTab,
+  NotificationsTab,
+  PermissionsTab,
+  TracingTab,
+  WorktreeTab,
+} from "./settings/panels";
 import { post } from "./settings/post";
 import { optionsKey, type LoadedOptions, type State } from "./settings/state";
 import { SubTabs, TABS, Tabs, type Tab } from "./settings/tabs";
@@ -24,7 +34,8 @@ type Saved = { tab?: unknown; agentSection?: unknown; usageSource?: unknown };
 const AGENT_SECTIONS = ["general", "manage", "custom"] as const;
 type AgentSection = (typeof AGENT_SECTIONS)[number];
 
-const agentSectionOf = (value: unknown): AgentSection | undefined => AGENT_SECTIONS.find((section) => section === value);
+const agentSectionOf = (value: unknown): AgentSection | undefined =>
+  AGENT_SECTIONS.find((section) => section === value);
 
 function savedTab(): Tab {
   const state = getState() as Saved | undefined;
@@ -46,7 +57,15 @@ function save(patch: Saved): void {
 
 function App() {
   const { t } = useL10n();
-  const [state, setState] = useState<State>({ values: {}, overridden: [], workspaceAutoApprove: {}, scope: "user", hasWorkspace: false, locked: [], agents: [] });
+  const [state, setState] = useState<State>({
+    values: {},
+    overridden: [],
+    workspaceAutoApprove: {},
+    scope: "user",
+    hasWorkspace: false,
+    locked: [],
+    agents: [],
+  });
   const [loaded, setLoaded] = useState<LoadedOptions>({});
   const [tab, setTab] = useState(savedTab);
   const [agentSection, setAgentSection] = useState(savedAgentSection);
@@ -101,8 +120,15 @@ function App() {
   const current = TABS.find((x) => x.id === tab)!;
   // Usage, Doctor and the installed agents are no settings.
   const scoped = current.keys.length > 0 && !onCatalog;
-  const panelDesc = tab !== "agent" || agentSection === "general" ? current.desc : agentSection === "manage" ? "settings.manageDesc" : "settings.customDesc";
-  const workspaceLabel = state.workspaceName ? t("settings.scopeWorkspaceNamed", state.workspaceName) : t("settings.scopeWorkspace");
+  const panelDesc =
+    tab !== "agent" || agentSection === "general"
+      ? current.desc
+      : agentSection === "manage"
+        ? "settings.manageDesc"
+        : "settings.customDesc";
+  const workspaceLabel = state.workspaceName
+    ? t("settings.scopeWorkspaceNamed", state.workspaceName)
+    : t("settings.scopeWorkspace");
   // A disabled option says why; a long workspace name is cut off, so the workspace's says it in full.
   const scopeTitle = (desc: string) => (scoped ? desc : t("settings.scopeNotApplicable"));
 
@@ -119,12 +145,21 @@ function App() {
             disabled={!scoped}
             options={[
               { value: "user", label: t("settings.scopeUser"), title: scopeTitle(t("settings.scopeUserDesc")) },
-              { value: "workspace", label: workspaceLabel, title: scopeTitle(`${workspaceLabel}\n${t("settings.scopeWorkspaceDesc")}`) },
+              {
+                value: "workspace",
+                label: workspaceLabel,
+                title: scopeTitle(`${workspaceLabel}\n${t("settings.scopeWorkspaceDesc")}`),
+              },
             ]}
             onChange={(scope) => post({ type: "scope", scope: scope === "workspace" ? "workspace" : "user" })}
           />
         )}
-        <button className="open-native with-icon" aria-label={t("settings.openNative")} title={t("settings.openNative")} onClick={() => post({ type: "openNative" })}>
+        <button
+          className="open-native with-icon"
+          aria-label={t("settings.openNative")}
+          title={t("settings.openNative")}
+          onClick={() => post({ type: "openNative" })}
+        >
           <Icon svg={externalIcon} />
           <span className="open-native-label">{t("settings.openNative")}</span>
         </button>
@@ -166,7 +201,11 @@ function App() {
                   {
                     id: "custom",
                     label: t("settings.custom"),
-                    badge: overridden("customAgents") ? <span className="dot warning" /> : customCount > 0 && <span className="count">{customCount}</span>,
+                    badge: overridden("customAgents") ? (
+                      <span className="dot warning" />
+                    ) : (
+                      customCount > 0 && <span className="count">{customCount}</span>
+                    ),
                   },
                 ]}
                 onSelect={selectAgentSection}
@@ -177,7 +216,12 @@ function App() {
                 ) : agentSection === "manage" ? (
                   <AgentCatalogTab catalog={catalog} />
                 ) : (
-                  <EntryList agents value={v.customAgents} overridden={overridden("customAgents")} locked={state.locked.includes("customAgents")} />
+                  <EntryList
+                    agents
+                    value={v.customAgents}
+                    overridden={overridden("customAgents")}
+                    locked={state.locked.includes("customAgents")}
+                  />
                 )}
               </div>
             </>
@@ -185,13 +229,20 @@ function App() {
 
           {tab === "commit" && <CommitTab state={state} loaded={loaded} load={load} />}
 
-          {tab === "mcp" && <EntryList value={v.mcpServers} overridden={overridden("mcpServers")} locked={state.locked.includes("mcpServers")} />}
+          {tab === "mcp" && (
+            <EntryList
+              value={v.mcpServers}
+              overridden={overridden("mcpServers")}
+              locked={state.locked.includes("mcpServers")}
+            />
+          )}
 
           {tab === "links" && <LinksTab state={state} />}
 
           {tab === "tracing" && <TracingTab state={state} />}
 
-          {tab === "usage" && <UsageTab
+          {tab === "usage" && (
+            <UsageTab
               source={usageSource}
               onSource={(next) => {
                 setUsageSource(next);
@@ -201,7 +252,8 @@ function App() {
               onClear={() => post({ type: "clearUsage" })}
               onQuery={(text, limit) => post({ type: "usageQuery", text, limit })}
               onCcusage={(source, refresh) => post({ type: "ccusage", source, refresh })}
-            />}
+            />
+          )}
 
           {tab === "doctor" && <DoctorTab doctor={doctor} />}
         </main>

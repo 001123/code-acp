@@ -142,20 +142,45 @@ function DiagramPage() {
       <div className="diagram-toolbar">
         <span className="diagram-spacer" />
         <div className="diagram-zoom" hidden={source}>
-          <button type="button" className="icon-btn" title={t("lightbox.zoomOut")} aria-label={t("lightbox.zoomOut")} onClick={() => zoom(1 / STEP)}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={t("lightbox.zoomOut")}
+            aria-label={t("lightbox.zoomOut")}
+            onClick={() => zoom(1 / STEP)}
+          >
             <Icon svg={zoomOutIcon} />
           </button>
           <button type="button" className="diagram-scale" title={t("lightbox.reset")} onClick={() => setView(FIT)}>
             {Math.round(view.scale * 100)}%
           </button>
-          <button type="button" className="icon-btn" title={t("lightbox.zoomIn")} aria-label={t("lightbox.zoomIn")} onClick={() => zoom(STEP)}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={t("lightbox.zoomIn")}
+            aria-label={t("lightbox.zoomIn")}
+            onClick={() => zoom(STEP)}
+          >
             <Icon svg={zoomInIcon} />
           </button>
-          <button type="button" className="icon-btn" title={t("lightbox.reset")} aria-label={t("lightbox.reset")} onClick={() => setView(FIT)}>
+          <button
+            type="button"
+            className="icon-btn"
+            title={t("lightbox.reset")}
+            aria-label={t("lightbox.reset")}
+            onClick={() => setView(FIT)}
+          >
             <Icon svg={zoomResetIcon} />
           </button>
         </div>
-        <button type="button" className="icon-btn" title={sourceLabel} aria-label={sourceLabel} aria-pressed={source} onClick={() => setSource(!source)}>
+        <button
+          type="button"
+          className="icon-btn"
+          title={sourceLabel}
+          aria-label={sourceLabel}
+          aria-pressed={source}
+          onClick={() => setSource(!source)}
+        >
           <Icon svg={source ? schemaIcon : codeIcon} />
         </button>
       </div>

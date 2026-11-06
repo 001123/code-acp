@@ -72,7 +72,25 @@ export function highlight(grammar: string, code: string): CodeToken[][] {
   highlighter ??= createHighlighterCoreSync({
     engine: createJavaScriptRegexEngine({ forgiving: true }),
     themes: [createCssVariablesTheme({ name: "composer", variablePrefix: "--hl-", fontStyle: true })],
-    langs: [c, css, diff, go, html, java, javascript, json, kotlin, markdown, python, rust, shellscript, sql, toml, tsx, yaml],
+    langs: [
+      c,
+      css,
+      diff,
+      go,
+      html,
+      java,
+      javascript,
+      json,
+      kotlin,
+      markdown,
+      python,
+      rust,
+      shellscript,
+      sql,
+      toml,
+      tsx,
+      yaml,
+    ],
   });
   const lines = highlighter.codeToTokensBase(code, { lang: grammar, theme: "composer" }).map((tokens) => {
     const out: CodeToken[] = [];

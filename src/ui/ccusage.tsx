@@ -175,7 +175,8 @@ function Block({ block }: { block: NonNullable<CcusageView["block"]> }) {
     [t("usage.tokens"), tokens(block.tokens)],
     [t("ccusage.blockEnds"), `${time(block.end)} · ${t("ccusage.minutesLeft", Math.floor(left / 60), left % 60)}`],
   ];
-  if (block.costPerHour !== undefined) details.push([t("ccusage.burnRate"), t("ccusage.perHour", cost(usd(block.costPerHour)))]);
+  if (block.costPerHour !== undefined)
+    details.push([t("ccusage.burnRate"), t("ccusage.perHour", cost(usd(block.costPerHour)))]);
   if (block.projectedCost !== undefined) details.push([t("ccusage.projected"), cost(usd(block.projectedCost))]);
   return (
     <section className="usage-section">
@@ -227,10 +228,7 @@ function useDetails(): (row: DayRow) => Detail[] {
       const before = byModel.get(m.name);
       byModel.set(m.name, m.cost === undefined ? before : (before ?? 0) + m.cost);
     }
-    return [
-      ...tokenDetails(row.tokens),
-      ...[...byModel].map(([name, amount]) => [name, cost(usd(amount))] as const),
-    ];
+    return [...tokenDetails(row.tokens), ...[...byModel].map(([name, amount]) => [name, cost(usd(amount))] as const)];
   };
 }
 
@@ -383,7 +381,11 @@ function Sessions({ view }: { view: CcusageView }) {
   const [shown, setShown] = useState(SESSION_PAGE);
   const query = text.trim().toLowerCase();
   const matching = query
-    ? view.sessions.filter((s) => `${s.id} ${s.agent ? `${s.agent} ${agentName(s.agent)}` : ""} ${s.project ?? ""} ${s.models.join(" ")}`.toLowerCase().includes(query))
+    ? view.sessions.filter((s) =>
+        `${s.id} ${s.agent ? `${s.agent} ${agentName(s.agent)}` : ""} ${s.project ?? ""} ${s.models.join(" ")}`
+          .toLowerCase()
+          .includes(query),
+      )
     : view.sessions;
   return (
     <section className="usage-section">
@@ -433,7 +435,11 @@ function Sessions({ view }: { view: CcusageView }) {
                         <td className="usage-session" title={s.id}>
                           <span className="usage-session-title">{s.project ?? s.id}</span>
                           <span className="desc">
-                            {[s.agent && agentName(s.agent), s.lastAt === undefined ? undefined : time(s.lastAt), s.models.join(", ")]
+                            {[
+                              s.agent && agentName(s.agent),
+                              s.lastAt === undefined ? undefined : time(s.lastAt),
+                              s.models.join(", "),
+                            ]
                               .filter(Boolean)
                               .join(" · ")}
                           </span>

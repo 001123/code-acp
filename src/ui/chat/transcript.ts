@@ -15,7 +15,14 @@ export type Item =
   | { kind: "userMessage"; id: number; text: string; attachments: SentAttachment[]; turn?: number }
   | ToolItem
   | { kind: "plan"; id: number; entries: acp.PlanEntry[] }
-  | { kind: "permission"; id: number; requestId: number; toolCall: acp.ToolCallUpdate; options: acp.PermissionOption[]; done: boolean }
+  | {
+      kind: "permission";
+      id: number;
+      requestId: number;
+      toolCall: acp.ToolCallUpdate;
+      options: acp.PermissionOption[];
+      done: boolean;
+    }
   | ElicitationItem
   | CompactionItem
   | { kind: "notice" | "error"; id: number; text: Text }
@@ -154,9 +161,15 @@ export function clipContent(content: acp.ToolCallContent[] | null | undefined): 
 }
 
 /** The open permission request or question of `item`, and the tool call it is about. */
-export function openRequest(item: DistributiveOmit<Item, "id">): { requestId: number; toolCallId?: string; parentId?: string } | undefined {
+export function openRequest(
+  item: DistributiveOmit<Item, "id">,
+): { requestId: number; toolCallId?: string; parentId?: string } | undefined {
   if (item.kind === "permission" && !item.done) {
-    return { requestId: item.requestId, toolCallId: item.toolCall.toolCallId, parentId: parentToolUseId(item.toolCall) };
+    return {
+      requestId: item.requestId,
+      toolCallId: item.toolCall.toolCallId,
+      parentId: parentToolUseId(item.toolCall),
+    };
   }
   if (item.kind === "elicitation" && item.outcome === undefined) {
     return { requestId: item.requestId, toolCallId: item.toolCallId };
@@ -209,7 +222,8 @@ export function transcript(state: Transcript, action: Action): Transcript {
       });
       const isTool = (i: Item): i is ToolItem => i.kind === "tool";
       const parentId = parentToolUseId(u);
-      const parent = parentId === undefined ? undefined : state.items.find((i) => isTool(i) && i.toolCallId === parentId);
+      const parent =
+        parentId === undefined ? undefined : state.items.find((i) => isTool(i) && i.toolCallId === parentId);
       const holder = state.items.find((i) => isTool(i) && i.children?.some((c) => c.toolCallId === u.toolCallId));
       if (holder && isTool(holder)) {
         const children = holder.children!.map((c) => (c.toolCallId === u.toolCallId ? merge(c) : c));
@@ -218,9 +232,10 @@ export function transcript(state: Transcript, action: Action): Transcript {
       const existing = state.items.find((i) => isTool(i) && i.toolCallId === u.toolCallId);
       if (parent && isTool(parent) && parent !== existing) {
         // A subagent's call goes under the call that started it, also when an earlier update did not say so.
-        const child = existing && isTool(existing)
-          ? merge(existing)
-          : merge({ kind: "tool", id: state.nextId, toolCallId: u.toolCallId });
+        const child =
+          existing && isTool(existing)
+            ? merge(existing)
+            : merge({ kind: "tool", id: state.nextId, toolCallId: u.toolCallId });
         const open = state.items.flatMap((i) => {
           const request = openRequest(i);
           return request && request.toolCallId === u.toolCallId ? [request.requestId] : [];
@@ -228,7 +243,9 @@ export function transcript(state: Transcript, action: Action): Transcript {
         const waiting = [...(parent.waiting ?? []), ...open.filter((id) => !parent.waiting?.includes(id))];
         const items = state.items
           .filter((i) => i !== existing)
-          .map((i) => (i === parent ? { ...parent, subagent: true, children: [...(parent.children ?? []), child], waiting } : i));
+          .map((i) =>
+            i === parent ? { ...parent, subagent: true, children: [...(parent.children ?? []), child], waiting } : i,
+          );
         return { ...state, items, nextId: existing ? state.nextId : state.nextId + 1 };
       }
       if (!existing) {
@@ -255,7 +272,9 @@ export function transcript(state: Transcript, action: Action): Transcript {
       if (!parent || parent.kind !== "tool") return next;
       return {
         ...next,
-        items: next.items.map((i) => (i === parent ? { ...parent, waiting: [...(parent.waiting ?? []), requestId] } : i)),
+        items: next.items.map((i) =>
+          i === parent ? { ...parent, waiting: [...(parent.waiting ?? []), requestId] } : i,
+        ),
       };
     }
     case "permissionDone":
@@ -276,7 +295,11 @@ export function transcript(state: Transcript, action: Action): Transcript {
     case "elicitationComplete":
       return {
         ...state,
-        items: state.items.map((i) => (i.kind === "elicitation" && "url" in i && i.elicitationId === action.elicitationId ? { ...i, completed: true } : i)),
+        items: state.items.map((i) =>
+          i.kind === "elicitation" && "url" in i && i.elicitationId === action.elicitationId
+            ? { ...i, completed: true }
+            : i,
+        ),
       };
     case "compaction": {
       const { compactionId, status, summary, error } = action.update;
@@ -295,17 +318,26 @@ export function transcript(state: Transcript, action: Action): Transcript {
       const found = findCompaction(state, action.compactionId);
       return found
         ? { ...state, items: replace(found.id, () => ({ ...found, summary: clip(found.summary + action.text) })) }
-        : add({ kind: "compaction", compactionId: action.compactionId, status: "in_progress", summary: clip(action.text) });
+        : add({
+            kind: "compaction",
+            compactionId: action.compactionId,
+            status: "in_progress",
+            summary: clip(action.text),
+          });
     }
     case "agentStopped":
       return {
         ...state,
-        items: state.items.map((i) => (i.kind === "compaction" && i.status === "in_progress" ? { ...i, status: "cancelled" } : i)),
+        items: state.items.map((i) =>
+          i.kind === "compaction" && i.status === "in_progress" ? { ...i, status: "cancelled" } : i,
+        ),
       };
     case "endStream":
       return { ...state, streaming: undefined };
     case "rewind": {
-      const index = state.items.findIndex((i) => (i.kind === "userMessage" || i.kind === "user") && i.turn === action.turn);
+      const index = state.items.findIndex(
+        (i) => (i.kind === "userMessage" || i.kind === "user") && i.turn === action.turn,
+      );
       return index < 0 ? state : { ...state, items: state.items.slice(0, index), streaming: undefined };
     }
     case "restoreTraces": {
@@ -380,7 +412,8 @@ export function contentText(block: acp.ContentBlock | undefined): string {
   if (!block) return "";
   if (block.type === "text") return block.text;
   if (block.type === "resource_link") return `[${block.name}](${block.uri})`;
-  if (block.type === "resource") return ("text" in block.resource ? block.resource.text : undefined) ?? block.resource.uri ?? "";
+  if (block.type === "resource")
+    return ("text" in block.resource ? block.resource.text : undefined) ?? block.resource.uri ?? "";
   return `[${block.type}]`;
 }
 

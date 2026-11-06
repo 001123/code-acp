@@ -45,9 +45,18 @@ describe("mcpServersFor", () => {
         s: { type: "sse", url: "https://s" },
         c: { command: "x" },
       });
-      assert.deepStrictEqual((yield* mcpServersFor(undefined)).map((s) => s.name), ["c"]);
-      assert.deepStrictEqual((yield* mcpServersFor({ http: true })).map((s) => s.name), ["h", "c"]);
-      assert.deepStrictEqual((yield* mcpServersFor({ sse: true })).map((s) => s.name), ["s", "c"]);
+      assert.deepStrictEqual(
+        (yield* mcpServersFor(undefined)).map((s) => s.name),
+        ["c"],
+      );
+      assert.deepStrictEqual(
+        (yield* mcpServersFor({ http: true })).map((s) => s.name),
+        ["h", "c"],
+      );
+      assert.deepStrictEqual(
+        (yield* mcpServersFor({ sse: true })).map((s) => s.name),
+        ["s", "c"],
+      );
     }),
   );
 
@@ -59,7 +68,10 @@ describe("mcpServersFor", () => {
         bad3: { command: 1 },
         good: { command: "ok" },
       });
-      assert.deepStrictEqual((yield* mcpServersFor({ http: true })).map((s) => s.name), ["good"]);
+      assert.deepStrictEqual(
+        (yield* mcpServersFor({ http: true })).map((s) => s.name),
+        ["good"],
+      );
     }),
   );
 

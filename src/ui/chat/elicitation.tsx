@@ -42,14 +42,33 @@ function fieldsOf(schema: acp.ElicitationSchema): Field[] {
     switch (property.type) {
       case "string": {
         const p = property as acp.StringPropertySchema;
-        const choices = p.oneOf?.map((o) => ({ value: o.const, title: o.title, description: opt(o.description) })) ?? p.enum?.map((value) => ({ value, title: value }));
+        const choices =
+          p.oneOf?.map((o) => ({ value: o.const, title: o.title, description: opt(o.description) })) ??
+          p.enum?.map((value) => ({ value, title: value }));
         if (choices) return [{ ...base, kind: "choice", choices, multiple: false }];
-        return [{ ...base, kind: "text", format: opt(p.format), minLength: opt(p.minLength), maxLength: opt(p.maxLength), pattern: opt(p.pattern) }];
+        return [
+          {
+            ...base,
+            kind: "text",
+            format: opt(p.format),
+            minLength: opt(p.minLength),
+            maxLength: opt(p.maxLength),
+            pattern: opt(p.pattern),
+          },
+        ];
       }
       case "number":
       case "integer": {
         const p = property as acp.NumberPropertySchema;
-        return [{ ...base, kind: "number", integer: property.type === "integer", minimum: opt(p.minimum), maximum: opt(p.maximum) }];
+        return [
+          {
+            ...base,
+            kind: "number",
+            integer: property.type === "integer",
+            minimum: opt(p.minimum),
+            maximum: opt(p.maximum),
+          },
+        ];
       }
       case "boolean":
         return [{ ...base, kind: "boolean" }];
@@ -60,7 +79,9 @@ function fieldsOf(schema: acp.ElicitationSchema): Field[] {
           items.anyOf?.map((o) => ({ value: o.const, title: o.title, description: opt(o.description) })) ??
           items.enum?.map((value) => ({ value, title: value }));
         if (!choices) return [];
-        return [{ ...base, kind: "choice", choices, multiple: true, minItems: opt(p.minItems), maxItems: opt(p.maxItems) }];
+        return [
+          { ...base, kind: "choice", choices, multiple: true, minItems: opt(p.minItems), maxItems: opt(p.maxItems) },
+        ];
       }
       default:
         return [];
@@ -73,7 +94,8 @@ function defaults(schema: acp.ElicitationSchema): Draft {
   for (const [key, property] of Object.entries(schema.properties ?? {})) {
     const value = property.default;
     if (typeof value === "number") draft[key] = String(value);
-    else if (typeof value === "string" || typeof value === "boolean" || Array.isArray(value)) draft[key] = value as Draft[string];
+    else if (typeof value === "string" || typeof value === "boolean" || Array.isArray(value))
+      draft[key] = value as Draft[string];
   }
   return draft;
 }
@@ -164,7 +186,9 @@ export const ElicitationView = memo(function ElicitationView({ item }: { item: F
 
   useLayoutEffect(() => {
     if (!done && !typingElsewhere()) {
-      form.current?.querySelector<HTMLElement>("button.elicitation-option, input, textarea")?.focus({ preventScroll: true });
+      form.current
+        ?.querySelector<HTMLElement>("button.elicitation-option, input, textarea")
+        ?.focus({ preventScroll: true });
     }
   }, []);
 
@@ -186,7 +210,9 @@ export const ElicitationView = memo(function ElicitationView({ item }: { item: F
     }
   };
 
-  const complete = fields.every((f) => (!f.required || valueOf(f, draft[f.key]) !== undefined) && countOk(f, draft[f.key]));
+  const complete = fields.every(
+    (f) => (!f.required || valueOf(f, draft[f.key]) !== undefined) && countOk(f, draft[f.key]),
+  );
 
   const answer = (response: ElicitationAnswer) => post({ type: "elicitation", id: item.requestId, response });
 
@@ -216,13 +242,19 @@ export const ElicitationView = memo(function ElicitationView({ item }: { item: F
       if (field?.kind === "choice" && choice) {
         e.preventDefault();
         pick(field, choice.value);
-        form.current?.querySelector<HTMLElement>(`[data-field="${CSS.escape(field.key)}"] [data-index="${Number(e.key) - 1}"]`)?.focus();
+        form.current
+          ?.querySelector<HTMLElement>(`[data-field="${CSS.escape(field.key)}"] [data-index="${Number(e.key) - 1}"]`)
+          ?.focus();
       }
     }
   };
 
   const outcome =
-    item.outcome === "accept" ? "chat.elicitation.answered" : item.outcome === "decline" ? "chat.elicitation.declined" : "chat.elicitation.cancelled";
+    item.outcome === "accept"
+      ? "chat.elicitation.answered"
+      : item.outcome === "decline"
+        ? "chat.elicitation.declined"
+        : "chat.elicitation.cancelled";
 
   return (
     <form ref={form} className={"elicitation" + (done ? " done" : "")} onSubmit={submit} onKeyDown={onKeyDown}>
@@ -267,12 +299,22 @@ function FieldView({
 }) {
   const { t } = useL10n();
   const label = field.title ?? (field.kind === "text" || field.kind === "number" ? undefined : field.description);
-  const required = field.required && <span className="elicitation-required" title={t("chat.elicitation.required")}> *</span>;
+  const required = field.required && (
+    <span className="elicitation-required" title={t("chat.elicitation.required")}>
+      {" "}
+      *
+    </span>
+  );
   switch (field.kind) {
     case "choice": {
       const chosen = (v: string) => (field.multiple ? Array.isArray(value) && value.includes(v) : value === v);
       return (
-        <div className="elicitation-field" data-field={field.key} role={field.multiple ? "group" : "radiogroup"} aria-label={label}>
+        <div
+          className="elicitation-field"
+          data-field={field.key}
+          role={field.multiple ? "group" : "radiogroup"}
+          aria-label={label}
+        >
           {label && (
             <div className="elicitation-label">
               {label}
@@ -288,7 +330,9 @@ function FieldView({
                 data-index={i}
                 role={field.multiple ? "checkbox" : "radio"}
                 aria-checked={chosen(choice.value)}
-                className={"elicitation-option" + (chosen(choice.value) ? " chosen" : "") + (field.multiple ? " multiple" : "")}
+                className={
+                  "elicitation-option" + (chosen(choice.value) ? " chosen" : "") + (field.multiple ? " multiple" : "")
+                }
                 onClick={() => onPick(field, choice.value)}
               >
                 <span className="elicitation-key">{i < 9 ? i + 1 : ""}</span>

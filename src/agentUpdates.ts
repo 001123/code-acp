@@ -13,19 +13,22 @@ export interface AgentUpdate {
 }
 
 /** Finds registry updates for installed agents and installs them. */
-export class AgentUpdates extends Context.Service<AgentUpdates, {
-  /**
-   * Looks for updates in the registry, unless checks are off (codeAcp.checkAgentUpdates). Returns the ones to
-   * notify about: those not yet offered since the window opened; empty when the registry cannot be loaded.
-   */
-  readonly due: Effect.Effect<ReadonlyArray<AgentUpdate>>;
-  /** Updates the last check found that are still not installed. */
-  readonly pending: Effect.Effect<ReadonlyArray<AgentUpdate>>;
-  /** Fires when a check finds a different set of registry versions. */
-  readonly onDidChange: vscode.Event<void>;
-  /** Installs the updates one by one behind a progress notification, reports failures and returns the agents updated. */
-  install(updates: ReadonlyArray<AgentUpdate>): Effect.Effect<ReadonlyArray<RegistryAgent>>;
-}>()("code-acp/AgentUpdates") {
+export class AgentUpdates extends Context.Service<
+  AgentUpdates,
+  {
+    /**
+     * Looks for updates in the registry, unless checks are off (codeAcp.checkAgentUpdates). Returns the ones to
+     * notify about: those not yet offered since the window opened; empty when the registry cannot be loaded.
+     */
+    readonly due: Effect.Effect<ReadonlyArray<AgentUpdate>>;
+    /** Updates the last check found that are still not installed. */
+    readonly pending: Effect.Effect<ReadonlyArray<AgentUpdate>>;
+    /** Fires when a check finds a different set of registry versions. */
+    readonly onDidChange: vscode.Event<void>;
+    /** Installs the updates one by one behind a progress notification, reports failures and returns the agents updated. */
+    install(updates: ReadonlyArray<AgentUpdate>): Effect.Effect<ReadonlyArray<RegistryAgent>>;
+  }
+>()("code-acp/AgentUpdates") {
   static readonly layer = Layer.effect(
     AgentUpdates,
     Effect.gen(function* () {
@@ -42,7 +45,9 @@ export class AgentUpdates extends Context.Service<AgentUpdates, {
       const pending = Effect.gen(function* () {
         return (yield* manager.list).flatMap((installed): Array<AgentUpdate> => {
           const agent = latest.get(installed.id);
-          return agent && agent.version !== installed.version && installKind(agent) ? [{ installed, latest: agent }] : [];
+          return agent && agent.version !== installed.version && installKind(agent)
+            ? [{ installed, latest: agent }]
+            : [];
         });
       });
 
@@ -75,8 +80,13 @@ export class AgentUpdates extends Context.Service<AgentUpdates, {
         const installAll = (progress: vscode.Progress<{ message?: string }>) =>
           Effect.forEach(updates, ({ latest }) =>
             manager
-              .install(latest, (message) => Effect.sync(() => progress.report({ message: `${latest.name}: ${message}` })))
-              .pipe(Effect.result, Effect.map((result) => ({ agent: latest, result }))),
+              .install(latest, (message) =>
+                Effect.sync(() => progress.report({ message: `${latest.name}: ${message}` })),
+              )
+              .pipe(
+                Effect.result,
+                Effect.map((result) => ({ agent: latest, result })),
+              ),
           );
         const results = yield* thenable(() =>
           vscode.window.withProgress(

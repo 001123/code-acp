@@ -29,7 +29,12 @@ export class LastOptions {
   }
 
   /** Keeps `value` when `configId` is the model, level of thinking or fast mode of `options` (the session's before the change). */
-  picked(agentId: string, options: ReadonlyArray<acp.SessionConfigOption> | null | undefined, configId: string, value: string): Thenable<void> | undefined {
+  picked(
+    agentId: string,
+    options: ReadonlyArray<acp.SessionConfigOption> | null | undefined,
+    configId: string,
+    value: string,
+  ): Thenable<void> | undefined {
     const change = this.change(options, configId, value);
     const all = this.all;
     const current = all[agentId] ?? {};
@@ -39,7 +44,11 @@ export class LastOptions {
     return this.state.update(KEY, { ...all, [agentId]: { ...current, ...change } });
   }
 
-  private change(options: ReadonlyArray<acp.SessionConfigOption> | null | undefined, configId: string, value: string): Picked | undefined {
+  private change(
+    options: ReadonlyArray<acp.SessionConfigOption> | null | undefined,
+    configId: string,
+    value: string,
+  ): Picked | undefined {
     if (modelOption(options)?.id === configId) {
       return { model: value };
     }

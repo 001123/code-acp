@@ -41,7 +41,11 @@ const TokenNode = Node.create({
     return [{ tag: "mark[data-token]" }];
   },
   renderHTML({ node }) {
-    return ["mark", { class: node.attrs.image ? "token image" : "token", "data-token": node.attrs.token, contenteditable: "false" }, node.attrs.token];
+    return [
+      "mark",
+      { class: node.attrs.image ? "token image" : "token", "data-token": node.attrs.token, contenteditable: "false" },
+      node.attrs.token,
+    ];
   },
   renderText({ node }) {
     return node.attrs.token;
@@ -69,7 +73,13 @@ function caretLine(state: EditorState) {
   const { $head, empty } = state.selection;
   if (!empty || $head.depth !== 1) return undefined;
   const index = $head.index(0);
-  return { index, start: $head.start(), size: $head.parent.content.size, style: stylesOf(state.doc)[index]!, offset: $head.parentOffset };
+  return {
+    index,
+    start: $head.start(),
+    size: $head.parent.content.size,
+    style: stylesOf(state.doc)[index]!,
+    offset: $head.parentOffset,
+  };
 }
 
 /** Backspace right after a hidden prefix removes it, turning a heading or quote back into text. */
@@ -101,7 +111,8 @@ const LivePreview = Extension.create<{ placeholder: () => string }>({
           const at = caretLine(state);
           if (!at) return null;
           const { index, start, offset, style } = at;
-          const moved = !trs.some((tr) => tr.docChanged) && old.selection.empty ? old.selection.head - start : undefined;
+          const moved =
+            !trs.some((tr) => tr.docChanged) && old.selection.empty ? old.selection.head - start : undefined;
           const prefix = style.prefix ?? 0;
           if (offset < prefix) {
             const leaving = moved === prefix && index > 0;
@@ -130,7 +141,8 @@ const LivePreview = Extension.create<{ placeholder: () => string }>({
             const starts: number[] = [];
             doc.forEach((line, offset, i) => {
               starts.push(offset + 1);
-              if (focused && selection.from <= offset + 1 + line.content.size && selection.to >= offset + 1) touched.add(styles[i]!.fence ?? -1 - i);
+              if (focused && selection.from <= offset + 1 + line.content.size && selection.to >= offset + 1)
+                touched.add(styles[i]!.fence ?? -1 - i);
             });
             styles.forEach((style, i) => {
               const line = doc.child(i);
@@ -145,11 +157,14 @@ const LivePreview = Extension.create<{ placeholder: () => string }>({
                 }
                 decorations.push(Decoration.node(start - 1, start - 1 + line.nodeSize, attrs));
               }
-              if (style.prefix) decorations.push(Decoration.inline(start, start + style.prefix, { class: "md-prefix" }));
+              if (style.prefix)
+                decorations.push(Decoration.inline(start, start + style.prefix, { class: "md-prefix" }));
               for (const span of style.spans) {
                 if (span.from === span.to) continue;
                 // Inline syntax shows while the selection touches its construct, other markers while it touches the line.
-                const shown = span.around ? focused && selection.from <= start + span.around.to && selection.to >= start + span.around.from : active;
+                const shown = span.around
+                  ? focused && selection.from <= start + span.around.to && selection.to >= start + span.around.from
+                  : active;
                 const cls = span.kind === "marker" ? (shown ? "md-marker" : "md-marker md-hidden") : `md-${span.kind}`;
                 decorations.push(Decoration.inline(start + span.from, start + span.to, { class: cls }));
               }
@@ -164,7 +179,12 @@ const LivePreview = Extension.create<{ placeholder: () => string }>({
 });
 
 /** Syntax colors for the code of the fenced block opened on line `open`. */
-function codeDecorations(doc: PmNode, styles: readonly LineStyle[], starts: readonly number[], open: number): Decoration[] {
+function codeDecorations(
+  doc: PmNode,
+  styles: readonly LineStyle[],
+  starts: readonly number[],
+  open: number,
+): Decoration[] {
   const lang = fenceLanguage(lineText(doc.child(open), true).replace(FENCE, ""));
   if (!lang) return [];
   const lines: number[] = [];
@@ -261,7 +281,13 @@ function linesOf(schema: Schema, text: string, tokens: readonly TokenInfo[]): Fr
 }
 
 /** Replaces `from`..`to` (offsets in `flatText`) with `text`, its `tokens` as chips; the caret goes after it. */
-export function replaceText(view: EditorView, from: number, to: number, text: string, tokens: readonly TokenInfo[] = []): void {
+export function replaceText(
+  view: EditorView,
+  from: number,
+  to: number,
+  text: string,
+  tokens: readonly TokenInfo[] = [],
+): void {
   const { state } = view;
   const end = posAt(state.doc, to);
   const tr = state.tr.replace(posAt(state.doc, from), end, new Slice(linesOf(state.schema, text, tokens), 1, 1));

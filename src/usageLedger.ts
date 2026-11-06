@@ -144,9 +144,17 @@ export function addTurn(ledger: Ledger, ref: SessionRef, usage: unknown, day: st
  * elsewhere (a reopened session), for sessions the ledger hasn't seen. A cost below the last one means the agent
  * counts from zero again (a restarted agent); all of it is new then.
  */
-export function addCost(ledger: Ledger, ref: SessionRef, cost: Cost, day: string, now: number, previous?: Cost): Ledger {
+export function addCost(
+  ledger: Ledger,
+  ref: SessionRef,
+  cost: Cost,
+  day: string,
+  now: number,
+  previous?: Cost,
+): Ledger {
   const last = ledger.sessions[sessionKey(ref.agentId, ref.sessionId)]?.lastCost ?? previous;
-  const delta = !last || last.currency !== cost.currency || cost.amount < last.amount ? cost.amount : cost.amount - last.amount;
+  const delta =
+    !last || last.currency !== cost.currency || cost.amount < last.amount ? cost.amount : cost.amount - last.amount;
   return record(ledger, ref, day, now, { ...NO_TOTALS, cost: delta > 0 ? { [cost.currency]: delta } : {} }, cost);
 }
 
@@ -274,17 +282,20 @@ export function summarize(
  * Tokens and cost the agents report, by session and by local day, kept for good in the global storage (shared by
  * every workspace): one file a month, `usage/YYYY/MM.json`, so a record rewrites only the current month.
  */
-export class UsageLedger extends Context.Service<UsageLedger, {
-  /** Fires after every record and after a clear. */
-  readonly onDidChange: vscode.Event<void>;
-  recordTurn(ref: SessionRef, usage: unknown): Effect.Effect<void>;
-  recordCost(ref: SessionRef, cost: Cost, previous?: Cost): Effect.Effect<void>;
-  session(agentId: string, sessionId: string): Effect.Effect<Totals | undefined>;
-  /** What was recorded on the current local day. */
-  readonly today: Effect.Effect<Totals>;
-  summary(query: SessionQuery, searchText?: (session: SessionEntry) => string): Effect.Effect<UsageSummary>;
-  readonly clear: Effect.Effect<void>;
-}>()("code-acp/UsageLedger") {
+export class UsageLedger extends Context.Service<
+  UsageLedger,
+  {
+    /** Fires after every record and after a clear. */
+    readonly onDidChange: vscode.Event<void>;
+    recordTurn(ref: SessionRef, usage: unknown): Effect.Effect<void>;
+    recordCost(ref: SessionRef, cost: Cost, previous?: Cost): Effect.Effect<void>;
+    session(agentId: string, sessionId: string): Effect.Effect<Totals | undefined>;
+    /** What was recorded on the current local day. */
+    readonly today: Effect.Effect<Totals>;
+    summary(query: SessionQuery, searchText?: (session: SessionEntry) => string): Effect.Effect<UsageSummary>;
+    readonly clear: Effect.Effect<void>;
+  }
+>()("code-acp/UsageLedger") {
   static readonly layer = Layer.effect(
     UsageLedger,
     Effect.gen(function* () {
@@ -305,8 +316,11 @@ export class UsageLedger extends Context.Service<UsageLedger, {
 
       /** The local date `daysAgo` days before now, `YYYY-MM-DD`. */
       const localDay = (daysAgo: number) =>
-        Effect.map(DateTime.now, (now) => DateTime.formatIsoDate(DateTime.subtract(DateTime.setZone(now, zone), { days: daysAgo })));
-      const monthOfTime = (ms: number) => monthOf(DateTime.formatIsoDate(DateTime.setZone(DateTime.makeUnsafe(ms), zone)));
+        Effect.map(DateTime.now, (now) =>
+          DateTime.formatIsoDate(DateTime.subtract(DateTime.setZone(now, zone), { days: daysAgo })),
+        );
+      const monthOfTime = (ms: number) =>
+        monthOf(DateTime.formatIsoDate(DateTime.setZone(DateTime.makeUnsafe(ms), zone)));
 
       const mtimeOf = (file: string) =>
         fs.stat(file).pipe(
@@ -373,7 +387,9 @@ export class UsageLedger extends Context.Service<UsageLedger, {
         });
 
       /** Usage is a nicety: a failed write must not break the chat. */
-      const logFailure = Effect.catch((err: { message: string }) => Effect.logWarning(`Saving usage failed: ${err.message}`));
+      const logFailure = Effect.catch((err: { message: string }) =>
+        Effect.logWarning(`Saving usage failed: ${err.message}`),
+      );
 
       /** Splits the ledger earlier versions kept whole (in `usage.json`, or before that in globalState) into months. */
       const migrate = Effect.gen(function* () {
@@ -409,12 +425,21 @@ export class UsageLedger extends Context.Service<UsageLedger, {
         );
 
       const recordTurn = (ref: SessionRef, usage: unknown) =>
-        modify((ledger, _, day, now) => addTurn(ledger, ref, usage, day, now)).pipe(Effect.withSpan("UsageLedger.recordTurn"));
+        modify((ledger, _, day, now) => addTurn(ledger, ref, usage, day, now)).pipe(
+          Effect.withSpan("UsageLedger.recordTurn"),
+        );
 
       // A session kept on from an earlier month has its last cost there.
       const recordCost = (ref: SessionRef, cost: Cost, previous?: Cost) =>
         modify((ledger, all, day, now) =>
-          addCost(ledger, ref, cost, day, now, all.sessions[sessionKey(ref.agentId, ref.sessionId)]?.lastCost ?? previous),
+          addCost(
+            ledger,
+            ref,
+            cost,
+            day,
+            now,
+            all.sessions[sessionKey(ref.agentId, ref.sessionId)]?.lastCost ?? previous,
+          ),
         ).pipe(Effect.withSpan("UsageLedger.recordCost"));
 
       const session = (agentId: string, sessionId: string) =>
@@ -430,7 +455,14 @@ export class UsageLedger extends Context.Service<UsageLedger, {
 
       const summary = (query: SessionQuery, searchText?: (session: SessionEntry) => string) =>
         Effect.gen(function* () {
-          return summarize(yield* readAll, yield* localDay(0), yield* localDay(6), yield* localDay(29), query, searchText);
+          return summarize(
+            yield* readAll,
+            yield* localDay(0),
+            yield* localDay(6),
+            yield* localDay(29),
+            query,
+            searchText,
+          );
         });
 
       const clear = lock.withPermits(1)(

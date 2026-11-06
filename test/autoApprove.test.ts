@@ -14,7 +14,8 @@ import { __test } from "./stubs/vscode";
 const memento = (values = new Map<string, unknown>()) =>
   ({
     get: (key: string) => values.get(key),
-    update: async (key: string, value: unknown) => void (value === undefined ? values.delete(key) : values.set(key, value)),
+    update: async (key: string, value: unknown) =>
+      void (value === undefined ? values.delete(key) : values.set(key, value)),
   }) as unknown as vscode.Memento;
 
 const layer = () =>
@@ -60,7 +61,10 @@ describe("verdictOf", () => {
   it("asks when no rule allows it", () => {
     for (const kind of ["read", "search", "edit", "move", "execute", "fetch"] as const) {
       assert.strictEqual(verdictOf({}, kind, false), "ask");
-      assert.strictEqual(verdictOf({ [kind === "search" ? "read" : kind === "move" ? "edit" : kind]: "ask" }, kind, false), "ask");
+      assert.strictEqual(
+        verdictOf({ [kind === "search" ? "read" : kind === "move" ? "edit" : kind]: "ask" }, kind, false),
+        "ask",
+      );
     }
   });
 
@@ -101,7 +105,13 @@ describe("pathsAreSafe", () => {
   });
 
   it("protects what can run later from being written, not from being read", () => {
-    for (const target of ["/w/.git/hooks/pre-commit", "/w/.vscode/tasks.json", "/w/sub/.git/config", "/w/.GIT/config", "/w/.VSCode/tasks.json"]) {
+    for (const target of [
+      "/w/.git/hooks/pre-commit",
+      "/w/.vscode/tasks.json",
+      "/w/sub/.git/config",
+      "/w/.GIT/config",
+      "/w/.VSCode/tasks.json",
+    ]) {
       assert.isFalse(pathsAreSafe("edit", "/w", [target]), target);
       assert.isFalse(pathsAreSafe("move", "/w", [target]), target);
       assert.isTrue(pathsAreSafe("read", "/w", [target]), target);
@@ -141,12 +151,18 @@ describe("AutoApprove", () => {
       const outside = path.join(root, "secret");
       assert.strictEqual(yield* answer(request({ kind: "edit", locations: [{ path: inside }] }), { cwd }), "once");
       assert.isUndefined(yield* answer(request({ kind: "edit", locations: [{ path: outside }] }), { cwd }));
-      assert.isUndefined(yield* answer(request({ kind: "edit", locations: [{ path: path.join(cwd, "..", "secret") }] }), { cwd }));
+      assert.isUndefined(
+        yield* answer(request({ kind: "edit", locations: [{ path: path.join(cwd, "..", "secret") }] }), { cwd }),
+      );
       assert.isUndefined(yield* answer(request({ kind: "edit", locations: [{ path: "a.ts" }] }), { cwd }));
       assert.isUndefined(yield* answer(request({ kind: "edit" }), { cwd }));
       assert.isUndefined(
         yield* answer(
-          request({ kind: "edit", locations: [{ path: inside }], content: [{ type: "diff", path: outside, newText: "x" }] }),
+          request({
+            kind: "edit",
+            locations: [{ path: inside }],
+            content: [{ type: "diff", path: outside, newText: "x" }],
+          }),
           { cwd },
         ),
       );
@@ -165,7 +181,8 @@ describe("AutoApprove", () => {
         await fs.symlink(path.join(cwd, ".git", "hooks"), path.join(cwd, "hooks"));
       });
       __test.setSetting("codeAcp.autoApprove", { read: "allow", edit: "allow" });
-      const asks = (kind: acp.ToolKind, file: string) => answer(request({ kind, locations: [{ path: path.join(cwd, file) }] }), { cwd });
+      const asks = (kind: acp.ToolKind, file: string) =>
+        answer(request({ kind, locations: [{ path: path.join(cwd, file) }] }), { cwd });
       assert.isUndefined(yield* asks("read", "to-file"));
       assert.isUndefined(yield* asks("read", "to-folder/secret"));
       assert.isUndefined(yield* asks("edit", "to-folder/new.ts"));
@@ -181,7 +198,10 @@ describe("AutoApprove", () => {
       const cwd = path.join(root, "link-to-work");
       yield* Effect.promise(() => fs.symlink(path.join(root, "work"), cwd));
       __test.setSetting("codeAcp.autoApprove", { read: "allow" });
-      assert.strictEqual(yield* answer(request({ kind: "read", locations: [{ path: path.join(root, "work", "a.ts") }] }), { cwd }), "once");
+      assert.strictEqual(
+        yield* answer(request({ kind: "read", locations: [{ path: path.join(root, "work", "a.ts") }] }), { cwd }),
+        "once",
+      );
     }).pipe(Effect.scoped, Effect.provide(layer())),
   );
 

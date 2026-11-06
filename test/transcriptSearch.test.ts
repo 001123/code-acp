@@ -29,7 +29,8 @@ const texts = (ranges: Range[]) => ranges.map((range) => range.toString());
 const settle = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
 
 describe("findMatches", () => {
-  const slices = (text: string, query: string) => findMatches(text, query).map(({ start, end }) => text.slice(start, end));
+  const slices = (text: string, query: string) =>
+    findMatches(text, query).map(({ start, end }) => text.slice(start, end));
 
   it("ignores case and diacritics", () => {
     assert.deepStrictEqual(slices("Tìm KIẾM và tim kiem", "tim kiem"), ["Tìm KIẾM", "tim kiem"]);
@@ -67,7 +68,9 @@ describe("findRanges", () => {
   });
 
   it("leaves out buttons, hidden parts and placeholders, not collapsed sections", () => {
-    const root = dom(`<button>needle</button><div hidden>needle</div><div class="empty">needle</div><div class="waiting">needle</div><details><summary>x</summary><pre>a needle</pre></details>`);
+    const root = dom(
+      `<button>needle</button><div hidden>needle</div><div class="empty">needle</div><div class="waiting">needle</div><details><summary>x</summary><pre>a needle</pre></details>`,
+    );
     const [only, ...rest] = findRanges(root, "needle");
     assert.isEmpty(rest);
     assert.strictEqual(only!.startContainer.parentElement!.tagName, "PRE");
@@ -78,7 +81,9 @@ describe("findRanges", () => {
   });
 
   it("can keep to the questions and answers", () => {
-    const root = dom(`<div class="msg user"><p>needle</p></div><div class="msg assistant md"><p>needle</p></div><div class="plan">needle</div><details class="thought"><p>needle</p></details><details class="tool"><summary>needle</summary><div class="tool-body">needle<div class="msg assistant">needle</div></div></details><details class="activity"><div class="msg assistant">needle</div></details>`);
+    const root = dom(
+      `<div class="msg user"><p>needle</p></div><div class="msg assistant md"><p>needle</p></div><div class="plan">needle</div><details class="thought"><p>needle</p></details><details class="tool"><summary>needle</summary><div class="tool-body">needle<div class="msg assistant">needle</div></div></details><details class="activity"><div class="msg assistant">needle</div></details>`,
+    );
     assert.lengthOf(findRanges(root, "needle"), 8);
     const ranges = findRanges(root, "needle", undefined, true);
     assert.deepStrictEqual(
@@ -117,7 +122,9 @@ describe("openAround", () => {
   afterEach(() => void (document.body.innerHTML = ""));
 
   it("opens the sections around a match and closes them when moving on", () => {
-    const root = dom(`<details id="a"><summary>s</summary><details id="b"><summary>s</summary><p>one</p></details></details><details id="c"><summary>s</summary><p>two</p></details>`);
+    const root = dom(
+      `<details id="a"><summary>s</summary><details id="b"><summary>s</summary><p>one</p></details></details><details id="c"><summary>s</summary><p>two</p></details>`,
+    );
     const [a, b, c] = ["a", "b", "c"].map((id) => root.querySelector<HTMLDetailsElement>(`#${id}`)!);
     let opened = openAround(findRanges(root, "one")[0]!, []);
     assert.isTrue(a!.open && b!.open);
@@ -128,7 +135,9 @@ describe("openAround", () => {
   });
 
   it("does not open a section for a match in its summary, nor take over one the user opened", () => {
-    const root = dom(`<details id="a"><summary>title</summary><p>x</p></details><details id="b" open><summary>s</summary><p>body</p></details>`);
+    const root = dom(
+      `<details id="a"><summary>title</summary><p>x</p></details><details id="b" open><summary>s</summary><p>body</p></details>`,
+    );
     const a = root.querySelector<HTMLDetailsElement>("#a")!;
     const b = root.querySelector<HTMLDetailsElement>("#b")!;
     assert.deepStrictEqual(openAround(findRanges(root, "title")[0]!, []), []);
@@ -157,7 +166,8 @@ describe("TranscriptSearch", () => {
       onClose: () => closed++,
     });
   };
-  const render = (resetKey: unknown = 1, request = 1) => act(() => root.render(createElement(Search, { resetKey, request })));
+  const render = (resetKey: unknown = 1, request = 1) =>
+    act(() => root.render(createElement(Search, { resetKey, request })));
   const input = () => host.querySelector("input")!;
   const type = async (value: string) => {
     await act(async () => {
@@ -170,7 +180,7 @@ describe("TranscriptSearch", () => {
   const press = (key: string, shiftKey = false) =>
     act(async () => void input().dispatchEvent(new KeyboardEvent("keydown", { key, shiftKey, bubbles: true })));
   const count = () => host.querySelector(".transcript-search-count")?.textContent;
-  const currentText = () => [...highlights.get("transcript-search-current") ?? []][0]?.toString();
+  const currentText = () => [...(highlights.get("transcript-search-current") ?? [])][0]?.toString();
 
   beforeEach(async () => {
     revealed = 0;

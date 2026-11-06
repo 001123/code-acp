@@ -15,8 +15,22 @@ const claudeDaily = JSON.stringify({
       totalCost: 1.5,
       modelsUsed: ["claude-opus-5-5", "claude-haiku-5-5"],
       modelBreakdowns: [
-        { modelName: "claude-opus-5-5", inputTokens: 8, outputTokens: 15, cacheReadTokens: 300, cacheCreationTokens: 40, cost: 1.4 },
-        { modelName: "claude-haiku-5-5", inputTokens: 2, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0, cost: 0.1 },
+        {
+          modelName: "claude-opus-5-5",
+          inputTokens: 8,
+          outputTokens: 15,
+          cacheReadTokens: 300,
+          cacheCreationTokens: 40,
+          cost: 1.4,
+        },
+        {
+          modelName: "claude-haiku-5-5",
+          inputTokens: 2,
+          outputTokens: 5,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          cost: 0.1,
+        },
       ],
     },
     {
@@ -85,7 +99,15 @@ const codexDaily = JSON.stringify({
       cacheCreationTokens: 0,
       totalTokens: 160,
       costUSD: 0.25,
-      models: { "gpt-6.1-sol": { inputTokens: 100, outputTokens: 10, reasoningOutputTokens: 4, totalTokens: 160, isFallback: false } },
+      models: {
+        "gpt-6.1-sol": {
+          inputTokens: 100,
+          outputTokens: 10,
+          reasoningOutputTokens: 4,
+          totalTokens: 160,
+          isFallback: false,
+        },
+      },
     },
   ],
 });
@@ -157,10 +179,34 @@ describe("toView", () => {
     Effect.gen(function* () {
       const [daily, sessions] = yield* decodeUnified(
         JSON.stringify({
-          daily: [{ agent: "all", period: "2026-10-31", inputTokens: 5, outputTokens: 5, totalTokens: 10, totalCost: 1, metadata: { agents: ["claude", "codex"] } }],
+          daily: [
+            {
+              agent: "all",
+              period: "2026-10-31",
+              inputTokens: 5,
+              outputTokens: 5,
+              totalTokens: 10,
+              totalCost: 1,
+              metadata: { agents: ["claude", "codex"] },
+            },
+          ],
           session: [
-            { agent: "claude", period: "a", inputTokens: 1, totalTokens: 1, totalCost: 0.4, metadata: { lastActivity: "2026-10-31T01:00:00.000Z" } },
-            { agent: "codex", period: "b", inputTokens: 2, totalTokens: 2, totalCost: 0.5, metadata: { lastActivity: "2026-10-31T02:00:00.000Z" } },
+            {
+              agent: "claude",
+              period: "a",
+              inputTokens: 1,
+              totalTokens: 1,
+              totalCost: 0.4,
+              metadata: { lastActivity: "2026-10-31T01:00:00.000Z" },
+            },
+            {
+              agent: "codex",
+              period: "b",
+              inputTokens: 2,
+              totalTokens: 2,
+              totalCost: 0.5,
+              metadata: { lastActivity: "2026-10-31T02:00:00.000Z" },
+            },
             { agent: "claude", period: "c", inputTokens: 3, totalTokens: 3, totalCost: 0.1, metadata: {} },
           ],
           totals: { totalCost: 1 },

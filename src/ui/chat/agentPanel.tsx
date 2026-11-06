@@ -60,7 +60,14 @@ export function AgentPanel({
         <AgentIcon icon={current?.icon} />
       </button>
       {summary && (
-        <button type="button" id="agent-summary" title={t("chat.agentSettings")} aria-haspopup="dialog" aria-expanded={menu.open} onClick={menu.press}>
+        <button
+          type="button"
+          id="agent-summary"
+          title={t("chat.agentSettings")}
+          aria-haspopup="dialog"
+          aria-expanded={menu.open}
+          onClick={menu.press}
+        >
           {summary}
           <Icon svg={chevronDownIcon} />
         </button>

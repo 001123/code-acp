@@ -134,7 +134,9 @@ export class Follower implements vscode.Disposable {
   /** The agent wrote `path` through the client: shown where its pending tool call changed it, else at the top. */
   fileWritten(tab: Tab, path: string): void {
     const call = [...this.calls.entries()].find(
-      ([key, c]) => key.startsWith(`${tab.id}:`) && (c.locations.some((l) => l.path === path) || c.diffs.some((d) => d.path === path)),
+      ([key, c]) =>
+        key.startsWith(`${tab.id}:`) &&
+        (c.locations.some((l) => l.path === path) || c.diffs.some((d) => d.path === path)),
     )?.[1];
     this.show(tab, call ?? { locations: [{ path }], diffs: [] }, path);
   }

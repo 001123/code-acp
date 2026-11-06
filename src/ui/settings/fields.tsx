@@ -55,7 +55,12 @@ export function Field(props: {
   );
 }
 
-export function Toggle(props: { id: string; checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean }) {
+export function Toggle(props: {
+  id: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
     <span className="toggle">
       <input
@@ -131,7 +136,12 @@ export function Segmented(props: {
   disabled?: boolean;
 }) {
   return (
-    <div id={props.id} className={props.className ? `segmented ${props.className}` : "segmented"} role="radiogroup" aria-label={props.label}>
+    <div
+      id={props.id}
+      className={props.className ? `segmented ${props.className}` : "segmented"}
+      role="radiogroup"
+      aria-label={props.label}
+    >
       {props.options.map((o) => (
         <button
           key={o.value}

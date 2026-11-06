@@ -33,7 +33,13 @@ export interface TurnsHost extends ChatUi {
   readonly usage: TabUsage;
   readonly tabWorktrees: TabWorktrees;
   /** The tab's session, created when missing; undefined when the user has to act first. */
-  ensureSession(tab: Tab): Effect.Effect<string | undefined, AgentStartError | AgentRequestError, Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit>;
+  ensureSession(
+    tab: Tab,
+  ): Effect.Effect<
+    string | undefined,
+    AgentStartError | AgentRequestError,
+    Output | ExtensionCtx | AcpTrace | Worktrees | ShadowGit
+  >;
   cancelTab(tab: Tab): Effect.Effect<void, AgentRequestError | AuthRequiredError>;
   /** A turn ended that the user should hear about. */
   finished(tab: Tab): void;
@@ -50,7 +56,8 @@ interface PreparedTurn {
 }
 
 /** What a worktree gets named after when `parts` is its first message. */
-const promptName = (parts: OutgoingMessage["parts"]): string => messageText(parts).trim() || parts.find((part) => typeof part !== "string")?.name || "";
+const promptName = (parts: OutgoingMessage["parts"]): string =>
+  messageText(parts).trim() || parts.find((part) => typeof part !== "string")?.name || "";
 
 /** The turns of chat tabs: sending messages, queueing them, taking them back. */
 export class TabTurns {
@@ -122,7 +129,12 @@ export class TabTurns {
         Effect.sync(() => {
           const stopReason = Exit.isSuccess(exit) ? exit.value : undefined;
           // A turn the user stopped needs no word; one the queue follows is not the end yet.
-          if (stopReason && stopReason !== "cancelled" && !(stopReason === "end_turn" && tab.queue.length) && this.host.tabs.has(tab)) {
+          if (
+            stopReason &&
+            stopReason !== "cancelled" &&
+            !(stopReason === "end_turn" && tab.queue.length) &&
+            this.host.tabs.has(tab)
+          ) {
             this.host.finished(tab);
           }
           // The queue waits while the user looks at a turn they stopped, or that failed.
@@ -189,7 +201,11 @@ export class TabTurns {
   }
 
   /** Sends a message right away: a running turn is stopped, and the message goes first once it has. */
-  private readonly sendNow = Effect.fn("TabTurns.sendNow")(function* (this: TabTurns, tab: Tab, message: OutgoingMessage) {
+  private readonly sendNow = Effect.fn("TabTurns.sendNow")(function* (
+    this: TabTurns,
+    tab: Tab,
+    message: OutgoingMessage,
+  ) {
     if (!tab.busy && !tab.sending) {
       return yield* this.send(tab, message);
     }
@@ -199,7 +215,11 @@ export class TabTurns {
   });
 
   /** Moves a queued message first and sends it, stopping the running turn. */
-  private readonly sendQueuedNow = Effect.fn("TabTurns.sendQueuedNow")(function* (this: TabTurns, tab: Tab, id: number) {
+  private readonly sendQueuedNow = Effect.fn("TabTurns.sendQueuedNow")(function* (
+    this: TabTurns,
+    tab: Tab,
+    id: number,
+  ) {
     const index = tab.queue.findIndex((each) => each.id === id);
     if (index < 0) {
       return;
@@ -299,10 +319,19 @@ export class TabTurns {
   }
 
   /** Runs a turn; its stop reason, or undefined without one. A message that gets no turn goes back to the composer. */
-  private readonly sendTurn = Effect.fn("TabTurns.sendTurn")(function* (this: TabTurns, tab: Tab, message: OutgoingMessage) {
+  private readonly sendTurn = Effect.fn("TabTurns.sendTurn")(function* (
+    this: TabTurns,
+    tab: Tab,
+    message: OutgoingMessage,
+  ) {
     const prepared = yield* Effect.gen({ self: this }, function* () {
       // An edit or a retry stays in the conversation it changes. A session still starting has to get there first.
-      if (tab.worktreeOnSend && tab.rewindNote === undefined && (!(yield* this.host.ensureSession(tab)) || !(yield* this.host.tabWorktrees.enterOnSend(tab, promptName(message.parts))))) {
+      if (
+        tab.worktreeOnSend &&
+        tab.rewindNote === undefined &&
+        (!(yield* this.host.ensureSession(tab)) ||
+          !(yield* this.host.tabWorktrees.enterOnSend(tab, promptName(message.parts))))
+      ) {
         return undefined;
       }
       return yield* this.prepareTurn(tab, message);
@@ -403,7 +432,9 @@ export class TabTurns {
     return yield* agent.prompt(sessionId, prompt).pipe(
       Effect.tap((res) => this.host.usage.recordTurn(tab, sessionId, res)),
       Effect.tap((res) => Effect.sync(() => this.host.postTab(tab, { type: "turnEnd", stopReason: res.stopReason }))),
-      Effect.tap((res) => (readSettings().tracing ? this.postTrace(tab, sessionId, turn, position, res, stats, costBefore) : Effect.void)),
+      Effect.tap((res) =>
+        readSettings().tracing ? this.postTrace(tab, sessionId, turn, position, res, stats, costBefore) : Effect.void,
+      ),
       Effect.map((res) => res.stopReason),
       Effect.catchTags({
         AuthRequiredError: () =>
@@ -459,7 +490,12 @@ export class TabTurns {
       Effect.orElseSucceed(() => undefined),
     );
     const totals = yield* this.host.usage.totals(tab);
-    const trace = turnTrace(tab, sessionId, response, { stats: stats.summary(now), costBefore, changes, number: totals?.turns });
+    const trace = turnTrace(tab, sessionId, response, {
+      stats: stats.summary(now),
+      costBefore,
+      changes,
+      number: totals?.turns,
+    });
     this.host.postTab(tab, { type: "turnTrace", trace });
     // Gathering the numbers takes a while, and the tab may have moved on to another session.
     if (tab.sessionId === sessionId) {

@@ -13,10 +13,15 @@ export class AgentPool {
     if (!lock) {
       this.startLocks.set(agentId, (lock = Semaphore.makeUnsafe(1)));
     }
-    return Semaphore.withPermits(lock, 1)(
+    return Semaphore.withPermits(
+      lock,
+      1,
+    )(
       Effect.suspend(() => {
         const running = this.running.get(agentId);
-        return running ? Effect.succeed(running) : Effect.tap(start, (started) => Effect.sync(() => this.running.set(agentId, started)));
+        return running
+          ? Effect.succeed(running)
+          : Effect.tap(start, (started) => Effect.sync(() => this.running.set(agentId, started)));
       }),
     );
   }
@@ -47,7 +52,10 @@ export class AgentPool {
   }
 
   /** Stops the processes `inUse` says no tab needs. */
-  readonly stopIdle = Effect.fn("AgentPool.stopIdle")(function* (this: AgentPool, inUse: (running: RunningAgent) => boolean) {
+  readonly stopIdle = Effect.fn("AgentPool.stopIdle")(function* (
+    this: AgentPool,
+    inUse: (running: RunningAgent) => boolean,
+  ) {
     for (const running of [...this.running.values()]) {
       if (!inUse(running)) {
         this.running.delete(running.agentId);

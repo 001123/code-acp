@@ -44,11 +44,21 @@ describe("follow the agent", () => {
 
   it("falls back to the location's line", () => {
     const read = mergeCall(undefined, { locations: [{ path: "/w/a.ts", line: 40 }] });
-    assert.deepStrictEqual(followTarget(read, "/w/a.ts", undefined), { path: "/w/a.ts", startLine: 39, endLine: 39, highlight: false });
+    assert.deepStrictEqual(followTarget(read, "/w/a.ts", undefined), {
+      path: "/w/a.ts",
+      startLine: 39,
+      endLine: 39,
+      highlight: false,
+    });
     const edit = mergeCall(undefined, {
       locations: [{ path: "/w/a.ts" }],
       content: [{ type: "diff", path: "/w/a.ts", oldText: "gone", newText: "" }],
     });
-    assert.deepStrictEqual(followTarget(edit, "/w/a.ts", "nothing here"), { path: "/w/a.ts", startLine: 0, endLine: 0, highlight: false });
+    assert.deepStrictEqual(followTarget(edit, "/w/a.ts", "nothing here"), {
+      path: "/w/a.ts",
+      startLine: 0,
+      endLine: 0,
+      highlight: false,
+    });
   });
 });

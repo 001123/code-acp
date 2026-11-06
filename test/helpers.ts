@@ -22,7 +22,10 @@ export const makeOutput = (): OutputStub => {
   } as OutputStub;
 };
 
-export const makeExtensionCtx = (globalStorage = "/tmp/code-acp-test-storage", packageJSON: unknown = { version: "1.2.3" }) =>
+export const makeExtensionCtx = (
+  globalStorage = "/tmp/code-acp-test-storage",
+  packageJSON: unknown = { version: "1.2.3" },
+) =>
   ({
     extension: { packageJSON },
     globalStorageUri: { fsPath: globalStorage },

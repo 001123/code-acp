@@ -50,7 +50,11 @@ export function UsageMeter({
   // A ring of radius 7 in a 16×16 box; the dash covers `ratio` of the circumference.
   const circumference = 2 * Math.PI * 7;
   return (
-    <span id="usage" onClick={() => post({ type: "showUsage" })} data-level={ratio >= 0.9 ? "high" : ratio >= 0.7 ? "medium" : "low"}>
+    <span
+      id="usage"
+      onClick={() => post({ type: "showUsage" })}
+      data-level={ratio >= 0.9 ? "high" : ratio >= 0.7 ? "medium" : "low"}
+    >
       {/* Focusable so the panel also opens from the keyboard. */}
       <span
         id="usage-ring"
@@ -59,10 +63,17 @@ export function UsageMeter({
         aria-label={summary}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") post({ type: "showUsage" });
-        }}>
+        }}
+      >
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <circle className="usage-track" cx="8" cy="8" r="7" />
-          <circle className="usage-fill" cx="8" cy="8" r="7" strokeDasharray={`${ratio * circumference} ${circumference}`} />
+          <circle
+            className="usage-fill"
+            cx="8"
+            cy="8"
+            r="7"
+            strokeDasharray={`${ratio * circumference} ${circumference}`}
+          />
         </svg>
       </span>
       <span id="usage-panel">
@@ -83,7 +94,13 @@ export function UsageMeter({
         {onCompact && (
           // On the wrapper: a click on a disabled button must not open the summary either.
           <span className="usage-actions" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="secondary" disabled={busy} title={t("chat.compactTitle")} onClick={onCompact}>
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              title={t("chat.compactTitle")}
+              onClick={onCompact}
+            >
               {t("chat.compact")}
             </button>
           </span>

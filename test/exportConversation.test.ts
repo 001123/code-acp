@@ -15,7 +15,12 @@ describe("conversationMarkdown", () => {
 
   it("writes speakers once per turn, with tool calls as one compact list", () => {
     const items: Item[] = [
-      { kind: "userMessage", id: 1, text: "Fix **it**", attachments: [{ name: "a.png" }, { name: "b.ts", token: "@b.ts" }] },
+      {
+        kind: "userMessage",
+        id: 1,
+        text: "Fix **it**",
+        attachments: [{ name: "a.png" }, { name: "b.ts", token: "@b.ts" }],
+      },
       { kind: "thought", id: 2, text: "Hmm" },
       {
         kind: "tool",
@@ -27,7 +32,14 @@ describe("conversationMarkdown", () => {
         children: [{ kind: "tool", id: 4, toolCallId: "t2", title: "Read", status: "failed" }],
       },
       { kind: "tool", id: 5, toolCallId: "t3" },
-      { kind: "plan", id: 6, entries: [{ content: "One", status: "completed", priority: "high" }, { content: "Two", status: "pending", priority: "low" }] },
+      {
+        kind: "plan",
+        id: 6,
+        entries: [
+          { content: "One", status: "completed", priority: "high" },
+          { content: "Two", status: "pending", priority: "low" },
+        ],
+      },
       { kind: "assistant", id: 7, text: "Done\n\n```ts\nx\n```" },
       { kind: "notice", id: 8, text: { raw: "Cancelled" } },
       { kind: "error", id: 9, text: { raw: "line 1\nline 2" } },
