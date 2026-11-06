@@ -4,7 +4,7 @@
   --picker-hover: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
   left: 0;
   display: block;
-  width: min(400px, calc(100vw - 24px));
+  width: min(340px, calc(100vw - 24px));
   padding: 0;
   font-size: 0.92em;
   container-type: inline-size;
@@ -16,7 +16,7 @@
   height: min(236px, calc(100vh - 120px));
 }
 .picker-body.with-effort {
-  grid-template-columns: auto minmax(0, 1fr) minmax(96px, 26%);
+  grid-template-columns: auto minmax(0, 1fr) minmax(96px, 30%);
 }
 .picker-body.with-footer {
   grid-template-rows: minmax(0, 1fr) auto;
@@ -391,7 +391,7 @@
 }
 
 /* Narrow views: the levels of thinking go under the models, side by side. */
-@container (max-width: 380px) {
+@container (max-width: 300px) {
   .picker-body.with-effort {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
