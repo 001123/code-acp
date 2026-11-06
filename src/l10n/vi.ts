@@ -486,6 +486,8 @@ const vi: Record<MessageKey, string> = {
   "chat.mermaidShowCode": "Xem mã Mermaid",
   "chat.mermaidShowDiagram": "Xem sơ đồ",
   "chat.mermaidExpand": "Mở sơ đồ trong tab editor để phóng to, thu nhỏ",
+  "chat.mermaidPlay": "Phát lần lượt từng message",
+  "chat.mermaidStop": "Dừng phát",
   "diagram.title": "Sơ đồ Mermaid",
   "lightbox.zoomIn": "Phóng to (+)",
   "lightbox.zoomOut": "Thu nhỏ (−)",

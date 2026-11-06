@@ -29,24 +29,34 @@
 .mermaid :is(.pele-node, .pele-edge, .pele-edge-label) {
   transition: opacity 0.15s;
 }
-[data-hover] :is(.pele-node, .pele-edge, .pele-edge-label):not([data-hot]) {
+[data-hover]
+  :is(.pele-node, .pele-edge, .pele-edge-label, .pele-lifeline, .pele-activation, .pele-destroy):not([data-hot]) {
   opacity: 0.25;
 }
-.mermaid .pele-edge[data-hot] > path:not(.pele-marker, .pele-edge-hit) {
+/* While a sequence plays, the messages already sent stay readable. */
+[data-hover] :is(.pele-edge, .pele-edge-label)[data-done] {
+  opacity: 0.7;
+}
+.mermaid .pele-edge[data-hot] > path:not(.pele-marker, .pele-edge-hit, .pele-trace) {
   stroke: var(--pele-accent);
   stroke-width: 2;
   stroke-dasharray: 6 4;
   animation: pele-flow 0.5s linear infinite;
 }
 /* Two-way links: round dots that sway back and forth instead of flowing one way. */
-.mermaid .pele-edge[data-hot][data-flow="both"] > path:not(.pele-marker, .pele-edge-hit) {
+.mermaid .pele-edge[data-hot][data-flow="both"] > path:not(.pele-marker, .pele-edge-hit, .pele-trace) {
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-dasharray: 0.1 6;
   animation: pele-sway 0.9s ease-in-out infinite alternate;
 }
+/* Replies (dashed messages): shorter dashes, so they read apart from calls. */
+.mermaid .pele-edge[data-hot][data-flow="reply"] > path:not(.pele-marker, .pele-edge-hit, .pele-trace) {
+  stroke-dasharray: 2 4;
+  animation-name: pele-flow-reply;
+}
 /* Links without arrowheads have no direction to show. */
-.mermaid .pele-edge[data-hot][data-flow="none"] > path:not(.pele-marker, .pele-edge-hit) {
+.mermaid .pele-edge[data-hot][data-flow="none"] > path:not(.pele-marker, .pele-edge-hit, .pele-trace) {
   stroke-dasharray: none;
   animation: none;
 }
@@ -57,12 +67,40 @@
   stroke: var(--pele-accent);
   stroke-width: 2;
 }
+.mermaid .pele-frame[data-hot] > rect:first-child {
+  stroke: var(--pele-accent);
+  stroke-width: 1.5;
+}
+.mermaid .pele-frame[data-hot] > :is(.pele-frame-kind, .pele-frame-label) {
+  fill: var(--pele-accent);
+}
+/* The pulse of the message being played, on a path of length 100 (src/ui/diagramPlay.ts). */
+.mermaid .pele-trace {
+  fill: none;
+  stroke: var(--pele-accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 6 100;
+  stroke-dashoffset: 6;
+  pointer-events: none;
+  animation: pele-trace 0.8s ease-in-out forwards;
+}
 .mermaid .pele-edge-hit {
   cursor: pointer;
 }
 @keyframes pele-flow {
   to {
     stroke-dashoffset: -10;
+  }
+}
+@keyframes pele-flow-reply {
+  to {
+    stroke-dashoffset: -6;
+  }
+}
+@keyframes pele-trace {
+  to {
+    stroke-dashoffset: -100;
   }
 }
 @keyframes pele-sway {
@@ -76,5 +114,8 @@
 @media (prefers-reduced-motion: reduce) {
   .mermaid .pele-edge[data-hot] > path {
     animation: none !important;
+  }
+  .mermaid .pele-trace {
+    display: none;
   }
 }

@@ -122,7 +122,8 @@
 .md .mermaid-block:hover .mermaid-actions,
 .md .mermaid-block:has(.pele-zoom:not([hidden])) .mermaid-actions,
 .md .mermaid-block:has(.mermaid-source) .mermaid-actions,
-.md .mermaid-actions:focus-within {
+.md .mermaid-actions:focus-within,
+.md .mermaid-block:has(.mermaid[data-playing]) .mermaid-actions {
   opacity: 1;
 }
 .md .mermaid-actions .icon-btn:hover {
@@ -142,4 +143,8 @@
   border-radius: 6px;
   background: var(--pele-bg);
   overflow-x: auto;
+}
+/* A third button, to play a sequence diagram. */
+.md .mermaid-block[data-sequence] .mermaid {
+  --pele-zoom-top: 110px;
 }

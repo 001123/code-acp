@@ -2,11 +2,14 @@ import { render } from "pele";
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import type { DiagramFromWebview, DiagramToWebview } from "../diagramPanel";
 import { hoverDiagram } from "./diagramHover";
+import { useSequencePlayer } from "./diagramPlay";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
 import { poster, useMessages } from "./vscode";
 import codeIcon from "@tabler/icons/outline/code.svg";
+import playIcon from "@tabler/icons/outline/player-play.svg";
+import stopIcon from "@tabler/icons/outline/player-stop.svg";
 import schemaIcon from "@tabler/icons/outline/schema.svg";
 import zoomInIcon from "@tabler/icons/outline/zoom-in.svg";
 import zoomOutIcon from "@tabler/icons/outline/zoom-out.svg";
@@ -52,9 +55,11 @@ function DiagramPage() {
   const [box, setBox] = useState<{ w: number; h: number }>();
   const stage = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean }>(undefined);
+  const player = useSequencePlayer(stage);
 
   useMessages((msg: DiagramToWebview) => {
     if (msg.type === "diagram") {
+      player.stop();
       setCode(msg.code);
       setView(FIT);
       setSource(false);
@@ -64,6 +69,7 @@ function DiagramPage() {
 
   const drawn = code === undefined ? undefined : draw(code);
   const size = drawn && "svg" in drawn ? drawn : undefined;
+  const sequence = !!size && /^<svg[^>]*\bclass="[^"]*\bpele-sequence\b/.test(size.svg);
 
   /** Zoom by `factor`, keeping the stage point (cx, cy) — relative to its center — fixed on screen. */
   const zoom = (factor: number, cx = 0, cy = 0) =>
@@ -136,6 +142,7 @@ function DiagramPage() {
   };
 
   const sourceLabel = t(source ? "chat.mermaidShowDiagram" : "chat.mermaidShowCode");
+  const playLabel = t(player.playing ? "chat.mermaidStop" : "chat.mermaidPlay");
 
   return (
     <div className="diagram">
@@ -173,13 +180,28 @@ function DiagramPage() {
             <Icon svg={zoomResetIcon} />
           </button>
         </div>
+        {sequence && !source && (
+          <button
+            type="button"
+            className="icon-btn"
+            title={playLabel}
+            aria-label={playLabel}
+            aria-pressed={player.playing}
+            onClick={player.toggle}
+          >
+            <Icon svg={player.playing ? stopIcon : playIcon} />
+          </button>
+        )}
         <button
           type="button"
           className="icon-btn"
           title={sourceLabel}
           aria-label={sourceLabel}
           aria-pressed={source}
-          onClick={() => setSource(!source)}
+          onClick={() => {
+            player.stop();
+            setSource(!source);
+          }}
         >
           <Icon svg={source ? schemaIcon : codeIcon} />
         </button>

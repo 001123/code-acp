@@ -6,9 +6,12 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import codeIcon from "@tabler/icons/outline/code.svg";
 import maximizeIcon from "@tabler/icons/outline/maximize.svg";
+import playIcon from "@tabler/icons/outline/player-play.svg";
+import stopIcon from "@tabler/icons/outline/player-stop.svg";
 import schemaIcon from "@tabler/icons/outline/schema.svg";
 import { OpenDiagram } from "./chat/context";
 import { hoverDiagram } from "./diagramHover";
+import { useSequencePlayer } from "./diagramPlay";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 
@@ -21,6 +24,8 @@ function Mermaid({ code }: { code: string }) {
   const mounted = useRef<Mounted>(null);
   const [drawn, setDrawn] = useState(false);
   const [source, setSource] = useState(false);
+  const [sequence, setSequence] = useState(false);
+  const player = useSequencePlayer(host);
   const openDiagram = useContext(OpenDiagram);
   const { t } = useL10n();
   let valid = true;
@@ -35,7 +40,10 @@ function Mermaid({ code }: { code: string }) {
     if (mounted.current) mounted.current.update(code);
     else mounted.current = mount(host.current, code);
     setDrawn(true);
-  }, [code, valid]);
+    setSequence(!!host.current.querySelector("svg.pele-sequence"));
+    // A redraw replaces the SVG being played.
+    player.stop();
+  }, [code, valid, player.stop]);
   useLayoutEffect(() => {
     const stop = hoverDiagram(host.current!);
     return () => {
@@ -47,10 +55,11 @@ function Mermaid({ code }: { code: string }) {
   const expand = openDiagram && (() => openDiagram(code));
 
   const sourceLabel = t(source ? "chat.mermaidShowDiagram" : "chat.mermaidShowCode");
+  const playLabel = t(player.playing ? "chat.mermaidStop" : "chat.mermaidPlay");
 
   return (
     <>
-      <div className="mermaid-block" hidden={!drawn && !valid}>
+      <div className="mermaid-block" hidden={!drawn && !valid} data-sequence={sequence || undefined}>
         <div ref={host} className="mermaid" hidden={source} onDoubleClick={expand} />
         {source && (
           <pre className="mermaid-source">
@@ -69,13 +78,28 @@ function Mermaid({ code }: { code: string }) {
               <Icon svg={maximizeIcon} />
             </button>
           )}
+          {sequence && !source && (
+            <button
+              type="button"
+              className="icon-btn"
+              title={playLabel}
+              aria-label={playLabel}
+              aria-pressed={player.playing}
+              onClick={player.toggle}
+            >
+              <Icon svg={player.playing ? stopIcon : playIcon} />
+            </button>
+          )}
           <button
             type="button"
             className="icon-btn"
             title={sourceLabel}
             aria-label={sourceLabel}
             aria-pressed={source}
-            onClick={() => setSource(!source)}
+            onClick={() => {
+              player.stop();
+              setSource(!source);
+            }}
           >
             <Icon svg={source ? schemaIcon : codeIcon} />
           </button>
