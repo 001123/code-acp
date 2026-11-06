@@ -20,3 +20,41 @@
   --pele-series-7: var(--vscode-terminal-ansiCyan);
   --pele-series-8: var(--vscode-terminal-ansiMagenta);
 }
+/* pele fills edge labels with --pele-bg, which VS Code themes make translucent, so lines showed through the text. */
+.mermaid .pele-edge-label rect {
+  fill: var(--pele-surface);
+}
+
+/* Hover highlighting, set up by src/ui/diagramHover.ts. */
+.mermaid :is(.pele-node, .pele-edge, .pele-edge-label) {
+  transition: opacity 0.15s;
+}
+[data-hover] :is(.pele-node, .pele-edge, .pele-edge-label):not([data-hot]) {
+  opacity: 0.25;
+}
+.mermaid .pele-edge[data-hot] > path:not(.pele-marker, .pele-edge-hit) {
+  stroke: var(--pele-accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  animation: pele-flow 0.5s linear infinite;
+}
+.mermaid .pele-edge[data-hot] > .pele-marker {
+  fill: var(--pele-accent);
+}
+.mermaid :is(.pele-node, .pele-cluster)[data-hot] > :is(rect, path, polygon, circle, ellipse) {
+  stroke: var(--pele-accent);
+  stroke-width: 2;
+}
+.mermaid .pele-edge-hit {
+  cursor: pointer;
+}
+@keyframes pele-flow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mermaid .pele-edge[data-hot] > path {
+    animation: none;
+  }
+}

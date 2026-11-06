@@ -1,10 +1,13 @@
 import { render } from "pele";
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import type { DiagramFromWebview, DiagramToWebview } from "../diagramPanel";
+import { hoverDiagram } from "./diagramHover";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
 import { poster, useMessages } from "./vscode";
+import codeIcon from "@tabler/icons/outline/code.svg";
+import schemaIcon from "@tabler/icons/outline/schema.svg";
 import zoomInIcon from "@tabler/icons/outline/zoom-in.svg";
 import zoomOutIcon from "@tabler/icons/outline/zoom-out.svg";
 import zoomResetIcon from "@tabler/icons/outline/zoom-reset.svg";
@@ -45,6 +48,7 @@ function DiagramPage() {
   const [code, setCode] = useState<string>();
   const [view, setView] = useState(FIT);
   const [dragging, setDragging] = useState(false);
+  const [source, setSource] = useState(false);
   const [box, setBox] = useState<{ w: number; h: number }>();
   const stage = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean }>(undefined);
@@ -53,6 +57,7 @@ function DiagramPage() {
     if (msg.type === "diagram") {
       setCode(msg.code);
       setView(FIT);
+      setSource(false);
     }
   });
   useEffect(() => post({ type: "ready" }), []);
@@ -79,6 +84,8 @@ function DiagramPage() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => hoverDiagram(stage.current!), []);
+
   useEffect(() => {
     const el = stage.current!;
     const onWheel = (e: WheelEvent) => {
@@ -90,6 +97,7 @@ function DiagramPage() {
   }, []);
 
   useEffect(() => {
+    if (source) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "+" || e.key === "=") zoom(STEP);
@@ -100,7 +108,7 @@ function DiagramPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [source]);
 
   const fit = size && box ? Math.min(MAX_FIT, (box.w - MARGIN * 2) / size.w, (box.h - MARGIN * 2) / size.h) : undefined;
   const shown = size && fit !== undefined ? { w: size.w * fit * view.scale, h: size.h * fit * view.scale } : undefined;
@@ -127,26 +135,39 @@ function DiagramPage() {
     setDragging(false);
   };
 
+  const sourceLabel = t(source ? "chat.mermaidShowDiagram" : "chat.mermaidShowCode");
+
   return (
     <div className="diagram">
       <div className="diagram-toolbar">
         <span className="diagram-spacer" />
-        <button type="button" className="icon-btn" title={t("lightbox.zoomOut")} aria-label={t("lightbox.zoomOut")} onClick={() => zoom(1 / STEP)}>
-          <Icon svg={zoomOutIcon} />
-        </button>
-        <button type="button" className="diagram-scale" title={t("lightbox.reset")} onClick={() => setView(FIT)}>
-          {Math.round(view.scale * 100)}%
-        </button>
-        <button type="button" className="icon-btn" title={t("lightbox.zoomIn")} aria-label={t("lightbox.zoomIn")} onClick={() => zoom(STEP)}>
-          <Icon svg={zoomInIcon} />
-        </button>
-        <button type="button" className="icon-btn" title={t("lightbox.reset")} aria-label={t("lightbox.reset")} onClick={() => setView(FIT)}>
-          <Icon svg={zoomResetIcon} />
+        <div className="diagram-zoom" hidden={source}>
+          <button type="button" className="icon-btn" title={t("lightbox.zoomOut")} aria-label={t("lightbox.zoomOut")} onClick={() => zoom(1 / STEP)}>
+            <Icon svg={zoomOutIcon} />
+          </button>
+          <button type="button" className="diagram-scale" title={t("lightbox.reset")} onClick={() => setView(FIT)}>
+            {Math.round(view.scale * 100)}%
+          </button>
+          <button type="button" className="icon-btn" title={t("lightbox.zoomIn")} aria-label={t("lightbox.zoomIn")} onClick={() => zoom(STEP)}>
+            <Icon svg={zoomInIcon} />
+          </button>
+          <button type="button" className="icon-btn" title={t("lightbox.reset")} aria-label={t("lightbox.reset")} onClick={() => setView(FIT)}>
+            <Icon svg={zoomResetIcon} />
+          </button>
+        </div>
+        <button type="button" className="icon-btn" title={sourceLabel} aria-label={sourceLabel} aria-pressed={source} onClick={() => setSource(!source)}>
+          <Icon svg={source ? schemaIcon : codeIcon} />
         </button>
       </div>
+      {source && (
+        <pre className="diagram-source">
+          <code>{code}</code>
+        </pre>
+      )}
       <div
         ref={stage}
         className="diagram-stage"
+        hidden={source}
         data-dragging={dragging || undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

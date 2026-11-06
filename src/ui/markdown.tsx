@@ -4,8 +4,11 @@ import { memo, useContext, useLayoutEffect, useRef, useState, type MouseEvent, t
 import Markdown, { defaultUrlTransform, type Components, type UrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import codeIcon from "@tabler/icons/outline/code.svg";
 import maximizeIcon from "@tabler/icons/outline/maximize.svg";
+import schemaIcon from "@tabler/icons/outline/schema.svg";
 import { OpenDiagram } from "./chat/context";
+import { hoverDiagram } from "./diagramHover";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 
@@ -17,6 +20,7 @@ function Mermaid({ code }: { code: string }) {
   const host = useRef<HTMLDivElement>(null);
   const mounted = useRef<Mounted>(null);
   const [drawn, setDrawn] = useState(false);
+  const [source, setSource] = useState(false);
   const openDiagram = useContext(OpenDiagram);
   const { t } = useL10n();
   let valid = true;
@@ -32,19 +36,37 @@ function Mermaid({ code }: { code: string }) {
     else mounted.current = mount(host.current, code);
     setDrawn(true);
   }, [code, valid]);
-  useLayoutEffect(() => () => mounted.current?.destroy(), []);
+  useLayoutEffect(() => {
+    const stop = hoverDiagram(host.current!);
+    return () => {
+      stop();
+      mounted.current?.destroy();
+    };
+  }, []);
 
   const expand = openDiagram && (() => openDiagram(code));
+
+  const sourceLabel = t(source ? "chat.mermaidShowDiagram" : "chat.mermaidShowCode");
 
   return (
     <>
       <div className="mermaid-block" hidden={!drawn && !valid}>
-        <div ref={host} className="mermaid" onDoubleClick={expand} />
-        {expand && (
-          <button type="button" className="icon-btn mermaid-expand" title={t("chat.mermaidExpand")} aria-label={t("chat.mermaidExpand")} onClick={expand}>
-            <Icon svg={maximizeIcon} />
-          </button>
+        <div ref={host} className="mermaid" hidden={source} onDoubleClick={expand} />
+        {source && (
+          <pre className="mermaid-source">
+            <code>{code}</code>
+          </pre>
         )}
+        <div className="mermaid-actions">
+          {expand && (
+            <button type="button" className="icon-btn" title={t("chat.mermaidExpand")} aria-label={t("chat.mermaidExpand")} onClick={expand}>
+              <Icon svg={maximizeIcon} />
+            </button>
+          )}
+          <button type="button" className="icon-btn" title={sourceLabel} aria-label={sourceLabel} aria-pressed={source} onClick={() => setSource(!source)}>
+            <Icon svg={source ? schemaIcon : codeIcon} />
+          </button>
+        </div>
       </div>
       {!drawn && !valid && (
         <pre>

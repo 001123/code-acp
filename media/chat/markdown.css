@@ -100,31 +100,44 @@
   position: relative;
   margin: 0 0 0.7em;
 }
-/* Sized and styled like pele's zoom controls, which sit just below it in the same column. */
-.md .mermaid-expand {
+/* Sized and styled like pele's zoom controls, which sit just below them in the same column. */
+.md .mermaid-actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.md .mermaid-actions .icon-btn {
   width: 30px;
   height: 30px;
   border: 1px solid var(--pele-border);
   border-radius: var(--pele-radius, 4px);
   background: var(--pele-bg);
   color: var(--pele-fg);
-  opacity: 0;
-  transition: opacity 0.1s;
 }
-.md .mermaid-block:hover .mermaid-expand,
-.md .mermaid-block:has(.pele-zoom:not([hidden])) .mermaid-expand,
-.md .mermaid-expand:focus-visible {
+.md .mermaid-block:hover .mermaid-actions,
+.md .mermaid-block:has(.pele-zoom:not([hidden])) .mermaid-actions,
+.md .mermaid-block:has(.mermaid-source) .mermaid-actions,
+.md .mermaid-actions:focus-within {
   opacity: 1;
 }
-.md .mermaid-expand:hover {
+.md .mermaid-actions .icon-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
 }
+.md .mermaid-source {
+  margin: 0;
+  /* Clear of the buttons. */
+  padding-right: 46px;
+  min-height: 80px;
+  box-sizing: border-box;
+}
 .md .mermaid {
-  /* Below the expand button. */
-  --pele-zoom-top: 42px;
+  /* Below the buttons. */
+  --pele-zoom-top: 76px;
   padding: 8px;
   border-radius: 6px;
   background: var(--pele-bg);

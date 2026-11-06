@@ -445,6 +445,8 @@ const vi: Record<MessageKey, string> = {
   "trace.channel": "Code ACP Trace",
   "chat.unknownType": "không rõ kiểu",
   "chat.removeAttachment": "Bỏ đính kèm",
+  "chat.mermaidShowCode": "Xem mã Mermaid",
+  "chat.mermaidShowDiagram": "Xem sơ đồ",
   "chat.mermaidExpand": "Mở sơ đồ trong tab editor để phóng to, thu nhỏ",
   "diagram.title": "Sơ đồ Mermaid",
   "lightbox.zoomIn": "Phóng to (+)",
