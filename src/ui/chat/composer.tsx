@@ -416,12 +416,12 @@ export function useComposer(options: ComposerOptions) {
         <EditorContent editor={editor} />
       </div>
       <div id="actions">
-        {usage}
         <AgentPanel tab={activeTab} choices={agents} summary={quickConfig} config={agentConfig} />
         <FolderSelect tab={activeTab} folders={folders} />
+        {settings}
         <span className="spacer" />
         {compare.element}
-        {settings}
+        {usage}
         <button
           type="button"
           id="cancel"
