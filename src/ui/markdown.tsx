@@ -1,9 +1,13 @@
 import { mount, render, type Mounted } from "pele";
 import type { ElementContent, Root, RootContent } from "hast";
-import { memo, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { memo, useContext, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import Markdown, { defaultUrlTransform, type Components, type UrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import maximizeIcon from "@tabler/icons/outline/maximize.svg";
+import { OpenDiagram } from "./chat/context";
+import { Icon } from "./icon";
+import { useL10n } from "./l10n";
 
 /**
  * A ```mermaid block drawn by pele. Text that does not parse (a block still streaming in, or a
@@ -13,6 +17,8 @@ function Mermaid({ code }: { code: string }) {
   const host = useRef<HTMLDivElement>(null);
   const mounted = useRef<Mounted>(null);
   const [drawn, setDrawn] = useState(false);
+  const openDiagram = useContext(OpenDiagram);
+  const { t } = useL10n();
   let valid = true;
   try {
     render(code);
@@ -28,9 +34,18 @@ function Mermaid({ code }: { code: string }) {
   }, [code, valid]);
   useLayoutEffect(() => () => mounted.current?.destroy(), []);
 
+  const expand = openDiagram && (() => openDiagram(code));
+
   return (
     <>
-      <div ref={host} className="mermaid" hidden={!drawn && !valid} />
+      <div className="mermaid-block" hidden={!drawn && !valid}>
+        <div ref={host} className="mermaid" onDoubleClick={expand} />
+        {expand && (
+          <button type="button" className="icon-btn mermaid-expand" title={t("chat.mermaidExpand")} aria-label={t("chat.mermaidExpand")} onClick={expand}>
+            <Icon svg={maximizeIcon} />
+          </button>
+        )}
+      </div>
       {!drawn && !valid && (
         <pre>
           <code>{code}</code>

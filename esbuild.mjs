@@ -25,7 +25,7 @@ const contexts = await Promise.all([
   // chrome148 is the Chromium of VS Code 1.123–1.138 (Electron 42), the oldest release on Node 24: keep it in sync with engines.vscode.
   esbuild.context({
     ...common,
-    entryPoints: ["chat", "settings"].flatMap((page) => [
+    entryPoints: ["chat", "settings", "diagram"].flatMap((page) => [
       { in: `src/ui/${page}.tsx`, out: page },
       { in: `media/${page}.css`, out: page },
     ]),

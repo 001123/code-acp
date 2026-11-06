@@ -20,6 +20,7 @@ export interface ViewMessagesHost {
   liveTabs(): ReadonlyArray<Tab>;
   usualOptions(agentId: string): Wanted | undefined;
   openFile(file: string, line: number | undefined): Effect.Effect<void, VscodeError, AppServices>;
+  openDiagram(code: string): void;
 }
 
 const runCommand = (command: string, ...args: ReadonlyArray<unknown>) =>
@@ -74,6 +75,9 @@ export class ViewMessages {
         }
         break;
       }
+      case "openDiagram":
+        this.host.openDiagram(msg.code);
+        break;
       case "searchFiles": {
         const completions = yield* Completions;
         // A failed search offers nothing rather than an error in the chat.

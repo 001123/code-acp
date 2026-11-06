@@ -9,7 +9,7 @@ import { useL10n, type Translate } from "./l10n";
 import { mount } from "./mount";
 import { useMessages } from "./vscode";
 import { ChangesBar } from "./chat/changes";
-import { HoverPreview, OpenPreview, ShownTab, Terminals, type Hover, type Preview } from "./chat/context";
+import { HoverPreview, OpenDiagram, OpenPreview, ShownTab, Terminals, type Hover, type Preview } from "./chat/context";
 import { useComposer } from "./chat/composer";
 import { GroupPanel } from "./chat/groupPanel";
 import type { History } from "./chat/history";
@@ -85,6 +85,7 @@ function App() {
 
   const [preview, setPreview] = useState<Preview>();
   const closePreview = useCallback(() => setPreview(undefined), []);
+  const openDiagram = useCallback((code: string) => post({ type: "openDiagram", code }), []);
   const [hover, setHover] = useState<Hover>();
   const current = (active !== undefined && states[active]) || NEW_TAB;
   const group = groups.find((each) => each.id === shownGroup);
@@ -542,6 +543,7 @@ function App() {
     return () => document.removeEventListener("copy", onCopy);
   }, []);
   return (
+    <OpenDiagram.Provider value={openDiagram}>
     <OpenPreview.Provider value={setPreview}>
       <HoverPreview.Provider value={setHover}>
       <ShownTab.Provider value={shownTab}>
@@ -645,6 +647,7 @@ function App() {
       </ShownTab.Provider>
       </HoverPreview.Provider>
     </OpenPreview.Provider>
+    </OpenDiagram.Provider>
   );
 }
 

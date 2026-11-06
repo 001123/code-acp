@@ -116,6 +116,8 @@ export type FromWebview =
   | { type: "openFile"; path: string; line?: number }
   /** An image from the lightbox (a data URI), to open in a window of its own. */
   | { type: "openImage"; src: string; name: string }
+  /** A ```mermaid block's source, to open in an editor tab where it can be zoomed and panned. */
+  | { type: "openDiagram"; code: string }
   /** Workspace files matching what follows "@"; answered with "files" carrying the same `id`. */
   | { type: "searchFiles"; id: number; query: string }
   /** Skills for "$"; answered with "skills". */
@@ -179,6 +181,7 @@ export type ViewMessage = Extract<
       | "elicitation"
       | "openFile"
       | "openImage"
+      | "openDiagram"
       | "searchFiles"
       | "attachProblems"
       | "attachTerminal"

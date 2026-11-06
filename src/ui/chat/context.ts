@@ -10,6 +10,9 @@ export interface Preview {
 /** Opens an image in the lightbox; provided by the app. */
 export const OpenPreview = createContext<(preview: Preview) => void>(() => {});
 
+/** Opens a Mermaid diagram's source in an editor tab; provided by the chat, so diagrams elsewhere get no button. */
+export const OpenDiagram = createContext<((code: string) => void) | undefined>(undefined);
+
 /** An image token under the pointer: `rect` is the box to place the thumbnail next to. */
 export interface Hover {
   src: string;

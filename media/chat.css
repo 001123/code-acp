@@ -12,5 +12,6 @@
 @import "./chat/history.css";
 @import "./chat/groups.css";
 @import "./chat/setup.css";
+@import "./shared/pele.css";
 @import "./chat/markdown.css";
 @import "./chat/lightbox.css";

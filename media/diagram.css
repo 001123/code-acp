@@ -1,0 +1,3 @@
+/* Entry of the diagram page's styles; esbuild bundles it to dist/webview/diagram.css. Order is cascade order. */
+@import "./shared/pele.css";
+@import "./diagram/base.css";

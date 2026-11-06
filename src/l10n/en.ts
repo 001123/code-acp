@@ -444,6 +444,8 @@ const en = {
   "trace.channel": "Code ACP Trace",
   "chat.unknownType": "unknown type",
   "chat.removeAttachment": "Remove attachment",
+  "chat.mermaidExpand": "Open the diagram in an editor tab to zoom and pan",
+  "diagram.title": "Mermaid diagram",
   "lightbox.zoomIn": "Zoom in (+)",
   "lightbox.zoomOut": "Zoom out (−)",
   "lightbox.reset": "Fit (0)",

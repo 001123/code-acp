@@ -96,30 +96,37 @@
   border-top: 1px solid var(--vscode-panel-border);
   margin: 1em 0;
 }
-.md .mermaid {
+.md .mermaid-block {
+  position: relative;
   margin: 0 0 0.7em;
+}
+/* Sized and styled like pele's zoom controls, which sit just below it in the same column. */
+.md .mermaid-expand {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--pele-border);
+  border-radius: var(--pele-radius, 4px);
+  background: var(--pele-bg);
+  color: var(--pele-fg);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.md .mermaid-block:hover .mermaid-expand,
+.md .mermaid-block:has(.pele-zoom:not([hidden])) .mermaid-expand,
+.md .mermaid-expand:focus-visible {
+  opacity: 1;
+}
+.md .mermaid-expand:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+.md .mermaid {
+  /* Below the expand button. */
+  --pele-zoom-top: 42px;
   padding: 8px;
   border-radius: 6px;
   background: var(--pele-bg);
   overflow-x: auto;
-  /* pele diagram colors follow the VS Code theme */
-  --pele-bg: var(--vscode-textCodeBlock-background, transparent);
-  --pele-fg: var(--vscode-foreground);
-  --pele-muted: var(--vscode-descriptionForeground);
-  --pele-line: var(--vscode-foreground);
-  --pele-surface: var(--vscode-editor-background);
-  --pele-surface-alt: var(--vscode-editorWidget-background);
-  --pele-border: var(--vscode-panel-border);
-  --pele-accent: var(--vscode-textLink-foreground);
-  --pele-error: var(--vscode-errorForeground);
-  --pele-font: var(--vscode-font-family);
-  --pele-font-mono: var(--vscode-editor-font-family);
-  --pele-series-1: var(--vscode-charts-blue);
-  --pele-series-2: var(--vscode-charts-orange);
-  --pele-series-3: var(--vscode-charts-green);
-  --pele-series-4: var(--vscode-charts-red);
-  --pele-series-5: var(--vscode-charts-purple);
-  --pele-series-6: var(--vscode-charts-yellow);
-  --pele-series-7: var(--vscode-terminal-ansiCyan);
-  --pele-series-8: var(--vscode-terminal-ansiMagenta);
 }

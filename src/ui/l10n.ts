@@ -8,22 +8,26 @@ interface Table {
   readonly strings: Partial<Record<MessageKey, string>>;
 }
 
+// Guarded so modules that render strings can be imported by tests outside a webview.
+const inWebview = typeof document !== "undefined";
+
 /** Initial table from the `#l10n-data` block; replaced when the extension posts { type: "l10n" }. */
-let table: Table = JSON.parse(document.getElementById("l10n-data")?.textContent || '{"lang":"en","strings":{}}');
+let table: Table = JSON.parse((inWebview && document.getElementById("l10n-data")?.textContent) || '{"lang":"en","strings":{}}');
 const listeners = new Set<() => void>();
 
 function apply(): void {
   document.documentElement.lang = table.lang;
 }
-apply();
-
-window.addEventListener("message", (e) => {
-  if (e.data?.type === "l10n") {
-    table = { lang: e.data.lang, strings: e.data.strings };
-    apply();
-    for (const f of listeners) f();
-  }
-});
+if (inWebview) {
+  apply();
+  window.addEventListener("message", (e) => {
+    if (e.data?.type === "l10n") {
+      table = { lang: e.data.lang, strings: e.data.strings };
+      apply();
+      for (const f of listeners) f();
+    }
+  });
+}
 
 function subscribe(f: () => void): () => void {
   listeners.add(f);

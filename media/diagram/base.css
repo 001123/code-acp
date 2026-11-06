@@ -1,0 +1,93 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+}
+.svg-icon {
+  display: contents;
+}
+.svg-icon svg {
+  width: 16px;
+  height: 16px;
+}
+[hidden] {
+  display: none !important;
+}
+.diagram {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.diagram-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
+}
+.diagram-spacer {
+  flex: 1;
+}
+.icon-btn,
+.diagram-scale {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+.icon-btn {
+  width: 28px;
+  padding: 0;
+}
+.diagram-scale {
+  min-width: 4.5em;
+  padding: 2px 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.icon-btn:hover,
+.diagram-scale:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+.diagram-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.diagram-stage[data-dragging] {
+  cursor: grabbing;
+}
+.diagram-canvas {
+  flex: none;
+}
+.diagram-canvas svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+}
+.diagram-error {
+  margin: 16px;
+  white-space: pre-wrap;
+  color: var(--vscode-errorForeground);
+  font-family: var(--vscode-editor-font-family);
+}
