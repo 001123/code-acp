@@ -725,27 +725,42 @@
           "properties": {
             "read": {
               "type": "string",
-              "enum": ["ask", "allow"],
+              "enum": [
+                "ask",
+                "allow"
+              ],
               "description": "%config.autoApprove.read%"
             },
             "edit": {
               "type": "string",
-              "enum": ["ask", "allow"],
+              "enum": [
+                "ask",
+                "allow"
+              ],
               "description": "%config.autoApprove.edit%"
             },
             "execute": {
               "type": "string",
-              "enum": ["ask", "allow"],
+              "enum": [
+                "ask",
+                "allow"
+              ],
               "description": "%config.autoApprove.execute%"
             },
             "fetch": {
               "type": "string",
-              "enum": ["ask", "allow"],
+              "enum": [
+                "ask",
+                "allow"
+              ],
               "description": "%config.autoApprove.fetch%"
             },
             "worktreeTabs": {
               "type": "string",
-              "enum": ["ask", "allow"],
+              "enum": [
+                "ask",
+                "allow"
+              ],
               "description": "%config.autoApprove.worktreeTabs%"
             }
           }
@@ -902,7 +917,9 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run typecheck && npm test",
     "package": "node esbuild.mjs --production && vsce package --out release/",
     "reinstall": "npm run package && for cli in code codium; do if command -v $cli >/dev/null; then $cli --install-extension release/code-acp-$npm_package_version.vsix --force; fi; done",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
@@ -930,6 +947,7 @@
     "execa": "^10.2.1",
     "happy-dom": "^21.0.4",
     "pele": "1.13.0",
+    "prettier": "3.9.10",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",

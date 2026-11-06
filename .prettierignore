@@ -1,0 +1,9 @@
+# Generated or installed
+dist
+release
+package-lock.json
+skills-lock.json
+
+# Vendored agent skills
+.agents
+.claude
