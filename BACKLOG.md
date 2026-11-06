@@ -17,10 +17,6 @@ Open work for Code ACP, as of 2026-11-06. What has shipped is in [CHANGELOG.md](
 - [ ] **F1. Checks after each turn.** Run a command such as `npm run check` when the agent finishes, send failures back as the next prompt, and stop after a set number of rounds. Fits beside the worktree setup command in settings.
 - [ ] **F2. Comments on diffs.** Comment on hunks in the changes review and send them to the agent as one batch, on top of Keep and Undo.
 
-### Sidebar
-
-- [ ] **F3. Filter tabs that need the user.** Rows already show pending requests and changed lines; add a filter (or a group) for tabs waiting on a permission, question or login.
-
 ### Composer
 
 - [ ] **F4. More `@` mentions:** `@git-diff` (working tree or a branch), `@symbol` (workspace symbols) and `@url`.

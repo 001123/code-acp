@@ -67,6 +67,7 @@
 }
 /* The open width less the panel's borders. */
 #tab-top,
+#tab-waiting,
 #tab-main,
 #tab-working,
 #tab-history {
@@ -163,7 +164,16 @@
   overflow-y: auto;
   scrollbar-width: none;
 }
+/* The tabs waiting on the user, at the top below the search; a short list, with its own scroll, and a line below. */
+#tab-waiting {
+  flex: none;
+  max-height: 40%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
 /* Clear of the sticky section heading. */
+#tab-waiting .tab,
 #tab-working .tab {
   scroll-margin-top: 26px;
 }

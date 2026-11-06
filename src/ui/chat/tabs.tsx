@@ -15,6 +15,7 @@ import type { Totals } from "../../usageLedger";
 import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import activityIcon from "@tabler/icons/outline/activity.svg";
+import bellIcon from "@tabler/icons/outline/bell-ringing.svg";
 import archiveIcon from "@tabler/icons/outline/archive.svg";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import chevronRightIcon from "@tabler/icons/outline/chevron-right.svg";
@@ -43,9 +44,11 @@ import {
   rowKey,
   rowsInHand,
   sumChanges,
+  sumRequests,
   tabChanges,
   tabRows,
   tabWorking,
+  waitingRowKeys,
   workingRowKeys,
   type ShownRow,
   type TabChanges,
@@ -217,6 +220,7 @@ export function TabSidebar({
   const scroller = useRef<HTMLDivElement>(null);
   const restTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const workingKeys = useRef<ReadonlySet<string>>(new Set());
+  const waitingKeys = useRef<ReadonlySet<string>>(new Set());
   const searching = query.trim() !== "";
   const docked = prefs.docked && dockable;
   const inHand = rowsInHand(tabs, groups, { dragged: dragged?.ids, renaming, renamingGroup });
@@ -414,14 +418,7 @@ export function TabSidebar({
 
   const groupRow = (group: TabGroupInfo, members: TabInfo[], shown: TabInfo[]) => {
     const running = members.filter((tab) => states[tab.id]?.status.busy || tab.attempt === "running").length;
-    const open = members.map((tab) => openRequests(states[tab.id]));
-    const requests = requestsLabel(
-      {
-        permissions: open.reduce((sum, each) => sum + each.permissions, 0),
-        questions: open.reduce((sum, each) => sum + each.questions, 0),
-      },
-      t,
-    );
+    const requests = requestsLabel(sumRequests(members.map((tab) => openRequests(states[tab.id]))), t);
     const waiting = requests !== undefined;
     const changed = sumChanges(members.flatMap((tab) => tabChanges(states[tab.id], showChanges) ?? []));
     const pinned = members[0]!.pinned;
@@ -532,15 +529,15 @@ export function TabSidebar({
   const rows = tabRows(tabs, groups);
   // A row keeps its section during a drag or a rename: moving it would end them.
   if (!inHand) {
-    workingKeys.current = workingRowKeys(
-      rows,
-      (tab) => tabWorking(tab, states[tab.id]),
-      (tab) => requestsLabel(openRequests(states[tab.id]), t) !== undefined,
-    );
+    const waits = (tab: TabInfo) => requestsLabel(openRequests(states[tab.id]), t) !== undefined;
+    workingKeys.current = workingRowKeys(rows, (tab) => tabWorking(tab, states[tab.id]), waits);
+    waitingKeys.current = waitingRowKeys(rows, waits);
   }
   const shownRows = searching ? matchingRows(rows, query, titleOf) : allRows(rows);
   const isWorkingRow = (row: ShownRow) => !searching && workingKeys.current.has(rowKey(row));
+  const isWaitingRow = (row: ShownRow) => !searching && waitingKeys.current.has(rowKey(row));
   const workingRows = shownRows.filter(isWorkingRow);
+  const waitingRows = shownRows.filter(isWaitingRow);
   /** The section stays out of the way when collapsed, but the conversation on screen stays in the sidebar. */
   const isOnScreen = (row: ShownRow) =>
     row.kind === "tab"
@@ -550,7 +547,7 @@ export function TabSidebar({
     row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members, row.shown);
   useEffect(() => {
     panel.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" });
-  }, [active, shownGroup, tabs.length, workingRows.length]);
+  }, [active, shownGroup, tabs.length, workingRows.length, waitingRows.length]);
   const past = historyGroups(history?.sessions ?? [], {
     openIds: new Set(tabs.flatMap((tab) => tab.sessionId ?? [])),
     query,
@@ -619,10 +616,24 @@ export function TabSidebar({
             </button>
           )}
         </div>
+        {waitingRows.length > 0 && (
+          <div id="tab-waiting">
+            <SidebarSection
+              icon={bellIcon}
+              label={t("chat.sidebarWaiting")}
+              detail={String(waitingRows.length)}
+              collapsed={prefs.waitingCollapsed}
+              onToggle={() => setPrefs({ waitingCollapsed: !prefs.waitingCollapsed })}
+            />
+            <div role="tablist">
+              {(prefs.waitingCollapsed ? waitingRows.filter(isOnScreen) : waitingRows).map(shownRow)}
+            </div>
+          </div>
+        )}
         <div id="tab-main">
           <div id="tab-scroll" ref={scroller}>
             <div id="tab-list" role="tablist">
-              {shownRows.filter((row) => !isWorkingRow(row)).map(shownRow)}
+              {shownRows.filter((row) => !isWorkingRow(row) && !isWaitingRow(row)).map(shownRow)}
             </div>
             {searching && historySection}
             {noMatch && (

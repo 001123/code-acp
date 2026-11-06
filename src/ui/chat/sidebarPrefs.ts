@@ -9,6 +9,7 @@ export interface SidebarPrefs {
   sort: HistorySort;
   historyCollapsed: boolean;
   workingCollapsed: boolean;
+  waitingCollapsed: boolean;
 }
 
 const read = (): SidebarPrefs => {
@@ -18,6 +19,7 @@ const read = (): SidebarPrefs => {
     sort: HISTORY_SORTS.find((sort) => sort === saved.sort) ?? "updated",
     historyCollapsed: saved.historyCollapsed === true,
     workingCollapsed: saved.workingCollapsed === true,
+    waitingCollapsed: saved.waitingCollapsed === true,
   };
 };
 

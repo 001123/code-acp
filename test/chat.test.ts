@@ -33,6 +33,8 @@ import {
   tabChanges,
   tabRows,
   tabWorking,
+  sumRequests,
+  waitingRowKeys,
   workingRowKeys,
   type ShownRow,
 } from "../src/ui/chat/tabRows";
@@ -272,31 +274,47 @@ describe("the sidebar's groups", () => {
   });
 
   describe("what a row says", () => {
-    const withItems = (...items: unknown[]) => ({ transcript: { ...EMPTY, items } }) as unknown as TabState;
+    const withItems = (...items: unknown[]) =>
+      ({ transcript: { ...EMPTY, items }, status: { text: "" } }) as unknown as TabState;
     const permission = (done: boolean) => ({ kind: "permission", requestId: 1, toolCall: { toolCallId: "t" }, done });
     const question = (outcome?: string) => ({ kind: "elicitation", requestId: 2, message: "?", outcome });
     const t = (key: string, ...args: unknown[]) => [key, ...args].join(" ");
 
     it("counts the requests still open, by kind", () => {
-      assert.deepStrictEqual(openRequests(undefined), { permissions: 0, questions: 0 });
+      assert.deepStrictEqual(openRequests(undefined), { permissions: 0, questions: 0, logins: 0 });
       assert.deepStrictEqual(openRequests(withItems(permission(true), question("accept"))), {
         permissions: 0,
         questions: 0,
+        logins: 0,
       });
       assert.deepStrictEqual(
         openRequests(withItems(permission(false), permission(false), permission(true), question())),
-        { permissions: 2, questions: 1 },
+        { permissions: 2, questions: 1, logins: 0 },
+      );
+    });
+
+    it("counts a login the agent needs", () => {
+      const state = { ...withItems(), status: { text: "", needsLogin: true } } as TabState;
+      assert.deepStrictEqual(openRequests(state), { permissions: 0, questions: 0, logins: 1 });
+    });
+
+    it("adds up the requests of several tabs", () => {
+      assert.deepStrictEqual(
+        sumRequests([
+          { permissions: 1, questions: 0, logins: 1 },
+          { permissions: 2, questions: 1, logins: 0 },
+        ]),
+        { permissions: 3, questions: 1, logins: 1 },
       );
     });
 
     it("names one request, counts several and says nothing without any", () => {
-      assert.strictEqual(requestsLabel({ permissions: 0, questions: 0 }, t), undefined);
-      assert.strictEqual(requestsLabel({ permissions: 1, questions: 0 }, t), "chat.tabPermission");
-      assert.strictEqual(requestsLabel({ permissions: 0, questions: 1 }, t), "chat.tabQuestion");
-      assert.strictEqual(
-        requestsLabel({ permissions: 3, questions: 2 }, t),
-        "chat.tabPermissions 3 · chat.tabQuestions 2",
-      );
+      const open = (permissions: number, questions: number, logins = 0) => ({ permissions, questions, logins });
+      assert.strictEqual(requestsLabel(open(0, 0), t), undefined);
+      assert.strictEqual(requestsLabel(open(1, 0), t), "chat.tabPermission");
+      assert.strictEqual(requestsLabel(open(0, 1), t), "chat.tabQuestion");
+      assert.strictEqual(requestsLabel(open(3, 2), t), "chat.tabPermissions 3 · chat.tabQuestions 2");
+      assert.strictEqual(requestsLabel(open(1, 0, 1), t), "chat.tabLogin · chat.tabPermission");
     });
 
     const file = (added: number, removed: number) => ({
@@ -552,6 +570,13 @@ describe("sidebar rows", () => {
 
     it("leaves pinned tabs where they are", () => {
       assert.deepStrictEqual(keys([1], [], tabRows([{ ...tab(1, "Alpha"), pinned: true }], [])), []);
+    });
+
+    it("takes the tabs and groups waiting on the user, except pinned ones", () => {
+      const waiting = (ids: number[], list = rows) => [...waitingRowKeys(list, (each) => ids.includes(each.id))];
+      assert.deepStrictEqual(waiting([1, 3]), ["tab-1", "group-1"]);
+      assert.deepStrictEqual(waiting([]), []);
+      assert.deepStrictEqual(waiting([1], tabRows([{ ...tab(1, "Alpha"), pinned: true }], [])), []);
     });
 
     it("counts a running turn or attempt, not a session being reopened", () => {

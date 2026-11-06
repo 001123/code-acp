@@ -46,6 +46,12 @@ export function workingRowKeys(
   return new Set(rows.filter((row) => isWorking(row.kind === "tab" ? [row.tab] : row.members)).map(rowKey));
 }
 
+/** The rows of the sidebar's waiting section: one of their tabs waits on the user, and they aren't pinned. */
+export function waitingRowKeys(rows: ReadonlyArray<TabRow>, waiting: (tab: TabInfo) => boolean): Set<string> {
+  const isWaiting = (members: ReadonlyArray<TabInfo>) => members.some(waiting) && !members.some((tab) => tab.pinned);
+  return new Set(rows.filter((row) => isWaiting(row.kind === "tab" ? [row.tab] : row.members)).map(rowKey));
+}
+
 /** What a drag or a rename is on, by id. */
 export interface RowsInHand {
   dragged?: ReadonlyArray<number> | undefined;
@@ -105,21 +111,37 @@ export function diffTotals(diff: WorktreeDiff): { added: number; removed: number
   };
 }
 
-/** The requests a tab's conversation waits on the user for, by kind. */
+/** What a tab waits on the user for, by kind: requests in its conversation, and a login its agent needs. */
 export interface OpenRequests {
   permissions: number;
   questions: number;
+  /** Tabs whose agent needs the user to log in. */
+  logins: number;
 }
+
+export const NO_REQUESTS: OpenRequests = { permissions: 0, questions: 0, logins: 0 };
 
 export function openRequests(state: TabState | undefined): OpenRequests {
   const open = state?.transcript.items.filter((item) => openRequest(item) !== undefined) ?? [];
   const permissions = open.filter((item) => item.kind === "permission").length;
-  return { permissions, questions: open.length - permissions };
+  return { permissions, questions: open.length - permissions, logins: state?.status.needsLogin ? 1 : 0 };
 }
 
+/** The requests of several tabs together. */
+export const sumRequests = (each: ReadonlyArray<OpenRequests>): OpenRequests =>
+  each.reduce(
+    (sum, one) => ({
+      permissions: sum.permissions + one.permissions,
+      questions: sum.questions + one.questions,
+      logins: sum.logins + one.logins,
+    }),
+    NO_REQUESTS,
+  );
+
 /** What the user is waited on for, in a few words; `undefined` when nothing is open. */
-export function requestsLabel({ permissions, questions }: OpenRequests, t: Translate): string | undefined {
+export function requestsLabel({ permissions, questions, logins }: OpenRequests, t: Translate): string | undefined {
   const parts = [
+    ...(logins === 0 ? [] : [t("chat.tabLogin")]),
     ...(permissions === 0 ? [] : [permissions === 1 ? t("chat.tabPermission") : t("chat.tabPermissions", permissions)]),
     ...(questions === 0 ? [] : [questions === 1 ? t("chat.tabQuestion") : t("chat.tabQuestions", questions)]),
   ];
