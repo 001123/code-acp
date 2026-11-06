@@ -60,7 +60,7 @@ export class TabAgents {
     });
   }
 
-  /** The agent `tab` runs on: its pick while it exists, else the default (last picked). */
+  /** The agent `tab` runs on: its pick while it exists, else the default. */
   readonly agentIdOf = Effect.fn("TabAgents.agentIdOf")(function* (this: TabAgents, tab: Tab) {
     if (tab.agentId && (yield* this.host.manager.has(tab.agentId))) {
       return tab.agentId;
@@ -274,17 +274,17 @@ export class TabAgents {
     this.host.runtime.runFork(Scope.close(running.scope, Exit.void));
   }
 
-  /** Switches `tab` to another agent, starting over in a fresh session; it also becomes the default for new tabs. */
+  /** Switches `tab` to another agent, starting over in a fresh session. The default for new tabs stays as it is. */
   readonly setTabAgent = Effect.fn("TabAgents.setTabAgent")(function* (this: TabAgents, tab: Tab, agentId: string) {
     const { sessions } = this.host;
-    const change = tab.agentId !== agentId;
-    if (change && !(yield* sessions.confirmStartOver(tab))) {
+    if ((yield* this.agentIdOf(tab)) === agentId) {
+      tab.agentId = agentId;
       return;
     }
-    yield* this.host.manager.setActive(agentId);
-    if (change) {
-      yield* sessions.startOver(tab, (tab) => (tab.agentId = agentId));
+    if (!(yield* sessions.confirmStartOver(tab))) {
+      return;
     }
+    yield* sessions.startOver(tab, (tab) => (tab.agentId = agentId));
   });
 
   readonly login = Effect.fn("TabAgents.login")(function* (this: TabAgents) {
