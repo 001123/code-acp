@@ -1,0 +1,432 @@
+/* The agent panel: a rail of agents, the models with a search, the levels of thinking, and the other options below. */
+#agent-panel {
+  --picker-line: var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
+  --picker-hover: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  left: 0;
+  display: block;
+  width: min(480px, calc(100vw - 24px));
+  padding: 0;
+  font-size: 0.92em;
+  container-type: inline-size;
+}
+.picker-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: min(272px, calc(100vh - 120px));
+}
+.picker-body.with-effort {
+  grid-template-columns: auto minmax(0, 1fr) minmax(104px, 28%);
+}
+.picker-body.with-footer {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.picker-body svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.picker-rail {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 0;
+  padding: 4px;
+  border-right: 1px solid var(--picker-line);
+}
+.rail-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.rail-sep {
+  width: 60%;
+  height: 1px;
+  margin: 2px 0;
+  background: var(--picker-line);
+}
+.rail-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+.rail-btn svg,
+.rail-btn .agent-icon {
+  width: 16px;
+  height: 16px;
+}
+.rail-btn:hover,
+.rail-btn:focus-visible {
+  background: var(--picker-hover);
+  color: var(--vscode-foreground);
+  outline: none;
+}
+/* The agent or view shown. */
+.rail-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+  color: var(--vscode-foreground);
+}
+/* The tab's agent: a bar at its left edge, inside the button so the rail does not scroll sideways. */
+.rail-btn[data-current]::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--vscode-focusBorder, var(--vscode-button-background));
+}
+.rail-btn[data-update]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vscode-activityBarBadge-background, var(--vscode-button-background));
+}
+
+.picker-models {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 4px 6px;
+}
+.picker-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 5px;
+  margin-bottom: 3px;
+  border-bottom: 1px solid var(--picker-line);
+  color: var(--vscode-descriptionForeground);
+}
+.picker-search:focus-within {
+  border-bottom-color: var(--vscode-focusBorder);
+}
+.picker-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--vscode-foreground);
+  font: inherit;
+}
+.picker-search input::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+.picker-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.picker-list .menu-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.picker-list .menu-heading .agent-icon {
+  width: 12px;
+  height: 12px;
+}
+.picker-model {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 1px 3px 1px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.picker-model[data-active="true"] {
+  background: var(--picker-hover);
+  color: var(--vscode-menu-selectionForeground, inherit);
+}
+.picker-model .menu-label {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-model > .svg-icon svg {
+  color: var(--vscode-descriptionForeground);
+}
+.picker-star {
+  display: flex;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  visibility: hidden;
+}
+.picker-model[data-active="true"] .picker-star,
+.picker-star[data-on="true"],
+.picker-star:focus-visible {
+  visibility: visible;
+}
+.picker-star:hover {
+  color: var(--vscode-foreground);
+}
+.picker-star[data-on="true"] {
+  color: var(--vscode-editorWarning-foreground, #e2c08d);
+}
+.picker-key {
+  flex: none;
+  min-width: 2.2em;
+  font: inherit;
+  font-size: 0.85em;
+  text-align: right;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+}
+.picker-model[data-active="true"] .picker-key {
+  opacity: 1;
+}
+/* Another agent's models: picking one switches to it. */
+.picker-other {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 4px 6px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+.picker-other .agent-icon {
+  width: 12px;
+  height: 12px;
+}
+.picker-other .label-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-switch {
+  flex: none;
+  height: 20px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 0.92em;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  cursor: pointer;
+}
+.picker-switch:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+[data-dimmed] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.picker-empty {
+  padding: 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.picker-effort {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 4px 6px;
+  border-left: 1px solid var(--picker-line);
+}
+.picker-effort-head {
+  padding: 5px 6px 6px;
+  margin-bottom: 3px;
+  border-bottom: 1px solid var(--picker-line);
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-effort-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.picker-effort-list > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 24px;
+  padding: 1px 6px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.picker-effort-list > button:hover,
+.picker-effort-list > button:focus-visible {
+  background: var(--picker-hover);
+  outline: none;
+}
+.picker-effort-list .menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-effort-list > button[aria-checked="false"] svg {
+  visibility: hidden;
+}
+
+.picker-footer {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 6px;
+  border-top: 1px solid var(--picker-line);
+}
+.picker-segments {
+  display: inline-flex;
+  padding: 1px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
+.picker-segments > button,
+.picker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.picker-segments > button:hover,
+.picker-chip:hover,
+.picker-chip[aria-expanded="true"] {
+  color: var(--vscode-foreground);
+}
+.picker-segments > button[aria-checked="true"] {
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.picker-chip {
+  max-width: 100%;
+  background: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+}
+.picker-chip .label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-chip > .svg-icon:last-child svg {
+  width: 12px;
+  height: 12px;
+}
+.picker-drop {
+  position: relative;
+  min-width: 0;
+}
+.picker-drop-list {
+  bottom: calc(100% + 4px);
+  min-width: 160px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.picker-drop-list.left {
+  left: 0;
+}
+.picker-drop-list.right {
+  right: 0;
+}
+.picker-drop-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.picker-drop-list button:hover,
+.picker-drop-list button:focus-visible {
+  background: var(--picker-hover);
+  outline: none;
+}
+.picker-drop-list button[aria-checked="false"] .menu-check {
+  visibility: hidden;
+}
+
+/* Narrow views: the levels of thinking go under the models, side by side. */
+@container (max-width: 380px) {
+  .picker-body.with-effort {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .picker-body.with-effort.with-footer {
+    grid-template-rows: minmax(0, 1fr) auto auto;
+  }
+  .picker-effort {
+    grid-column: 2;
+    border-left: none;
+    border-top: 1px solid var(--picker-line);
+  }
+  .picker-effort-head {
+    padding: 0 4px 4px;
+    margin-bottom: 2px;
+    border-bottom: none;
+  }
+  .picker-effort-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .picker-effort-list > button {
+    min-height: 24px;
+  }
+  .picker-effort-list > button[aria-checked="true"] {
+    background: var(--picker-hover);
+  }
+  .picker-effort-list > button svg {
+    display: none;
+  }
+}

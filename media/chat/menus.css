@@ -48,14 +48,9 @@
   border-radius: 50%;
   background: var(--vscode-activityBarBadge-background, var(--vscode-button-background));
 }
-/* Menus open upward: the gear's aligned to its right edge, the agent's to its left. */
+/* Menus open upward: the gear's aligned to its right edge. */
 #chat-settings-menu {
   right: 0;
-}
-#agent-panel {
-  left: 0;
-  width: max-content;
-  max-width: min(320px, calc(100vw - 24px));
 }
 .popup-menu {
   position: absolute;
@@ -122,19 +117,6 @@
 .popup-menu .menu-label {
   flex: 1;
 }
-.panel-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 4px 6px;
-  margin-bottom: 2px;
-  border-bottom: 1px solid
-    var(--vscode-menu-separatorBackground, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
-}
-.panel-head .agent-switch {
-  flex: 1;
-  min-width: 0;
-}
 .submenu-trigger {
   display: flex;
   align-items: center;
@@ -150,10 +132,6 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
-}
-.panel-head .submenu-trigger {
-  padding-left: 4px;
-  font-weight: 600;
 }
 .submenu-trigger:hover,
 .submenu-trigger[aria-expanded="true"],
@@ -190,11 +168,6 @@
 }
 .submenu-trigger[data-opens="left"] .submenu-chevron svg {
   transform: rotate(180deg);
-}
-.panel-row > .submenu-trigger > .svg-icon svg {
-  width: 14px;
-  height: 14px;
-  color: var(--vscode-descriptionForeground);
 }
 .config-loading {
   display: flex;

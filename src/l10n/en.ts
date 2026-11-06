@@ -381,6 +381,17 @@ const en = {
   "chat.agentSettings": "Agent settings",
   "chat.switchAgent": "Switch agent",
   "chat.loadingOptions": "Loading the agent's options…",
+  "chat.searchModels": "Search models…",
+  "chat.favoriteModels": "Favorite models",
+  "chat.addFavorite": "Add to favorites",
+  "chat.removeFavorite": "Remove from favorites",
+  "chat.noFavorites": "Star a model to keep it here.",
+  "chat.noModelsMatch": "No models match.",
+  "chat.noModelChoice": "This agent has no models to choose from.",
+  "chat.standardSpeed": "Standard",
+  "chat.fastSpeed": "Fast",
+  "chat.switchToAgent": "Switch",
+  "chat.thinkingLevel": "Thinking",
   "chat.startOverConfirm":
     "Start a new session? This tab's conversation will be closed; the agent's file changes stay.",
   "chat.startOverBusyConfirm":

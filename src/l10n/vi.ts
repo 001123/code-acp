@@ -383,6 +383,17 @@ const vi: Record<MessageKey, string> = {
   "chat.agentSettings": "Cài đặt agent",
   "chat.switchAgent": "Đổi agent",
   "chat.loadingOptions": "Đang tải tùy chọn của agent…",
+  "chat.searchModels": "Tìm model…",
+  "chat.favoriteModels": "Model yêu thích",
+  "chat.addFavorite": "Thêm vào yêu thích",
+  "chat.removeFavorite": "Bỏ khỏi yêu thích",
+  "chat.noFavorites": "Gắn sao cho model để giữ nó ở đây.",
+  "chat.noModelsMatch": "Không có model nào khớp.",
+  "chat.noModelChoice": "Agent này không có model nào để chọn.",
+  "chat.standardSpeed": "Tiêu chuẩn",
+  "chat.fastSpeed": "Nhanh",
+  "chat.switchToAgent": "Chuyển",
+  "chat.thinkingLevel": "Suy nghĩ",
   "chat.startOverConfirm":
     "Bắt đầu phiên mới? Cuộc hội thoại của tab này sẽ bị đóng; các thay đổi file của agent vẫn được giữ.",
   "chat.startOverBusyConfirm":

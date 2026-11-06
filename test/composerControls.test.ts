@@ -9,6 +9,11 @@ import type { TabInfo } from "../src/chat/protocol";
 vi.mock("../src/ui/chat/post", () => ({ post: () => {} }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as { acquireVsCodeApi?: unknown }).acquireVsCodeApi = () => ({
+  postMessage: () => {},
+  getState: () => undefined,
+  setState: () => {},
+});
 
 const { AgentPanel } = await import("../src/ui/chat/agentPanel");
 const { quickConfig } = await import("../src/ui/chat/sessionConfig");
@@ -69,6 +74,139 @@ describe("composer controls", () => {
       assert.isNotNull(find("#agent-panel"));
       click(0);
       assert.isNull(find("#agent-panel"));
+    });
+  });
+
+  describe("model picker", () => {
+    const options: ReadonlyArray<acp.SessionConfigOption> = [
+      {
+        id: "m",
+        name: "Model",
+        type: "select",
+        category: "model",
+        currentValue: "o",
+        options: [
+          { value: "o", name: "Opus" },
+          { value: "s", name: "Sonnet" },
+        ],
+      },
+      {
+        id: "e",
+        name: "Reasoning",
+        type: "select",
+        category: "thought_level",
+        currentValue: "med",
+        options: [
+          { value: "low", name: "Low" },
+          { value: "med", name: "Medium" },
+        ],
+      },
+      {
+        id: "fast",
+        name: "Fast mode",
+        type: "select",
+        currentValue: "off",
+        options: [
+          { value: "off", name: "Off" },
+          { value: "on", name: "On" },
+        ],
+      },
+    ];
+    const open = (onChange: (id: string, value: string) => void = () => {}) => {
+      draw(
+        createElement(AgentPanel, {
+          tab: { ...gitTab, agentId: "a" },
+          choices: {
+            agents: [
+              { id: "a", name: "Agent A" },
+              { id: "b", name: "Agent B" },
+            ],
+          },
+          summary: quickConfig(options),
+          config: { options, loading: false, onChange },
+        }),
+      );
+      act(() => void find("#agent-summary")!.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })));
+    };
+    const texts = (selector: string) => [...document.querySelectorAll(selector)].map((e) => e.textContent);
+
+    it("lists the agents, models, levels of thinking and a fast switch", () => {
+      open();
+      assert.lengthOf(document.querySelectorAll(".rail-agents .rail-btn"), 2);
+      assert.deepStrictEqual(texts(".picker-model .menu-label"), ["Opus", "Sonnet"]);
+      assert.strictEqual(find(".picker-model[aria-selected=true]")!.textContent!.startsWith("Opus"), true);
+      assert.deepStrictEqual(texts(".picker-effort-list .menu-label"), ["Low", "Medium"]);
+      assert.isNotNull(find(".picker-segments"));
+    });
+
+    it("filters the models by the search", () => {
+      open();
+      const input = find<HTMLInputElement>(".picker-search input")!;
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "son");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      assert.deepStrictEqual(texts(".picker-model .menu-label"), ["Sonnet"]);
+    });
+
+    it("picks a model, a level and the fast mode", () => {
+      const picked: Array<[string, string]> = [];
+      open((id, value) => picked.push([id, value]));
+      const rows = document.querySelectorAll<HTMLElement>(".picker-model");
+      act(() => rows[1]!.click());
+      act(() => document.querySelectorAll<HTMLElement>(".picker-effort-list button")[0]!.click());
+      act(() => document.querySelectorAll<HTMLElement>(".picker-segments button")[1]!.click());
+      assert.deepStrictEqual(picked, [
+        ["m", "s"],
+        ["e", "low"],
+        ["fast", "on"],
+      ]);
+    });
+  });
+
+  describe("model picker rail", () => {
+    it("shows another agent's models on hover without switching to it", async () => {
+      vi.useFakeTimers();
+      try {
+        draw(
+          createElement(AgentPanel, {
+            tab: { ...gitTab, agentId: "a" },
+            choices: {
+              agents: [
+                { id: "a", name: "Agent A" },
+                { id: "b", name: "Agent B" },
+              ],
+            },
+            summary: "s",
+            config: { options: [], loading: false, onChange: () => {} },
+          }),
+        );
+        act(() => void find("#agent-summary")!.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })));
+        const b = document.querySelectorAll<HTMLElement>(".rail-agents .rail-btn")[1]!;
+        act(() => void b.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
+        act(() => void vi.advanceTimersByTime(200));
+        assert.strictEqual(b.getAttribute("aria-pressed"), "true");
+        assert.isNotNull(find(".picker-other"));
+        assert.isNotNull(find(".config-loading"));
+        await act(async () => {
+          window.dispatchEvent(
+            new MessageEvent("message", {
+              data: {
+                type: "attemptOptions",
+                agentId: "b",
+                model: "",
+                options: { models: [{ value: "x", name: "Xeno" }], efforts: [], fastMode: false },
+              },
+            }),
+          );
+        });
+        assert.deepStrictEqual(
+          [...document.querySelectorAll(".picker-model .menu-label")].map((e) => e.textContent),
+          ["Xeno"],
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

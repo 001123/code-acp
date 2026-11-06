@@ -7,7 +7,8 @@ import { useL10n } from "../l10n";
 import chevronUpIcon from "@tabler/icons/outline/chevron-up.svg";
 import plusIcon from "@tabler/icons/outline/plus.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
-import { AgentIcon, type AgentChoices } from "./agentPanel";
+import { AgentIcon } from "./agentIcon";
+import type { AgentChoices } from "./agentPanel";
 import { ComposerCheckbox } from "./composerParts";
 import {
   attemptKey,

@@ -6,7 +6,8 @@ import { Icon } from "../icon";
 import { useL10n } from "../l10n";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import loaderIcon from "@tabler/icons/outline/loader-2.svg";
-import { AgentIcon, type AgentChoices } from "./agentPanel";
+import { AgentIcon } from "./agentIcon";
+import type { AgentChoices } from "./agentPanel";
 import { post } from "./post";
 
 /** Registry ids of the agents offered first, in order. */

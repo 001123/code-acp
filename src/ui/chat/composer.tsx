@@ -6,7 +6,7 @@ import { Icon } from "../icon";
 import { useL10n, type Translate } from "../l10n";
 import arrowUpIcon from "@tabler/icons/outline/arrow-up.svg";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
-import { AgentPanel, type AgentChoices } from "./agentPanel";
+import { AgentPanel, type AgentChoices, type AgentConfig } from "./agentPanel";
 import { imageSrc } from "./attachments";
 import { copiedImages, htmlTokens, imageTokens, pastedContent, type CopiedToken } from "./clipboard";
 import { useCompare } from "./compare";
@@ -61,8 +61,8 @@ export interface ComposerOptions {
   usage: ReactNode;
   /** Shown before the stop and send buttons. */
   settings: ReactNode;
-  /** The session's config options, shown in the agent panel. */
-  agentConfig: ReactNode;
+  /** The session's config options, shown in the agent panel; undefined without a tab. */
+  agentConfig: AgentConfig | undefined;
   /** The session's model and effort, shown beside the agent button. */
   quickConfig: ReactNode;
   /** The session's config options, which a comparison starts from. */
@@ -417,9 +417,7 @@ export function useComposer(options: ComposerOptions) {
       </div>
       <div id="actions">
         {usage}
-        <AgentPanel tab={activeTab} choices={agents} summary={quickConfig}>
-          {agentConfig}
-        </AgentPanel>
+        <AgentPanel tab={activeTab} choices={agents} summary={quickConfig} config={agentConfig} />
         <FolderSelect tab={activeTab} folders={folders} />
         <span className="spacer" />
         {compare.element}

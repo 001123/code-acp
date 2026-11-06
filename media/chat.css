@@ -9,6 +9,7 @@
 @import "./chat/attachments.css";
 @import "./chat/toolbar.css";
 @import "./chat/menus.css";
+@import "./chat/modelPicker.css";
 @import "./chat/history.css";
 @import "./chat/groups.css";
 @import "./chat/setup.css";

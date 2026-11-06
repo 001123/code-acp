@@ -10,15 +10,13 @@ import cpuIcon from "@tabler/icons/outline/cpu.svg";
 import loaderIcon from "@tabler/icons/outline/loader-2.svg";
 import robotIcon from "@tabler/icons/outline/robot.svg";
 import shieldIcon from "@tabler/icons/outline/shield-half.svg";
-import { SubMenu, type SubMenuEntry } from "./popupMenu";
-import { post } from "./post";
 
-type SelectOption = acp.SessionConfigOption & { type: "select" };
+export type SelectOption = acp.SessionConfigOption & { type: "select" };
 
 const CONFIG_ICONS = { mode: shieldIcon, model: cpuIcon, effort: brainIcon, fast: boltIcon, agent: robotIcon };
 
 /** What a config option sets: by its ACP category, else by keywords in its id or name. */
-function configKind(option: acp.SessionConfigOption): keyof typeof CONFIG_ICONS | undefined {
+export function configKind(option: acp.SessionConfigOption): keyof typeof CONFIG_ICONS | undefined {
   switch (option.category) {
     case "mode":
       return "mode";
@@ -37,13 +35,13 @@ function configKind(option: acp.SessionConfigOption): keyof typeof CONFIG_ICONS 
   return undefined;
 }
 
-function configIcon(option: acp.SessionConfigOption): string {
+export function configIcon(option: acp.SessionConfigOption): string {
   const kind = configKind(option);
   return kind ? CONFIG_ICONS[kind] : adjustmentsIcon;
 }
 
 /** The name of the option's current value. */
-function currentName(option: SelectOption): string {
+export function currentName(option: SelectOption): string {
   const flat = option.options.flatMap((o) => ("options" in o ? o.options : [o]));
   return flat.find((o) => o.value === option.currentValue)?.name ?? option.currentValue;
 }
@@ -67,48 +65,6 @@ export function sessionChoices(options: ReadonlyArray<acp.SessionConfigOption>):
     // The agent's own "default" is what no pick means.
     ...(effort !== undefined && !/^(default|auto)$/i.test(effort) && { effort }),
   };
-}
-
-/** One row of the agent panel: picks a value for a select config option. */
-export function ConfigSelect({
-  tab,
-  option,
-  onChange,
-}: {
-  tab: number;
-  option: SelectOption;
-  onChange: (value: string) => void;
-}) {
-  const grouped = option.options.some((o) => "options" in o);
-  const entries = option.options.flatMap((o): SubMenuEntry[] =>
-    "options" in o
-      ? [
-          { heading: o.name },
-          ...o.options.map((v) => ({ value: v.value, label: v.name, title: v.description ?? undefined })),
-        ]
-      : [{ value: o.value, label: o.name, title: o.description ?? undefined }],
-  );
-  return (
-    <SubMenu
-      id={`config:${option.id}`}
-      className={`panel-row${grouped ? " grouped" : ""}`}
-      title={option.description ?? undefined}
-      trigger={
-        <>
-          <Icon svg={configIcon(option)} />
-          <span className="menu-label">{option.name}</span>
-          <span className="submenu-value">{currentName(option)}</span>
-        </>
-      }
-      entries={entries}
-      current={option.currentValue}
-      onPick={(value) => {
-        if (value === option.currentValue) return;
-        onChange(value);
-        post({ type: "setConfig", tab, configId: option.id, value });
-      }}
-    />
-  );
 }
 
 /** The session's model and effort as text, for the button beside the agent's; undefined when the agent has neither. */

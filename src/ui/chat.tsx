@@ -18,7 +18,7 @@ import { NEW_TAB, TabSidebar, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
 import type { AgentChoices } from "./chat/agentPanel";
 import { ChatSettings } from "./chat/chatSettings";
-import { ConfigLoading, ConfigSelect, quickConfig } from "./chat/sessionConfig";
+import { quickConfig } from "./chat/sessionConfig";
 import { AgentSetup, needsSetup } from "./chat/agentSetup";
 import { UsageMeter } from "./chat/usageMeter";
 import { PrDraftForm, WorkspaceBar } from "./chat/workspaceControls";
@@ -197,17 +197,7 @@ function App() {
       />
     ),
     agentConfig:
-      active !== undefined &&
-      (configLoading ? (
-        // The options of the agent switched from would apply to a session that is gone.
-        <ConfigLoading />
-      ) : (
-        config.map((opt) =>
-          opt.type === "select" ? (
-            <ConfigSelect key={opt.id} tab={active} option={opt} onChange={(value) => setConfigValue(opt.id, value)} />
-          ) : null,
-        )
-      )),
+      active !== undefined ? { options: config, loading: !!configLoading, onChange: setConfigValue } : undefined,
     quickConfig: active !== undefined && !configLoading && quickConfig(config),
     config,
     hidden: group !== undefined || !chatShown,

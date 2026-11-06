@@ -38,12 +38,11 @@ export class ViewMessages {
     agentId: string,
     model: string,
   ): Effect.Effect<AgentOptions, CommitMessageError, CommitMessage> {
-    const live = this.host
-      .liveTabs()
-      .find(
-        (tab) =>
-          tab.running?.agentId === agentId && model !== "" && modelOption(tab.configOptions)?.currentValue === model,
-      );
+    const live = this.host.liveTabs().find(
+      // Any model will do for its usual one: the models are the same.
+      (tab) =>
+        tab.running?.agentId === agentId && (model === "" || modelOption(tab.configOptions)?.currentValue === model),
+    );
     return live
       ? Effect.succeed(agentOptions(live.configOptions))
       : CommitMessage.use((commit) => commit.options(agentId, model || (this.host.usualOptions(agentId)?.model ?? "")));
