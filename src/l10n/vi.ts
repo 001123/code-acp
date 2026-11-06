@@ -213,13 +213,13 @@ const vi: Record<MessageKey, string> = {
     "Đọc file và truy cập mạng đều đang được phép, nên agent bị nội dung nó đọc đánh lừa có thể gửi thông tin bí mật của bạn ra ngoài mà không hỏi.",
   "settings.autoApproveWorkspaceNote":
     "Quy tắc của workspace chỉ nằm trên máy này, không nằm trong file của project, nên repository không thể đặt chúng.",
-  "settings.links": "Liên kết",
-  "settings.linksDesc": "Những liên kết agent được phép đề nghị bạn mở. Luôn hỏi bạn trước khi mở.",
   "settings.allowedHttpHosts": "Host được phép dùng http",
   "settings.allowedHttpHostsDesc":
     "Mỗi dòng một tên hoặc địa chỉ IP, không kèm cổng. Liên kết https và http tới localhost, 127.0.0.1 không cần khai báo. Mọi người trong cùng mạng đều đọc được dữ liệu gửi qua http.",
   "settings.allowedHttpHostsInvalid": "Dòng {0} không phải tên host hoặc địa chỉ IP.",
   "settings.usage": "Mức sử dụng",
+  "settings.debug": "Debug",
+  "settings.debugDesc": "Kiểm tra agent có chạy được không, và theo dõi những gì agent làm.",
   "settings.doctor": "Doctor",
   "settings.doctorDesc":
     "Kiểm tra các công cụ mà agent cần, rồi khởi động từng agent để xem agent có chạy được và có cần đăng nhập không. Không gửi prompt nào.",
@@ -358,6 +358,8 @@ const vi: Record<MessageKey, string> = {
   "settings.showRestore": "Hiện nút Khôi phục",
   "settings.showRestoreDesc":
     "Hiện nút Khôi phục trên tin nhắn của bạn, để đưa các file agent đã sửa về trạng thái trước tin nhắn đó.",
+  "settings.git": "Git",
+  "settings.gitDesc": "Worktree cho các cuộc trò chuyện và commit message cho view Source Control.",
   "settings.worktree": "Worktree",
   "settings.worktreeDesc": "Chạy các cuộc trò chuyện trong git worktree riêng.",
   "settings.notificationsTab": "Thông báo",
@@ -417,7 +419,7 @@ const vi: Record<MessageKey, string> = {
   "chat.elicitation.linkOpened": "Đã mở trong trình duyệt",
   "chat.elicitation.linkFinished": "Đã hoàn tất",
   "chat.elicitation.unsafeUrl":
-    "Đã chặn một liên kết agent yêu cầu mở. Chỉ mở được liên kết không chứa tên người dùng, qua https, hoặc qua http tới localhost, 127.0.0.1 và các host trong Cài đặt > Liên kết: {0}",
+    "Đã chặn một liên kết agent yêu cầu mở. Chỉ mở được liên kết không chứa tên người dùng, qua https, hoặc qua http tới localhost, 127.0.0.1 và các host trong Cài đặt > Quyền: {0}",
   "chat.elicitation.notOpened": "Liên kết chưa được mở.",
   "chat.compaction.inProgress": "Đang compact cuộc trò chuyện…",
   "chat.compaction.completed": "Đã compact cuộc trò chuyện",

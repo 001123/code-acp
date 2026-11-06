@@ -11,6 +11,18 @@ h2 {
   margin: 0 0 2px;
 }
 
+.panel-section + .panel-section {
+  margin-top: 24px;
+}
+.panel-section h3 {
+  margin: 0;
+  font-size: 1.05em;
+  font-weight: 600;
+}
+.panel-section > .desc {
+  margin-bottom: 10px;
+}
+
 .subtabs {
   display: flex;
   gap: 4px;

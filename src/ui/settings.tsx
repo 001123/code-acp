@@ -6,19 +6,17 @@ import type { UsageView } from "../settingsPanel";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
-import { DoctorTab } from "./settings/doctor";
 import { EntryList, serversOf } from "./settings/entries";
 import { ADD_VIEW, ProvidersTab, type AddSection, type ProviderView } from "./settings/providers";
 import { ScopeContext, Segmented } from "./settings/fields";
 import {
-  CommitTab,
+  DebugTab,
   GeneralTab,
   LanguageTab,
-  LinksTab,
+  AllowedHostsCard,
   NotificationsTab,
   PermissionsTab,
-  TracingTab,
-  WorktreeTab,
+  GitTab,
 } from "./settings/panels";
 import { post } from "./settings/post";
 import { optionsKey, type LoadedOptions, type State } from "./settings/state";
@@ -34,6 +32,12 @@ function savedTab(): Tab {
   const state = getState() as Saved | undefined;
   // The Agent tab of earlier versions is the Providers tab.
   if (state?.tab === "agent") return "providers";
+  // The Links tab of earlier versions is part of the Permissions tab.
+  if (state?.tab === "links") return "permissions";
+  // The Worktree and Commit messages tabs of earlier versions are the Git tab.
+  if (state?.tab === "worktree" || state?.tab === "commit") return "git";
+  // The Tracing and Doctor tabs of earlier versions are the Debug tab.
+  if (state?.tab === "tracing" || state?.tab === "doctor") return "debug";
   return TABS.find((tab) => tab.id === state?.tab)?.id ?? "general";
 }
 
@@ -96,7 +100,7 @@ function App() {
     if (msg.type === "selectTab" && TABS.some((x) => x.id === msg.tab)) {
       select(msg.tab);
       if (msg.tab === "providers" && msg.section === "add") selectProvider(ADD_VIEW);
-      if (msg.tab === "doctor" && msg.section === "run") post({ type: "doctorRun" });
+      if (msg.tab === "debug" && msg.section === "doctor") post({ type: "doctorRun" });
     }
     // Answers for an agent no longer selected are dropped.
     if (msg.type === "models") setLoaded((l) => ({ ...l, [optionsKey(msg.agentId, msg.model)]: msg }));
@@ -123,7 +127,7 @@ function App() {
     return null;
   };
   const current = TABS.find((x) => x.id === tab)!;
-  // Usage and Doctor are no settings.
+  // Usage is no settings.
   const scoped = current.keys.length > 0;
   const panelDesc = current.desc;
   const workspaceLabel = state.workspaceName
@@ -186,9 +190,14 @@ function App() {
 
           {tab === "notifications" && <NotificationsTab state={state} />}
 
-          {tab === "permissions" && <PermissionsTab state={state} />}
+          {tab === "permissions" && (
+            <>
+              <PermissionsTab state={state} />
+              <AllowedHostsCard state={state} />
+            </>
+          )}
 
-          {tab === "worktree" && <WorktreeTab state={state} />}
+          {tab === "git" && <GitTab state={state} loaded={loaded} load={load} />}
 
           {tab === "providers" && (
             <ProvidersTab
@@ -204,8 +213,6 @@ function App() {
             />
           )}
 
-          {tab === "commit" && <CommitTab state={state} loaded={loaded} load={load} />}
-
           {tab === "mcp" && (
             <EntryList
               value={v.mcpServers}
@@ -213,10 +220,6 @@ function App() {
               locked={state.locked.includes("mcpServers")}
             />
           )}
-
-          {tab === "links" && <LinksTab state={state} />}
-
-          {tab === "tracing" && <TracingTab state={state} />}
 
           {tab === "usage" && (
             <UsageTab
@@ -232,7 +235,7 @@ function App() {
             />
           )}
 
-          {tab === "doctor" && <DoctorTab doctor={doctor} />}
+          {tab === "debug" && <DebugTab state={state} doctor={doctor} />}
         </main>
       </div>
     </ScopeContext.Provider>

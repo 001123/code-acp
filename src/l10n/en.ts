@@ -212,13 +212,13 @@ const en = {
     "Reading files and network access are both allowed, so an agent misled by what it reads could send your secrets out without asking.",
   "settings.autoApproveWorkspaceNote":
     "A workspace's rules stay on this machine rather than in the project's files, so a repository can't set them.",
-  "settings.links": "Links",
-  "settings.linksDesc": "Which links an agent may ask you to open. You are always asked first.",
   "settings.allowedHttpHosts": "Hosts allowed over http",
   "settings.allowedHttpHostsDesc":
     "One name or IP address per line, without a port. Links over https, and http to localhost and 127.0.0.1, need no entry. Anyone on the network can read what is sent over http.",
   "settings.allowedHttpHostsInvalid": "Line {0} is not a host name or IP address.",
   "settings.usage": "Usage",
+  "settings.debug": "Debug",
+  "settings.debugDesc": "Check that agents can run, and trace what they do.",
   "settings.doctor": "Doctor",
   "settings.doctorDesc":
     "Check the tools agents depend on, then start each agent to see that it runs and whether it needs a login. No prompts are sent.",
@@ -356,6 +356,8 @@ const en = {
   "settings.showRestore": "Show Restore button",
   "settings.showRestoreDesc":
     "Show the Restore button on your messages, which puts the files the agent changed back to how they were before that message.",
+  "settings.git": "Git",
+  "settings.gitDesc": "Worktrees for conversations, and commit messages for the Source Control view.",
   "settings.worktree": "Worktree",
   "settings.worktreeDesc": "Run conversations in isolated git worktrees.",
   "settings.notificationsTab": "Notifications",
@@ -414,7 +416,7 @@ const en = {
   "chat.elicitation.linkOpened": "Opened in your browser",
   "chat.elicitation.linkFinished": "Finished",
   "chat.elicitation.unsafeUrl":
-    "The agent asked to open a link that was blocked. Only links without a user name can open, over https, or over http to localhost, 127.0.0.1 and the hosts in Settings > Links: {0}",
+    "The agent asked to open a link that was blocked. Only links without a user name can open, over https, or over http to localhost, 127.0.0.1 and the hosts in Settings > Permissions: {0}",
   "chat.elicitation.notOpened": "The link wasn't opened.",
   "chat.compaction.inProgress": "Compacting the conversation…",
   "chat.compaction.completed": "Conversation compacted",

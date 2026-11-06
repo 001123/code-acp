@@ -159,7 +159,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ),
     // "run": a command asks for the checks; merely opening the tab does not start the agents.
     vscode.commands.registerCommand("codeAcp.doctor", () =>
-      SettingsPanel.show(context, runtime, manager, "doctor", "run"),
+      SettingsPanel.show(context, runtime, manager, "debug", "doctor"),
     ),
     vscode.commands.registerCommand(
       LOGIN_AGENT_COMMAND,

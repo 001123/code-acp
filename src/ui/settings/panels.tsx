@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { ApprovalRules, SessionDefaults, SettingKey } from "../../settings";
 import { Icon } from "../icon";
 import { useL10n, type MessageKey } from "../l10n";
+import type { DoctorState } from "../../doctor";
 import { AgentModelFields, SessionOptionFields } from "./agentModel";
+import { DoctorTab } from "./doctor";
 import { Field, Overridden, Segmented, Text, Toggle } from "./fields";
 import { parseHosts } from "./hosts";
 import { formatPairs, parsePairs } from "./pairs";
@@ -194,7 +196,7 @@ export function PermissionsTab({ state }: { state: State }) {
   );
 }
 
-export function WorktreeTab({ state }: { state: State }) {
+function WorktreeCard({ state }: { state: State }) {
   const v = state.values;
   const overridden = isOverridden(state);
   return (
@@ -268,7 +270,7 @@ export function WorktreeTab({ state }: { state: State }) {
   );
 }
 
-export function TracingTab({ state }: { state: State }) {
+function TracingSection({ state }: { state: State }) {
   const { t } = useL10n();
   return (
     <>
@@ -295,7 +297,8 @@ export function TracingTab({ state }: { state: State }) {
   );
 }
 
-export function LinksTab({ state }: { state: State }) {
+/** The hosts links from agents may reach over plain http, on the Permissions tab. */
+export function AllowedHostsCard({ state }: { state: State }) {
   const { t } = useL10n();
   const [error, setError] = useState<string>();
   const hosts = state.values.allowedHttpHosts as ReadonlyArray<string> | undefined;
@@ -330,11 +333,7 @@ export function LinksTab({ state }: { state: State }) {
   );
 }
 
-export function CommitTab(props: {
-  state: State;
-  loaded: LoadedOptions;
-  load: (agentId: string, model: string) => void;
-}) {
+function CommitCard(props: { state: State; loaded: LoadedOptions; load: (agentId: string, model: string) => void }) {
   const { state, loaded, load } = props;
   const overridden = isOverridden(state);
   return (
@@ -366,5 +365,43 @@ export function CommitTab(props: {
         />
       </Field>
     </section>
+  );
+}
+
+/** A heading inside a tab's panel, with what its card below is about. */
+function PanelSection(props: { title: MessageKey; desc: MessageKey; children: ReactNode }) {
+  const { t } = useL10n();
+  return (
+    <div className="panel-section">
+      <h3>{t(props.title)}</h3>
+      <div className="desc">{t(props.desc)}</div>
+      {props.children}
+    </div>
+  );
+}
+
+export function GitTab(props: { state: State; loaded: LoadedOptions; load: (agentId: string, model: string) => void }) {
+  return (
+    <>
+      <PanelSection title="settings.worktree" desc="settings.worktreeDesc">
+        <WorktreeCard state={props.state} />
+      </PanelSection>
+      <PanelSection title="settings.commit" desc="settings.commitDesc">
+        <CommitCard {...props} />
+      </PanelSection>
+    </>
+  );
+}
+
+export function DebugTab(props: { state: State; doctor: DoctorState }) {
+  return (
+    <>
+      <PanelSection title="settings.doctor" desc="settings.doctorDesc">
+        <DoctorTab doctor={props.doctor} />
+      </PanelSection>
+      <PanelSection title="settings.tracing" desc="settings.tracingTabDesc">
+        <TracingSection state={props.state} />
+      </PanelSection>
+    </>
   );
 }

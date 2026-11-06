@@ -8,26 +8,12 @@ import bellIcon from "@tabler/icons/outline/bell.svg";
 import shieldIcon from "@tabler/icons/outline/shield-check.svg";
 import branchIcon from "@tabler/icons/outline/git-branch.svg";
 import stackIcon from "@tabler/icons/outline/stack-2.svg";
-import commitIcon from "@tabler/icons/outline/git-commit.svg";
 import plugIcon from "@tabler/icons/outline/plug-connected.svg";
 import chartIcon from "@tabler/icons/outline/chart-bar.svg";
-import linkIcon from "@tabler/icons/outline/link.svg";
-import activityIcon from "@tabler/icons/outline/activity.svg";
-import stethoscopeIcon from "@tabler/icons/outline/stethoscope.svg";
+import bugIcon from "@tabler/icons/outline/bug.svg";
 
 export type Tab =
-  | "general"
-  | "language"
-  | "notifications"
-  | "permissions"
-  | "worktree"
-  | "providers"
-  | "commit"
-  | "mcp"
-  | "links"
-  | "tracing"
-  | "usage"
-  | "doctor";
+  "general" | "language" | "notifications" | "permissions" | "git" | "providers" | "mcp" | "usage" | "debug";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
   {
@@ -56,14 +42,24 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     label: "settings.permissions",
     desc: "settings.permissionsDesc",
     icon: shieldIcon,
-    keys: ["autoApprove"],
+    keys: ["autoApprove", "allowedHttpHosts"],
   },
   {
-    id: "worktree",
-    label: "settings.worktree",
-    desc: "settings.worktreeDesc",
+    id: "git",
+    label: "settings.git",
+    desc: "settings.gitDesc",
     icon: branchIcon,
-    keys: ["worktreeForNewTabs", "worktreeCopyFiles", "worktreeSetupCommand", "worktreeProjectSetupCommand"],
+    keys: [
+      "worktreeForNewTabs",
+      "worktreeCopyFiles",
+      "worktreeSetupCommand",
+      "worktreeProjectSetupCommand",
+      "commitMessage.agent",
+      "commitMessage.model",
+      "commitMessage.effort",
+      "commitMessage.fastMode",
+      "commitMessage.instructions",
+    ],
   },
   {
     id: "providers",
@@ -72,24 +68,9 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     icon: stackIcon,
     keys: ["providers", "sessionDefaults", "checkAgentUpdates", "nodePath", "ccusagePath", "env", "customAgents"],
   },
-  {
-    id: "commit",
-    label: "settings.commit",
-    desc: "settings.commitDesc",
-    icon: commitIcon,
-    keys: [
-      "commitMessage.agent",
-      "commitMessage.model",
-      "commitMessage.effort",
-      "commitMessage.fastMode",
-      "commitMessage.instructions",
-    ],
-  },
   { id: "mcp", label: "settings.mcp", desc: "settings.mcpDesc", icon: plugIcon, keys: ["mcpServers"] },
-  { id: "links", label: "settings.links", desc: "settings.linksDesc", icon: linkIcon, keys: ["allowedHttpHosts"] },
-  { id: "tracing", label: "settings.tracing", desc: "settings.tracingTabDesc", icon: activityIcon, keys: ["tracing"] },
   { id: "usage", label: "settings.usage", desc: "settings.usageDesc", icon: chartIcon, keys: [] },
-  { id: "doctor", label: "settings.doctor", desc: "settings.doctorDesc", icon: stethoscopeIcon, keys: [] },
+  { id: "debug", label: "settings.debug", desc: "settings.debugDesc", icon: bugIcon, keys: ["tracing"] },
 ];
 
 /** Tabs inside a section's panel, for what would be too much on one page. */
