@@ -38,6 +38,18 @@
   stroke-dasharray: 6 4;
   animation: pele-flow 0.5s linear infinite;
 }
+/* Two-way links: round dots that sway back and forth instead of flowing one way. */
+.mermaid .pele-edge[data-hot][data-flow="both"] > path:not(.pele-marker, .pele-edge-hit) {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 6;
+  animation: pele-sway 0.9s ease-in-out infinite alternate;
+}
+/* Links without arrowheads have no direction to show. */
+.mermaid .pele-edge[data-hot][data-flow="none"] > path:not(.pele-marker, .pele-edge-hit) {
+  stroke-dasharray: none;
+  animation: none;
+}
 .mermaid .pele-edge[data-hot] > .pele-marker {
   fill: var(--pele-accent);
 }
@@ -53,8 +65,16 @@
     stroke-dashoffset: -10;
   }
 }
+@keyframes pele-sway {
+  from {
+    stroke-dashoffset: 6;
+  }
+  to {
+    stroke-dashoffset: -6;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .mermaid .pele-edge[data-hot] > path {
-    animation: none;
+    animation: none !important;
   }
 }

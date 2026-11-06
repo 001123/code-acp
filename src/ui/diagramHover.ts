@@ -20,13 +20,19 @@ export function edgeEnds(edgeId: string, ids: ReadonlySet<string>): [string, str
   return undefined;
 }
 
-/** Edges are hairlines; a wide transparent copy under each one makes them easy to point at. */
+/**
+ * Edges are hairlines; a wide transparent copy under each one makes them easy to point at.
+ * Each edge is also tagged with its direction, which picks its animation.
+ */
 function addHitPaths(svg: SVGSVGElement) {
   if (svg.dataset.hit) return;
   svg.dataset.hit = "1";
   for (const edge of svg.querySelectorAll(".pele-edge")) {
     const line = edge.querySelector("path:not(.pele-marker)");
     if (!line) continue;
+    // One arrowhead: flows from tail to head. Two: pulses both ways. None: a plain link, lit but still.
+    const heads = edge.querySelectorAll(".pele-marker").length;
+    if (heads !== 1) edge.setAttribute("data-flow", heads === 0 ? "none" : "both");
     const hit = line.cloneNode() as SVGPathElement;
     hit.setAttribute("class", HIT);
     hit.setAttribute("stroke", "transparent");
