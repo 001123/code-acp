@@ -664,6 +664,20 @@
           "default": false,
           "description": "%config.showRestore%"
         },
+        "codeAcp.fontSize": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 32,
+          "description": "%config.fontSize%"
+        },
+        "codeAcp.codeFontSize": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 32,
+          "description": "%config.codeFontSize%"
+        },
         "codeAcp.tracing": {
           "type": "boolean",
           "default": false,

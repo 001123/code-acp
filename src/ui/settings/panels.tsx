@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { ApprovalRules, SessionDefaults, SettingKey } from "../../settings";
 import { Icon } from "../icon";
-import { useL10n, type MessageKey } from "../l10n";
+import { useL10n, type MessageKey, type Translate } from "../l10n";
 import type { DoctorState } from "../../doctor";
 import { AgentModelFields, SessionOptionFields } from "./agentModel";
 import { DoctorTab } from "./doctor";
@@ -82,6 +82,66 @@ export function GeneralTab({ state }: { state: State }) {
       >
         <Toggle id="showRestore" checked={v.showRestore === true} onChange={(checked) => set("showRestore", checked)} />
       </Field>
+    </section>
+  );
+}
+
+const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24];
+
+/** A size in pixels to pick, where 0 follows `inherited`, the size VS Code shows. */
+function FontSizeField(props: {
+  state: State;
+  id: "fontSize" | "codeFontSize";
+  label: MessageKey;
+  desc: MessageKey;
+  defaultLabel: MessageKey;
+  inherited: string;
+}) {
+  const { t } = useL10n();
+  const raw = props.state.values[props.id];
+  const value = typeof raw === "number" ? raw : 0;
+  // A size set in settings.json that the list doesn't have is still shown.
+  const sizes = value && !FONT_SIZES.includes(value) ? [...FONT_SIZES, value].sort((a, b) => a - b) : FONT_SIZES;
+  return (
+    <Field id={props.id} label={props.label} desc={props.desc} overridden={isOverridden(props.state)(props.id)}>
+      <select id={props.id} value={value} onChange={(e) => set(props.id, Number(e.target.value))}>
+        <option value={0}>{t(props.defaultLabel, props.inherited)}</option>
+        {sizes.map((size) => (
+          <option key={size} value={size}>
+            {t("settings.fontSizePx", size)}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+/** The size VS Code gives a CSS variable of its theme, as "13 px". */
+function themeSize(variable: string, t: Translate): string {
+  const px = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(variable));
+  return Number.isFinite(px) ? t("settings.fontSizePx", px) : "";
+}
+
+export function DisplayTab({ state }: { state: State }) {
+  const { t } = useL10n();
+  return (
+    <section className="card">
+      <FontSizeField
+        state={state}
+        id="fontSize"
+        label="settings.fontSize"
+        desc="settings.fontSizeDesc"
+        defaultLabel="settings.fontSizeDefault"
+        inherited={themeSize("--vscode-font-size", t)}
+      />
+      <FontSizeField
+        state={state}
+        id="codeFontSize"
+        label="settings.codeFontSize"
+        desc="settings.codeFontSizeDesc"
+        defaultLabel="settings.codeFontSizeDefault"
+        inherited={themeSize("--vscode-editor-font-size", t)}
+      />
     </section>
   );
 }

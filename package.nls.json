@@ -28,6 +28,8 @@
   "config.autoScroll": "Keep the chat scrolled to the newest content while the agent replies. Turn off to stay where you scrolled.",
   "config.showChanges": "Show the bar above the message box that lists the files the agent changed, with Undo all and Keep all, and Keep and Undo above each change in the editor.",
   "config.showRestore": "Show the Restore button on your messages, which puts the files the agent changed back to how they were before that message.",
+  "config.fontSize": "Size in pixels of the text in the chat. 0 follows VS Code's font size.",
+  "config.codeFontSize": "Size in pixels of code and terminal output in the chat. 0 follows the editor's font size.",
   "config.tracing": "For advanced users. Shows each turn's stop reason, duration, tokens, cost and context in the chat, and logs every ACP message in the Code ACP Trace output channel. The log can contain file contents, tool input and output: env and header values and fields named like secrets are masked, but other secrets may remain, and VS Code keeps output channels in its log folder.",
   "config.checkAgentUpdates": "Check the ACP Registry for agent updates on startup and offer to install them.",
   "command.generateCommitMessage": "Code ACP: Generate Commit Message",

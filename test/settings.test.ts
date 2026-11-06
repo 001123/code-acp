@@ -41,6 +41,17 @@ describe("readSettings", () => {
     assert.strictEqual(s["commitMessage.instructions"], DEFAULT_COMMIT_INSTRUCTIONS);
   });
 
+  it("reads font sizes, and falls back to VS Code's on sizes out of range", () => {
+    assert.strictEqual(readSettings().fontSize, 0);
+    assert.strictEqual(readSettings().codeFontSize, 0);
+    __test.setSetting("codeAcp.fontSize", 16);
+    __test.setSetting("codeAcp.codeFontSize", 99);
+    assert.strictEqual(readSettings().fontSize, 16);
+    assert.strictEqual(readSettings().codeFontSize, 0);
+    assert.isUndefined(valueToStore("user", "fontSize", 0, { defaultValue: 0 }));
+    assert.strictEqual(valueToStore("user", "fontSize", 14, { defaultValue: 0 }), 14);
+  });
+
   it("reads session defaults by agent, and falls back on invalid ones", () => {
     __test.setSetting("codeAcp.sessionDefaults", { claude: { model: "opus", effort: "high", fastMode: "on" } });
     assert.deepStrictEqual(readSettings().sessionDefaults, {

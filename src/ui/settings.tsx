@@ -11,6 +11,7 @@ import { ADD_VIEW, ProvidersTab, type AddSection, type ProviderView } from "./se
 import { ScopeContext, Segmented } from "./settings/fields";
 import {
   DebugTab,
+  DisplayTab,
   GeneralTab,
   LanguageTab,
   AllowedHostsCard,
@@ -185,6 +186,8 @@ function App() {
           )}
 
           {tab === "general" && <GeneralTab state={state} />}
+
+          {tab === "display" && <DisplayTab state={state} />}
 
           {tab === "language" && <LanguageTab state={state} />}
 

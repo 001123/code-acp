@@ -3,6 +3,7 @@ import type { SettingKey } from "../../settings";
 import { Icon } from "../icon";
 import { useL10n, type MessageKey } from "../l10n";
 import settingsIcon from "@tabler/icons/outline/settings.svg";
+import typographyIcon from "@tabler/icons/outline/typography.svg";
 import languageIcon from "@tabler/icons/outline/language.svg";
 import bellIcon from "@tabler/icons/outline/bell.svg";
 import shieldIcon from "@tabler/icons/outline/shield-check.svg";
@@ -13,7 +14,16 @@ import chartIcon from "@tabler/icons/outline/chart-bar.svg";
 import bugIcon from "@tabler/icons/outline/bug.svg";
 
 export type Tab =
-  "general" | "language" | "notifications" | "permissions" | "git" | "providers" | "mcp" | "usage" | "debug";
+  | "general"
+  | "display"
+  | "language"
+  | "notifications"
+  | "permissions"
+  | "git"
+  | "providers"
+  | "mcp"
+  | "usage"
+  | "debug";
 
 export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey; icon: string; keys: SettingKey[] }> = [
   {
@@ -22,6 +32,13 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     desc: "settings.generalDesc",
     icon: settingsIcon,
     keys: ["followAgent", "autoScroll", "showChanges", "showRestore"],
+  },
+  {
+    id: "display",
+    label: "settings.display",
+    desc: "settings.displayDesc",
+    icon: typographyIcon,
+    keys: ["fontSize", "codeFontSize"],
   },
   {
     id: "language",

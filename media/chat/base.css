@@ -5,7 +5,7 @@ body {
   flex-direction: column;
   height: 100vh;
   font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
+  font-size: var(--chat-font-size, var(--vscode-font-size));
   color: var(--vscode-foreground);
 }
 
@@ -140,7 +140,7 @@ pre {
   overflow: auto;
   white-space: pre-wrap;
   font-family: var(--vscode-editor-font-family);
-  font-size: var(--vscode-editor-font-size);
+  font-size: var(--chat-code-font-size, var(--vscode-editor-font-size));
   background: var(--vscode-textCodeBlock-background);
 }
 /* Fallback of the root error boundary (src/ui/mount.tsx). */

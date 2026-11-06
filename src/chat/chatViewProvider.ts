@@ -313,6 +313,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
           this.post({ type: "showChanges", enabled: readSettings().showChanges });
           this.changes.refreshLenses();
         }
+        if (e.affectsConfiguration("codeAcp.fontSize") || e.affectsConfiguration("codeAcp.codeFontSize")) {
+          this.postDisplay();
+        }
         if (e.affectsConfiguration("codeAcp.showRestore")) {
           this.post({ type: "showRestore", enabled: readSettings().showRestore });
           for (const tab of this.tabs.all) {
@@ -386,6 +389,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (this.tabs.has(tab)) {
       this.post({ ...message, tab: tab.id });
     }
+  }
+
+  /** codeAcp.fontSize and codeAcp.codeFontSize, in pixels; 0 follows VS Code. */
+  private postDisplay(): void {
+    const { fontSize, codeFontSize } = readSettings();
+    this.post({ type: "display", fontSize, codeFontSize });
   }
 
   private postTabs(): void {
@@ -506,6 +515,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.post({ type: "showChanges", enabled: readSettings().showChanges });
         this.post({ type: "tracing", enabled: readSettings().tracing });
         this.post({ type: "showRestore", enabled: readSettings().showRestore });
+        this.postDisplay();
         for (const each of this.tabs.all) {
           this.refreshStatus(each);
           this.usage.postSaved(each);

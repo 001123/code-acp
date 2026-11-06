@@ -317,6 +317,20 @@ describe("ChatViewProvider", () => {
     ),
   );
 
+  it.live("posts the chat's font sizes, and again when they change", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType } = yield* startChat;
+        assert.deepStrictEqual(ofType("display").at(-1), { type: "display", fontSize: 0, codeFontSize: 0 });
+        __test.setSetting("codeAcp.fontSize", 16);
+        yield* until(() => ofType("display").at(-1)?.fontSize === 16, "the text size");
+        __test.setSetting("codeAcp.codeFontSize", 99);
+        __test.setSetting("codeAcp.codeFontSize", 14);
+        yield* until(() => ofType("display").at(-1)?.codeFontSize === 14, "the code size");
+      }),
+    ),
+  );
+
   it.live("keeps the gear's General settings in step with the configuration", () =>
     Effect.scoped(
       Effect.gen(function* () {

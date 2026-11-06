@@ -278,7 +278,7 @@ button.workspace-status:hover,
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
   font: inherit;
-  font-size: var(--vscode-font-size);
+  font-size: var(--chat-font-size, var(--vscode-font-size));
 }
 #pr-draft textarea {
   max-height: 40vh;

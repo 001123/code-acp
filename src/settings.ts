@@ -71,6 +71,9 @@ export const SessionDefaults = Schema.Struct({
 });
 export type SessionDefaults = typeof SessionDefaults.Type;
 
+/** A font size in pixels, where 0 means VS Code's own. */
+const FontSize = Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 32 }));
+
 /** Schemas of the codeAcp.* settings; keep in sync with `contributes.configuration` in package.json. */
 export const Settings = Schema.Struct({
   language: Schema.Literals(["auto", "en", "vi"]),
@@ -92,6 +95,10 @@ export const Settings = Schema.Struct({
   showChanges: Schema.Boolean,
   /** Show the Restore button on the user's messages. */
   showRestore: Schema.Boolean,
+  /** Size in pixels of the chat's text; 0 follows VS Code's. */
+  fontSize: FontSize,
+  /** Size in pixels of the chat's code and terminal output; 0 follows the editor's. */
+  codeFontSize: FontSize,
   /** Show each turn's numbers in the chat and log the messages exchanged with agents, for advanced users. */
   tracing: Schema.Boolean,
   /** Show a notification when a tab the user isn't looking at finishes or asks for permission. */
@@ -139,6 +146,8 @@ export const SETTING_KEYS = [
   "autoScroll",
   "showChanges",
   "showRestore",
+  "fontSize",
+  "codeFontSize",
   "tracing",
   "notifications",
   "notifyFinished",
@@ -173,6 +182,8 @@ const DEFAULTS: Settings = {
   autoScroll: true,
   showChanges: true,
   showRestore: false,
+  fontSize: 0,
+  codeFontSize: 0,
   tracing: false,
   notifications: true,
   notifyFinished: true,
@@ -216,6 +227,8 @@ export function readSettings(): Settings {
     autoScroll: read("autoScroll"),
     showChanges: read("showChanges"),
     showRestore: read("showRestore"),
+    fontSize: read("fontSize"),
+    codeFontSize: read("codeFontSize"),
     tracing: read("tracing"),
     notifications: read("notifications"),
     notifyFinished: read("notifyFinished"),

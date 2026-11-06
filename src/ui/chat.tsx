@@ -38,6 +38,15 @@ import { conversationMarkdown } from "./chat/exportMarkdown";
 import { TranscriptSearch } from "./chat/transcriptSearch";
 
 /** The transcript only lives here, so an entry that fails to render must not take the rest down with it. */
+/** codeAcp.fontSize and codeAcp.codeFontSize: sizes in pixels for the chat's CSS, where 0 keeps VS Code's. */
+function applyDisplay(fontSize: unknown, codeFontSize: unknown): void {
+  const root = document.documentElement.style;
+  const apply = (variable: string, size: unknown) =>
+    typeof size === "number" && size > 0 ? root.setProperty(variable, `${size}px`) : root.removeProperty(variable);
+  apply("--chat-font-size", fontSize);
+  apply("--chat-code-font-size", codeFontSize);
+}
+
 function EntryBoundary({ items, children }: { items: readonly unknown[]; children: ReactNode }) {
   const { t } = useL10n();
   return (
@@ -261,6 +270,8 @@ function App() {
         return setTracing(msg.enabled);
       case "showRestore":
         return setShowRestore(msg.enabled);
+      case "display":
+        return applyDisplay(msg.fontSize, msg.codeFontSize);
       case "turnTrace":
         return dispatch(tab, { type: "add", item: { kind: "trace", trace: msg.trace } });
       case "turnTraces":
