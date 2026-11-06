@@ -483,6 +483,7 @@ const en = {
   "chat.mermaidShowCode": "Show the Mermaid source",
   "chat.mermaidShowDiagram": "Show the diagram",
   "chat.mermaidExpand": "Open the diagram in an editor tab to zoom and pan",
+  "chat.mermaidOpenLarger": "Click to view it larger",
   "chat.mermaidPlay": "Play the messages one at a time",
   "chat.mermaidStop": "Stop playing",
   "diagram.title": "Mermaid diagram",

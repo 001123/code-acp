@@ -150,8 +150,35 @@
 .md .mermaid > svg {
   display: block;
   width: auto;
-  max-height: 50vh;
+  max-height: 40vh;
   margin-inline: auto;
+}
+/* Over a diagram the height cap shrank, pointing to the full-size view. */
+.md .mermaid-open {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  white-space: nowrap;
+  opacity: 0;
+}
+.md .mermaid-open svg {
+  width: 16px;
+  height: 16px;
+}
+.md .mermaid-block:hover .mermaid-open,
+.md .mermaid-open:focus-visible {
+  opacity: 1;
+}
+.md .mermaid-block:has(.mermaid[data-playing]) .mermaid-open {
+  opacity: 0;
+  pointer-events: none;
 }
 /* A third button, to play a sequence diagram. */
 .md .mermaid-block[data-sequence] .mermaid {

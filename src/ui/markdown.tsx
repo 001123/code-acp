@@ -25,6 +25,7 @@ function Mermaid({ code }: { code: string }) {
   const [drawn, setDrawn] = useState(false);
   const [source, setSource] = useState(false);
   const [sequence, setSequence] = useState(false);
+  const [squeezed, setSqueezed] = useState(false);
   const player = useSequencePlayer(host);
   const openDiagram = useContext(OpenDiagram);
   const { t } = useL10n();
@@ -45,8 +46,18 @@ function Mermaid({ code }: { code: string }) {
     player.stop();
   }, [code, valid, player.stop]);
   useLayoutEffect(() => {
-    const stop = hoverDiagram(host.current!);
+    const el = host.current!;
+    const stop = hoverDiagram(el);
+    // Whether the height cap in markdown.css shrank the diagram; it is redrawn and resized in place.
+    const measure = () => {
+      const svg = el.querySelector("svg");
+      const cap = svg ? parseFloat(getComputedStyle(svg).maxHeight) : NaN;
+      setSqueezed(!!svg && svg.getBoundingClientRect().height >= cap - 1);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
     return () => {
+      observer.disconnect();
       stop();
       mounted.current?.destroy();
     };
@@ -61,6 +72,12 @@ function Mermaid({ code }: { code: string }) {
     <>
       <div className="mermaid-block" hidden={!drawn && !valid} data-sequence={sequence || undefined}>
         <div ref={host} className="mermaid" hidden={source} onDoubleClick={expand} />
+        {expand && squeezed && !source && (
+          <button type="button" className="mermaid-open" onClick={expand}>
+            <Icon svg={maximizeIcon} />
+            {t("chat.mermaidOpenLarger")}
+          </button>
+        )}
         {source && (
           <pre className="mermaid-source">
             <code>{code}</code>
