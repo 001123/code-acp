@@ -129,9 +129,8 @@ function App() {
   const [showChanges, setShowChanges] = useState(true);
   /** codeAcp.tracing: the numbers below each turn. */
   const [tracing, setTracing] = useState(false);
-  /** codeAcp.showRestore, codeAcp.rememberSessionOptions: only for the gear's menu; the host applies them. */
+  /** codeAcp.showRestore: only for the gear's menu; the host applies it. */
   const [showRestore, setShowRestore] = useState(false);
-  const [rememberSessionOptions, setRememberSessionOptions] = useState(true);
   const checkpointTurns = changes?.turns;
   const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;
   const shownTab = useMemo<ShownTab>(
@@ -193,7 +192,6 @@ function App() {
         autoScroll={autoScroll}
         showChanges={showChanges}
         showRestore={showRestore}
-        rememberSessionOptions={rememberSessionOptions}
         tracing={tracing}
       />
     ),
@@ -263,8 +261,6 @@ function App() {
         return setTracing(msg.enabled);
       case "showRestore":
         return setShowRestore(msg.enabled);
-      case "rememberSessionOptions":
-        return setRememberSessionOptions(msg.enabled);
       case "turnTrace":
         return dispatch(tab, { type: "add", item: { kind: "trace", trace: msg.trace } });
       case "turnTraces":

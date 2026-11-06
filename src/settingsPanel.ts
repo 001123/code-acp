@@ -69,7 +69,6 @@ function isDefault(key: SettingKey, value: unknown): boolean {
   if (key === "tracing") return value === false;
   if (key === "notifications") return value === true;
   if (key === "notifyFinished") return value === true;
-  if (key === "rememberSessionOptions") return value === true;
   if (key === "worktreeForNewTabs") return value === false;
   if (key === "commitMessage.effort") return value === LOWEST_EFFORT;
   if (key === "commitMessage.fastMode") return value === "default";

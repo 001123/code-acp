@@ -98,9 +98,7 @@ export const Settings = Schema.Struct({
   notifications: Schema.Boolean,
   /** Among those notifications, also show the one for a tab that finished. */
   notifyFinished: Schema.Boolean,
-  /** Start new chat sessions with the model, effort and fast mode last picked for their agent. */
-  rememberSessionOptions: Schema.Boolean,
-  /** The model, effort and fast mode to start sessions with, by agent id; these win over the last picked. */
+  /** The model, effort and fast mode to start sessions with, by agent id. */
   sessionDefaults: Schema.Record(Schema.String, SessionDefaults),
   /** Run each new chat tab in a git worktree of its own, on a new branch. */
   worktreeForNewTabs: Schema.Boolean,
@@ -144,7 +142,6 @@ export const SETTING_KEYS = [
   "tracing",
   "notifications",
   "notifyFinished",
-  "rememberSessionOptions",
   "sessionDefaults",
   "worktreeForNewTabs",
   "worktreeCopyFiles",
@@ -179,7 +176,6 @@ const DEFAULTS: Settings = {
   tracing: false,
   notifications: true,
   notifyFinished: true,
-  rememberSessionOptions: true,
   sessionDefaults: {},
   worktreeForNewTabs: false,
   worktreeCopyFiles: [],
@@ -223,7 +219,6 @@ export function readSettings(): Settings {
     tracing: read("tracing"),
     notifications: read("notifications"),
     notifyFinished: read("notifyFinished"),
-    rememberSessionOptions: read("rememberSessionOptions"),
     sessionDefaults: read("sessionDefaults"),
     worktreeForNewTabs: read("worktreeForNewTabs"),
     worktreeCopyFiles: read("worktreeCopyFiles"),

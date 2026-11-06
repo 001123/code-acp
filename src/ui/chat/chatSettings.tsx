@@ -3,7 +3,6 @@ import { useL10n } from "../l10n";
 import tracingIcon from "@tabler/icons/outline/activity.svg";
 import generalIcon from "@tabler/icons/outline/adjustments-horizontal.svg";
 import autoScrollIcon from "@tabler/icons/outline/arrow-bar-to-down.svg";
-import rememberIcon from "@tabler/icons/outline/bookmark.svg";
 import followIcon from "@tabler/icons/outline/eye.svg";
 import changesIcon from "@tabler/icons/outline/file-diff.svg";
 import restoreIcon from "@tabler/icons/outline/restore.svg";
@@ -16,7 +15,6 @@ type ChatSettingsProps = {
   autoScroll: boolean;
   showChanges: boolean;
   showRestore: boolean;
-  rememberSessionOptions: boolean;
   tracing: boolean;
 };
 
@@ -60,13 +58,6 @@ export function ChatSettings(props: ChatSettingsProps) {
       title: t("settings.showRestoreDesc"),
       on: props.showRestore,
       onToggle: () => post({ type: "setShowRestore", enabled: !props.showRestore }),
-    },
-    {
-      toggle: "remember-session-options",
-      label: withIcon(rememberIcon, t("settings.rememberSessionOptions")),
-      title: t("settings.rememberSessionOptionsDesc"),
-      on: props.rememberSessionOptions,
-      onToggle: () => post({ type: "setRememberSessionOptions", enabled: !props.rememberSessionOptions }),
     },
   ];
   return (

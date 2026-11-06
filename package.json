@@ -679,11 +679,6 @@
           "default": true,
           "description": "%config.notifyFinished%"
         },
-        "codeAcp.rememberSessionOptions": {
-          "type": "boolean",
-          "default": true,
-          "description": "%config.rememberSessionOptions%"
-        },
         "codeAcp.sessionDefaults": {
           "type": "object",
           "default": {},

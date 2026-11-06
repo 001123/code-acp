@@ -65,7 +65,6 @@ describe("ChatSettings", () => {
           autoScroll: true,
           showChanges: true,
           showRestore: false,
-          rememberSessionOptions: true,
           tracing,
         }),
       ),
@@ -98,7 +97,7 @@ describe("ChatSettings", () => {
     const rows = document.querySelectorAll(
       "#chat-settings-menu > button, #chat-settings-menu .submenu-trigger, #chat-settings-menu .submenu > button",
     );
-    assert.strictEqual(rows.length, 8);
+    assert.strictEqual(rows.length, 7);
     for (const row of rows) assert.isNotNull(row.querySelector(":scope .svg-icon"), row.textContent ?? "");
   });
 
@@ -130,7 +129,6 @@ describe("ChatSettings", () => {
         ["auto-scroll", "true"],
         ["show-changes", "true"],
         ["show-restore", "false"],
-        ["remember-session-options", "true"],
       ],
     );
     for (const el of toggles) act(() => el.click());
@@ -139,7 +137,6 @@ describe("ChatSettings", () => {
       { type: "setAutoScroll", enabled: false },
       { type: "setShowChanges", enabled: false },
       { type: "setShowRestore", enabled: true },
-      { type: "setRememberSessionOptions", enabled: false },
     ]);
     assert.isNotNull(submenu());
   });

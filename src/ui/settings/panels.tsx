@@ -82,19 +82,6 @@ export function GeneralTab({ state }: { state: State }) {
       >
         <Toggle id="showRestore" checked={v.showRestore === true} onChange={(checked) => set("showRestore", checked)} />
       </Field>
-      <Field
-        id="rememberSessionOptions"
-        label="settings.rememberSessionOptions"
-        desc="settings.rememberSessionOptionsDesc"
-        overridden={overridden("rememberSessionOptions")}
-        inline
-      >
-        <Toggle
-          id="rememberSessionOptions"
-          checked={v.rememberSessionOptions !== false}
-          onChange={(checked) => set("rememberSessionOptions", checked)}
-        />
-      </Field>
     </section>
   );
 }

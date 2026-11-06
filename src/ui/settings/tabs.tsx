@@ -21,7 +21,7 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     label: "settings.general",
     desc: "settings.generalDesc",
     icon: settingsIcon,
-    keys: ["followAgent", "autoScroll", "showChanges", "showRestore", "rememberSessionOptions"],
+    keys: ["followAgent", "autoScroll", "showChanges", "showRestore"],
   },
   {
     id: "language",

@@ -17,7 +17,6 @@ import { AttachmentQueue, pruneTempFiles } from "./attachments";
 import { ChangeReview, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
 import { ComposerCommands } from "./composerCommands";
 import { DraftStore } from "./drafts";
-import { LastOptions } from "./lastOptions";
 import { saveConversation } from "./exportConversation";
 import { Follower } from "./follow";
 import { TabGroups } from "./groups";
@@ -53,7 +52,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   private readonly agents = new AgentPool();
   private readonly tabs: TabList;
   private readonly drafts: DraftStore;
-  private readonly lastOptions: LastOptions;
   private readonly turns: TabTurns;
   private readonly sessions: TabSessions;
   private readonly tabAgents: TabAgents;
@@ -196,7 +194,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     if (saved === undefined) {
       this.tabs.active.worktreeOnSend = readSettings().worktreeForNewTabs;
     }
-    this.lastOptions = new LastOptions(context.globalState);
     this.indicators = new ChatIndicators({
       manager,
       tabs: this.tabs,
@@ -243,7 +240,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       agents: this.agents,
       permissions: this.permissions,
       turns: this.turns,
-      lastOptions: this.lastOptions,
       selectTab: (tab) => this.tabActions.selectTab(tab),
       getAgent: (tab) => this.tabAgents.getAgent(tab),
     });
@@ -316,9 +312,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         if (e.affectsConfiguration("codeAcp.showChanges")) {
           this.post({ type: "showChanges", enabled: readSettings().showChanges });
           this.changes.refreshLenses();
-        }
-        if (e.affectsConfiguration("codeAcp.rememberSessionOptions")) {
-          this.post({ type: "rememberSessionOptions", enabled: readSettings().rememberSessionOptions });
         }
         if (e.affectsConfiguration("codeAcp.showRestore")) {
           this.post({ type: "showRestore", enabled: readSettings().showRestore });
@@ -513,7 +506,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         this.post({ type: "showChanges", enabled: readSettings().showChanges });
         this.post({ type: "tracing", enabled: readSettings().tracing });
         this.post({ type: "showRestore", enabled: readSettings().showRestore });
-        this.post({ type: "rememberSessionOptions", enabled: readSettings().rememberSessionOptions });
         for (const each of this.tabs.all) {
           this.refreshStatus(each);
           this.usage.postSaved(each);

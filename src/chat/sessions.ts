@@ -15,7 +15,6 @@ import type { AgentPool } from "./agents";
 import { confirm, type ChangeReview } from "./changes";
 import { canDeleteSessions, canReopen } from "./history";
 import type { ChatUi } from "./host";
-import type { LastOptions } from "./lastOptions";
 import type { Permissions } from "./permissions";
 import { resetConversation, type Reopen, type RunningAgent, type Tab, type TabList } from "./tabs";
 import { TurnTraces } from "./turnTraces";
@@ -31,7 +30,6 @@ export interface SessionsHost extends ChatUi {
   readonly tabs: TabList;
   readonly agents: AgentPool;
   readonly permissions: Permissions<Tab>;
-  readonly lastOptions: LastOptions;
   readonly changes: ChangeReview;
   readonly usage: TabUsage;
   readonly tabWorktrees: TabWorktrees;
@@ -98,11 +96,9 @@ export class TabSessions {
     );
   });
 
-  /** What sessions of the agent start with: chosen for it in settings, else last picked for it. */
+  /** What sessions of the agent start with: chosen for it in settings. */
   usualOptions(agentId: string) {
-    const settings = readSettings();
-    const remembered = settings.rememberSessionOptions ? this.host.lastOptions.wanted(agentId) : undefined;
-    return startingOptions(settings.sessionDefaults[agentId], remembered);
+    return startingOptions(readSettings().sessionDefaults[agentId], undefined);
   }
 
   /**
@@ -492,7 +488,7 @@ export class TabSessions {
     }
   });
 
-  /** Sets a config option of the tab's session, remembering it for the agent's next sessions (codeAcp.rememberSessionOptions). */
+  /** Sets a config option of the tab's session. */
   readonly setConfig = Effect.fn("TabSessions.setConfig")(function* (
     this: TabSessions,
     tab: Tab,
@@ -502,15 +498,8 @@ export class TabSessions {
     if (!tab.running || !tab.sessionId) {
       return;
     }
-    const { agentId } = tab.running;
     const before = tab.configOptions;
     const res = yield* tab.running.agent.setConfigOption(tab.sessionId, configId, value);
-    const picked = readSettings().rememberSessionOptions
-      ? this.host.lastOptions.picked(agentId, before, configId, value)
-      : undefined;
-    if (picked) {
-      yield* thenable(() => picked);
-    }
     if (tab.wanted) {
       // It reopens with what the user picked since.
       if (modelOption(before)?.id === configId) tab.wanted = { ...tab.wanted, model: value };

@@ -32,7 +32,6 @@ describe("readSettings", () => {
     assert.isFalse(s.tracing);
     assert.isTrue(s.notifications);
     assert.isTrue(s.notifyFinished);
-    assert.isTrue(s.rememberSessionOptions);
     assert.deepStrictEqual(s.sessionDefaults, {});
     assert.isFalse(s.worktreeForNewTabs);
     assert.deepStrictEqual(s.worktreeCopyFiles, []);

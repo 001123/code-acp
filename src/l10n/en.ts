@@ -363,9 +363,6 @@ const en = {
   "settings.notificationsTab": "Notifications",
   "settings.notificationsTabDesc": "When Code ACP tells you about conversations you aren't looking at.",
   "settings.notifications": "Show notifications",
-  "settings.rememberSessionOptions": "Remember model and effort",
-  "settings.rememberSessionOptionsDesc":
-    "Start and reopen chats with the model, effort and fast mode you last picked for the agent, except where the Agent page sets them.",
   "settings.notificationsDesc":
     "Notify when a conversation you aren't looking at finishes or needs your approval. The chat view's badge counts them either way.",
   "settings.notifyFinished": "Notify when finished",
@@ -739,10 +736,8 @@ const en = {
   "settings.languageEn": "English",
   "settings.languageVi": "Tiếng Việt",
   "settings.noAgents": "No agent installed",
-  "settings.defaultModelDesc":
-    "New chats with this agent start on this model, whatever was picked in an earlier chat. On the agent's default, they follow “Remember model and effort”.",
-  "settings.defaultEffortDesc":
-    "How long the model thinks before it answers in new chats with this agent. On the agent's default, they follow “Remember model and effort”.",
+  "settings.defaultModelDesc": "New chats with this agent start on this model, whatever was picked in an earlier chat.",
+  "settings.defaultEffortDesc": "How long the model thinks before it answers in new chats with this agent.",
   "settings.manageAgents": "Manage agents",
   "settings.nodePath": "Node path",
   "settings.nodePathDesc": "Node used to run agents installed via npm.",

@@ -5,7 +5,6 @@ import { AgentRequestError, AuthRequiredError, type AcpAgent } from "../src/acpC
 import { AgentPool } from "../src/chat/agents";
 import { ChangeReview } from "../src/chat/changes";
 import type { ChatUi } from "../src/chat/host";
-import type { LastOptions } from "../src/chat/lastOptions";
 import { Permissions } from "../src/chat/permissions";
 import { NoAgentError, TabSessions } from "../src/chat/sessions";
 import { TabList, type RunningAgent, type Tab } from "../src/chat/tabs";
@@ -102,7 +101,6 @@ const makeSessions = Effect.fnUntraced(function* (
     agents,
     turns,
     permissions: new Permissions<Tab>({ shown: () => {}, done: () => {} }),
-    lastOptions: { wanted: () => undefined } as unknown as LastOptions,
     selectTab: () => Effect.void,
     getAgent: (tab) => {
       if (noAgent) {

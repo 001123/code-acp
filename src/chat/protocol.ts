@@ -150,7 +150,6 @@ export type FromWebview =
   | { type: "setTracing"; enabled: boolean }
   | { type: "setShowChanges"; enabled: boolean }
   | { type: "setShowRestore"; enabled: boolean }
-  | { type: "setRememberSessionOptions"; enabled: boolean }
   /** Stars a model of agent `agent` in codeAcp.providers, or takes its star away. */
   | { type: "toggleFavorite"; agent: string; value: string; name: string }
   /** Favorites the webview kept before they were a setting, to add to codeAcp.providers once. */
@@ -196,7 +195,6 @@ export type ViewMessage = Extract<
       | "setTracing"
       | "setShowChanges"
       | "setShowRestore"
-      | "setRememberSessionOptions"
       | "toggleFavorite"
       | "importFavorites";
   }

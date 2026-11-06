@@ -365,9 +365,6 @@ const vi: Record<MessageKey, string> = {
   "settings.notificationsTab": "Thông báo",
   "settings.notificationsTabDesc": "Khi nào Code ACP báo cho bạn về các cuộc trò chuyện bạn không xem.",
   "settings.notifications": "Hiện thông báo",
-  "settings.rememberSessionOptions": "Ghi nhớ model và effort",
-  "settings.rememberSessionOptionsDesc":
-    "Bắt đầu và mở lại cuộc trò chuyện với model, effort và fast mode bạn chọn gần nhất cho agent, trừ những gì đã đặt ở trang Agent.",
   "settings.notificationsDesc":
     "Thông báo khi một cuộc trò chuyện bạn không xem đã xong hoặc cần bạn cho phép. Dù bật hay tắt, huy hiệu của khung chat vẫn đếm chúng.",
   "settings.notifyFinished": "Thông báo khi xong",
@@ -742,10 +739,8 @@ const vi: Record<MessageKey, string> = {
   "settings.languageEn": "English",
   "settings.languageVi": "Tiếng Việt",
   "settings.noAgents": "Chưa cài agent nào",
-  "settings.defaultModelDesc":
-    "Cuộc trò chuyện mới với agent này bắt đầu bằng model này, bất kể lần trước đã chọn gì. Nếu để mặc định của agent thì theo “Ghi nhớ model và effort”.",
-  "settings.defaultEffortDesc":
-    "Thời gian model suy nghĩ trước khi trả lời trong cuộc trò chuyện mới với agent này. Nếu để mặc định của agent thì theo “Ghi nhớ model và effort”.",
+  "settings.defaultModelDesc": "Cuộc trò chuyện mới với agent này bắt đầu bằng model này, bất kể lần trước đã chọn gì.",
+  "settings.defaultEffortDesc": "Thời gian model suy nghĩ trước khi trả lời trong cuộc trò chuyện mới với agent này.",
   "settings.manageAgents": "Quản lý agent",
   "settings.nodePath": "Đường dẫn Node",
   "settings.nodePathDesc": "Node dùng để chạy các agent cài qua npm.",

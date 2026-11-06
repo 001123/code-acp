@@ -139,9 +139,6 @@ export class ViewMessages {
       case "setShowRestore":
         yield* updateSetting("showRestore", msg.enabled);
         break;
-      case "setRememberSessionOptions":
-        yield* updateSetting("rememberSessionOptions", msg.enabled);
-        break;
       case "toggleFavorite":
         yield* toggleFavorite(msg.agent, { value: msg.value, name: msg.name });
         break;

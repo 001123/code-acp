@@ -322,18 +322,8 @@ describe("ChatViewProvider", () => {
       Effect.gen(function* () {
         const { ofType } = yield* startChat;
         assert.deepStrictEqual(ofType("showRestore").at(-1), { type: "showRestore", enabled: false });
-        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), {
-          type: "rememberSessionOptions",
-          enabled: true,
-        });
         __test.setSetting("codeAcp.showRestore", true);
-        __test.setSetting("codeAcp.rememberSessionOptions", false);
-        yield* until(() => ofType("rememberSessionOptions").at(-1)?.enabled === false, "the setting");
-        assert.deepStrictEqual(ofType("showRestore").at(-1), { type: "showRestore", enabled: true });
-        assert.deepStrictEqual(ofType("rememberSessionOptions").at(-1), {
-          type: "rememberSessionOptions",
-          enabled: false,
-        });
+        yield* until(() => ofType("showRestore").at(-1)?.enabled === true, "the setting");
       }),
     ),
   );
@@ -1253,52 +1243,49 @@ describe("ChatViewProvider", () => {
       }).pipe(Effect.scoped),
     );
 
-    it.live(
-      "starts each attempt on the model and effort picked for it, without changing what the agent's next sessions start with",
-      () =>
-        Effect.gen(function* () {
-          agentEnv = { MOCK_MODELS: "1" };
-          const { send, members, ofType, tabsNow, tab, context } = yield* startInRepo;
-          send({
-            type: "bestOf",
-            tab,
-            parts: ["updates"],
-            attempts: [
-              { agentId: "mock", model: "big", effort: "high", label: "Big · High" },
-              { agentId: "mock", model: "small", effort: "", label: "Small" },
-            ],
-          });
-          yield* until(
-            () => members().length === 2 && members().every((each) => each.attempt === "done"),
-            "both to finish",
+    it.live("starts each attempt on the model and effort picked for it", () =>
+      Effect.gen(function* () {
+        agentEnv = { MOCK_MODELS: "1" };
+        const { send, members, ofType, tabsNow, tab, context } = yield* startInRepo;
+        send({
+          type: "bestOf",
+          tab,
+          parts: ["updates"],
+          attempts: [
+            { agentId: "mock", model: "big", effort: "high", label: "Big · High" },
+            { agentId: "mock", model: "small", effort: "", label: "Small" },
+          ],
+        });
+        yield* until(
+          () => members().length === 2 && members().every((each) => each.attempt === "done"),
+          "both to finish",
+        );
+        const [big, small] = members();
+        const picked = (id: number) =>
+          (ofType("session", id).at(-1)!.configOptions as Array<{ id: string; currentValue: string }>).map(
+            (option) => option.currentValue,
           );
-          const [big, small] = members();
-          const picked = (id: number) =>
-            (ofType("session", id).at(-1)!.configOptions as Array<{ id: string; currentValue: string }>).map(
-              (option) => option.currentValue,
-            );
-          assert.deepStrictEqual(picked(big!.id), ["big", "high"]);
-          assert.deepStrictEqual(picked(small!.id), ["small", "low"]);
-          assert.strictEqual(big!.attemptLabel, "Big · High");
-          assert.isUndefined(context.globalState.get("codeAcp.lastSessionOptions"));
-          for (const each of members()) {
-            yield* until(() => ofType("status", each.id).at(-1)?.busy === false, "the tab to be idle");
-          }
+        assert.deepStrictEqual(picked(big!.id), ["big", "high"]);
+        assert.deepStrictEqual(picked(small!.id), ["small", "low"]);
+        assert.strictEqual(big!.attemptLabel, "Big · High");
+        for (const each of members()) {
+          yield* until(() => ofType("status", each.id).at(-1)?.busy === false, "the tab to be idle");
+        }
 
-          // Still so after a reload, for the sessions to reopen with.
-          yield* until(
-            () =>
-              (
-                context.workspaceState.get("codeAcp.tabs") as { tabs: Array<{ wanted?: unknown }> } | undefined
-              )?.tabs.some((each) => each.wanted) === true,
-            "the tabs to be saved",
-          );
-          const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
-          const saved = restored.all.find((each) => each.group !== undefined);
-          assert.deepStrictEqual(saved!.wanted, { model: "big", effort: "high" });
-          assert.strictEqual(saved!.attemptLabel, "Big · High");
-          assert.strictEqual(tabsNow().groups.length, 1);
-        }).pipe(Effect.scoped),
+        // Still so after a reload, for the sessions to reopen with.
+        yield* until(
+          () =>
+            (
+              context.workspaceState.get("codeAcp.tabs") as { tabs: Array<{ wanted?: unknown }> } | undefined
+            )?.tabs.some((each) => each.wanted) === true,
+          "the tabs to be saved",
+        );
+        const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
+        const saved = restored.all.find((each) => each.group !== undefined);
+        assert.deepStrictEqual(saved!.wanted, { model: "big", effort: "high" });
+        assert.strictEqual(saved!.attemptLabel, "Big · High");
+        assert.strictEqual(tabsNow().groups.length, 1);
+      }).pipe(Effect.scoped),
     );
 
     it.live("reads an attempt's options from a session on that model, and says why it can't otherwise", () =>
