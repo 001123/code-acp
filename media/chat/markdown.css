@@ -153,7 +153,7 @@
   max-height: 40vh;
   margin-inline: auto;
 }
-/* Over a diagram the height cap shrank, pointing to the full-size view. */
+/* Over a diagram drawn smaller than its natural size, pointing to the full-size view. */
 .md .mermaid-open {
   position: absolute;
   top: 50%;

@@ -48,11 +48,12 @@ function Mermaid({ code }: { code: string }) {
   useLayoutEffect(() => {
     const el = host.current!;
     const stop = hoverDiagram(el);
-    // Whether the height cap in markdown.css shrank the diagram; it is redrawn and resized in place.
+    // Whether the diagram is drawn smaller than its natural size: the height cap in markdown.css, or
+    // the chat's width, shrank it. It is redrawn and resized in place.
     const measure = () => {
-      const svg = el.querySelector("svg");
-      const cap = svg ? parseFloat(getComputedStyle(svg).maxHeight) : NaN;
-      setSqueezed(!!svg && svg.getBoundingClientRect().height >= cap - 1);
+      const svg = el.querySelector<SVGSVGElement>(":scope > svg");
+      const natural = svg?.width.baseVal.value ?? 0;
+      setSqueezed(!!svg && natural > 0 && svg.getBoundingClientRect().width < natural * 0.9);
     };
     const observer = new ResizeObserver(measure);
     observer.observe(el);

@@ -486,6 +486,8 @@ const en = {
   "chat.mermaidOpenLarger": "Click to view it larger",
   "chat.mermaidPlay": "Play the messages one at a time",
   "chat.mermaidStop": "Stop playing",
+  "chat.mermaidHoverOn": "Highlight the flow under the pointer",
+  "chat.mermaidHoverOff": "Stop highlighting the flow under the pointer",
   "diagram.title": "Mermaid diagram",
   "lightbox.zoomIn": "Zoom in (+)",
   "lightbox.zoomOut": "Zoom out (−)",

@@ -80,6 +80,9 @@ body {
 .diagram-scale:hover {
   background: var(--vscode-toolbar-hoverBackground);
 }
+.icon-btn[aria-pressed="true"] {
+  background: var(--vscode-toolbar-activeBackground, var(--vscode-toolbar-hoverBackground));
+}
 .diagram-stage {
   flex: 1;
   min-height: 0;

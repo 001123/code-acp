@@ -8,6 +8,8 @@ import { useL10n } from "./l10n";
 import { mount } from "./mount";
 import { poster, setState, useMessages } from "./vscode";
 import codeIcon from "@tabler/icons/outline/code.svg";
+import hoverIcon from "@tabler/icons/outline/bulb.svg";
+import hoverOffIcon from "@tabler/icons/outline/bulb-off.svg";
 import playIcon from "@tabler/icons/outline/player-play.svg";
 import stopIcon from "@tabler/icons/outline/player-stop.svg";
 import schemaIcon from "@tabler/icons/outline/schema.svg";
@@ -52,6 +54,7 @@ function DiagramPage() {
   const [view, setView] = useState(FIT);
   const [dragging, setDragging] = useState(false);
   const [source, setSource] = useState(false);
+  const [hover, setHover] = useState(true);
   const [box, setBox] = useState<{ w: number; h: number }>();
   const stage = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean }>(undefined);
@@ -63,6 +66,7 @@ function DiagramPage() {
       setState({ code: msg.code } satisfies DiagramState);
       player.stop();
       setCode(msg.code);
+      setHover(msg.hover);
       setView(FIT);
       setSource(false);
     }
@@ -92,7 +96,7 @@ function DiagramPage() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => hoverDiagram(stage.current!), []);
+  useEffect(() => (hover ? hoverDiagram(stage.current!) : undefined), [hover]);
 
   useEffect(() => {
     const el = stage.current!;
@@ -144,6 +148,7 @@ function DiagramPage() {
   };
 
   const sourceLabel = t(source ? "chat.mermaidShowDiagram" : "chat.mermaidShowCode");
+  const hoverLabel = t(hover ? "chat.mermaidHoverOff" : "chat.mermaidHoverOn");
   const playLabel = t(player.playing ? "chat.mermaidStop" : "chat.mermaidPlay");
 
   return (
@@ -182,6 +187,21 @@ function DiagramPage() {
             <Icon svg={zoomResetIcon} />
           </button>
         </div>
+        {!source && (
+          <button
+            type="button"
+            className="icon-btn"
+            title={hoverLabel}
+            aria-label={hoverLabel}
+            aria-pressed={hover}
+            onClick={() => {
+              post({ type: "hover", on: !hover });
+              setHover(!hover);
+            }}
+          >
+            <Icon svg={hover ? hoverIcon : hoverOffIcon} />
+          </button>
+        )}
         {sequence && !source && (
           <button
             type="button"

@@ -167,7 +167,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     liveTabs: () => this.tabs.all,
     usualOptions: (agentId) => this.sessions.usualOptions(agentId),
     openFile: (file, line) => this.openFile(file, line),
-    openDiagram: (code) => showDiagram(this.context.extensionUri, code),
+    openDiagram: (code) => showDiagram(this.context, code),
   });
   private readonly disposables: vscode.Disposable[] = [];
   /** Pending `writeTabs`; flushed on dispose, which is too late to be kept when the window reloads. */

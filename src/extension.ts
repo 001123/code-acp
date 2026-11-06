@@ -103,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       dragAndDropController: dropView,
     }),
     SettingsPanel.registerSerializer(context, runtime, manager),
-    registerDiagramSerializer(context.extensionUri),
+    registerDiagramSerializer(context),
     vscode.commands.registerCommand("codeAcp.manageAgents", manageAgents),
     vscode.commands.registerCommand("codeAcp.selectAgent", run(selectAgent)),
     vscode.commands.registerCommand("codeAcp.openSettings", () => SettingsPanel.show(context, runtime, manager)),
