@@ -88,6 +88,9 @@ export function Text(props: {
   onReset?: () => void;
   rows?: number;
   placeholder?: string;
+  autoFocus?: boolean;
+  /** Names the input when no label points at it. */
+  label?: string;
 }) {
   const [draft, setDraft] = useState(props.value);
   const focused = useRef(false);
@@ -103,6 +106,8 @@ export function Text(props: {
     value: draft,
     spellCheck: false,
     placeholder: props.placeholder,
+    autoFocus: props.autoFocus,
+    "aria-label": props.label,
     onFocus: () => (focused.current = true),
     onBlur: () => {
       focused.current = false;

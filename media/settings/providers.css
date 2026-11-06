@@ -1,0 +1,493 @@
+/* The Providers tab: the agents on the left, the one picked on the right. */
+body:has(.providers) {
+  max-width: 1180px;
+}
+/* The split follows the width the panel gets, not the window: the section sidebar takes its share. */
+.providers {
+  container: providers / inline-size;
+}
+.providers-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.providers-count {
+  color: var(--vscode-descriptionForeground);
+}
+button.providers-checked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 3px 6px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+}
+button.providers-checked:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--vscode-foreground);
+}
+button.providers-checked.loading .svg-icon svg {
+  animation: providers-spin 1s linear infinite;
+}
+@keyframes providers-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Narrow first: the list above, the picked one below. */
+.providers-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
+  overflow: hidden;
+}
+.providers-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.providers-nav {
+  display: flex;
+}
+.providers-nav > button.provider-nav {
+  flex: 1 1 0;
+  min-width: 0;
+  border-bottom: none;
+}
+.providers-nav > button.provider-nav + button.provider-nav {
+  border-left: 1px solid var(--border);
+}
+/* Room for both: the list beside the detail. */
+@container providers (min-width: 540px) {
+  .providers-split {
+    /* A third of the width, so the detail keeps the rest. */
+    grid-template-columns: clamp(180px, 30%, 280px) minmax(0, 1fr);
+    min-height: 420px;
+  }
+  .providers-list {
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+  }
+  .providers-nav {
+    flex-direction: column;
+  }
+  .providers-nav > button.provider-nav {
+    flex: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .providers-nav > button.provider-nav + button.provider-nav {
+    border-left: none;
+  }
+}
+.providers-empty {
+  padding: 16px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.provider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.provider-row:hover {
+  background: var(--surface-hover);
+}
+.provider-row[aria-current="page"] {
+  background: var(--vscode-list-inactiveSelectionBackground, var(--surface-hover));
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder);
+}
+.provider-row[data-disabled] .provider-pick {
+  opacity: 0.55;
+}
+button.provider-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 0 14px 16px;
+  background: none;
+  color: inherit;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+}
+button.provider-pick:hover {
+  background: none;
+}
+button.provider-pick:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.provider-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+/* A narrow list column: tighter rows, so the name keeps its room beside the toggle. */
+@container providers (min-width: 540px) and (max-width: 819px) {
+  .provider-row {
+    gap: 6px;
+    padding-right: 10px;
+  }
+  button.provider-pick {
+    gap: 10px;
+    padding: 12px 0 12px 12px;
+  }
+  button.provider-nav {
+    padding: 11px 12px;
+  }
+}
+.provider-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.provider-name {
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.provider-version {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+  color: var(--vscode-descriptionForeground);
+}
+.provider-update {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  align-self: center;
+  background: var(--vscode-notificationsInfoIcon-foreground, var(--vscode-focusBorder));
+}
+.provider-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 0.92em;
+  color: var(--vscode-descriptionForeground);
+}
+.provider-sub > span + span::before {
+  content: "·";
+  margin-right: 6px;
+}
+.provider-status.ok {
+  color: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+}
+.provider-status.login,
+.provider-status.warning {
+  color: var(--vscode-editorWarning-foreground);
+}
+.provider-status.error {
+  color: var(--vscode-errorForeground);
+}
+.provider-default {
+  color: var(--vscode-foreground);
+}
+
+.provider-icon,
+.provider-icon-fallback {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+}
+.provider-icon {
+  background-color: var(--vscode-foreground);
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+.provider-icon-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.provider-icon-fallback .svg-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+button.provider-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  text-align: left;
+}
+button.provider-nav:hover {
+  background: var(--surface-hover);
+  color: var(--vscode-foreground);
+}
+button.provider-nav[aria-current="page"] {
+  color: var(--vscode-foreground);
+  background: var(--vscode-list-inactiveSelectionBackground, var(--surface-hover));
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder);
+}
+
+.providers-detail {
+  container: provider-detail / inline-size;
+  min-width: 0;
+  padding: 14px 14px 20px;
+}
+@container providers (min-width: 720px) {
+  .providers-detail {
+    padding: 18px 22px 24px;
+  }
+}
+.provider-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.provider-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 12px;
+}
+.provider-head .provider-icon,
+.provider-head .provider-icon-fallback {
+  width: 28px;
+  height: 28px;
+}
+.provider-head-text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.provider-head-name {
+  font-size: 1.15em;
+  font-weight: 600;
+}
+.provider-badge {
+  padding: 0 6px;
+  font-size: 0.85em;
+  line-height: 18px;
+  border-radius: 9px;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+}
+.provider-badge.muted {
+  color: var(--vscode-descriptionForeground);
+  background: var(--surface-hover);
+}
+.provider-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.provider-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vscode-descriptionForeground);
+}
+.provider-busy .svg-icon svg {
+  animation: providers-spin 1s linear infinite;
+}
+
+.provider-check {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.provider-check-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vscode-descriptionForeground);
+}
+.provider-check.ok .provider-check-dot {
+  background: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+}
+.provider-check.login .provider-check-dot,
+.provider-check.warning .provider-check-dot {
+  background: var(--vscode-editorWarning-foreground);
+}
+.provider-check.error .provider-check-dot {
+  background: var(--vscode-errorForeground);
+}
+.provider-check-text {
+  flex: 1;
+  min-width: 0;
+}
+.provider-check-text .desc {
+  display: inline;
+}
+.provider-check button {
+  padding: 3px 10px;
+}
+
+.provider-section + .provider-section,
+fieldset.plain + .provider-section,
+.provider-section + fieldset.plain,
+fieldset.plain + fieldset.plain {
+  margin-top: 18px;
+}
+fieldset.plain > .note:first-child {
+  margin: 0 0 12px;
+}
+.provider-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.provider-section h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.05em;
+  font-weight: 600;
+}
+.provider-section > .desc {
+  margin-bottom: 10px;
+}
+.provider-section > .card,
+.provider-section-head + .card {
+  margin-top: 10px;
+}
+code.provider-command {
+  display: block;
+  padding: 6px 8px;
+  font-family: var(--vscode-editor-font-family);
+  word-break: break-all;
+  background: var(--vscode-textCodeBlock-background, var(--surface));
+  border-radius: 4px;
+}
+
+.variables {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.variable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+.variable-row input {
+  font-family: var(--vscode-editor-font-family);
+}
+.variables-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.models-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+button.link-btn {
+  padding: 2px 0;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+}
+button.link-btn:hover {
+  background: none;
+  text-decoration: underline;
+}
+.models-list {
+  display: flex;
+  flex-direction: column;
+}
+.models-heading {
+  margin: 14px 0 4px;
+  font-size: 0.92em;
+  color: var(--vscode-descriptionForeground);
+}
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 4px;
+  border-radius: var(--radius);
+}
+.model-row:hover {
+  background: var(--surface-hover);
+}
+.model-row[data-hidden] .model-name,
+.model-row[data-hidden] .model-value,
+.model-row[data-hidden] .model-star {
+  opacity: 0.5;
+}
+.model-row .spacer {
+  flex: 1;
+}
+.model-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+code.model-value {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-star[data-on="true"] {
+  color: var(--vscode-editorWarning-foreground);
+}
+.model-move {
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+}
+.model-row:hover .model-move,
+.model-move:focus-within {
+  opacity: 1;
+}
+.model-move .icon-btn {
+  padding: 3px;
+}
+
+/* Too narrow for the actions beside the name: they get their own line, under the text. */
+@container provider-detail (max-width: 440px) {
+  .provider-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding-left: 40px;
+  }
+  .variable-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .variable-row > :nth-child(2) {
+    grid-column: 1;
+  }
+  .variable-row > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .model-move {
+    opacity: 1;
+  }
+}

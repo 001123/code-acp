@@ -5,6 +5,7 @@ import { canLogout, spawnAgent, type UrlElicitation } from "../acpClient";
 import type { AgentManager } from "../agentManager";
 import type { AgentUpdate, AgentUpdates } from "../agentUpdates";
 import { t } from "../i18n";
+import { providerPrefs } from "../providers";
 import { thenable, type AppRuntime } from "../runtime";
 import { readSettings } from "../settings";
 import { stopAll, type AgentPool } from "./agents";
@@ -50,13 +51,19 @@ export class TabAgents {
       const { manager, updates } = this.host;
       const activeId = yield* manager.activeId;
       const pending = new Map((yield* updates.pending).map((u) => [u.installed.id, u.latest.version]));
+      const prefs = providerPrefs();
       const agents = (yield* manager.agents).map((a) => ({
         id: a.id,
         name: a.version ? `${a.name} ${a.version}` : a.name,
         icon: a.icon,
         update: pending.get(a.id),
+        hiddenModels: prefs.get(a.id)?.hiddenModels ?? [],
+        modelOrder: prefs.get(a.id)?.modelOrder ?? [],
       }));
-      this.host.post({ type: "agent", agents, activeId });
+      const favorites = agents.flatMap((a) =>
+        (prefs.get(a.id)?.favorites ?? []).map((f) => ({ agent: a.id, value: f.value, name: f.name })),
+      );
+      this.host.post({ type: "agent", agents, activeId, favorites });
     });
   }
 

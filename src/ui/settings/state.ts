@@ -1,4 +1,4 @@
-import type { AgentChoice } from "../../agentManager";
+import type { AgentChoice, ProviderChoice } from "../../agentManager";
 import type { ApprovalRules, SettingKey, SettingsScope } from "../../settings";
 import type { AgentOptions } from "../../sessionOptions";
 
@@ -12,6 +12,8 @@ export interface State {
   workspaceName?: string;
   locked: ReadonlyArray<SettingKey>;
   agents: AgentChoice[];
+  /** Every agent, enabled or not. */
+  providers: ProviderChoice[];
   activeId?: string;
 }
 

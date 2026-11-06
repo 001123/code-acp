@@ -17,6 +17,7 @@ import { post } from "./chat/post";
 import { NEW_TAB, TabSidebar, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
 import type { AgentChoices } from "./chat/agentPanel";
+import { takeSavedFavorites } from "./chat/modelFavorites";
 import { ChatSettings } from "./chat/chatSettings";
 import { quickConfig } from "./chat/sessionConfig";
 import { AgentSetup, needsSetup } from "./chat/agentSetup";
@@ -333,9 +334,12 @@ function App() {
         // E.g. the agent failed to start.
         update(tab, (s) => ({ ...s, configLoading: false }));
         return dispatch(tab, { type: "add", item: { kind: "error", text: { raw: msg.text } } });
-      case "agent":
+      case "agent": {
         setAgentsKnown(true);
-        return setAgents({ agents: msg.agents, activeId: msg.activeId });
+        const saved = takeSavedFavorites();
+        if (saved) post({ type: "importFavorites", favorites: saved });
+        return setAgents({ agents: msg.agents, activeId: msg.activeId, favorites: msg.favorites });
+      }
       case "catalog":
         return setCatalog(msg.catalog);
       case "doctor":

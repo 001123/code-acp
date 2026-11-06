@@ -20,6 +20,7 @@
   "config.language": "Ngôn ngữ giao diện của Code ACP.",
   "config.language.auto": "Theo ngôn ngữ hiển thị của VS Code",
   "config.customAgents": "Các ACP agent chạy từ lệnh cục bộ, theo tên. Chúng hiện trong bộ chọn agent của chat cạnh các agent đã cài; env của chúng được thêm lên trên codeAcp.env.",
+  "config.providers": "Cài đặt riêng cho từng agent, theo id: bật hay tắt, tham số khởi chạy và biến môi trường thêm, cùng các model hiện trong bộ chọn, thứ tự và model được gắn sao.",
   "config.env": "Biến môi trường thêm cho agent (vd. ANTHROPIC_API_KEY).",
   "config.nodePath": "Node dùng để chạy các agent cài qua npm.",
   "config.ccusagePath": "Đường dẫn file chạy ccusage cho trang Mức sử dụng (ví dụ bản cài global). Để trống thì chạy bản cố định qua npx.",

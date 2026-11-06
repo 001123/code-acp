@@ -307,7 +307,7 @@ export class SettingsPanel {
         break;
       }
       case "use":
-        if (yield* this.manager.has(msg.id)) {
+        if ((yield* this.manager.agents).some((agent) => agent.id === msg.id)) {
           yield* this.manager.setActive(msg.id);
         }
         break;
@@ -331,7 +331,7 @@ export class SettingsPanel {
             yield* thenable(() => vscode.env.openExternal(vscode.Uri.parse(fix.url)));
             break;
           case "manageAgents":
-            void this.panel.webview.postMessage({ type: "selectTab", tab: "agent", section: "manage" });
+            void this.panel.webview.postMessage({ type: "selectTab", tab: "providers", section: "add" });
             break;
           case "login":
             yield* thenable(() => vscode.commands.executeCommand(LOGIN_AGENT_COMMAND, fix.agentId));
@@ -385,6 +385,7 @@ export class SettingsPanel {
         workspaceName: vscode.workspace.name,
         locked: lockedSettings(scope),
         agents: yield* this.manager.agents,
+        providers: yield* this.manager.providers,
         activeId: yield* this.manager.activeId,
       });
     });

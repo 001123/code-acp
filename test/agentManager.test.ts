@@ -9,7 +9,7 @@ import { AgentManager } from "../src/agentManager";
 import { isPathSegment, Platform, type BinaryTarget, type RegistryAgent } from "../src/registry";
 import { ExtensionCtx, Output } from "../src/runtime";
 import { makeOutput } from "./helpers";
-import { window } from "./stubs/vscode";
+import { __test, window } from "./stubs/vscode";
 
 const CONTENT = "#!/bin/sh\n";
 const CHECKSUM = createHash("sha256").update(CONTENT).digest("hex");
@@ -236,4 +236,85 @@ describe("AgentManager.uninstall", () => {
       );
     });
   }
+});
+
+describe("codeAcp.providers", () => {
+  const installed = {
+    tool: {
+      id: "tool",
+      name: "Tool",
+      version: "1.0.0",
+      kind: "binary",
+      command: "/bin/tool",
+      args: ["--acp"],
+      env: {},
+    },
+    other: { id: "other", name: "Other", version: "2.0.0", kind: "npx", command: "node", args: ["o.js"], env: {} },
+  };
+  beforeEach(() => {
+    __test.setSetting("codeAcp.env", { SHARED: "1", KEY: "shared" });
+    return () => {
+      __test.setSetting("codeAcp.providers", undefined);
+      __test.setSetting("codeAcp.env", undefined);
+    };
+  });
+
+  it.live("adds a provider's arguments and variables to its command", () =>
+    withManager(
+      () =>
+        Effect.gen(function* () {
+          __test.setSetting("codeAcp.providers", { tool: { args: ["--model", "x"], env: { KEY: "own" } } });
+          const command = yield* AgentManager.use((manager) => manager.command("tool"));
+          assert.deepStrictEqual(command?.args, ["--acp", "--model", "x"]);
+          assert.deepStrictEqual(command?.env, { SHARED: "1", KEY: "own" });
+        }),
+      installed,
+    ),
+  );
+
+  it.live("leaves a disabled provider out of the chat, and its default to the next one", () =>
+    withManager(
+      () =>
+        Effect.gen(function* () {
+          yield* AgentManager.use((manager) => manager.setActive("tool"));
+          __test.setSetting("codeAcp.providers", { tool: { enabled: false } });
+          const manager = yield* AgentManager;
+          assert.deepStrictEqual(
+            (yield* manager.agents).map((a) => a.id),
+            ["other"],
+          );
+          assert.deepStrictEqual(
+            (yield* manager.providers).map((p) => [p.id, p.enabled, p.commandLine]),
+            [
+              ["tool", false, "/bin/tool --acp"],
+              ["other", true, "node o.js"],
+            ],
+          );
+          // Tabs already on it keep it.
+          assert.isTrue(yield* manager.has("tool"));
+          assert.strictEqual(yield* manager.activeId, "other");
+          // Still startable, for the Providers page to ask it for its models.
+          assert.isDefined(yield* manager.command("tool"));
+
+          __test.setSetting("codeAcp.providers", {});
+          assert.strictEqual(yield* manager.activeId, "tool");
+        }),
+      installed,
+    ),
+  );
+
+  it.live("skips a bad entry without dropping the others", () =>
+    withManager(
+      () =>
+        Effect.gen(function* () {
+          __test.setSetting("codeAcp.providers", { tool: { enabled: "no" }, other: { enabled: false } });
+          const manager = yield* AgentManager;
+          assert.deepStrictEqual(
+            (yield* manager.agents).map((a) => a.id),
+            ["tool"],
+          );
+        }),
+      installed,
+    ),
+  );
 });

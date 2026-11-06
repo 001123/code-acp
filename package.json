@@ -571,6 +571,62 @@
           "default": {},
           "description": "%config.env%"
         },
+        "codeAcp.providers": {
+          "scope": "machine",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "hiddenModels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "modelOrder": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "favorites": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "name"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {},
+          "description": "%config.providers%"
+        },
         "codeAcp.nodePath": {
           "scope": "machine",
           "type": "string",

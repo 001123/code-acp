@@ -368,6 +368,7 @@ describe("the Doctor tab of the settings page", () => {
         const runtime = makeRuntime(context, makeOutput());
         const manager = {
           agents: Effect.succeed([]),
+          providers: Effect.succeed([]),
           activeId: Effect.succeed(undefined),
           onDidChange: () => ({ dispose: () => {} }),
         } as unknown as AgentManager["Service"];
@@ -445,7 +446,7 @@ describe("the Doctor tab of the settings page", () => {
       yield* until(() => panel.posted.some((m) => m.type === "selectTab"), "the Agent tab");
       assert.deepInclude(
         panel.posted.find((m) => m.type === "selectTab"),
-        { tab: "agent", section: "manage" },
+        { tab: "providers", section: "add" },
       );
     }),
   );

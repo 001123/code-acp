@@ -6,12 +6,11 @@ import type { UsageView } from "../settingsPanel";
 import { Icon } from "./icon";
 import { useL10n } from "./l10n";
 import { mount } from "./mount";
-import { AgentCatalogTab } from "./settings/catalog";
 import { DoctorTab } from "./settings/doctor";
 import { EntryList, serversOf } from "./settings/entries";
+import { ADD_VIEW, ProvidersTab, type AddSection, type ProviderView } from "./settings/providers";
 import { ScopeContext, Segmented } from "./settings/fields";
 import {
-  AgentTab,
   CommitTab,
   GeneralTab,
   LanguageTab,
@@ -23,27 +22,28 @@ import {
 } from "./settings/panels";
 import { post } from "./settings/post";
 import { optionsKey, type LoadedOptions, type State } from "./settings/state";
-import { SubTabs, TABS, Tabs, type Tab } from "./settings/tabs";
+import { TABS, Tabs, type Tab } from "./settings/tabs";
 import { UsageTab, type UsageSource } from "./usage";
 import { getState, setState as saveState, useMessages } from "./vscode";
 import externalIcon from "@tabler/icons/outline/external-link.svg";
 import folderIcon from "@tabler/icons/outline/folder.svg";
 
-type Saved = { tab?: unknown; agentSection?: unknown; usageSource?: unknown };
-
-const AGENT_SECTIONS = ["general", "manage", "custom"] as const;
-type AgentSection = (typeof AGENT_SECTIONS)[number];
-
-const agentSectionOf = (value: unknown): AgentSection | undefined =>
-  AGENT_SECTIONS.find((section) => section === value);
+type Saved = { tab?: unknown; provider?: unknown; addSection?: unknown; usageSource?: unknown };
 
 function savedTab(): Tab {
   const state = getState() as Saved | undefined;
+  // The Agent tab of earlier versions is the Providers tab.
+  if (state?.tab === "agent") return "providers";
   return TABS.find((tab) => tab.id === state?.tab)?.id ?? "general";
 }
 
-function savedAgentSection(): AgentSection {
-  return agentSectionOf((getState() as Saved | undefined)?.agentSection) ?? "general";
+function savedProvider(): ProviderView {
+  const provider = (getState() as Saved | undefined)?.provider;
+  return typeof provider === "string" ? provider : "";
+}
+
+function savedAddSection(): AddSection {
+  return (getState() as Saved | undefined)?.addSection === "custom" ? "custom" : "registry";
 }
 
 function savedUsageSource(): UsageSource {
@@ -65,10 +65,12 @@ function App() {
     hasWorkspace: false,
     locked: [],
     agents: [],
+    providers: [],
   });
   const [loaded, setLoaded] = useState<LoadedOptions>({});
   const [tab, setTab] = useState(savedTab);
-  const [agentSection, setAgentSection] = useState(savedAgentSection);
+  const [provider, setProvider] = useState(savedProvider);
+  const [addSection, setAddSection] = useState(savedAddSection);
   const [catalog, setCatalog] = useState<CatalogState>({ agents: [], loading: true });
   const [doctor, setDoctor] = useState<DoctorState>({ rows: [], running: false });
   const [usage, setUsage] = useState<UsageView>();
@@ -77,9 +79,13 @@ function App() {
     setTab(next);
     save({ tab: next });
   };
-  const selectAgentSection = (next: AgentSection) => {
-    setAgentSection(next);
-    save({ agentSection: next });
+  const selectProvider = (next: ProviderView) => {
+    setProvider(next);
+    save({ provider: next });
+  };
+  const selectAddSection = (next: AddSection) => {
+    setAddSection(next);
+    save({ addSection: next });
   };
 
   useMessages((msg) => {
@@ -89,8 +95,7 @@ function App() {
     if (msg.type === "doctor") setDoctor(msg.doctor);
     if (msg.type === "selectTab" && TABS.some((x) => x.id === msg.tab)) {
       select(msg.tab);
-      const section = agentSectionOf(msg.section);
-      if (section) selectAgentSection(section);
+      if (msg.tab === "providers" && msg.section === "add") selectProvider(ADD_VIEW);
       if (msg.tab === "doctor" && msg.section === "run") post({ type: "doctorRun" });
     }
     // Answers for an agent no longer selected are dropped.
@@ -98,11 +103,11 @@ function App() {
   });
   // After useMessages, so the listener is in place before the extension answers.
   useEffect(() => post({ type: "ready" }), []);
-  const onCatalog = tab === "agent" && agentSection === "manage";
-  // The registry is only fetched for those who look at it.
+  const onProviders = tab === "providers";
+  // The registry is only fetched for those who look at it: for its agents, and the updates of those installed.
   useEffect(() => {
-    if (onCatalog) post({ type: "catalogLoad" });
-  }, [onCatalog]);
+    if (onProviders) post({ type: "catalogLoad" });
+  }, [onProviders]);
 
   const v = state.values;
   const overridden = (key: SettingKey) => state.overridden.includes(key);
@@ -111,21 +116,16 @@ function App() {
     post({ type: "loadModels", agentId, model });
   };
   const mcpCount = serversOf(v.mcpServers).length;
-  const customCount = serversOf(v.customAgents).length;
   const badge = (id: Tab): ReactNode => {
     if (TABS.find((x) => x.id === id)!.keys.some(overridden)) return <span className="dot warning" />;
     if (id === "mcp" && mcpCount) return <span className="count">{mcpCount}</span>;
+    if (id === "providers" && state.providers.length) return <span className="count">{state.providers.length}</span>;
     return null;
   };
   const current = TABS.find((x) => x.id === tab)!;
-  // Usage, Doctor and the installed agents are no settings.
-  const scoped = current.keys.length > 0 && !onCatalog;
-  const panelDesc =
-    tab !== "agent" || agentSection === "general"
-      ? current.desc
-      : agentSection === "manage"
-        ? "settings.manageDesc"
-        : "settings.customDesc";
+  // Usage and Doctor are no settings.
+  const scoped = current.keys.length > 0;
+  const panelDesc = current.desc;
   const workspaceLabel = state.workspaceName
     ? t("settings.scopeWorkspaceNamed", state.workspaceName)
     : t("settings.scopeWorkspace");
@@ -190,41 +190,18 @@ function App() {
 
           {tab === "worktree" && <WorktreeTab state={state} />}
 
-          {tab === "agent" && (
-            <>
-              <SubTabs
-                label={t("settings.agentSections")}
-                active={agentSection}
-                tabs={[
-                  { id: "general", label: t("settings.general") },
-                  { id: "manage", label: t("settings.manageAgents") },
-                  {
-                    id: "custom",
-                    label: t("settings.custom"),
-                    badge: overridden("customAgents") ? (
-                      <span className="dot warning" />
-                    ) : (
-                      customCount > 0 && <span className="count">{customCount}</span>
-                    ),
-                  },
-                ]}
-                onSelect={selectAgentSection}
-              />
-              <div id="subpanel" role="tabpanel" aria-labelledby={`subtab-${agentSection}`}>
-                {agentSection === "general" ? (
-                  <AgentTab state={state} loaded={loaded} load={load} />
-                ) : agentSection === "manage" ? (
-                  <AgentCatalogTab catalog={catalog} />
-                ) : (
-                  <EntryList
-                    agents
-                    value={v.customAgents}
-                    overridden={overridden("customAgents")}
-                    locked={state.locked.includes("customAgents")}
-                  />
-                )}
-              </div>
-            </>
+          {tab === "providers" && (
+            <ProvidersTab
+              state={state}
+              catalog={catalog}
+              doctor={doctor}
+              loaded={loaded}
+              load={load}
+              view={provider}
+              onView={selectProvider}
+              addSection={addSection}
+              onAddSection={selectAddSection}
+            />
           )}
 
           {tab === "commit" && <CommitTab state={state} loaded={loaded} load={load} />}

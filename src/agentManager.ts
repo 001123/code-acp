@@ -14,6 +14,7 @@ import {
   type RegistryAgent,
 } from "./registry";
 import { ExtensionCtx, messageOf, Output, thenable } from "./runtime";
+import { isProviderEnabled, providerPrefs } from "./providers";
 import { CustomAgentEntry, readSettings } from "./settings";
 
 export const InstallKind = Schema.Literals(["npx", "uvx", "binary"]);
@@ -50,6 +51,15 @@ export interface AgentChoice {
   readonly icon?: string;
 }
 
+/** An agent as the Providers page lists it, enabled or not. */
+export interface ProviderChoice extends AgentChoice {
+  readonly enabled: boolean;
+  /** How it was installed; undefined for a custom agent. */
+  readonly kind?: InstallKind;
+  /** The command line it starts with, before the provider's own arguments. */
+  readonly commandLine: string;
+}
+
 /** Prefix of the ids of codeAcp.customAgents entries; keeps them apart from registry ids. */
 const CUSTOM_PREFIX = "custom:";
 
@@ -68,6 +78,20 @@ const customAgents = Effect.sync(() => {
   }
   return agents;
 });
+
+/** `command` with the extra arguments and variables of the provider `id`. */
+const withPrefs = (id: string, command: AgentCommand): AgentCommand => {
+  const prefs = providerPrefs().get(id);
+  return prefs?.args?.length || prefs?.env
+    ? { ...command, args: [...command.args, ...(prefs.args ?? [])], env: { ...command.env, ...prefs.env } }
+    : command;
+};
+
+const isEnabled = isProviderEnabled;
+
+/** A command line as a shell would read it, for display. */
+const commandLineOf = (command: string, args: ReadonlyArray<string>) =>
+  [command, ...args].map((arg) => (/[\s"']/.test(arg) ? JSON.stringify(arg) : arg)).join(" ");
 
 const INSTALLED_KEY = "codeAcp.installedAgents";
 const ACTIVE_KEY = "codeAcp.activeAgent";
@@ -101,12 +125,15 @@ export class AgentManager extends Context.Service<
     readonly onDidChange: vscode.Event<void>;
     readonly list: Effect.Effect<ReadonlyArray<InstalledAgent>>;
     get(id: string): Effect.Effect<InstalledAgent | undefined>;
-    /** Every agent the chat can run: the installed ones, then the custom ones. */
+    /** Every agent the chat can run: the enabled installed ones, then the enabled custom ones. */
     readonly agents: Effect.Effect<ReadonlyArray<AgentChoice>>;
+    /** Every agent, enabled or not, for the Providers page. */
+    readonly providers: Effect.Effect<ReadonlyArray<ProviderChoice>>;
+    /** Whether the agent `id` exists, enabled or not: tabs already on a disabled agent keep it. */
     has(id: string): Effect.Effect<boolean>;
-    /** Command to launch the agent `id`, installed or custom; undefined when there is no such agent. */
+    /** Command to launch the agent `id`, installed or custom, enabled or not; undefined when there is no such agent. */
     command(id: string): Effect.Effect<AgentCommand | undefined>;
-    /** The default agent for new tabs, while it still exists. */
+    /** The default agent for new tabs, while it still exists and is enabled; else the first enabled one. */
     readonly activeId: Effect.Effect<string | undefined>;
     readonly active: Effect.Effect<InstalledAgent | undefined>;
     setActive(id: string | undefined): Effect.Effect<void, InstallError>;
@@ -137,7 +164,7 @@ export class AgentManager extends Context.Service<
       yield* Effect.acquireRelease(
         Effect.sync(() =>
           vscode.workspace.onDidChangeConfiguration((e) => {
-            if (e.affectsConfiguration("codeAcp.customAgents")) {
+            if (e.affectsConfiguration("codeAcp.customAgents") || e.affectsConfiguration("codeAcp.providers")) {
               changed.fire();
             }
           }),
@@ -170,13 +197,19 @@ export class AgentManager extends Context.Service<
           () => ({}),
         ),
       );
-      const has = (id: string) =>
+      const exists = (id: string) =>
         Effect.gen(function* () {
           return !!(yield* state)[id] || (yield* customAgents).has(id);
         });
+      const has = exists;
+      const ids = Effect.gen(function* () {
+        return [...Object.keys(yield* state), ...(yield* customAgents).keys()];
+      });
       const activeId = Effect.gen(function* () {
         const id = context.globalState.get(ACTIVE_KEY);
-        return Predicate.isString(id) && (yield* has(id)) ? id : undefined;
+        if (!Predicate.isString(id) || !(yield* exists(id))) return undefined;
+        // A disabled default gives way, without being forgotten, to the first agent still enabled.
+        return isEnabled(id) ? id : (yield* ids).find(isEnabled);
       });
       const notify = Effect.sync(() => changed.fire());
 
@@ -364,11 +397,12 @@ export class AgentManager extends Context.Service<
         yield* notify;
       });
 
-      const commandFor = (agent: InstalledAgent): AgentCommand => ({
-        command: agent.command,
-        args: agent.args,
-        env: { ...agent.env, ...readSettings().env },
-      });
+      const commandFor = (agent: InstalledAgent): AgentCommand =>
+        withPrefs(agent.id, {
+          command: agent.command,
+          args: agent.args,
+          env: { ...agent.env, ...readSettings().env },
+        });
 
       const command = Effect.fn("AgentManager.command")(function* (id: string) {
         const installed = (yield* state)[id];
@@ -377,11 +411,11 @@ export class AgentManager extends Context.Service<
         }
         const custom = (yield* customAgents).get(id);
         return custom
-          ? ({
+          ? withPrefs(id, {
               command: custom.command.trim(),
               args: custom.args ?? [],
               env: { ...readSettings().env, ...custom.env },
-            } satisfies AgentCommand)
+            })
           : undefined;
       });
 
@@ -397,6 +431,26 @@ export class AgentManager extends Context.Service<
             icon,
           }));
           const custom = [...(yield* customAgents)].map(([id, { name }]): AgentChoice => ({ id, name }));
+          return [...installed, ...custom].filter((agent) => isEnabled(agent.id));
+        }),
+        providers: Effect.gen(function* () {
+          const installed = Object.values(yield* state).map(
+            ({ id, name, version, icon, kind, command, args }): ProviderChoice => ({
+              id,
+              name,
+              version,
+              icon,
+              kind,
+              enabled: isEnabled(id),
+              commandLine: commandLineOf(command, args),
+            }),
+          );
+          const custom = [...(yield* customAgents)].map(([id, { name, command, args }]): ProviderChoice => ({
+            id,
+            name,
+            enabled: isEnabled(id),
+            commandLine: commandLineOf(command.trim(), args ?? []),
+          }));
           return [...installed, ...custom];
         }),
         has,

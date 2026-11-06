@@ -53,7 +53,7 @@
 /* Opens upward on hover or focus, aligned to the ring's left edge. */
 #usage-panel {
   position: absolute;
-  left: 0;
+  right: 0;
   bottom: calc(100% + 6px);
   z-index: 20;
   display: none;

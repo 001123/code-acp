@@ -20,6 +20,7 @@
   "config.language": "Language of the Code ACP interface.",
   "config.language.auto": "Same as the VS Code display language",
   "config.customAgents": "ACP agents run from local commands, by name. They appear in the chat's agent picker next to the installed agents; their env is added on top of codeAcp.env.",
+  "config.providers": "Per-agent settings, by agent id: whether it is enabled, extra launch arguments and environment variables, and which models its picker shows, in what order, and which are starred.",
   "config.env": "Extra environment variables for the agent (e.g. ANTHROPIC_API_KEY).",
   "config.nodePath": "Node used to run agents installed via npm.",
   "config.ccusagePath": "Path of the ccusage executable for the Usage page (e.g. a global install). Empty runs a pinned release through npx.",

@@ -1,5 +1,6 @@
 /* The Manage agents section of the Agent tab. */
 .catalog-toolbar {
+  container: catalog-toolbar / inline-size;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -48,9 +49,48 @@
   cursor: pointer;
   user-select: none;
 }
+.catalog-filter {
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+.catalog-filter:hover,
+.catalog-filter:has(input:checked) {
+  color: var(--vscode-foreground);
+}
+.catalog-filter:hover {
+  background: var(--surface-hover);
+}
+/* Drawn from theme colors: the native box stays white on a dark theme. */
 .catalog-filter input {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-content: center;
+  width: 14px;
+  height: 14px;
   margin: 0;
-  accent-color: var(--vscode-button-background);
+  border: 1px solid var(--vscode-checkbox-border, var(--vscode-descriptionForeground));
+  border-radius: 3px;
+  background: var(--vscode-checkbox-background, transparent);
+  cursor: pointer;
+}
+.catalog-filter input:checked {
+  border-color: var(--vscode-button-background);
+  background: var(--vscode-button-background);
+}
+.catalog-filter input:checked::before {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid var(--vscode-button-foreground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+.catalog-filter input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
 }
 .catalog-count {
   color: var(--vscode-descriptionForeground);
@@ -84,6 +124,7 @@ button.catalog-refresh.loading:disabled {
 }
 
 .catalog-list {
+  container: catalog / inline-size;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -216,4 +257,42 @@ button.catalog-refresh.loading:disabled {
   width: 32px;
   height: 32px;
   opacity: 0.6;
+}
+
+/* Narrow cards keep the tile beside the text; the actions go under it. */
+@container catalog (max-width: 480px) {
+  .catalog-card {
+    align-items: flex-start;
+    gap: 8px 12px;
+    padding: 12px;
+  }
+  .catalog-tile {
+    width: 32px;
+    height: 32px;
+  }
+  .catalog-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .catalog-body {
+    flex: 1 1 0;
+  }
+  .catalog-actions {
+    flex-basis: 100%;
+    padding-left: 44px;
+  }
+}
+
+/* Not enough room for everything on one line: the refresh button keeps only its icon. */
+@container catalog-toolbar (max-width: 560px) {
+  .catalog-search {
+    flex-basis: 120px;
+    min-width: 110px;
+  }
+  button.catalog-refresh {
+    padding-inline: 7px;
+  }
+  .catalog-refresh-label {
+    display: none;
+  }
 }

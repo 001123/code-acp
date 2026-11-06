@@ -14,9 +14,8 @@ import type { AgentOptions } from "../../sessionOptions";
 import type { AgentChoices } from "./agentPanel";
 import { AgentIcon } from "./agentIcon";
 import type { FavoriteModel } from "./modelFavorites";
+import { isHidden, orderModels } from "../modelPrefs";
 import { ConfigLoading, configIcon, configKind, currentName, type SelectOption } from "./sessionConfig";
-
-const isMac = typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
 
 /** The values of a fast mode select that turn it on and off; undefined when it has no such pair. */
 function fastValues(option: SelectOption): { on: string; off: string } | undefined {
@@ -32,15 +31,7 @@ type Row =
 type ModelRow = Exclude<Row, { heading: ReactNode }>;
 
 /** A select of the footer: a button that opens its values above it. */
-function FooterSelect({
-  option,
-  align,
-  onPick,
-}: {
-  option: SelectOption;
-  align: "left" | "right";
-  onPick: (value: string) => void;
-}) {
+function FooterSelect({ option, onPick }: { option: SelectOption; onPick: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -65,12 +56,15 @@ function FooterSelect({
         onClick={() => setOpen(!open)}
       >
         <Icon svg={configIcon(option)} />
-        <span className="label-text">{currentName(option)}</span>
+        <span className="label-text">
+          <span className="picker-chip-name">{option.name}</span>
+          <span className="picker-chip-value">{currentName(option)}</span>
+        </span>
         <Icon svg={chevronUpIcon} />
       </button>
       {open && (
         <div
-          className={`popup-menu picker-drop-list ${align}`}
+          className="popup-menu picker-drop-list"
           role="menu"
           aria-label={option.name}
           onKeyDown={(e) => {
@@ -87,6 +81,9 @@ function FooterSelect({
             e.preventDefault();
           }}
         >
+          <div className="menu-heading" role="presentation">
+            {option.name}
+          </div>
           {option.options.map((o) =>
             "options" in o ? (
               <div key={o.group} className="menu-group">
@@ -256,8 +253,8 @@ export function ModelPicker({
       }
     }
   } else if (other) {
-    for (const v of preview?.options?.models ?? [])
-      if (matches(v.name, v.value, v.description))
+    for (const v of orderModels(preview?.options?.models ?? [], other))
+      if (!isHidden(other, v.value) && matches(v.name, v.value, v.description))
         rows.push({
           key: `${other.id}\0${v.value}`,
           agent: other.id,
@@ -267,9 +264,21 @@ export function ModelPicker({
           current: false,
         });
   } else if (model && agentId) {
-    for (const o of model.options) {
+    const prefs = current ?? {};
+    // Hidden models are left out, but for the one the session is on.
+    const visible = (v: acp.SessionConfigSelectOption) => v.value === model.currentValue || !isHidden(prefs, v.value);
+    const ungrouped = orderModels(
+      model.options.filter((o): o is acp.SessionConfigSelectOption => !("options" in o)),
+      prefs,
+    );
+    let next = 0;
+    // The agent's groups stay where they are; the models in each, and those outside any, follow the user's order.
+    const options = model.options.map((o) =>
+      "options" in o ? { ...o, options: orderModels(o.options, prefs) } : ungrouped[next++]!,
+    );
+    for (const o of options) {
       const group = "options" in o ? o.options : [o];
-      const shown = group.filter((v) => matches(v.name, v.value, v.description));
+      const shown = group.filter((v) => visible(v) && matches(v.name, v.value, v.description));
       if (shown.length === 0) continue;
       if ("options" in o) rows.push({ key: `group:${o.group}`, heading: o.name });
       for (const v of shown)
@@ -297,15 +306,6 @@ export function ModelPicker({
   };
 
   const onKey = (e: ReactKeyboardEvent<HTMLElement>) => {
-    const mod = isMac ? e.metaKey : e.ctrlKey;
-    if (mod && /^[1-9]$/.test(e.key)) {
-      const row = pickable[Number(e.key) - 1];
-      if (row) {
-        e.preventDefault();
-        pick(row);
-      }
-      return;
-    }
     if (e.target !== search.current) {
       // Typing anywhere in the panel searches.
       if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target instanceof HTMLInputElement))
@@ -344,7 +344,6 @@ export function ModelPicker({
     ? (preview?.options?.efforts ?? []).map((c) => ({ value: c.value, name: c.name, description: c.description }))
     : (effort?.options.flatMap((o) => ("options" in o ? o.options : [o])) ?? []);
   const footer = fast || mode || others.length > 0;
-  let shortcut = 0;
   return (
     <div
       className={`picker-body${effort || levels.length ? " with-effort" : ""}${footer ? " with-footer" : ""}`}
@@ -433,7 +432,6 @@ export function ModelPicker({
                   {row.heading}
                 </div>
               );
-            const n = ++shortcut;
             const starred = isFavorite(row.agent, row.value);
             return (
               <div
@@ -463,7 +461,6 @@ export function ModelPicker({
                 >
                   <Icon svg={starred ? starFilledIcon : starIcon} />
                 </button>
-                {n <= 9 && <kbd className="picker-key">{isMac ? `⌘${n}` : `Ctrl+${n}`}</kbd>}
               </div>
             );
           })}
@@ -496,11 +493,10 @@ export function ModelPicker({
       {footer && (
         <div className="picker-footer" data-dimmed={other ? "" : undefined}>
           {fast && <FastSwitch option={fast} onSet={(value) => onSetConfig(fast.id, value)} />}
+          {mode && <FooterSelect option={mode} onPick={(value) => onSetConfig(mode.id, value)} />}
           {others.map((o) => (
-            <FooterSelect key={o.id} option={o} align="left" onPick={(value) => onSetConfig(o.id, value)} />
+            <FooterSelect key={o.id} option={o} onPick={(value) => onSetConfig(o.id, value)} />
           ))}
-          <span className="spacer" />
-          {mode && <FooterSelect option={mode} align="right" onPick={(value) => onSetConfig(mode.id, value)} />}
         </div>
       )}
     </div>

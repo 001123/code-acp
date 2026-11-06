@@ -26,6 +26,26 @@ export const CustomAgentEntry = Schema.Struct({
 });
 export type CustomAgentEntry = typeof CustomAgentEntry.Type;
 
+/** A model starred for an agent, with its name for when that agent is not running. */
+export const FavoriteModel = Schema.Struct({ value: Schema.String, name: Schema.String });
+export type FavoriteModel = typeof FavoriteModel.Type;
+
+/** One entry of codeAcp.providers: how an agent (installed or custom) runs and what its model picker shows; what is left out keeps the defaults. */
+export const ProviderPrefs = Schema.Struct({
+  /** False hides the agent from the chat and keeps it from being the default. */
+  enabled: Schema.optional(Schema.Boolean),
+  /** Arguments added after the agent's own on every start. */
+  args: Schema.optional(Schema.Array(Schema.String)),
+  /** Variables set for this agent alone, over codeAcp.env. */
+  env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /** Model values left out of the chat's model picker. */
+  hiddenModels: Schema.optional(Schema.Array(Schema.String)),
+  /** Model values in the order the picker lists them; those left out follow in the agent's order. */
+  modelOrder: Schema.optional(Schema.Array(Schema.String)),
+  favorites: Schema.optional(Schema.Array(FavoriteModel)),
+});
+export type ProviderPrefs = typeof ProviderPrefs.Type;
+
 const ApprovalRule = Schema.optional(Schema.Literals(["ask", "allow"]));
 
 /** Which permission requests are answered without asking; what is left out is asked about, or follows the user's rules in a workspace. */
@@ -57,6 +77,8 @@ export const Settings = Schema.Struct({
   /** Agents run from local commands, by name; listed next to the installed ones. */
   customAgents: Schema.Record(Schema.String, CustomAgentEntry),
   env: Schema.Record(Schema.String, Schema.String),
+  /** How each agent runs and what its model picker shows, by agent id. */
+  providers: Schema.Record(Schema.String, ProviderPrefs),
   nodePath: Schema.String,
   /** Path of the ccusage executable for the Usage tab; empty runs a pinned release through `npx -y`. */
   ccusagePath: Schema.String,
@@ -111,6 +133,7 @@ export const SETTING_KEYS = [
   "language",
   "customAgents",
   "env",
+  "providers",
   "nodePath",
   "ccusagePath",
   "checkAgentUpdates",
@@ -145,6 +168,7 @@ const DEFAULTS: Settings = {
   language: "auto",
   customAgents: {},
   env: {},
+  providers: {},
   nodePath: "node",
   ccusagePath: "",
   checkAgentUpdates: true,
@@ -188,6 +212,7 @@ export function readSettings(): Settings {
     language: read("language"),
     customAgents: read("customAgents"),
     env: read("env"),
+    providers: read("providers"),
     nodePath: read("nodePath"),
     ccusagePath: read("ccusagePath"),
     checkAgentUpdates: read("checkAgentUpdates"),
@@ -222,6 +247,7 @@ export type SettingsScope = "user" | "workspace";
 export const USER_ONLY_SETTINGS: ReadonlyArray<SettingKey> = [
   "customAgents",
   "env",
+  "providers",
   "nodePath",
   "ccusagePath",
   "worktreeSetupCommand",

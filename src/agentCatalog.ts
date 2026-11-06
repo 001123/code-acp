@@ -34,6 +34,8 @@ export interface CatalogState {
   agents: CatalogAgent[];
   loading: boolean;
   error?: string;
+  /** When the registry was last fetched, in ms since the epoch. */
+  checkedAt?: number;
 }
 
 /** The ACP registry's agents with their install / update / uninstall actions, for a page that shows them through `post`. */
@@ -41,6 +43,7 @@ export class AgentCatalog {
   private registry?: Registry;
   private error?: string;
   private loading = false;
+  private checkedAt?: number;
   private readonly busy = new Map<string, string>();
 
   constructor(
@@ -92,6 +95,7 @@ export class AgentCatalog {
       if (Result.isSuccess(result)) {
         this.registry = result.success;
         this.error = undefined;
+        this.checkedAt = Date.now();
       } else {
         this.error = result.failure.message;
       }
@@ -146,6 +150,7 @@ export class AgentCatalog {
         })),
         loading: this.loading,
         error: this.error,
+        checkedAt: this.checkedAt,
       });
     });
   }

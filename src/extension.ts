@@ -34,7 +34,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const provider = new ChatViewProvider(context, runtime, manager, updates);
   const dropView = new DropViewProvider(run((uris: ReadonlyArray<vscode.Uri>) => provider.composer.attach(uris)));
 
-  const manageAgents = () => SettingsPanel.show(context, runtime, manager, "agent", "manage");
+  const manageAgents = () => SettingsPanel.show(context, runtime, manager, "providers", "add");
 
   const selectAgent = Effect.fn("selectAgent")(function* () {
     const manage = { label: t("agent.manage"), id: undefined as string | undefined };

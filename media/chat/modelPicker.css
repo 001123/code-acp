@@ -4,7 +4,7 @@
   --picker-hover: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
   left: 0;
   display: block;
-  width: min(480px, calc(100vw - 24px));
+  width: min(400px, calc(100vw - 24px));
   padding: 0;
   font-size: 0.92em;
   container-type: inline-size;
@@ -13,10 +13,10 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  height: min(272px, calc(100vh - 120px));
+  height: min(236px, calc(100vh - 120px));
 }
 .picker-body.with-effort {
-  grid-template-columns: auto minmax(0, 1fr) minmax(104px, 28%);
+  grid-template-columns: auto minmax(0, 1fr) minmax(96px, 26%);
 }
 .picker-body.with-footer {
   grid-template-rows: minmax(0, 1fr) auto;
@@ -156,7 +156,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 24px;
+  min-height: 22px;
   padding: 1px 3px 1px 6px;
   border-radius: 5px;
   white-space: nowrap;
@@ -194,18 +194,6 @@
 }
 .picker-star[data-on="true"] {
   color: var(--vscode-editorWarning-foreground, #e2c08d);
-}
-.picker-key {
-  flex: none;
-  min-width: 2.2em;
-  font: inherit;
-  font-size: 0.85em;
-  text-align: right;
-  color: var(--vscode-descriptionForeground);
-  opacity: 0.7;
-}
-.picker-model[data-active="true"] .picker-key {
-  opacity: 1;
 }
 /* Another agent's models: picking one switches to it. */
 .picker-other {
@@ -259,7 +247,7 @@
   border-left: 1px solid var(--picker-line);
 }
 .picker-effort-head {
-  padding: 5px 6px 6px;
+  padding: 4px 6px 5px;
   margin-bottom: 3px;
   border-bottom: 1px solid var(--picker-line);
   color: var(--vscode-descriptionForeground);
@@ -279,7 +267,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  min-height: 24px;
+  min-height: 22px;
   padding: 1px 6px;
   border: none;
   border-radius: 5px;
@@ -323,9 +311,9 @@
 .picker-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   height: 20px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: none;
   border-radius: 5px;
   background: none;
@@ -353,25 +341,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.picker-chip > .svg-icon:last-child svg {
-  width: 12px;
-  height: 12px;
+/* "Name value": what the option is, then what it is set to. */
+.picker-chip-value {
+  margin-left: 0.3em;
+  color: var(--vscode-foreground);
 }
+.picker-chip > .svg-icon:last-child svg {
+  width: 10px;
+  height: 10px;
+}
+.picker-chip > .svg-icon:last-child {
+  margin-right: -2px;
+}
+/* A chip keeps its whole label: it wraps to the next row before it would be cut. */
 .picker-drop {
   position: relative;
-  min-width: 0;
+  flex: none;
+  max-width: 100%;
 }
 .picker-drop-list {
   bottom: calc(100% + 4px);
+  left: 0;
   min-width: 160px;
   max-height: 240px;
   overflow-y: auto;
-}
-.picker-drop-list.left {
-  left: 0;
-}
-.picker-drop-list.right {
-  right: 0;
 }
 .picker-drop-list button {
   display: flex;

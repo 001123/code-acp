@@ -128,10 +128,11 @@ export function AgentCatalogTab({ catalog }: { catalog: CatalogState }) {
         <button
           className={"secondary with-icon catalog-refresh" + (catalog.loading ? " loading" : "")}
           disabled={catalog.loading}
+          title={catalog.loading ? t("manager.loading") : t("manager.refresh")}
           onClick={() => post({ type: "catalogRefresh" })}
         >
           <Icon svg={refreshIcon} />
-          {catalog.loading ? t("manager.loading") : t("manager.refresh")}
+          <span className="catalog-refresh-label">{catalog.loading ? t("manager.loading") : t("manager.refresh")}</span>
         </button>
       </div>
       {catalog.error && (

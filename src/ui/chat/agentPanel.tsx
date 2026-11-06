@@ -6,7 +6,8 @@ import { useL10n } from "../l10n";
 import { useMessages } from "../vscode";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import { AgentIcon } from "./agentIcon";
-import { useModelFavorites, type FavoriteModel } from "./modelFavorites";
+import type { ModelPrefs } from "../modelPrefs";
+import type { FavoriteModel } from "./modelFavorites";
 import { ModelPicker, type AgentPreview } from "./modelPicker";
 import { useHoverMenu } from "./popupMenu";
 import { post } from "./post";
@@ -15,9 +16,11 @@ import { configKind, type SelectOption } from "./sessionConfig";
 export { AgentIcon };
 
 export interface AgentChoices {
-  /** `update`: the newer registry version the agent can be updated to. */
-  agents: ReadonlyArray<{ id: string; name: string; icon?: string; update?: string }>;
+  /** `update`: the newer registry version the agent can be updated to; the rest is what codeAcp.providers says of its models. */
+  agents: ReadonlyArray<{ id: string; name: string; icon?: string; update?: string } & ModelPrefs>;
   activeId?: string;
+  /** The starred models, kept in codeAcp.providers. */
+  favorites?: ReadonlyArray<FavoriteModel>;
 }
 
 /** The session's config options as the panel shows them. */
@@ -46,7 +49,7 @@ export function AgentPanel({
 }) {
   const { t } = useL10n();
   const menu = useHoverMenu();
-  const [favorites, toggleFavorite] = useModelFavorites();
+  const favorites = choices.favorites ?? [];
   // Opened by a click or a key, not a hover: the search may take the focus from the composer.
   const [focusSearch, setFocusSearch] = useState(false);
   useEffect(() => {
@@ -145,7 +148,7 @@ export function AgentPanel({
             focusSearch={focusSearch}
             onSetAgent={(id) => tab && post({ type: "setAgent", tab: tab.id, id })}
             onSetConfig={setConfig}
-            onToggleFavorite={toggleFavorite}
+            onToggleFavorite={(favorite) => post({ type: "toggleFavorite", ...favorite })}
             onPickOther={(favorite) => {
               if (!tab) return;
               pending.current = { tab: tab.id, favorite, ready: false };

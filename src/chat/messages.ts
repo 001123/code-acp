@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { CommitMessage, type CommitMessageError } from "../commitMessage";
 import { Completions } from "../completions";
 import { Problems } from "../problems";
+import { importFavorites, toggleFavorite } from "../providers";
 import { thenable, type AppServices, type VscodeError } from "../runtime";
 import { agentOptions, modelOption, type AgentOptions, type Wanted } from "../sessionOptions";
 import { TerminalContext } from "../terminalContext";
@@ -140,6 +141,12 @@ export class ViewMessages {
         break;
       case "setRememberSessionOptions":
         yield* updateSetting("rememberSessionOptions", msg.enabled);
+        break;
+      case "toggleFavorite":
+        yield* toggleFavorite(msg.agent, { value: msg.value, name: msg.name });
+        break;
+      case "importFavorites":
+        yield* importFavorites(msg.favorites);
         break;
       default:
         msg satisfies never;

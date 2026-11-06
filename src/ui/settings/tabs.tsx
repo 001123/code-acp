@@ -7,7 +7,7 @@ import languageIcon from "@tabler/icons/outline/language.svg";
 import bellIcon from "@tabler/icons/outline/bell.svg";
 import shieldIcon from "@tabler/icons/outline/shield-check.svg";
 import branchIcon from "@tabler/icons/outline/git-branch.svg";
-import robotIcon from "@tabler/icons/outline/robot.svg";
+import stackIcon from "@tabler/icons/outline/stack-2.svg";
 import commitIcon from "@tabler/icons/outline/git-commit.svg";
 import plugIcon from "@tabler/icons/outline/plug-connected.svg";
 import chartIcon from "@tabler/icons/outline/chart-bar.svg";
@@ -21,7 +21,7 @@ export type Tab =
   | "notifications"
   | "permissions"
   | "worktree"
-  | "agent"
+  | "providers"
   | "commit"
   | "mcp"
   | "links"
@@ -66,11 +66,11 @@ export const TABS: ReadonlyArray<{ id: Tab; label: MessageKey; desc: MessageKey;
     keys: ["worktreeForNewTabs", "worktreeCopyFiles", "worktreeSetupCommand", "worktreeProjectSetupCommand"],
   },
   {
-    id: "agent",
-    label: "settings.agent",
-    desc: "settings.agentDesc",
-    icon: robotIcon,
-    keys: ["sessionDefaults", "checkAgentUpdates", "nodePath", "ccusagePath", "env", "customAgents"],
+    id: "providers",
+    label: "settings.providers",
+    desc: "settings.providersDesc",
+    icon: stackIcon,
+    keys: ["providers", "sessionDefaults", "checkAgentUpdates", "nodePath", "ccusagePath", "env", "customAgents"],
   },
   {
     id: "commit",
