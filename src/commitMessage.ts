@@ -2,7 +2,7 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { Context, Deferred, Effect, Layer, Predicate, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as vscode from "vscode";
-import { spawnAgent, type AcpAgent } from "./acpClient";
+import { spawnAgent, throwawaySession, type AcpAgent } from "./acpClient";
 import { AcpTrace } from "./acpTrace";
 import { AgentManager } from "./agentManager";
 import { t } from "./i18n";
@@ -222,7 +222,7 @@ export class CommitMessage extends Context.Service<
             // Nothing to approve here: the prompt asks for text only.
             requestPermission: () => Effect.succeed(CANCELLED),
           });
-          const session = yield* agent.newSession(cwd);
+          const session = yield* throwawaySession(agent, cwd);
           sessionId = session.sessionId;
           yield* configureSession(
             agent,
@@ -266,7 +266,7 @@ export class CommitMessage extends Context.Service<
             onUpdate: () => {},
             requestPermission: () => Effect.succeed(CANCELLED),
           });
-          const session = yield* agent.newSession(defaultCwd());
+          const session = yield* throwawaySession(agent, defaultCwd());
           return agentOptions(yield* configureSession(agent, session, { model, effort: "", fastMode: "default" }));
         },
         Effect.scoped,

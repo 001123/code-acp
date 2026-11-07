@@ -406,6 +406,27 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
   };
 });
 
+/** How long removing a throwaway session may take before it is left to the agent. */
+const DISCARD_TIMEOUT = "5 seconds";
+
+/**
+ * A session for the extension's own use (commit messages, probes), removed from `session/list` (or at least closed)
+ * when the Scope closes, so it never shows in History.
+ */
+export const throwawaySession = (
+  agent: AcpAgent,
+  cwd: string,
+): Effect.Effect<acp.NewSessionResponse, RequestError, Scope.Scope> =>
+  Effect.acquireRelease(agent.newSession(cwd), ({ sessionId }) => {
+    const capabilities = agent.initializeResponse.agentCapabilities?.sessionCapabilities;
+    const discard = capabilities?.delete
+      ? agent.deleteSession(sessionId)
+      : capabilities?.close
+        ? agent.closeSession(sessionId)
+        : Effect.void;
+    return discard.pipe(Effect.timeout(DISCARD_TIMEOUT), Effect.ignore);
+  });
+
 const readTextFile = Effect.fn("readTextFile")(function* (params: acp.ReadTextFileRequest) {
   const uri = vscode.Uri.file(params.path);
   // The editor buffer shows the agent unsaved changes. Any other file stays closed: opening it would wake language servers.

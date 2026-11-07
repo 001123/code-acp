@@ -1,6 +1,6 @@
 import { Context, Deferred, Effect, FileSystem, Layer, Option, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { spawnAgent } from "./acpClient";
+import { spawnAgent, throwawaySession } from "./acpClient";
 import { AcpTrace } from "./acpTrace";
 import { AgentManager, type AgentChoice, type InstallKind } from "./agentManager";
 import { CANCELLED } from "./chat/permissions";
@@ -134,9 +134,9 @@ export class Doctor extends Context.Service<
             onUpdate: () => {},
             requestPermission: () => Effect.succeed(CANCELLED),
           });
-          const session = yield* agent
-            .newSession(folder)
-            .pipe(Effect.timeoutOption(`${SESSION_TIMEOUT_SECONDS} seconds`));
+          const session = yield* throwawaySession(agent, folder).pipe(
+            Effect.timeoutOption(`${SESSION_TIMEOUT_SECONDS} seconds`),
+          );
           if (Option.isNone(session)) {
             return {
               status: "warning",
@@ -145,15 +145,6 @@ export class Doctor extends Context.Service<
               fix: { type: "showLog" },
             } satisfies DoctorResult;
           }
-          const { sessionId } = session.value;
-          const capabilities = agent.initializeResponse.agentCapabilities?.sessionCapabilities;
-          yield* (
-            capabilities?.delete
-              ? agent.deleteSession(sessionId)
-              : capabilities?.close
-                ? agent.closeSession(sessionId)
-                : Effect.void
-          ).pipe(Effect.ignore);
           return { status: "ok", description: choice.version, detail: t("doctor.agent.ok") } satisfies DoctorResult;
         }).pipe(
           Effect.scoped,

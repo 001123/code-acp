@@ -10,6 +10,7 @@ import {
   canFork,
   canLogout,
   spawnAgent,
+  throwawaySession,
   type UrlElicitation,
 } from "../src/acpClient";
 import { __test, Uri, workspace } from "./stubs/vscode";
@@ -348,6 +349,21 @@ describe("spawnAgent", () => {
         yield* agent.logout;
       }),
     );
+  });
+
+  it.live("removes a throwaway session from the agent's list when its Scope closes", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    return Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const record = path.join(yield* fs.makeTempDirectoryScoped(), "record");
+      yield* withAgent({ MOCK_HISTORY: "1", MOCK_RECORD: record }, rec, (agent) =>
+        Effect.gen(function* () {
+          const { sessionId } = yield* Effect.scoped(throwawaySession(agent, process.cwd()));
+          const lines = (yield* fs.readFileString(record)).trim().split("\n");
+          assert.deepStrictEqual(lines.slice(-1), [`delete ${sessionId}`]);
+        }),
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer));
   });
 
   it.live("passes compaction updates on", () => {
