@@ -8,5 +8,12 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
     testTimeout: 30_000,
+    // Tests commit in temporary repos; CI runners have no git identity.
+    env: {
+      GIT_AUTHOR_NAME: "KD Code Tests",
+      GIT_AUTHOR_EMAIL: "tests@kd-code.invalid",
+      GIT_COMMITTER_NAME: "KD Code Tests",
+      GIT_COMMITTER_EMAIL: "tests@kd-code.invalid",
+    },
   },
 });
