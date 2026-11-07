@@ -27,6 +27,7 @@ import dockIcon from "@tabler/icons/outline/layout-sidebar-right-expand.svg";
 import pinIcon from "@tabler/icons/outline/pin.svg";
 import pinFilledIcon from "@tabler/icons/filled/pin.svg";
 import plusIcon from "@tabler/icons/outline/plus.svg";
+import sparklesIcon from "@tabler/icons/outline/sparkles.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
 import { HISTORY_SORT_LABELS, HistoryList, SidebarSearch, SidebarSection, SortMenu, type History } from "./history";
 import { HISTORY_SORTS } from "./historyList";
@@ -220,6 +221,7 @@ export function TabSidebar({
   const [renamingGroup, setRenamingGroup] = useState<number>();
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [casting, setCasting] = useState(false);
   const [prefs, setPrefs] = useSidebarPrefs();
   const dockable = useDockable();
   const sortMenu = useClickMenu();
@@ -677,6 +679,20 @@ export function TabSidebar({
               <button id="new-tab" title={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
                 <Icon svg={plusIcon} />
                 <span id="new-tab-label">{t("chat.newTab")}</span>
+              </button>
+              <button
+                className="icon-btn small"
+                id="tab-archive"
+                title={t("chat.archiveTabs")}
+                aria-label={t("chat.archiveTabs")}
+                data-casting={casting || undefined}
+                onClick={() => {
+                  setCasting(true);
+                  post({ type: "archiveTabs" });
+                }}
+                onAnimationEnd={() => setCasting(false)}
+              >
+                <Icon svg={sparklesIcon} />
               </button>
             </div>
           )}

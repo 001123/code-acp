@@ -542,6 +542,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       case "newTab":
         yield* this.tabActions.newSession();
         break;
+      case "archiveTabs":
+        yield* this.tabActions.archiveIdle();
+        yield* this.drafts.prune;
+        break;
       case "selectGroup":
       case "closeGroup":
       case "discardGroup":

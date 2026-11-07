@@ -259,6 +259,28 @@ export class TabActions {
     }
   });
 
+  /**
+   * Archives every unpinned conversation at rest (sidebar button): those running a turn or waiting for the user stay,
+   * and a group goes only when all its tabs rest. Closing keeps each conversation in the history.
+   */
+  readonly archiveIdle = Effect.fn("TabActions.archiveIdle")(function* (this: TabActions) {
+    const { tabs, permissions } = this.host;
+    const pending = new Set(permissions.owners);
+    const rests = (tab: Tab) => !tab.busy && tab.attempt !== "running" && !pending.has(tab);
+    const targets = tabs.all.filter(
+      (tab) => !tab.pinned && (tab.group ? tabs.members(tab.group).every(rests) : rests(tab)),
+    );
+    const groups = new Set(targets.flatMap((tab) => (tab.group ? [tab.group] : [])));
+    for (const tab of targets) {
+      if (!tab.group) {
+        yield* this.closeTab(tab);
+      }
+    }
+    for (const group of groups) {
+      yield* this.closeGroup(group);
+    }
+  });
+
   /** Shows the chat with `tab` active. */
   readonly reveal = Effect.fn("TabActions.reveal")(function* (this: TabActions, tab: Tab) {
     if (!this.host.tabs.has(tab)) {

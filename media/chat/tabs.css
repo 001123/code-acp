@@ -90,6 +90,55 @@
 #tab-sort[data-sorted] {
   color: var(--vscode-foreground);
 }
+#tab-archive {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+}
+#tab-archive svg {
+  width: 16px;
+  height: 16px;
+}
+#tab-archive:hover {
+  color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+/* A spell on click: the sparkles wind back, spin and glow, then settle. */
+#tab-archive[data-casting] {
+  color: var(--vscode-textLink-foreground);
+  animation: tab-archive-glow 650ms ease-out;
+}
+#tab-archive[data-casting] svg {
+  animation: tab-archive-cast 650ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes tab-archive-cast {
+  0% {
+    transform: rotate(0);
+  }
+  35% {
+    transform: rotate(-25deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes tab-archive-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  60% {
+    box-shadow: 0 0 10px 2px color-mix(in srgb, var(--vscode-textLink-foreground) 45%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #tab-archive[data-casting],
+  #tab-archive[data-casting] svg {
+    animation-duration: 1ms;
+  }
+}
 #tab-dock {
   flex: none;
   margin-right: 8px;
@@ -121,7 +170,9 @@
 #new-tab-row {
   flex: none;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   width: 100cqw;
   padding: 6px 0 4px;
 }

@@ -33,6 +33,8 @@ export type FromWebview =
   | { type: "fork"; tab: number; turn?: number }
   | { type: "cancel"; tab: number }
   | { type: "newTab" }
+  /** Closes the unpinned tabs at rest, keeping their conversations in the history. */
+  | { type: "archiveTabs" }
   /** Sends the composer's content to each of `attempts`, in a new tab and worktree of a new group ("loadComposer" if not). */
   | { type: "bestOf"; tab: number; parts: PromptPart[]; attempts: AttemptPick[] }
   /** What agent `agentId` offers for a comparison, with the efforts of `model`; answered with "attemptOptions". */

@@ -622,6 +622,7 @@ const vi: Record<MessageKey, string> = {
   "chat.newTab": "Cuộc trò chuyện mới",
   "chat.closeTab": "Đóng tab",
   "chat.archiveTab": "Lưu trữ cuộc trò chuyện",
+  "chat.archiveTabs": "Lưu trữ các cuộc trò chuyện đang rảnh",
   "chat.findPlaceholder": "Tìm trong cuộc trò chuyện",
   "chat.findCount": "{0}/{1}",
   "chat.findNone": "Không có kết quả",
