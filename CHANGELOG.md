@@ -4,7 +4,9 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
-First public version; nothing has been released yet.
+## [0.0.1] - 2026-11-07
+
+First public version.
 
 ### Added
 
