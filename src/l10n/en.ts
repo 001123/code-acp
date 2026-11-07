@@ -398,6 +398,7 @@ const en = {
   "chat.noModelChoice": "This agent has no models to choose from.",
   "chat.standardSpeed": "Standard",
   "chat.fastSpeed": "Fast",
+  "chat.pickModelToSwitch": "Pick a model to switch",
   "chat.switchToAgent": "Switch",
   "chat.thinkingLevel": "Thinking",
   "chat.startOverConfirm":

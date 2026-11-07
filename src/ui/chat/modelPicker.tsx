@@ -327,6 +327,7 @@ export function ModelPicker({
   };
 
   const waiting = favoritesShown ? false : other ? !preview?.options && !preview?.error : loading;
+  const pickOther = other !== undefined && !!preview?.options?.models.some((v) => !isHidden(other, v.value));
   const empty = favoritesShown
     ? favorites.length === 0
       ? t("chat.noFavorites")
@@ -418,9 +419,16 @@ export function ModelPicker({
           <div className="picker-other">
             <AgentIcon icon={other.icon} />
             <span className="label-text">{other.name}</span>
-            <button type="button" className="picker-switch" onClick={() => onSetAgent(other.id)}>
-              {t("chat.switchToAgent")}
-            </button>
+            {/* A model picked switches to the agent; the button is for an agent without one to pick. */}
+            {pickOther ? (
+              <span className="picker-hint">{t("chat.pickModelToSwitch")}</span>
+            ) : (
+              !waiting && (
+                <button type="button" className="picker-switch" onClick={() => onSetAgent(other.id)}>
+                  {t("chat.switchToAgent")}
+                </button>
+              )
+            )}
           </div>
         )}
         <div ref={list} className="picker-list" role="listbox" aria-label={model?.name ?? t("chat.favoriteModels")}>

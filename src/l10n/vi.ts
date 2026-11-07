@@ -400,6 +400,7 @@ const vi: Record<MessageKey, string> = {
   "chat.noModelChoice": "Agent này không có model nào để chọn.",
   "chat.standardSpeed": "Tiêu chuẩn",
   "chat.fastSpeed": "Nhanh",
+  "chat.pickModelToSwitch": "Chọn model để chuyển",
   "chat.switchToAgent": "Chuyển",
   "chat.thinkingLevel": "Suy nghĩ",
   "chat.startOverConfirm":
