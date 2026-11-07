@@ -272,7 +272,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.commands.registerCommand(
         command,
         run((context?: { tab?: unknown }) =>
-          typeof context?.tab === "number" ? provider.tabAction(context.tab, action) : Effect.void,
+          typeof context?.tab === "number"
+            ? provider.tabAction(context.tab, action)
+            : // A keybinding passes no tab: close the active one.
+              action === "close"
+              ? provider.closeActiveTab
+              : Effect.void,
         ),
       ),
     ),

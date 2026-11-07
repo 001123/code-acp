@@ -23,6 +23,10 @@ import { Follower } from "./follow";
 import { TabGroups } from "./groups";
 import { HistoryRequests, listHistory } from "./history";
 import type { ChatUi } from "./host";
+
+/** Whether focus is inside the chat webview, for keybindings (see the "focus" message). */
+const setChatFocused = (focused: boolean) =>
+  thenable(() => vscode.commands.executeCommand("setContext", "kdCode.chatFocused", focused)).pipe(Effect.ignore);
 import { ChatIndicators } from "./indicators";
 import { ViewMessages } from "./messages";
 import { openFile } from "./openFile";
@@ -374,7 +378,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     );
     view.webview.onDidReceiveMessage((msg: FromWebview) => this.run(this.onMessage(msg), this.tabOf(msg)));
     view.onDidChangeVisibility(() => this.attention.refresh());
-    view.onDidDispose(() => (this.view = undefined));
+    view.onDidDispose(() => {
+      this.view = undefined;
+      this.run(setChatFocused(false));
+    });
     this.indicators.showBadge();
   }
 
@@ -513,6 +520,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       return;
     }
     switch (msg.type) {
+      case "focus":
+        yield* setChatFocused(msg.focused);
+        return;
       case "ready":
         yield* this.drafts.load();
         this.post({ type: "environment", remote: vscode.env.remoteName !== undefined });
@@ -771,6 +781,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   tabAction(id: number, action: TabAction) {
     return this.tabActions.run(id, action);
   }
+
+  /** Closes the active tab (keybinding), which archives its conversation to the history; pinned tabs stay. */
+  readonly closeActiveTab = Effect.suspend(() => this.tabActions.run(this.tabs.active.id, "close"));
 
   /** Opens the find box above the transcript; the message follows the focus command, as in `focusComposer`. */
   readonly findInConversation = this.focus.pipe(

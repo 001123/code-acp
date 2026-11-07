@@ -16,6 +16,11 @@ export type { ChangedFile, TerminalSnapshot, TurnTrace, WorktreeFileDiff, Worktr
 export type FromWebview =
   | { type: "ready" }
   /**
+   * Focus entered or left the webview. VS Code draws a sidebar webview over its view, outside the view's DOM, so
+   * `focusedView` stays unset while the webview has focus; keybindings use the `kdCode.chatFocused` context instead.
+   */
+  | { type: "focus"; focused: boolean }
+  /**
    * The composer in order: text runs and the attachments between them. While the tab is busy it is queued, or with
    * `now` sent right away, stopping the turn. With `rewind`, it replaces the user message of that turn and the rest
    * of the conversation after it.

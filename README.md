@@ -80,6 +80,7 @@ The walkthrough (`KD Code: Get Started`) takes you through these steps:
 | ------------------------- | ------------------ | ------------ | --------------------------------------- |
 | Open the chat             | `Ctrl+Alt+A`       | `Cmd+Alt+A`  | Anywhere                                |
 | New chat tab              | `Ctrl+Shift+Alt+N` | `Ctrl+Cmd+N` | Anywhere                                |
+| Archive the active thread | `Ctrl+W`           | `Cmd+W`      | Chat focused                            |
 | Cancel                    | `Ctrl+.`           | `Cmd+.`      | Chat focused                            |
 | Add selection to chat     | `Ctrl+Alt+L`       | `Cmd+Alt+L`  | Text selected in the editor or terminal |
 | Add file problems to chat | `Ctrl+Alt+P`       | `Cmd+Alt+P`  | Editor focused                          |

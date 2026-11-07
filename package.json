@@ -947,16 +947,22 @@
         "mac": "ctrl+cmd+n"
       },
       {
+        "command": "kdCode.closeTab",
+        "key": "ctrl+w",
+        "mac": "cmd+w",
+        "when": "kdCode.chatFocused || focusedView == 'kdCode.chat'"
+      },
+      {
         "command": "kdCode.findInConversation",
         "key": "ctrl+f",
         "mac": "cmd+f",
-        "when": "focusedView == 'kdCode.chat'"
+        "when": "kdCode.chatFocused || focusedView == 'kdCode.chat'"
       },
       {
         "command": "kdCode.cancel",
         "key": "ctrl+.",
         "mac": "cmd+.",
-        "when": "focusedView == 'kdCode.chat'"
+        "when": "kdCode.chatFocused || focusedView == 'kdCode.chat'"
       },
       {
         "command": "kdCode.addSelection",

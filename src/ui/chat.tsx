@@ -426,6 +426,18 @@ function App() {
   });
   // After useMessages, so the listener is in place before the extension answers.
   useEffect(() => post({ type: "ready" }), []);
+  // Keybindings scoped to the chat need to know when focus is in here (see the "focus" message).
+  useEffect(() => {
+    const onFocus = () => post({ type: "focus", focused: true });
+    const onBlur = () => post({ type: "focus", focused: false });
+    if (document.hasFocus()) onFocus();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
 
   function handleUpdate(tab: number | undefined, u: acp.SessionUpdate, turn?: number): void {
     switch (u.sessionUpdate) {
