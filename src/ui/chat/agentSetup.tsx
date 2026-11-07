@@ -10,8 +10,8 @@ import { AgentIcon } from "./agentIcon";
 import type { AgentChoices } from "./agentPanel";
 import { post } from "./post";
 
-/** Registry ids of the agents offered first, in order. */
-const SUGGESTED_AGENTS = ["claude-acp", "codex-acp", "antigravity-acp"];
+/** Registry ids of the agents offered first, in order, all picked until the user unticks them. */
+const SUGGESTED_AGENTS = ["claude-acp", "codex-acp"];
 
 /** The suggested agents the registry has and this machine can install. */
 export function suggestedAgents(agents: ReadonlyArray<CatalogAgent>): CatalogAgent[] {
@@ -23,16 +23,16 @@ export function needsSetup(agents: AgentChoices["agents"], catalog: CatalogState
   return agents.length === 0 || catalog.agents.some((agent) => agent.busy);
 }
 
-/** Suggested agents to pick from, and the way to all the others. */
+/** Suggested agents to pick from (all picked at first), and the way to all the others. */
 export function AgentPicker({ catalog }: { catalog: CatalogState }) {
   const { t } = useL10n();
-  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => post({ type: "catalogLoad" }), []);
   const suggested = suggestedAgents(catalog.agents);
   const installing = catalog.agents.some((agent) => agent.busy);
-  const chosen = suggested.filter((agent) => picked.has(agent.id) && !agent.installedVersion);
+  const chosen = suggested.filter((agent) => !skipped.has(agent.id) && !agent.installedVersion);
   const toggle = (id: string) =>
-    setPicked((current) => {
+    setSkipped((current) => {
       const next = new Set(current);
       if (!next.delete(id)) next.add(id);
       return next;
@@ -49,7 +49,7 @@ export function AgentPicker({ catalog }: { catalog: CatalogState }) {
             <label key={agent.id} className="setup-agent" title={agent.description}>
               <input
                 type="checkbox"
-                checked={picked.has(agent.id) || !!agent.installedVersion}
+                checked={!skipped.has(agent.id) || !!agent.installedVersion}
                 disabled={installing || !!agent.installedVersion}
                 onChange={() => toggle(agent.id)}
               />

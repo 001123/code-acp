@@ -33,15 +33,15 @@ const state = (agents: CatalogAgent[], extra: Partial<CatalogState> = {}): Catal
 const three = [agent("other"), agent("antigravity-acp", { kind: "binary" }), agent("codex-acp"), agent("claude-acp")];
 
 describe("suggestedAgents", () => {
-  it("gives Claude, Codex and Antigravity in that order", () => {
+  it("gives Claude and Codex in that order", () => {
     assert.deepStrictEqual(
       suggestedAgents(three).map((a) => a.id),
-      ["claude-acp", "codex-acp", "antigravity-acp"],
+      ["claude-acp", "codex-acp"],
     );
   });
 
   it("leaves out what this machine can't install", () => {
-    const agents = [agent("claude-acp"), agent("antigravity-acp", { kind: undefined })];
+    const agents = [agent("claude-acp"), agent("codex-acp", { kind: undefined })];
     assert.deepStrictEqual(
       suggestedAgents(agents).map((a) => a.id),
       ["claude-acp"],
@@ -81,20 +81,23 @@ describe("AgentPicker", () => {
     assert.deepStrictEqual(posted, [{ type: "catalogLoad" }]);
   });
 
-  it("needs one agent picked to continue, and installs what is picked", () => {
+  it("picks the suggested agents at first, and installs what stays picked", () => {
     render(state(three));
     posted.length = 0;
-    assert.strictEqual(boxes().length, 3);
-    assert.isTrue(button("chat.setup.continue").disabled);
+    assert.strictEqual(boxes().length, 2);
+    assert.isTrue(boxes().every((box) => box.checked));
 
-    act(() => boxes()[0]!.click());
-    act(() => boxes()[2]!.click());
+    act(() => boxes()[1]!.click());
     assert.isFalse(button("chat.setup.continue").disabled);
     act(() => button("chat.setup.continue").click());
-    assert.deepStrictEqual(posted, [
-      { type: "catalogInstall", id: "claude-acp" },
-      { type: "catalogInstall", id: "antigravity-acp" },
-    ]);
+    assert.deepStrictEqual(posted, [{ type: "catalogInstall", id: "claude-acp" }]);
+  });
+
+  it("needs one agent picked to continue", () => {
+    render(state(three));
+    act(() => boxes()[0]!.click());
+    act(() => boxes()[1]!.click());
+    assert.isTrue(button("chat.setup.continue").disabled);
   });
 
   it("locks the picks while installing and shows the progress", () => {
