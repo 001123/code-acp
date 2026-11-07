@@ -22,6 +22,7 @@ import { copyMessage } from "./clipboard";
 import { ElicitationView, UrlElicitationView } from "./elicitation";
 import { BackgroundToolCalls, OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
+import { justSent } from "./sendPulse";
 import { TurnTraceView } from "./turnTrace";
 import {
   compactionLabel,
@@ -432,6 +433,7 @@ function CompactionView({ item }: { item: CompactionItem }) {
 /** One transcript entry; memoized so a streamed chunk only re-renders the entry it extends. */
 export const ItemView = memo(function ItemView({ item }: { item: Item }) {
   const { t } = useL10n();
+  const [sent] = useState(() => item.kind === "user" && justSent());
   switch (item.kind) {
     case "assistant":
       return <MarkdownView className="msg assistant md" text={item.text} onOpenFile={openFile} />;
@@ -439,7 +441,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
       const replayed = fileLinkTokens(item.text);
       const tokens = [...(item.tokens ?? []), ...replayed.tokens];
       return (
-        <div className="msg user">
+        <div className="msg user" data-sent={sent || undefined}>
           <UserText text={replayed.text} tokens={tokens} />
           <MessageActions turn={item.turn} text={replayed.text} tokens={tokens} />
         </div>

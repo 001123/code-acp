@@ -68,7 +68,6 @@ describe("copying from the composer to another tab", () => {
       setPreview: () => {},
       setHover: () => {},
       usage: null,
-      settings: null,
       agentConfig: undefined,
       quickConfig: null,
       config: [],

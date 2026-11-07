@@ -1,10 +1,10 @@
 import { EditorContent, useEditor } from "@tiptap/react";
 import type * as acp from "@agentclientprotocol/sdk";
-import { useRef, type MutableRefObject, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type MutableRefObject, type ReactNode } from "react";
 import type { Attachment, PromptPart, QueuedInfo, TabInfo, WorkspaceFolderInfo } from "../../chat/protocol";
 import { Icon } from "../icon";
 import { useL10n, type Translate } from "../l10n";
-import arrowUpIcon from "@tabler/icons/outline/arrow-up.svg";
+import sendIcon from "@tabler/icons/outline/arrow-up.svg";
 import stopIcon from "@tabler/icons/filled/player-stop.svg";
 import { AgentPanel, type AgentChoices, type AgentConfig } from "./agentPanel";
 import { imageSrc } from "./attachments";
@@ -29,6 +29,7 @@ import {
 } from "./editor";
 import { useFileDrop } from "./fileDrop";
 import { post } from "./post";
+import { markSent } from "./sendPulse";
 import type { Trigger } from "./suggestions";
 import type { TabState } from "./tabs";
 import { splitTokens } from "../markdown";
@@ -60,7 +61,6 @@ export interface ComposerOptions {
   /** Shown first, at the left end of the actions. */
   usage: ReactNode;
   /** Shown before the stop and send buttons. */
-  settings: ReactNode;
   /** The session's config options, shown in the agent panel; undefined without a tab. */
   agentConfig: AgentConfig | undefined;
   /** The session's model and effort, shown beside the agent button. */
@@ -73,6 +73,9 @@ export interface ComposerOptions {
 
 /** The message composer: its state and logic, and the form to render. */
 export function useComposer(options: ComposerOptions) {
+  const sendButton = useRef<HTMLButtonElement>(null);
+  /** Set once a turn has run, so the send button animates back in after one but not on first render. */
+  const armed = useRef(false);
   const {
     active,
     activeRef,
@@ -91,12 +94,16 @@ export function useComposer(options: ComposerOptions) {
     setPreview,
     setHover,
     usage,
-    settings,
     agentConfig,
     quickConfig,
     config,
     hidden,
   } = options;
+  if (busy) armed.current = true;
+  // The send button hides as the turn starts, cutting its launch short: drop it so the return plays instead.
+  useLayoutEffect(() => {
+    if (busy) sendButton.current?.removeAttribute("data-launch");
+  }, [busy]);
   const { t } = useL10n();
   const activeTab = tabs.find((x) => x.id === active);
   const compare = useCompare({
@@ -350,6 +357,7 @@ export function useComposer(options: ComposerOptions) {
     if (active === undefined) return;
     const parts = content(active);
     if (!parts) return;
+    markSent(sendButton.current);
     if (compare.on) {
       post({ type: "bestOf", tab: active, parts, attempts: compare.attempts() });
       compare.turnOff();
@@ -418,7 +426,6 @@ export function useComposer(options: ComposerOptions) {
       <div id="actions">
         <AgentPanel tab={activeTab} choices={agents} summary={quickConfig} config={agentConfig} />
         <FolderSelect tab={activeTab} folders={folders} />
-        {settings}
         <span className="spacer" />
         {compare.element}
         {usage}
@@ -436,12 +443,15 @@ export function useComposer(options: ComposerOptions) {
         <button
           type="submit"
           id="send"
+          ref={sendButton}
+          data-armed={armed.current || undefined}
           className="icon-btn"
+          onAnimationEnd={(e) => e.animationName === "send-launch" && e.currentTarget.removeAttribute("data-launch")}
           data-compare={compare.on || undefined}
           title={compare.on ? t("bestOf.send", compare.count) : t(busy ? "chat.queueTitle" : "chat.sendTitle")}
           aria-label={compare.on ? t("bestOf.send", compare.count) : t("chat.send")}
         >
-          <Icon svg={arrowUpIcon} />
+          <Icon svg={sendIcon} />
         </button>
       </div>
     </form>

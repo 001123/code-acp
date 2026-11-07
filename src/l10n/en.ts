@@ -325,8 +325,6 @@ const en = {
   "statusBar.usageName": "KD Code Usage",
   "statusBar.usageTab": "This tab: {0} tokens · {1} turns",
   "statusBar.usageToday": "Today: {0} tokens · {1} turns",
-  "chat.viewSettings": "View settings",
-  "chat.openSettings": "Open settings",
   "chat.openDiff": "Open diff",
   "changes.diffTitle": "{0} (agent changes)",
   "changes.countOne": "1 file changed",

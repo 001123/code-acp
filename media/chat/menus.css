@@ -1,4 +1,3 @@
-#chat-settings,
 #agent {
   position: relative;
   display: inline-flex;
@@ -22,13 +21,10 @@
   mask-repeat: no-repeat;
   mask-position: center;
 }
-#chat-settings > .icon-btn,
 #agent > .icon-btn {
   background: none;
   color: var(--vscode-descriptionForeground);
 }
-#chat-settings > .icon-btn:hover,
-#chat-settings > .icon-btn[aria-expanded="true"],
 #agent > .icon-btn:hover,
 #agent > .icon-btn[aria-expanded="true"] {
   background: var(--vscode-toolbar-hoverBackground);
@@ -48,10 +44,6 @@
   border-radius: 50%;
   background: var(--vscode-activityBarBadge-background, var(--vscode-button-background));
 }
-/* Menus open upward: the gear's aligned to its right edge. */
-#chat-settings-menu {
-  right: 0;
-}
 .popup-menu {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -66,53 +58,6 @@
   color: var(--vscode-menu-foreground, var(--vscode-foreground));
   border: 1px solid var(--vscode-menu-border, color-mix(in srgb, var(--vscode-foreground) 14%, transparent));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-#chat-settings-menu > button {
-  display: flex;
-  align-items: center;
-  border-radius: 6px;
-  background: none;
-  color: inherit;
-  text-align: left;
-  white-space: nowrap;
-}
-#chat-settings-menu > button:hover,
-#chat-settings-menu > button:focus-visible {
-  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
-  color: var(--vscode-menu-selectionForeground, inherit);
-  outline: none;
-}
-/* The gear's rows look alike, whether they act or open a sub-menu. */
-#chat-settings-menu > button,
-#chat-settings-menu .submenu-trigger,
-#chat-settings-menu .submenu > button {
-  gap: 8px;
-  padding: 4px 6px;
-}
-#chat-settings-menu {
-  width: max-content;
-  min-width: 13em;
-}
-#chat-settings-menu .menu-separator {
-  margin-inline: 6px;
-}
-#chat-settings-menu .switch {
-  margin-inline-start: 4px;
-  width: 26px;
-  height: 16px;
-}
-#chat-settings-menu .switch::after {
-  width: 10px;
-  height: 10px;
-}
-#chat-settings-menu [aria-checked="true"] > .switch::after {
-  transform: translateX(10px);
-}
-#chat-settings-menu button > .svg-icon svg,
-#chat-settings-menu .menu-label > .svg-icon svg {
-  width: 14px;
-  height: 14px;
-  color: var(--vscode-descriptionForeground);
 }
 .popup-menu .menu-label {
   flex: 1;

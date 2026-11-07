@@ -326,8 +326,6 @@ const vi: Record<MessageKey, string> = {
   "statusBar.usageName": "Mức sử dụng KD Code",
   "statusBar.usageTab": "Tab này: {0} token · {1} lượt",
   "statusBar.usageToday": "Hôm nay: {0} token · {1} lượt",
-  "chat.viewSettings": "Cài đặt hiển thị",
-  "chat.openSettings": "Mở cài đặt",
   "chat.openDiff": "Mở diff",
   "changes.diffTitle": "{0} (thay đổi của agent)",
   "changes.countOne": "1 file đã thay đổi",

@@ -28,7 +28,6 @@ import { NEW_TAB, TabSidebar, tabStates, type TabState } from "./chat/tabs";
 import { formatDuration, useNow, WAITING_AFTER_MS } from "./chat/time";
 import type { AgentChoices } from "./chat/agentPanel";
 import { takeSavedFavorites } from "./chat/modelFavorites";
-import { ChatSettings } from "./chat/chatSettings";
 import { quickConfig } from "./chat/sessionConfig";
 import { AgentSetup, needsSetup } from "./chat/agentSetup";
 import { UsageMeter } from "./chat/usageMeter";
@@ -140,7 +139,6 @@ function App() {
     editing,
     backgroundTasks,
   } = current;
-  const [followAgent, setFollowAgent] = useState(false);
   /** kdCode.autoScroll: new content scrolls the messages to the end. */
   const [autoScroll, setAutoScroll] = useState(true);
   const autoScrollRef = useRef(autoScroll);
@@ -149,8 +147,6 @@ function App() {
   const [showChanges, setShowChanges] = useState(true);
   /** kdCode.tracing: the numbers below each turn. */
   const [tracing, setTracing] = useState(false);
-  /** kdCode.showRestore: only for the gear's menu; the host applies it. */
-  const [showRestore, setShowRestore] = useState(false);
   const checkpointTurns = changes?.turns;
   const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;
   const shownTab = useMemo<ShownTab>(
@@ -208,15 +204,6 @@ function App() {
             ? () => post({ type: "send", tab: active, parts: ["/compact"] })
             : undefined
         }
-      />
-    ),
-    settings: (
-      <ChatSettings
-        followAgent={followAgent}
-        autoScroll={autoScroll}
-        showChanges={showChanges}
-        showRestore={showRestore}
-        tracing={tracing}
       />
     ),
     agentConfig:
@@ -277,16 +264,12 @@ function App() {
       case "forked":
         if (tab !== undefined) dispatchTabs({ type: "fork", from: msg.from, tab });
         return;
-      case "followAgent":
-        return setFollowAgent(msg.enabled);
       case "autoScroll":
         return setAutoScroll(msg.enabled);
       case "showChanges":
         return setShowChanges(msg.enabled);
       case "tracing":
         return setTracing(msg.enabled);
-      case "showRestore":
-        return setShowRestore(msg.enabled);
       case "display":
         return applyDisplay(msg.fontSize, msg.codeFontSize);
       case "turnTrace":
