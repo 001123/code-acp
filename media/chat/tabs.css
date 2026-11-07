@@ -78,6 +78,18 @@
   display: flex;
   align-items: center;
 }
+/* Beside the search box, so always there; shows when the tabs aren't in their manual order. */
+#tab-sort {
+  opacity: 1;
+  margin-right: 8px;
+  color: var(--vscode-descriptionForeground);
+}
+#tab-top:has(#tab-dock) #tab-sort {
+  margin-right: 2px;
+}
+#tab-sort[data-sorted] {
+  color: var(--vscode-foreground);
+}
 #tab-dock {
   flex: none;
   margin-right: 8px;

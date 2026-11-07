@@ -21,6 +21,41 @@ export function tabRows(tabs: ReadonlyArray<TabInfo>, groups: ReadonlyArray<TabG
   return rows;
 }
 
+/** How the sidebar orders the tabs: as the user dragged them, or by when they started or what they're called. */
+export type TabSort = "manual" | "newest" | "oldest" | "title";
+
+export const TAB_SORTS: ReadonlyArray<TabSort> = ["manual", "newest", "oldest", "title"];
+
+/**
+ * The rows in the order of `sort`. Pinned rows stay first, and a group keeps its tabs. A group started when its first
+ * tab did; rows that haven't started, or have no title, come last, in the order they were in.
+ */
+export function sortRows(
+  rows: ReadonlyArray<TabRow>,
+  sort: TabSort,
+  titleOf: (row: TabRow) => string,
+  lang: string,
+): TabRow[] {
+  if (sort === "manual") return [...rows];
+  const membersOf = (row: TabRow) => (row.kind === "tab" ? [row.tab] : row.members);
+  const pinned = (row: TabRow) => (membersOf(row)[0]!.pinned ? 0 : 1);
+  const started = (row: TabRow) => {
+    const times = membersOf(row).flatMap((tab) => tab.createdAt ?? []);
+    return times.length === 0 ? undefined : Math.min(...times);
+  };
+  const collator = new Intl.Collator(lang, { sensitivity: "base", numeric: true });
+  const compare = (a: TabRow, b: TabRow): number => {
+    if (sort === "title") {
+      const [x, y] = [titleOf(a).trim(), titleOf(b).trim()];
+      return (x ? 0 : 1) - (y ? 0 : 1) || (x && y ? collator.compare(x, y) : 0);
+    }
+    const [x, y] = [started(a), started(b)];
+    if (x === undefined || y === undefined) return (x === undefined ? 1 : 0) - (y === undefined ? 1 : 0);
+    return sort === "newest" ? y - x : x - y;
+  };
+  return [...rows].sort((a, b) => pinned(a) - pinned(b) || compare(a, b));
+}
+
 /** A row as the sidebar shows it: a group may show only some of its tabs. */
 export type ShownRow =
   { kind: "tab"; tab: TabInfo } | { kind: "group"; group: TabGroupInfo; members: TabInfo[]; shown: TabInfo[] };

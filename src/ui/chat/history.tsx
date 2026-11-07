@@ -1,14 +1,14 @@
 import type * as acp from "@agentclientprotocol/sdk";
 import { useState, type ReactNode, type RefObject } from "react";
 import { Icon } from "../icon";
-import { useL10n, type Translate } from "../l10n";
+import { useL10n, type MessageKey, type Translate } from "../l10n";
 import sortIcon from "@tabler/icons/outline/arrows-sort.svg";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import searchIcon from "@tabler/icons/outline/search.svg";
 import trashIcon from "@tabler/icons/outline/trash.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
-import { folderName, HISTORY_SORTS, relativeTime, shortTime, type HistoryGroup, type HistorySort } from "./historyList";
+import { folderName, relativeTime, shortTime, type HistoryGroup, type HistorySort } from "./historyList";
 import { post } from "./post";
 
 export interface History {
@@ -21,11 +21,11 @@ export interface History {
   error?: string;
 }
 
-const SORT_LABELS = {
+export const HISTORY_SORT_LABELS: Record<HistorySort, MessageKey> = {
   updated: "chat.historySortUpdated",
   title: "chat.historySortTitle",
   folder: "chat.historySortFolder",
-} as const;
+};
 
 /** A heading of the sidebar that collapses what is below it; the closed rail keeps only its icon. */
 export function SidebarSection({
@@ -126,30 +126,38 @@ export function SidebarSearch({
   );
 }
 
-/** The button and menu that pick the history's order. */
-export function HistorySortMenu({
+/** The button and menu that pick an order: of the history, or of the tabs. */
+export function SortMenu<S extends string>({
   menu,
   sort,
+  sorts,
+  labels,
+  label,
+  id,
   onSort,
 }: {
   menu: { open: boolean; toggle: () => void; set: (open: boolean) => void; root: RefObject<HTMLDivElement | null> };
-  sort: HistorySort;
-  onSort: (sort: HistorySort) => void;
+  sort: S;
+  sorts: ReadonlyArray<S>;
+  labels: Record<S, MessageKey>;
+  label: string;
+  id?: string;
+  onSort: (sort: S) => void;
 }) {
   const { t } = useL10n();
-  // Opens upwards when the heading sits low in the view.
+  // Opens upwards when the button sits low in the view.
   const [up, setUp] = useState(false);
   return (
-    <div className="history-sort" ref={menu.root}>
+    <div className="history-sort" id={id} ref={menu.root} data-sorted={sort !== sorts[0] || undefined}>
       <button
         className="icon-btn small"
         // The tooltip would cover the menu.
-        title={menu.open ? undefined : t("chat.historySort")}
-        aria-label={t("chat.historySort")}
+        title={menu.open ? undefined : label}
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={menu.open}
         onClick={(e) => {
-          setUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 130);
+          setUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < 30 + 26 * sorts.length);
           menu.toggle();
         }}
       >
@@ -157,7 +165,7 @@ export function HistorySortMenu({
       </button>
       {menu.open && (
         <div className="popup-menu history-sort-menu" role="menu" data-up={up || undefined}>
-          {HISTORY_SORTS.map((each) => (
+          {sorts.map((each) => (
             <button
               key={each}
               role="menuitemradio"
@@ -168,7 +176,7 @@ export function HistorySortMenu({
               }}
             >
               <span className="history-sort-check">{each === sort && <Icon svg={checkIcon} />}</span>
-              {t(SORT_LABELS[each])}
+              {t(labels[each])}
             </button>
           ))}
         </div>

@@ -32,8 +32,8 @@
     border-color 0.15s,
     box-shadow 0.15s;
 }
-/* Leaves the dock button its margin. */
-#tab-top:has(#tab-dock) #tab-search-box {
+/* The buttons beside it keep their own margin. */
+#tab-top #tab-search-box {
   margin-right: 4px;
 }
 #tab-search-box:focus-within {

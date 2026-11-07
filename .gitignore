@@ -10,3 +10,6 @@ release
 
 # macOS
 .DS_Store
+
+# zvec-grep search index
+.zvec-grep

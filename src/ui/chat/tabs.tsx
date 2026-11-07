@@ -27,7 +27,8 @@ import pinIcon from "@tabler/icons/outline/pin.svg";
 import pinFilledIcon from "@tabler/icons/filled/pin.svg";
 import plusIcon from "@tabler/icons/outline/plus.svg";
 import xIcon from "@tabler/icons/outline/x.svg";
-import { HistoryList, HistorySortMenu, SidebarSearch, SidebarSection, type History } from "./history";
+import { HISTORY_SORT_LABELS, HistoryList, SidebarSearch, SidebarSection, SortMenu, type History } from "./history";
+import { HISTORY_SORTS } from "./historyList";
 import { historyGroups } from "./historyList";
 import { useClickMenu } from "./popupMenu";
 import { post } from "./post";
@@ -43,10 +44,12 @@ import {
   requestsLabel,
   rowKey,
   rowsInHand,
+  sortRows,
   sumChanges,
   sumRequests,
   tabChanges,
   tabRows,
+  TAB_SORTS,
   tabWorking,
   waitingRowKeys,
   workingRowKeys,
@@ -216,15 +219,18 @@ export function TabSidebar({
   const [prefs, setPrefs] = useSidebarPrefs();
   const dockable = useDockable();
   const sortMenu = useClickMenu();
+  const tabSortMenu = useClickMenu();
   const searchInput = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const restTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const workingKeys = useRef<ReadonlySet<string>>(new Set());
   const waitingKeys = useRef<ReadonlySet<string>>(new Set());
   const searching = query.trim() !== "";
+  /** Dragging sets the manual order, which another order hides. */
+  const reorderable = !searching && prefs.tabSort === "manual";
   const docked = prefs.docked && dockable;
   const inHand = rowsInHand(tabs, groups, { dragged: dragged?.ids, renaming, renamingGroup });
-  const held = inHand || query !== "" || searchFocused || sortMenu.open || docked;
+  const held = inHand || query !== "" || searchFocused || sortMenu.open || tabSortMenu.open || docked;
   const heldRef = useRef(held);
   heldRef.current = held;
   const needHistory = () => {
@@ -332,7 +338,7 @@ export function TabSidebar({
         key={key}
         className="tab"
         role="tab"
-        draggable={!searching && tab.id !== renaming}
+        draggable={reorderable && tab.id !== renaming}
         aria-selected={tab.id === active && shownGroup === undefined}
         data-member={member || undefined}
         data-active={(tab.id === active && shownGroup === undefined) || undefined}
@@ -431,7 +437,7 @@ export function TabSidebar({
         <div
           className="tab"
           role="tab"
-          draggable={!searching && group.id !== renamingGroup}
+          draggable={reorderable && group.id !== renamingGroup}
           aria-selected={group.id === shownGroup}
           data-group
           data-active={group.id === shownGroup || undefined}
@@ -526,7 +532,12 @@ export function TabSidebar({
     );
   };
 
-  const rows = tabRows(tabs, groups);
+  const rows = sortRows(
+    tabRows(tabs, groups),
+    prefs.tabSort,
+    (row) => (row.kind === "tab" ? (row.tab.title ?? "") : row.group.title),
+    lang,
+  );
   // A row keeps its section during a drag or a rename: moving it would end them.
   if (!inHand) {
     const waits = (tab: TabInfo) => requestsLabel(openRequests(states[tab.id]), t) !== undefined;
@@ -571,7 +582,14 @@ export function TabSidebar({
             setPrefs({ historyCollapsed: !prefs.historyCollapsed });
           }}
         >
-          <HistorySortMenu menu={sortMenu} sort={prefs.sort} onSort={(sort) => setPrefs({ sort })} />
+          <SortMenu
+            menu={sortMenu}
+            sort={prefs.sort}
+            sorts={HISTORY_SORTS}
+            labels={HISTORY_SORT_LABELS}
+            label={t("chat.historySort")}
+            onSort={(sort) => setPrefs({ sort })}
+          />
         </SidebarSection>
       )}
       {(searching || !prefs.historyCollapsed) && (
@@ -602,6 +620,15 @@ export function TabSidebar({
               searchInput.current?.blur();
               onLeaveSearch();
             }}
+          />
+          <SortMenu
+            id="tab-sort"
+            menu={tabSortMenu}
+            sort={prefs.tabSort}
+            sorts={TAB_SORTS}
+            labels={TAB_SORT_LABELS}
+            label={t("chat.tabSort")}
+            onSort={(tabSort) => setPrefs({ tabSort })}
           />
           {dockable && (
             <button
@@ -668,6 +695,13 @@ export function TabSidebar({
     </div>
   );
 }
+
+const TAB_SORT_LABELS = {
+  manual: "chat.tabSortManual",
+  newest: "chat.tabSortNewest",
+  oldest: "chat.tabSortOldest",
+  title: "chat.tabSortTitle",
+} as const;
 
 /** Edits a name in place: Enter or leaving the field keeps it, Escape drops it (`undefined`). */
 function TabNameInput({

@@ -29,6 +29,7 @@ import {
   openRequests,
   requestsLabel,
   rowsInHand,
+  sortRows,
   sumChanges,
   tabChanges,
   tabRows,
@@ -547,6 +548,46 @@ describe("sidebar rows", () => {
   it("keeps the whole group count when it shows only some of its tabs", () => {
     const [row] = matchingRows(rows, "gamma", titleOf);
     assert.deepStrictEqual(row?.kind === "group" ? row.members.map((member) => member.id) : [], [2, 3]);
+  });
+
+  describe("order", () => {
+    const at = (each: TabInfo, createdAt?: number, pinned = false) => ({ ...each, createdAt, pinned });
+    const list = tabRows(
+      [
+        at(tab(1, "Alpha"), 30),
+        at(tab(2, "Beta", 1), 50),
+        at(tab(3, "Gamma", 1), 10),
+        at(tab(4, "")),
+        at(tab(5, "Delta"), 20),
+      ],
+      [group],
+    );
+    const ids = (sort: Parameters<typeof sortRows>[1], each = list) =>
+      sortRows(each, sort, (row) => (row.kind === "tab" ? (row.tab.title ?? "") : row.group.title), "en").map((row) =>
+        row.kind === "tab" ? row.tab.id : row.members.map((member) => member.id),
+      );
+
+    it("keeps the manual order", () => {
+      assert.deepStrictEqual(ids("manual"), [1, [2, 3], 4, 5]);
+    });
+
+    it("orders by when rows started, a group by its first tab, the unstarted last", () => {
+      assert.deepStrictEqual(ids("newest"), [1, 5, [2, 3], 4]);
+      assert.deepStrictEqual(ids("oldest"), [[2, 3], 5, 1, 4]);
+    });
+
+    it("orders by title, the untitled last", () => {
+      assert.deepStrictEqual(ids("title"), [1, [2, 3], 5, 4]);
+    });
+
+    it("keeps pinned rows first", () => {
+      const pinned = tabRows(
+        [at(tab(1, "Alpha"), 30), at(tab(5, "Delta"), 20, true), at(tab(6, "Beta"), 40, true)],
+        [],
+      );
+      assert.deepStrictEqual(ids("newest", pinned), [6, 5, 1]);
+      assert.deepStrictEqual(ids("title", pinned), [6, 5, 1]);
+    });
   });
 
   describe("working section", () => {

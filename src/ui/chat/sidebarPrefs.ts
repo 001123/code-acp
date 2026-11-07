@@ -1,12 +1,14 @@
 import { useState, useSyncExternalStore } from "react";
 import { getState, setState } from "../vscode";
 import { HISTORY_SORTS, type HistorySort } from "./historyList";
+import { TAB_SORTS, type TabSort } from "./tabRows";
 
 /** How the user left the sidebar; kept in the webview's state. */
 export interface SidebarPrefs {
   /** Beside the conversation instead of over it on hover. */
   docked: boolean;
   sort: HistorySort;
+  tabSort: TabSort;
   historyCollapsed: boolean;
   workingCollapsed: boolean;
   waitingCollapsed: boolean;
@@ -17,6 +19,7 @@ const read = (): SidebarPrefs => {
   return {
     docked: saved.docked === true,
     sort: HISTORY_SORTS.find((sort) => sort === saved.sort) ?? "updated",
+    tabSort: TAB_SORTS.find((sort) => sort === saved.tabSort) ?? "manual",
     historyCollapsed: saved.historyCollapsed === true,
     workingCollapsed: saved.workingCollapsed === true,
     waitingCollapsed: saved.waitingCollapsed === true,

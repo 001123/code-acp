@@ -10,6 +10,7 @@ First public version; nothing has been released yet.
 
 - Chat with coding agents over the Agent Client Protocol, in tabs you can pin, rename and reorder, with a searchable history you can delete from.
 - A "Waiting on you" section at the top of the tab sidebar for tabs that wait on a permission, a question or a login.
+- Sort the open tabs by newest, oldest or title from the sidebar, or keep the order you dragged them into.
 - Install, update and switch agents from the ACP Registry, and add your own agents from local commands.
 - Queue, edit, resend and retry messages, and fork a conversation into a new tab.
 - A composer with live Markdown preview, drafts that survive reloads, and `/` agent commands and `$` skills.
