@@ -620,12 +620,16 @@ describe("sidebar rows", () => {
       assert.deepStrictEqual(waiting([1], tabRows([{ ...tab(1, "Alpha"), pinned: true }], [])), []);
     });
 
-    it("counts a running turn or attempt, not a session being reopened", () => {
-      const status = (status: TabState["status"]) => ({ status }) as TabState;
+    it("counts a running turn or attempt, or background work, not a session being reopened", () => {
+      const status = (status: TabState["status"]) => ({ status, backgroundTasks: [] }) as unknown as TabState;
       assert.isTrue(tabWorking(tab(1, "Alpha"), status({ text: "", busy: true })));
       assert.isFalse(tabWorking(tab(1, "Alpha"), status({ text: "", busy: true, loading: true })));
       assert.isFalse(tabWorking(tab(1, "Alpha"), undefined));
       assert.isTrue(tabWorking({ ...tab(1, "Alpha"), attempt: "running" }, undefined));
+      const background = { id: "t1", name: "Bash", taskType: "shell", canStop: true };
+      assert.isTrue(
+        tabWorking(tab(1, "Alpha"), { ...status({ text: "" }), backgroundTasks: [background] } as TabState),
+      );
     });
 
     it("stays held only by a drag or a rename on rows still there", () => {

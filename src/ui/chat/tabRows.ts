@@ -66,9 +66,11 @@ export const allRows = (rows: ReadonlyArray<TabRow>): ShownRow[] =>
 
 export const rowKey = (row: TabRow | ShownRow) => (row.kind === "tab" ? `tab-${row.tab.id}` : `group-${row.group.id}`);
 
-/** A turn is under way in the tab; reopening its session doesn't count. */
+/** A turn is under way in the tab, or the agent runs something in its background; reopening its session doesn't count. */
 export const tabWorking = (tab: TabInfo, state: TabState | undefined) =>
-  (!!state?.status.busy && !state.status.loading) || tab.attempt === "running";
+  (!!state?.status.busy && !state.status.loading) ||
+  tab.attempt === "running" ||
+  (state?.backgroundTasks.length ?? 0) > 0;
 
 /** The rows of the sidebar's working section: something runs in them, and they are neither pinned nor waiting on the user. */
 export function workingRowKeys(

@@ -71,6 +71,7 @@ describe("ChatIndicators usage", () => {
       permissions: { owners: [] },
       attention: { owners: () => [] },
       usage,
+      backgroundTasks: { of: () => [] },
       showAttentionCommand: "show.attention",
       showUsageCommand: "codeAcp.showUsage",
       view: () => undefined,

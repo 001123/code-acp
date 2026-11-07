@@ -15,6 +15,7 @@ import type { Follower } from "./follow";
 import type { ChatUi } from "./host";
 import { CANCELLED, ELICITATION_CANCELLED, parseElicitationUrl, type Permissions } from "./permissions";
 import { canReopen } from "./history";
+import type { TabBackgroundTasks } from "./backgroundTasks";
 import { replayedParts } from "./replay";
 import { NoAgentError, type TabSessions } from "./sessions";
 import { detachSession, resetConversation, type RunningAgent, type Tab, type TabList } from "./tabs";
@@ -38,6 +39,7 @@ export interface AgentsHost extends ChatUi {
   readonly follower: Follower;
   readonly turns: TabTurns;
   readonly sessions: TabSessions;
+  readonly backgroundTasks: TabBackgroundTasks;
   post(message: unknown): void;
 }
 
@@ -160,6 +162,12 @@ export class TabAgents {
         const tab = tabFor(snapshot.sessionId);
         if (tab) {
           this.host.postTab(tab, { type: "terminal", snapshot });
+        }
+      },
+      onAsyncTask: (sessionId, update) => {
+        const tab = tabFor(sessionId);
+        if (tab) {
+          this.host.backgroundTasks.onUpdate(tab, sessionId, update);
         }
       },
       onFileWritten: (sessionId, file) => {

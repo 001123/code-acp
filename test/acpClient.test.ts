@@ -426,6 +426,62 @@ describe("spawnAgent", () => {
     );
   });
 
+  it.live("announces async tasks only when onAsyncTask is given", () => {
+    const capabilities = (agent: AcpAgent) =>
+      (agent.initializeResponse._meta as { clientCapabilities: acp.ClientCapabilities }).clientCapabilities;
+    return Effect.gen(function* () {
+      yield* withAgent({}, allow, (agent) => Effect.sync(() => assert.isUndefined(capabilities(agent)._meta)));
+      const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+      yield* withAgent({}, { ...rec, handlers: { ...rec.handlers, onAsyncTask: () => {} } }, (agent) =>
+        Effect.sync(() =>
+          assert.deepStrictEqual(capabilities(agent)._meta, {
+            jetbrains: { air: { version: 1, capabilities: ["asyncTasks"] } },
+          }),
+        ),
+      );
+    });
+  });
+
+  it.live("takes async task updates off the session updates, and stops a task", () => {
+    const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
+    const tasks: Array<{ sessionId: string; update: unknown }> = [];
+    const handlers: AgentHandlers = {
+      ...rec.handlers,
+      onAsyncTask: (sessionId, update) => void tasks.push({ sessionId, update }),
+    };
+    return withAgent({}, { ...rec, handlers }, (agent) =>
+      Effect.gen(function* () {
+        yield* prompt(agent, "background");
+        // The update of a later version is dropped: the SDK would fail on it.
+        assert.strictEqual(messageText(rec), "started");
+        assert.deepStrictEqual(
+          rec.updates.map((u) => u.update.sessionUpdate),
+          ["agent_message_chunk"],
+        );
+        assert.deepStrictEqual(tasks, [
+          {
+            sessionId: "s1",
+            update: {
+              sessionUpdate: "async_task_spawned",
+              asyncTaskId: "t1",
+              name: "Bash",
+              taskType: "shell",
+              description: "sleep 60",
+              canStop: true,
+              toolCallId: "call1",
+            },
+          },
+          { sessionId: "s1", update: { sessionUpdate: "async_task_progress", asyncTaskId: "t1", summary: "tick 1" } },
+        ]);
+        yield* agent.stopAsyncTask("s1", "t1");
+        assert.deepStrictEqual(tasks.at(-1), {
+          sessionId: "s1",
+          update: { sessionUpdate: "async_task_state_update", asyncTaskId: "t1", state: "stopped" },
+        });
+      }),
+    );
+  });
+
   it.live("answers a read of a missing file with an error to the agent", () => {
     const rec = recorder(() => ({ outcome: { outcome: "cancelled" } }));
     return withAgent({}, rec, (agent) =>

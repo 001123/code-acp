@@ -124,6 +124,19 @@ acp
     return {};
   })
   .onRequest(acp.methods.agent.logout, () => ({}))
+  // The AIR async task extension: stopping a background task ends it as "stopped".
+  .onRequest(
+    "_session/async_task/stop",
+    (params) => params,
+    async ({ params, client }) => {
+      record(`stop ${params.asyncTaskId}`);
+      await client.notify(acp.methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: { sessionUpdate: "async_task_state_update", asyncTaskId: params.asyncTaskId, state: "stopped" },
+      });
+      return {};
+    },
+  )
   .onRequest(acp.methods.agent.session.load, async ({ params, client }) => {
     await client.notify(acp.methods.client.session.update, {
       sessionId: params.sessionId,
@@ -295,6 +308,25 @@ acp
         await say("The drafted title\n\nThe drafted ");
         await say("body");
         return { stopReason: "end_turn" };
+      case "background": {
+        // A background task the turn leaves running, and an update of the extension the client can't read.
+        const task = (update) =>
+          client.notify(acp.methods.client.session.update, { sessionId: params.sessionId, update });
+        await task({
+          sessionUpdate: "async_task_spawned",
+          asyncTaskId: "t1",
+          name: "Bash",
+          taskType: "shell",
+          description: "sleep 60",
+          showInTranscript: true,
+          canStop: true,
+          toolCallId: "call1",
+        });
+        await task({ sessionUpdate: "async_task_progress", asyncTaskId: "t1", summary: "tick 1" });
+        await task({ sessionUpdate: "async_task_future", asyncTaskId: "t1" });
+        await say("started");
+        return { stopReason: "end_turn" };
+      }
       case "refuse":
         return { stopReason: "refusal" };
       case "expired":

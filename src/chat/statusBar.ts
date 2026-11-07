@@ -15,6 +15,8 @@ export interface ChatStatus {
   readonly finished: number;
   /** Tabs running a turn. */
   readonly running: number;
+  /** Tasks the agents run in the background of the tabs' sessions. */
+  readonly background?: number;
 }
 
 export interface StatusBarView {
@@ -25,8 +27,9 @@ export interface StatusBarView {
 }
 
 export function statusBarView(status: ChatStatus): StatusBarView {
-  const { agent, model, effort, waiting, finished, running } = status;
-  const icon = waiting ? "$(bell-dot)" : running ? "$(loading~spin)" : finished ? "$(bell)" : "$(comment-discussion)";
+  const { agent, model, effort, waiting, finished, running, background = 0 } = status;
+  const busy = running || background;
+  const icon = waiting ? "$(bell-dot)" : busy ? "$(loading~spin)" : finished ? "$(bell)" : "$(comment-discussion)";
   const lines = [
     t("statusBar.agent", agent ?? t("statusBar.noAgent")),
     ...(model ? [t("statusBar.model", model)] : []),
@@ -34,7 +37,8 @@ export function statusBarView(status: ChatStatus): StatusBarView {
     ...(waiting ? [t("statusBar.waiting", waiting)] : []),
     ...(finished ? [t("statusBar.finished", finished)] : []),
     ...(running ? [t("statusBar.running", running)] : []),
-    ...(waiting || finished || running ? [] : [t("statusBar.idle")]),
+    ...(background ? [t("statusBar.background", background)] : []),
+    ...(waiting || finished || busy ? [] : [t("statusBar.idle")]),
     "",
     t(waiting || finished ? "statusBar.showAttention" : "statusBar.showChat"),
   ];

@@ -33,6 +33,14 @@ describe("statusBarView", () => {
     assert.notInclude(view.tooltip, "Ready");
   });
 
+  it("spins while a tab runs something in the background, with no turn running", () => {
+    const view = statusBarView({ ...idle, background: 1 });
+    assert.strictEqual(view.text, "$(loading~spin)");
+    assert.include(view.tooltip, "Background tasks: 1");
+    assert.notInclude(view.tooltip, "Running:");
+    assert.notInclude(view.tooltip, "Ready");
+  });
+
   it("warns while a permission waits, above everything else", () => {
     const view = statusBarView({ ...idle, waiting: 1, finished: 1, running: 1 });
     assert.strictEqual(view.text, "$(bell-dot)");

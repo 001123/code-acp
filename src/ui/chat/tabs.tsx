@@ -2,6 +2,7 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import type {
   Attachment,
+  BackgroundTask,
   ChangeHunk,
   ChangesMessage,
   PrDraft,
@@ -99,6 +100,8 @@ export interface TabState {
   worktreeDiff?: WorktreeDiff;
   /** The pull request the user is about to open. */
   prDraft?: PrDraft;
+  /** The work the agent runs in the background of the session ("backgroundTasks"). */
+  backgroundTasks: BackgroundTask[];
 }
 
 export const NEW_TAB: TabState = {
@@ -109,6 +112,7 @@ export const NEW_TAB: TabState = {
   commands: [],
   terminals: {},
   queue: [],
+  backgroundTasks: [],
 };
 
 export type TabsAction =
@@ -342,7 +346,7 @@ export function TabSidebar({
         aria-selected={tab.id === active && shownGroup === undefined}
         data-member={member || undefined}
         data-active={(tab.id === active && shownGroup === undefined) || undefined}
-        data-busy={state?.status.busy || undefined}
+        data-busy={state?.status.busy || (state?.backgroundTasks.length ?? 0) > 0 || undefined}
         data-waiting={waiting || undefined}
         data-pinned={tab.pinned || undefined}
         data-dragging={dragged?.ids.includes(tab.id) || undefined}
@@ -424,6 +428,7 @@ export function TabSidebar({
 
   const groupRow = (group: TabGroupInfo, members: TabInfo[], shown: TabInfo[]) => {
     const running = members.filter((tab) => states[tab.id]?.status.busy || tab.attempt === "running").length;
+    const background = members.some((tab) => (states[tab.id]?.backgroundTasks.length ?? 0) > 0);
     const requests = requestsLabel(sumRequests(members.map((tab) => openRequests(states[tab.id]))), t);
     const waiting = requests !== undefined;
     const changed = sumChanges(members.flatMap((tab) => tabChanges(states[tab.id], showChanges) ?? []));
@@ -443,7 +448,7 @@ export function TabSidebar({
           data-active={group.id === shownGroup || undefined}
           // With the rail closed, the group's row stands for the active tab among its own.
           data-current={members.some((tab) => tab.id === active) || undefined}
-          data-busy={running > 0 || undefined}
+          data-busy={running > 0 || background || undefined}
           data-waiting={waiting || undefined}
           data-pinned={pinned || undefined}
           data-dragging={dragged?.group === group.id || undefined}

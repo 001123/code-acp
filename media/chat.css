@@ -4,6 +4,7 @@
 @import "./chat/transcript.css";
 @import "./chat/elicitation.css";
 @import "./chat/changes.css";
+@import "./chat/backgroundTasks.css";
 @import "./chat/status.css";
 @import "./chat/composer.css";
 @import "./chat/attachments.css";

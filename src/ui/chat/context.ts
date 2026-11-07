@@ -34,3 +34,6 @@ export const ShownTab = createContext<ShownTab>({ busy: false, canFork: false, c
 
 /** The shown tab's agent terminals by id; their own context, so output only re-renders the terminal views. */
 export const Terminals = createContext<Readonly<Record<string, TerminalSnapshot>>>({});
+
+/** The tool calls of the shown tab whose work still runs in the background, though the calls are done. */
+export const BackgroundToolCalls = createContext<ReadonlySet<string>>(new Set());

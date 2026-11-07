@@ -220,7 +220,8 @@ details[open] > summary::before {
   width: 14px;
   height: 14px;
 }
-.tool[data-status="in_progress"] .tool-status svg {
+.tool[data-status="in_progress"] .tool-status svg,
+.tool-status[data-background] svg {
   animation: tool-spin 1s linear infinite;
 }
 @keyframes tool-spin {

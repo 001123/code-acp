@@ -380,6 +380,36 @@ describe("ChatViewProvider", () => {
     ),
   );
 
+  it.live("shows the work the agent left running in the background, and stops it", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { ofType, say, send, idle, tab } = yield* startChat;
+        const tasks = () => ofType("backgroundTasks", tab).at(-1)?.tasks;
+        say(tab, "background");
+        yield* until(() => ofType("turnEnd", tab).length === 1, "the end of the turn");
+        yield* idle(tab);
+        yield* until(() => tasks()?.[0]?.summary !== undefined, "the background task to report");
+        assert.deepStrictEqual(tasks(), [
+          {
+            id: "t1",
+            name: "Bash",
+            taskType: "shell",
+            description: "sleep 60",
+            summary: "tick 1",
+            outputFilePath: undefined,
+            toolCallId: "call1",
+            canStop: true,
+          },
+        ]);
+        // The turn is over; the task outlives it.
+        assert.strictEqual(ofType("status", tab).at(-1)?.busy, false);
+        send({ type: "stopBackgroundTask", tab, id: "t1" });
+        yield* until(() => tasks()?.length === 0, "the task to stop");
+        assert.isTrue(ofType("backgroundTasks", tab).some((m) => m.tasks[0]?.stopping === true));
+      }),
+    ),
+  );
+
   it.live("sends a new tab's message where it is when the setting ticks its box outside git", () =>
     Effect.scoped(
       Effect.gen(function* () {

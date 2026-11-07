@@ -1,0 +1,46 @@
+/* The work the agent runs in the background of the tab's session, above the composer. */
+#background-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 10px 6px;
+  padding: 2px 8px;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+.background-task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.background-task-icon {
+  display: inline-flex;
+  flex: none;
+}
+.background-task-icon svg {
+  width: 14px;
+  height: 14px;
+  animation: tool-spin 1s linear infinite;
+}
+.background-task-kind {
+  flex: none;
+  color: var(--vscode-foreground);
+}
+.background-task-text,
+.background-task-summary {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.background-task-summary {
+  font-style: italic;
+}
+.background-task .spacer {
+  flex: 1;
+}
+.background-task button.link {
+  flex: none;
+  margin-left: 0;
+}

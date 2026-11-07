@@ -8,6 +8,7 @@ import { readSettings } from "../settings";
 import { UsageLedger } from "../usageLedger";
 import { UsageStatusBar } from "../usageStatusBar";
 import { shouldNotify, type Attention, type AttentionReason } from "./attention";
+import type { TabBackgroundTasks } from "./backgroundTasks";
 import type { Permissions } from "./permissions";
 import { ChatStatusBar } from "./statusBar";
 import type { Tab, TabList } from "./tabs";
@@ -23,6 +24,7 @@ export interface IndicatorsHost {
   readonly permissions: Permissions<Tab>;
   readonly attention: Attention<Tab>;
   readonly usage: TabUsage;
+  readonly backgroundTasks: TabBackgroundTasks;
   /** Run by the status bar item. */
   readonly showAttentionCommand: string;
   /** Run by the usage status bar item. */
@@ -97,6 +99,7 @@ export class ChatIndicators implements vscode.Disposable {
         waiting: permissions.owners.length,
         finished: attention.owners("finished").length,
         running: tabs.all.filter((t) => t.busy).length,
+        background: tabs.all.reduce((n, t) => n + this.host.backgroundTasks.of(t).length, 0),
       });
     });
   }

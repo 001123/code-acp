@@ -20,7 +20,7 @@ import copyIcon from "@tabler/icons/outline/copy.svg";
 import checkIcon from "@tabler/icons/outline/check.svg";
 import { copyMessage } from "./clipboard";
 import { ElicitationView, UrlElicitationView } from "./elicitation";
-import { OpenPreview, ShownTab, Terminals, type Hover } from "./context";
+import { BackgroundToolCalls, OpenPreview, ShownTab, Terminals, type Hover } from "./context";
 import { openFile, post } from "./post";
 import { TurnTraceView } from "./turnTrace";
 import {
@@ -32,6 +32,7 @@ import {
   type ActivityItem,
   type CompactionItem,
   type Item,
+  type ToolItem,
 } from "./transcript";
 import { TokenMark, type Token } from "./tokens";
 
@@ -309,6 +310,22 @@ const TOOL_ICON: Record<string, string> = {
   completed: circleCheckIcon,
   failed: circleXIcon,
 };
+/** The icon of a tool call's status; a done call whose work goes on in the background still spins. */
+function ToolStatus({ item }: { item: ToolItem }) {
+  const { t } = useL10n();
+  const background = useContext(BackgroundToolCalls).has(item.toolCallId) && item.status === "completed";
+  const icon = background ? loaderIcon : item.status && TOOL_ICON[item.status];
+  return (
+    <span
+      className="tool-status"
+      data-background={background || undefined}
+      title={background ? t("backgroundTasks.title") : undefined}
+    >
+      {icon && <Icon svg={icon} />}
+    </span>
+  );
+}
+
 const PLAN_MARK: Record<string, string> = { pending: "☐", in_progress: "◐", completed: "☑" };
 
 /** A run of thoughts and tool calls, collapsed under one "Thinking" summary. */
@@ -453,9 +470,7 @@ export const ItemView = memo(function ItemView({ item }: { item: Item }) {
       return (
         <details className="tool" data-status={item.status}>
           <summary>
-            <span className="tool-status">
-              {item.status && TOOL_ICON[item.status] && <Icon svg={TOOL_ICON[item.status]} />}
-            </span>
+            <ToolStatus item={item} />
             {item.subagent && (
               <span className="tool-subagent" title={t("chat.subagent")}>
                 <Icon svg={usersIcon} />

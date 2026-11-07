@@ -14,6 +14,7 @@ import { Worktrees } from "../worktrees";
 import { AgentPool, stopAll } from "./agents";
 import { Attention } from "./attention";
 import { AttachmentQueue, pruneTempFiles } from "./attachments";
+import { TabBackgroundTasks } from "./backgroundTasks";
 import { ChangeReview, KEEP_HUNK_COMMAND, UNDO_HUNK_COMMAND } from "./changes";
 import { ComposerCommands } from "./composerCommands";
 import { DraftStore } from "./drafts";
@@ -114,6 +115,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     run: (effect, tab) => this.run(effect, tab),
   };
   private readonly usage = new TabUsage(this.ui);
+  private readonly backgroundTasks = new TabBackgroundTasks({
+    postTab: (tab, message) => this.postTab(tab, message),
+    changed: () => this.indicators.update(),
+  });
   /** Keep and Undo above each change of the active tab, in editors. */
   readonly hunkLenses: vscode.CodeLensProvider = {
     onDidChangeCodeLenses: this.changes.onDidChangeLenses,
@@ -200,6 +205,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       permissions: this.permissions,
       attention: this.attention,
       usage: this.usage,
+      backgroundTasks: this.backgroundTasks,
       showAttentionCommand: ChatViewProvider.showAttentionCommand,
       showUsageCommand: "codeAcp.showUsage",
       view: () => this.view,
@@ -254,6 +260,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       follower: this.follower,
       turns: this.turns,
       sessions: this.sessions,
+      backgroundTasks: this.backgroundTasks,
       post: (message) => this.post(message),
     });
     this.tabActions = new TabActions({
@@ -433,6 +440,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     // Called whenever `busy` changes.
     this.indicators.update();
     this.postTab(tab, { type: "status", text: t(key), busy: tab.busy, ...extra });
+    // Also called when the tab's session changed or its agent stopped, which ends the session's tasks.
+    this.backgroundTasks.post(tab);
   }
 
   /** The active tab was told to install an agent and now has one; other tabs start when selected. */
@@ -718,6 +727,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         if (tab.running && tab.sessionId) {
           yield* tab.running.agent.killTerminal(tab.sessionId, msg.terminalId);
         }
+        break;
+      case "stopBackgroundTask":
+        yield* this.backgroundTasks.stop(tab, msg.id);
         break;
       default:
         yield* this.changes.onMessage(tab, msg);

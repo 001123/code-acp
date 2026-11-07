@@ -128,6 +128,8 @@ export type FromWebview =
   | { type: "attachProblems"; scope: ProblemScope }
   /** Stops the command running in one of the agent's terminals. */
   | { type: "killTerminal"; tab: number; terminalId: string }
+  /** Stops one of the tab's background tasks ("backgroundTasks"); the turn, if one runs, goes on. */
+  | { type: "stopBackgroundTask"; tab: number; id: string }
   /**
    * Opens a diff of what the agent changed in `path`; the tool call's texts are used when the change was not
    * written through the client. `line` is 1-based.
@@ -219,6 +221,24 @@ export interface TurnChanges {
   files: number;
   added: number;
   removed: number;
+}
+
+/** Work the agent runs in the background of a tab's session, until it ends ("backgroundTasks" message). */
+export interface BackgroundTask {
+  id: string;
+  name: string;
+  /** "shell" (a command sent to the background), "monitor", "turn" (the agent works on its own), or another kind. */
+  taskType: string;
+  description?: string;
+  /** What it last reported. */
+  summary?: string;
+  /** The file its output goes to. */
+  outputFilePath?: string;
+  /** The tool call that started it. */
+  toolCallId?: string;
+  canStop: boolean;
+  /** Asked to stop, and not ended yet. */
+  stopping?: boolean;
 }
 
 /** A message waiting for the running turn to end ("queue" message). */

@@ -6,6 +6,12 @@ import { Readable, Writable } from "node:stream";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { AcpTrace } from "./acpTrace";
+import {
+  ASYNC_TASK_STOP_METHOD,
+  ASYNC_TASKS_CAPABILITY_META,
+  asyncTaskUpdateOf,
+  type AsyncTaskUpdate,
+} from "./asyncTasks";
 import { t } from "./i18n";
 import { makeAgentTerminals, type TerminalNotFoundError, type TerminalSnapshot } from "./agentTerminals";
 import { writeFile } from "./fileChanges";
@@ -42,6 +48,8 @@ export interface AgentHandlers {
   onTerminal?(snapshot: TerminalSnapshot): void;
   /** The agent wrote `path` through the client. */
   onFileWritten?(sessionId: string, path: string): void;
+  /** Work of a session started, changed or ended in the background. Without it the client offers no async tasks. */
+  onAsyncTask?(sessionId: string, update: AsyncTaskUpdate): void;
 }
 
 export interface AgentCommand {
@@ -105,6 +113,30 @@ export interface AcpAgent {
   readonly logout: Effect.Effect<void, RequestError>;
   /** Stops the command of one of the agent's terminals; the agent still gets its output and exit status. */
   killTerminal(sessionId: string, terminalId: string): Effect.Effect<void, TerminalNotFoundError>;
+  /** Stops a background task of the session ("onAsyncTask"); the prompt turn goes on. */
+  stopAsyncTask(sessionId: string, asyncTaskId: string): Effect.Effect<void, RequestError>;
+}
+
+/** The same stream, with the async task updates taken off it and given to `onAsyncTask`. */
+function takeAsyncTasks<M>(
+  stream: { readable: ReadableStream<M>; writable: WritableStream<M> },
+  onAsyncTask: (sessionId: string, update: AsyncTaskUpdate) => void,
+) {
+  return {
+    readable: stream.readable.pipeThrough(
+      new TransformStream<M, M>({
+        transform(message, controller) {
+          const task = asyncTaskUpdateOf(message);
+          if (task === undefined) {
+            controller.enqueue(message);
+          } else if (task !== "drop") {
+            onAsyncTask(task.sessionId, task.update);
+          }
+        },
+      }),
+    ),
+    writable: stream.writable,
+  };
 }
 
 /** Whether the agent can fork sessions; session/fork is unstable, so the stable types leave it out. */
@@ -166,13 +198,15 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         buffer: false,
         reject: false,
       });
-      const stream = trace.tap(
+      const traced = trace.tap(
         acp.ndJsonStream(
           Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
           Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
         ),
         `${path.basename(command)}#${child.pid ?? "?"}`,
       );
+      const { onAsyncTask } = handlers;
+      const stream = onAsyncTask ? takeAsyncTasks(traced, onAsyncTask) : traced;
       const connection = acp
         .client({ name: "code-acp" })
         .onNotification(acp.methods.client.session.update, ({ params }) => handlers.onUpdate(modes.translate(params)))
@@ -264,6 +298,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
         auth: { terminal: true },
         session: { notices: {}, compaction: {} },
         ...(handlers.elicit ? { elicitation: { form: {}, url: {} } } : {}),
+        ...(handlers.onAsyncTask ? { _meta: ASYNC_TASKS_CAPABILITY_META } : {}),
       },
     }),
   ).pipe(
@@ -361,6 +396,13 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
       request("authenticate", (agent) => agent.request(acp.methods.agent.authenticate, { methodId })),
     logout: request("logout", (agent) => agent.request(acp.methods.agent.logout, {})).pipe(Effect.asVoid),
     killTerminal: (sessionId, terminalId) => terminals.kill({ sessionId, terminalId }).pipe(Effect.asVoid),
+    stopAsyncTask: (sessionId, asyncTaskId) =>
+      request(ASYNC_TASK_STOP_METHOD, (agent) =>
+        agent.request<unknown, { sessionId: string; asyncTaskId: string }>(ASYNC_TASK_STOP_METHOD, {
+          sessionId,
+          asyncTaskId,
+        }),
+      ).pipe(Effect.asVoid),
   };
 });
 
