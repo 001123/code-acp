@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/001123/code-acp"
+    "url": "https://github.com/kd-labs-io/kd-code-extension"
   },
   "engines": {
     "vscode": "^1.123.0"

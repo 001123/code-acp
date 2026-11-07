@@ -1,9 +1,9 @@
 # KD Code
 
-[![Version](https://img.shields.io/github/package-json/v/001123/code-acp?label=version)](package.json)
+[![Version](https://img.shields.io/github/package-json/v/kd-labs-io/kd-code-extension?label=version)](package.json)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%E2%89%A51.123-007ACC)](https://code.visualstudio.com)
 [![ACP](https://img.shields.io/badge/protocol-ACP-6E56CF)](https://agentclientprotocol.com)
-[![License](https://img.shields.io/github/license/001123/code-acp)](LICENSE)
+[![License](https://img.shields.io/github/license/kd-labs-io/kd-code-extension)](LICENSE)
 
 Chat with coding agents in VS Code over the [Agent Client Protocol](https://agentclientprotocol.com). Install Claude, Codex, OpenCode and more from the [ACP Registry](https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json) in one click, then compare their work in isolated git worktrees.
 
