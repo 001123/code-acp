@@ -14,6 +14,7 @@ VS Code extension "KD Code": chat with coding agents over ACP, install agents fr
 - Chat view: host in `src/chat/` (`chatViewProvider.ts` is the adapter; tabs, groups, sessions, turns, usage, drafts, attachments, permissions, history, changes beside it), webview in `src/ui/chat.tsx` + `src/ui/chat/`. Messages shared by both live in `src/chat/protocol.ts`.
 - Tests: `test/*.test.ts` with `@effect/vitest`; `vscode` is aliased to `test/stubs/vscode.ts` (extend it as needed), `test/fixtures/mock-agent.mjs` is an ACP agent over stdio.
 - Formatting is Prettier (`.prettierrc.json`): run `npm run format`, then `npm run check` (format check + typecheck + tests) before finishing.
+- Commits follow Conventional Commits (`feat(chat): …`, `fix(worktrees): …`): release-please turns `feat`/`fix`/`perf` subjects into `CHANGELOG.md` entries and the version bump, so write them for users. Don't edit `CHANGELOG.md` or `version` by hand; merging the release PR publishes.
 - Local dev (the `code`, `codium` CLI is on `PATH`): after the checks pass, run `npm run reinstall` to package and reinstall the extension, then tell the user to run "Developer: Reload Window". Skip this in CI or remote sessions.
 
 ## Effect
