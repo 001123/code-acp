@@ -943,8 +943,8 @@
       },
       {
         "command": "kdCode.newSession",
-        "key": "ctrl+alt+n",
-        "mac": "cmd+alt+n",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
         "when": "focusedView == 'kdCode.chat'"
       },
       {
