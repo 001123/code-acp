@@ -3,7 +3,7 @@ name: Release
 # On every push to main, release-please opens or updates a release PR that bumps the version and adds the
 # commits since the last release to CHANGELOG.md. Merging that PR tags the release, and the publish job ships it.
 # Publishing lives in this workflow because a tag pushed with GITHUB_TOKEN does not trigger other workflows, and
-# Marketplace trusted publishing is bound to this file name.
+# Marketplace and Open VSX trusted publishing are bound to this file name.
 
 on:
   push:
@@ -43,7 +43,6 @@ jobs:
       id-token: write
     env:
       TAG: ${{ needs.release-please.outputs.tag_name }}
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -69,11 +68,10 @@ jobs:
       - name: Publish to Visual Studio Marketplace
         run: npx vsce publish --oidc --packagePath "release/kd-code-$VERSION.vsix"
 
-      - name: Publish to Open VSX
-        if: env.OVSX_PAT != ''
-        run: npx --yes ovsx publish "release/kd-code-$VERSION.vsix"
-
       - name: Attach the package to the GitHub release
         run: gh release upload "$TAG" "release/kd-code-$VERSION.vsix"
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Publish to Open VSX
+        run: npx --yes ovsx@^1.3.0 publish --trusted-publishing --packagePath "release/kd-code-$VERSION.vsix"
