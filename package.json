@@ -943,9 +943,8 @@
       },
       {
         "command": "kdCode.newSession",
-        "key": "ctrl+alt+k",
-        "mac": "cmd+alt+k",
-        "when": "focusedView == 'kdCode.chat'"
+        "key": "ctrl+shift+alt+n",
+        "mac": "ctrl+cmd+n"
       },
       {
         "command": "kdCode.findInConversation",
