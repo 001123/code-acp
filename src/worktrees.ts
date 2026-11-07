@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, FileSystem, Layer, Option, Predicate, Schema, Stream } from "effect";
+import { Context, Duration, Effect, Fiber, FileSystem, Layer, Option, Predicate, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { createHash, randomBytes } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
@@ -26,6 +26,8 @@ const MANAGED_DIR = path.join(".kd-code", "worktrees");
 const SETUP_TIMEOUT_MINUTES = 10;
 /** How much of a failed setup command's output its error shows, from the end. */
 const SETUP_OUTPUT_TAIL = 2000;
+/** How long to wait for the setup command's output once it has exited. */
+const SETUP_OUTPUT_GRACE = Duration.seconds(1);
 /** How long a push or a call to GitHub may run; a remote that doesn't answer would otherwise keep the user waiting for good. */
 const REMOTE_TIMEOUT_MINUTES = 10;
 
@@ -467,13 +469,15 @@ export class Worktrees extends Context.Service<
             ChildProcess.make(command, [], { cwd: root, shell: true, stdin: "ignore", forceKillAfter: "5 seconds" }),
           );
           let tail = "";
-          // Not waited for: a process the command leaves behind may hold on to the output.
-          yield* handle.all.pipe(
+          const reading = yield* handle.all.pipe(
             Stream.decodeText,
             Stream.runForEach((text) => Effect.sync(() => (tail = (tail + text).slice(-SETUP_OUTPUT_TAIL)))),
             Effect.forkScoped,
           );
           const code = yield* handle.exitCode;
+          // The output can still be in flight at exit. Wait for it only briefly: a process the command leaves behind
+          // may hold on to it.
+          yield* Fiber.join(reading).pipe(Effect.timeout(SETUP_OUTPUT_GRACE), Effect.ignore);
           if (code !== 0) {
             return yield* new WorktreeError({ message: t("worktree.setupFailed", code, tail.trim()) });
           }
