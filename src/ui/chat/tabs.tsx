@@ -18,6 +18,7 @@ import { useL10n } from "../l10n";
 import activityIcon from "@tabler/icons/outline/activity.svg";
 import bellIcon from "@tabler/icons/outline/bell-ringing.svg";
 import archiveIcon from "@tabler/icons/outline/archive.svg";
+import checkIcon from "@tabler/icons/outline/check.svg";
 import chevronDownIcon from "@tabler/icons/outline/chevron-down.svg";
 import chevronRightIcon from "@tabler/icons/outline/chevron-right.svg";
 import gitBranchIcon from "@tabler/icons/outline/git-branch.svg";
@@ -222,6 +223,13 @@ export function TabSidebar({
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [casting, setCasting] = useState(false);
+  // The first click on the archive button only arms it; a second click within a few seconds archives.
+  const [archiveArmed, setArchiveArmed] = useState(false);
+  useEffect(() => {
+    if (!archiveArmed) return;
+    const timer = setTimeout(() => setArchiveArmed(false), 3000);
+    return () => clearTimeout(timer);
+  }, [archiveArmed]);
   const [prefs, setPrefs] = useSidebarPrefs();
   const dockable = useDockable();
   const sortMenu = useClickMenu();
@@ -628,15 +636,6 @@ export function TabSidebar({
               onLeaveSearch();
             }}
           />
-          <SortMenu
-            id="tab-sort"
-            menu={tabSortMenu}
-            sort={prefs.tabSort}
-            sorts={TAB_SORTS}
-            labels={TAB_SORT_LABELS}
-            label={t("chat.tabSort")}
-            onSort={(tabSort) => setPrefs({ tabSort })}
-          />
           {dockable && (
             <button
               className="icon-btn small"
@@ -676,6 +675,15 @@ export function TabSidebar({
           </div>
           {!searching && (
             <div id="new-tab-row">
+              <SortMenu
+                id="tab-sort"
+                menu={tabSortMenu}
+                sort={prefs.tabSort}
+                sorts={TAB_SORTS}
+                labels={TAB_SORT_LABELS}
+                label={t("chat.tabSort")}
+                onSort={(tabSort) => setPrefs({ tabSort })}
+              />
               <button id="new-tab" title={t("chat.newTab")} onClick={() => post({ type: "newTab" })}>
                 <Icon svg={plusIcon} />
                 <span id="new-tab-label">{t("chat.newTab")}</span>
@@ -683,16 +691,24 @@ export function TabSidebar({
               <button
                 className="icon-btn small"
                 id="tab-archive"
-                title={t("chat.archiveTabs")}
-                aria-label={t("chat.archiveTabs")}
+                title={t(archiveArmed ? "chat.archiveTabsConfirm" : "chat.archiveTabs")}
+                aria-label={t(archiveArmed ? "chat.archiveTabsConfirm" : "chat.archiveTabs")}
+                data-armed={archiveArmed || undefined}
                 data-casting={casting || undefined}
                 onClick={() => {
+                  if (!archiveArmed) {
+                    setArchiveArmed(true);
+                    return;
+                  }
+                  setArchiveArmed(false);
                   setCasting(true);
                   post({ type: "archiveTabs" });
                 }}
+                onMouseLeave={() => setArchiveArmed(false)}
+                onBlur={() => setArchiveArmed(false)}
                 onAnimationEnd={() => setCasting(false)}
               >
-                <Icon svg={sparklesIcon} />
+                <Icon svg={archiveArmed ? checkIcon : sparklesIcon} />
               </button>
             </div>
           )}

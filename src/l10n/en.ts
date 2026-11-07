@@ -620,6 +620,7 @@ const en = {
   "chat.closeTab": "Close tab",
   "chat.archiveTab": "Archive conversation",
   "chat.archiveTabs": "Archive conversations at rest",
+  "chat.archiveTabsConfirm": "Click again to archive conversations at rest",
   "chat.findPlaceholder": "Find in conversation",
   "chat.findCount": "{0} of {1}",
   "chat.findNone": "No results",

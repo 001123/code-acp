@@ -78,14 +78,14 @@
   display: flex;
   align-items: center;
 }
-/* Beside the search box, so always there; shows when the tabs aren't in their manual order. */
+/* At the bottom left, beside the new chat button, so always there; shows when the tabs aren't in their manual order. */
 #tab-sort {
   opacity: 1;
-  margin-right: 8px;
   color: var(--vscode-descriptionForeground);
 }
-#tab-top:has(#tab-dock) #tab-sort {
-  margin-right: 2px;
+#tab-sort .history-sort-menu {
+  right: auto;
+  left: 0;
 }
 #tab-sort[data-sorted] {
   color: var(--vscode-foreground);
@@ -103,6 +103,10 @@
 }
 #tab-archive:hover {
   color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+#tab-archive[data-armed] {
+  color: var(--vscode-textLink-foreground);
   background: var(--vscode-toolbar-hoverBackground);
 }
 /* A spell on click: the sparkles wind back, spin and glow, then settle. */
@@ -152,7 +156,7 @@
 #tab-dock:hover {
   background: var(--vscode-toolbar-hoverBackground);
 }
-/* The tabs take the room the bottom sections leave, with the new chat button right below them. Keeps room for a tab and the button in a short view. */
+/* The tabs take the room the bottom sections leave, with the new chat button at the bottom. Keeps room for a tab and the button in a short view. */
 #tab-main {
   flex: 1 1 0;
   min-height: 82px;
@@ -161,20 +165,35 @@
 }
 /* The tabs, and the search's matches of both tabs and history. */
 #tab-scroll {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
 }
-/* Measures the panel, so that the button stays centred as it opens and closes. */
+/* Measures the panel, so that the button stays centred as it opens and closes; the sort button sits at the left edge, the archive button at the right. */
 #new-tab-row {
   flex: none;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* Equal side columns keep the stretched button centred. */
+  grid-template-columns: 36px 1fr 36px;
+  column-gap: 6px;
   align-items: center;
-  gap: 8px;
   width: 100cqw;
-  padding: 6px 0 4px;
+  padding: 6px 0;
+}
+#new-tab-row > #tab-sort {
+  grid-column: 1;
+  justify-self: start;
+  margin-left: 8px;
+}
+#new-tab-row > #new-tab {
+  grid-column: 2;
+  justify-content: center;
+}
+#new-tab-row > #tab-archive {
+  grid-column: 3;
+  justify-self: end;
+  margin-right: 8px;
 }
 #new-tab {
   flex: none;
@@ -209,6 +228,17 @@
     padding: 0;
   }
   #new-tab-label {
+    display: none;
+  }
+  #new-tab-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #new-tab-row > #tab-archive {
+    margin-right: 0;
+  }
+  #new-tab-row > #tab-sort {
     display: none;
   }
 }
