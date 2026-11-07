@@ -28,7 +28,7 @@ const runCommand = (command: string, ...args: ReadonlyArray<unknown>) =>
   thenable(() => vscode.commands.executeCommand(command, ...args));
 
 const updateSetting = (key: string, value: boolean | string) =>
-  thenable(() => vscode.workspace.getConfiguration("codeAcp").update(key, value, vscode.ConfigurationTarget.Global));
+  thenable(() => vscode.workspace.getConfiguration("kdCode").update(key, value, vscode.ConfigurationTarget.Global));
 
 /** Answers the webview's messages that don't touch a tab's conversation. */
 export class ViewMessages {
@@ -52,19 +52,19 @@ export class ViewMessages {
   readonly handle = Effect.fn("ViewMessages.handle")(function* (this: ViewMessages, msg: ViewMessage) {
     switch (msg.type) {
       case "selectAgent":
-        yield* runCommand("codeAcp.selectAgent");
+        yield* runCommand("kdCode.selectAgent");
         break;
       case "manageAgents":
-        yield* runCommand("codeAcp.manageAgents");
+        yield* runCommand("kdCode.manageAgents");
         break;
       case "showTrace":
-        yield* runCommand("codeAcp.showTrace");
+        yield* runCommand("kdCode.showTrace");
         break;
       case "showUsage":
-        yield* runCommand("codeAcp.showUsage");
+        yield* runCommand("kdCode.showUsage");
         break;
       case "openSettings":
-        yield* runCommand("codeAcp.openSettings");
+        yield* runCommand("kdCode.openSettings");
         break;
       case "permission":
         this.host.permissions.answer(msg.id, msg.optionId);

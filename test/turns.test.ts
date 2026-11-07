@@ -163,7 +163,7 @@ describe("TabTurns", () => {
       yield* until(() => prompts.length === 1);
       yield* answer(0);
       assert.deepStrictEqual(ofType(posted, "turnTrace"), []);
-      __test.setSetting("codeAcp.tracing", true);
+      __test.setSetting("kdCode.tracing", true);
       say("second");
       yield* until(() => prompts.length === 2);
       yield* answer(1, "max_tokens");
@@ -185,7 +185,7 @@ describe("TabTurns", () => {
 
   it.live("counts what the agent does during the running turn only", () =>
     Effect.gen(function* () {
-      __test.setSetting("codeAcp.tracing", true);
+      __test.setSetting("kdCode.tracing", true);
       const { say, answer, prompts, posted, tab } = yield* makeTurns();
       tab.turnStats?.onUpdate({ sessionUpdate: "tool_call", toolCallId: "before", title: "t" });
       say("first");

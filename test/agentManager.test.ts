@@ -45,7 +45,7 @@ const binaryAgent = (target: Partial<BinaryTarget>, agent: Partial<RegistryAgent
 });
 
 const makeContext = (storage: string, installed: unknown = {}) => {
-  const values = new Map<string, unknown>([["codeAcp.installedAgents", installed]]);
+  const values = new Map<string, unknown>([["kdCode.installedAgents", installed]]);
   return {
     globalStorageUri: { fsPath: storage },
     globalState: {
@@ -148,7 +148,7 @@ describe("AgentManager.install", () => {
     );
   }
 
-  for (const cmd of ["../../victim", "../tool", "/tmp/code-acp-evil", ".", "./"]) {
+  for (const cmd of ["../../victim", "../tool", "/tmp/kd-code-evil", ".", "./"]) {
     it.live(`rejects cmd ${cmd} and keeps the copy already installed`, () =>
       withManager(({ root, victim, requests }) =>
         Effect.gen(function* () {
@@ -238,7 +238,7 @@ describe("AgentManager.uninstall", () => {
   }
 });
 
-describe("codeAcp.providers", () => {
+describe("kdCode.providers", () => {
   const installed = {
     tool: {
       id: "tool",
@@ -252,10 +252,10 @@ describe("codeAcp.providers", () => {
     other: { id: "other", name: "Other", version: "2.0.0", kind: "npx", command: "node", args: ["o.js"], env: {} },
   };
   beforeEach(() => {
-    __test.setSetting("codeAcp.env", { SHARED: "1", KEY: "shared" });
+    __test.setSetting("kdCode.env", { SHARED: "1", KEY: "shared" });
     return () => {
-      __test.setSetting("codeAcp.providers", undefined);
-      __test.setSetting("codeAcp.env", undefined);
+      __test.setSetting("kdCode.providers", undefined);
+      __test.setSetting("kdCode.env", undefined);
     };
   });
 
@@ -263,7 +263,7 @@ describe("codeAcp.providers", () => {
     withManager(
       () =>
         Effect.gen(function* () {
-          __test.setSetting("codeAcp.providers", { tool: { args: ["--model", "x"], env: { KEY: "own" } } });
+          __test.setSetting("kdCode.providers", { tool: { args: ["--model", "x"], env: { KEY: "own" } } });
           const command = yield* AgentManager.use((manager) => manager.command("tool"));
           assert.deepStrictEqual(command?.args, ["--acp", "--model", "x"]);
           assert.deepStrictEqual(command?.env, { SHARED: "1", KEY: "own" });
@@ -277,7 +277,7 @@ describe("codeAcp.providers", () => {
       () =>
         Effect.gen(function* () {
           yield* AgentManager.use((manager) => manager.setActive("tool"));
-          __test.setSetting("codeAcp.providers", { tool: { enabled: false } });
+          __test.setSetting("kdCode.providers", { tool: { enabled: false } });
           const manager = yield* AgentManager;
           assert.deepStrictEqual(
             (yield* manager.agents).map((a) => a.id),
@@ -296,7 +296,7 @@ describe("codeAcp.providers", () => {
           // Still startable, for the Providers page to ask it for its models.
           assert.isDefined(yield* manager.command("tool"));
 
-          __test.setSetting("codeAcp.providers", {});
+          __test.setSetting("kdCode.providers", {});
           assert.strictEqual(yield* manager.activeId, "tool");
         }),
       installed,
@@ -307,7 +307,7 @@ describe("codeAcp.providers", () => {
     withManager(
       () =>
         Effect.gen(function* () {
-          __test.setSetting("codeAcp.providers", { tool: { enabled: "no" }, other: { enabled: false } });
+          __test.setSetting("kdCode.providers", { tool: { enabled: "no" }, other: { enabled: false } });
           const manager = yield* AgentManager;
           assert.deepStrictEqual(
             (yield* manager.agents).map((a) => a.id),

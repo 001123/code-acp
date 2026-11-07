@@ -24,8 +24,8 @@ import type { Tab } from "./tabs";
 const CHANGES_DELAY_MS = 200;
 
 /** Commands of the lenses above a change, called with the tab's id, the file and the change. */
-export const KEEP_HUNK_COMMAND = "codeAcp.keepHunk";
-export const UNDO_HUNK_COMMAND = "codeAcp.undoHunk";
+export const KEEP_HUNK_COMMAND = "kdCode.keepHunk";
+export const UNDO_HUNK_COMMAND = "kdCode.undoHunk";
 
 /** What the review of changes needs from the chat view. */
 export interface ChangesHost {

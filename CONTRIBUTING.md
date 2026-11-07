@@ -28,14 +28,14 @@ See [AGENTS.md](AGENTS.md) for the full conventions.
 
 ## Settings
 
-| Setting                                                    | Description                                                                         |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `codeAcp.language`                                         | `auto`, `en`, `vi`                                                                  |
-| `codeAcp.customAgents`                                     | Your own ACP agents (command, args, env by name), listed next to the installed ones |
-| `codeAcp.env`                                              | Extra environment variables for the agent                                           |
-| `codeAcp.nodePath`                                         | Node for npm agents (default `node`)                                                |
-| `codeAcp.checkAgentUpdates`                                | Check for agent updates daily                                                       |
-| `codeAcp.commitMessage.agent` / `.model` / `.instructions` | Agent, model and extra instructions for commit messages                             |
+| Setting                                                   | Description                                                                         |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `kdCode.language`                                         | `auto`, `en`, `vi`                                                                  |
+| `kdCode.customAgents`                                     | Your own ACP agents (command, args, env by name), listed next to the installed ones |
+| `kdCode.env`                                              | Extra environment variables for the agent                                           |
+| `kdCode.nodePath`                                         | Node for npm agents (default `node`)                                                |
+| `kdCode.checkAgentUpdates`                                | Check for agent updates daily                                                       |
+| `kdCode.commitMessage.agent` / `.model` / `.instructions` | Agent, model and extra instructions for commit messages                             |
 
 ## Terminal context
 

@@ -27,7 +27,7 @@ import type { Attachment, PrDraft } from "./protocol";
 import type { Tab, TabGroup, TabList } from "./tabs";
 
 /** Where the fingerprints of the project setup commands the user allowed are kept. */
-const APPROVED_COMMANDS_KEY = "codeAcp.approvedWorktreeCommands";
+const APPROVED_COMMANDS_KEY = "kdCode.approvedWorktreeCommands";
 const decodeApproved = Schema.decodeUnknownOption(Schema.Array(Schema.String));
 
 /** What the tab's worktree becomes when the tab leaves it. */

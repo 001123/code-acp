@@ -8,7 +8,7 @@ import { onDidChangeLocale, t } from "./i18n";
 export class DropViewProvider
   implements vscode.TreeDataProvider<string>, vscode.TreeDragAndDropController<string>, vscode.Disposable
 {
-  static readonly viewId = "codeAcp.drop";
+  static readonly viewId = "kdCode.drop";
 
   readonly dropMimeTypes = ["text/uri-list", "files"];
   readonly dragMimeTypes: string[] = [];

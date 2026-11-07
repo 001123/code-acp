@@ -42,7 +42,7 @@ const PackageJson = Schema.fromJsonString(
   }),
 );
 
-/** An agent the chat can run: installed from the registry, or one of codeAcp.customAgents (no version). */
+/** An agent the chat can run: installed from the registry, or one of kdCode.customAgents (no version). */
 export interface AgentChoice {
   readonly id: string;
   readonly name: string;
@@ -60,15 +60,15 @@ export interface ProviderChoice extends AgentChoice {
   readonly commandLine: string;
 }
 
-/** Prefix of the ids of codeAcp.customAgents entries; keeps them apart from registry ids. */
+/** Prefix of the ids of kdCode.customAgents entries; keeps them apart from registry ids. */
 const CUSTOM_PREFIX = "custom:";
 
 const decodeCustomEntries = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown));
 const decodeCustomAgent = Schema.decodeUnknownOption(CustomAgentEntry);
 
-/** The usable codeAcp.customAgents entries by id, decoded one by one so a bad entry does not drop the others. */
+/** The usable kdCode.customAgents entries by id, decoded one by one so a bad entry does not drop the others. */
 const customAgents = Effect.sync(() => {
-  const raw = vscode.workspace.getConfiguration("codeAcp").get("customAgents");
+  const raw = vscode.workspace.getConfiguration("kdCode").get("customAgents");
   const agents = new Map<string, CustomAgentEntry & { readonly name: string }>();
   for (const [name, value] of Object.entries(Option.getOrElse(decodeCustomEntries(raw ?? {}), () => ({})))) {
     const entry = decodeCustomAgent(value);
@@ -93,8 +93,8 @@ const isEnabled = isProviderEnabled;
 const commandLineOf = (command: string, args: ReadonlyArray<string>) =>
   [command, ...args].map((arg) => (/[\s"']/.test(arg) ? JSON.stringify(arg) : arg)).join(" ");
 
-const INSTALLED_KEY = "codeAcp.installedAgents";
-const ACTIVE_KEY = "codeAcp.activeAgent";
+const INSTALLED_KEY = "kdCode.installedAgents";
+const ACTIVE_KEY = "kdCode.activeAgent";
 
 type Launch = Pick<InstalledAgent, "command" | "args" | "env">;
 
@@ -121,7 +121,7 @@ export function installKind(agent: RegistryAgent): InstallKind | undefined {
 export class AgentManager extends Context.Service<
   AgentManager,
   {
-    /** Fires when agents are installed or removed, the default changes, or codeAcp.customAgents changes. */
+    /** Fires when agents are installed or removed, the default changes, or kdCode.customAgents changes. */
     readonly onDidChange: vscode.Event<void>;
     readonly list: Effect.Effect<ReadonlyArray<InstalledAgent>>;
     get(id: string): Effect.Effect<InstalledAgent | undefined>;
@@ -147,7 +147,7 @@ export class AgentManager extends Context.Service<
     ): Effect.Effect<InstalledAgent, InstallError>;
     uninstall(id: string): Effect.Effect<void, InstallError>;
   }
->()("code-acp/AgentManager") {
+>()("kd-code/AgentManager") {
   static readonly layer = Layer.effect(
     AgentManager,
     Effect.gen(function* () {
@@ -164,7 +164,7 @@ export class AgentManager extends Context.Service<
       yield* Effect.acquireRelease(
         Effect.sync(() =>
           vscode.workspace.onDidChangeConfiguration((e) => {
-            if (e.affectsConfiguration("codeAcp.customAgents") || e.affectsConfiguration("codeAcp.providers")) {
+            if (e.affectsConfiguration("kdCode.customAgents") || e.affectsConfiguration("kdCode.providers")) {
               changed.fire();
             }
           }),

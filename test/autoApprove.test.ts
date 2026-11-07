@@ -30,7 +30,7 @@ const layer = () =>
 
 const tempFolder = Effect.acquireRelease(
   Effect.promise(async () => {
-    const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "code-acp-approve-")));
+    const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "kd-code-approve-")));
     await fs.mkdir(path.join(root, "work"));
     await fs.writeFile(path.join(root, "work", "a.ts"), "");
     await fs.writeFile(path.join(root, "secret"), "");
@@ -125,7 +125,7 @@ describe("AutoApprove", () => {
     Effect.gen(function* () {
       const root = yield* tempFolder;
       const cwd = path.join(root, "work");
-      __test.setSetting("codeAcp.autoApprove", { read: "allow" });
+      __test.setSetting("kdCode.autoApprove", { read: "allow" });
       const known = { kind: "read", locations: [{ path: path.join(cwd, "a.ts") }], diffs: [] } as const;
       assert.strictEqual(yield* answer(request({}), { cwd, known }), "once");
       assert.isUndefined(yield* answer(request({}), { cwd }));
@@ -136,7 +136,7 @@ describe("AutoApprove", () => {
     Effect.gen(function* () {
       const root = yield* tempFolder;
       const cwd = path.join(root, "work");
-      __test.setSetting("codeAcp.autoApprove", { execute: "allow" });
+      __test.setSetting("kdCode.autoApprove", { execute: "allow" });
       assert.strictEqual(yield* answer(request({ kind: "execute" }), { cwd }), "once");
       assert.isUndefined(yield* answer(request({ kind: "execute" }, [ALWAYS]), { cwd }));
     }).pipe(Effect.scoped, Effect.provide(layer())),
@@ -146,7 +146,7 @@ describe("AutoApprove", () => {
     Effect.gen(function* () {
       const root = yield* tempFolder;
       const cwd = path.join(root, "work");
-      __test.setSetting("codeAcp.autoApprove", { edit: "allow" });
+      __test.setSetting("kdCode.autoApprove", { edit: "allow" });
       const inside = path.join(cwd, "new", "deep", "file.ts");
       const outside = path.join(root, "secret");
       assert.strictEqual(yield* answer(request({ kind: "edit", locations: [{ path: inside }] }), { cwd }), "once");
@@ -180,7 +180,7 @@ describe("AutoApprove", () => {
         await fs.mkdir(path.join(cwd, ".git", "hooks"), { recursive: true });
         await fs.symlink(path.join(cwd, ".git", "hooks"), path.join(cwd, "hooks"));
       });
-      __test.setSetting("codeAcp.autoApprove", { read: "allow", edit: "allow" });
+      __test.setSetting("kdCode.autoApprove", { read: "allow", edit: "allow" });
       const asks = (kind: acp.ToolKind, file: string) =>
         answer(request({ kind, locations: [{ path: path.join(cwd, file) }] }), { cwd });
       assert.isUndefined(yield* asks("read", "to-file"));
@@ -197,7 +197,7 @@ describe("AutoApprove", () => {
       const root = yield* tempFolder;
       const cwd = path.join(root, "link-to-work");
       yield* Effect.promise(() => fs.symlink(path.join(root, "work"), cwd));
-      __test.setSetting("codeAcp.autoApprove", { read: "allow" });
+      __test.setSetting("kdCode.autoApprove", { read: "allow" });
       assert.strictEqual(
         yield* answer(request({ kind: "read", locations: [{ path: path.join(root, "work", "a.ts") }] }), { cwd }),
         "once",
@@ -210,7 +210,7 @@ describe("AutoApprove", () => {
       const root = yield* tempFolder;
       const cwd = path.join(root, "work");
       const rules = yield* AutoApprove;
-      __test.setSetting("codeAcp.autoApprove", { execute: "allow" });
+      __test.setSetting("kdCode.autoApprove", { execute: "allow" });
       assert.strictEqual(yield* answer(request({ kind: "execute" }), { cwd }), "once");
       assert.isUndefined(yield* answer(request({ kind: "fetch" }), { cwd }));
 
@@ -227,7 +227,7 @@ describe("AutoApprove", () => {
   it.live("ignores values that make no sense, so everything asks", () =>
     Effect.gen(function* () {
       const root = yield* tempFolder;
-      __test.setSetting("codeAcp.autoApprove", { execute: "yes please" });
+      __test.setSetting("kdCode.autoApprove", { execute: "yes please" });
       assert.isUndefined(yield* answer(request({ kind: "execute" }), { cwd: path.join(root, "work") }));
     }).pipe(Effect.scoped, Effect.provide(layer())),
   );

@@ -23,7 +23,7 @@ export const makeOutput = (): OutputStub => {
 };
 
 export const makeExtensionCtx = (
-  globalStorage = "/tmp/code-acp-test-storage",
+  globalStorage = "/tmp/kd-code-test-storage",
   packageJSON: unknown = { version: "1.2.3" },
 ) =>
   ({

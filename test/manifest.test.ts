@@ -42,7 +42,7 @@ describe("walkthrough", () => {
     commands.has(command) || (command.endsWith(".focus") && views.has(command.slice(0, -".focus".length)));
 
   it("the extension's command opens a walkthrough it contributes", () => {
-    assert.isTrue(commands.has("codeAcp.openWalkthrough"));
+    assert.isTrue(commands.has("kdCode.openWalkthrough"));
     assert.include(read("src/extension.ts"), `#${contributes.walkthroughs[0].id}\``);
   });
 
@@ -72,8 +72,8 @@ describe("walkthrough", () => {
         } else if (kind === "onView") {
           assert.isTrue(views.has(name), event);
         } else {
-          assert.strictEqual(event, "onContext:codeAcp.hasAgent");
-          assert.include(read("src/extension.ts"), '"codeAcp.hasAgent"');
+          assert.strictEqual(event, "onContext:kdCode.hasAgent");
+          assert.include(read("src/extension.ts"), '"kdCode.hasAgent"');
         }
       }
     });

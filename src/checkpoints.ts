@@ -47,7 +47,7 @@ export class ShadowGit extends Context.Service<
     /** Deletes the snapshots of `root`, when the work tree itself is gone for good. */
     forget(root: string): Effect.Effect<void>;
   }
->()("code-acp/ShadowGit") {
+>()("kd-code/ShadowGit") {
   static readonly layer = Layer.effect(
     ShadowGit,
     Effect.gen(function* () {

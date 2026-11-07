@@ -25,7 +25,7 @@ const IMAGE_EXT: Record<string, string> = {
 };
 
 /** Pasted attachments and opened images go here, so agents and editors can read them by path. */
-const TEMP_DIR = path.join(os.tmpdir(), "code-acp");
+const TEMP_DIR = path.join(os.tmpdir(), "kd-code");
 
 /** Temp files older than this are removed on startup; a session rarely goes back to an attachment after a day. */
 const TEMP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -188,7 +188,7 @@ export const attachmentBlock = Effect.fn("attachmentBlock")(function* (
 
 /**
  * Attachments added from VS Code (context menus, terminal picks) while the webview may not be ready yet,
- * with the prompts written before them ("Ask Code ACP").
+ * with the prompts written before them ("Ask KD Code").
  */
 export class AttachmentQueue {
   private queued: Attachment[] = [];

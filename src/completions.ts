@@ -65,7 +65,7 @@ export class Completions extends Context.Service<
     readonly files: (query: string) => Effect.Effect<ReadonlyArray<FileSuggestion>, VscodeError>;
     readonly skills: Effect.Effect<ReadonlyArray<SkillSuggestion>>;
   }
->()("code-acp/Completions") {
+>()("kd-code/Completions") {
   static readonly layer = Layer.effect(
     Completions,
     Effect.gen(function* () {

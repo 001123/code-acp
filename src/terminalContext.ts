@@ -83,7 +83,7 @@ export class TerminalContext extends Context.Service<
      */
     readonly selection: Effect.Effect<Option.Option<Attachment>, VscodeError>;
   }
->()("code-acp/TerminalContext") {
+>()("kd-code/TerminalContext") {
   static readonly layer = Layer.effect(
     TerminalContext,
     Effect.gen(function* () {

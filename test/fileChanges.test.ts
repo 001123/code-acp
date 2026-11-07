@@ -118,7 +118,7 @@ describe("reviewing changes one by one", () => {
         Layer.provideMerge(
           Layer.mergeAll(
             NodeChildProcessSpawner.layer,
-            Layer.succeed(ExtensionCtx, makeExtensionCtx(path.join(os.tmpdir(), `code-acp-hunks-${process.pid}`))),
+            Layer.succeed(ExtensionCtx, makeExtensionCtx(path.join(os.tmpdir(), `kd-code-hunks-${process.pid}`))),
           ),
           Layer.mergeAll(NodeFileSystem.layer, NodePath.layer),
         ),

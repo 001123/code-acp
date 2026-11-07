@@ -7,9 +7,9 @@ const decodeEntries = Schema.decodeUnknownOption(Schema.Record(Schema.String, Sc
 const decodeProvider = Schema.decodeUnknownOption(ProviderPrefs);
 const decodeFavorites = Schema.decodeUnknownOption(Schema.Array(FavoriteModel));
 
-/** The usable codeAcp.providers entries by agent id, decoded one by one so a bad entry does not drop the others. */
+/** The usable kdCode.providers entries by agent id, decoded one by one so a bad entry does not drop the others. */
 export const providerPrefs = (): ReadonlyMap<string, ProviderPrefs> => {
-  const raw = vscode.workspace.getConfiguration("codeAcp").get("providers");
+  const raw = vscode.workspace.getConfiguration("kdCode").get("providers");
   const prefs = new Map<string, ProviderPrefs>();
   for (const [id, value] of Object.entries(Option.getOrElse(decodeEntries(raw ?? {}), () => ({})))) {
     const entry = decodeProvider(value);
@@ -18,7 +18,7 @@ export const providerPrefs = (): ReadonlyMap<string, ProviderPrefs> => {
   return prefs;
 };
 
-/** Whether the agent `id` is enabled: it is unless codeAcp.providers turns it off. */
+/** Whether the agent `id` is enabled: it is unless kdCode.providers turns it off. */
 export const isProviderEnabled = (id: string): boolean => providerPrefs().get(id)?.enabled !== false;
 
 /** Writes `change` of the prefs of agent `id` to the user's settings; an entry left empty is removed. */
@@ -32,7 +32,7 @@ export const updateProvider = (id: string, change: (prefs: ProviderPrefs) => Pro
     const value = Object.keys(next).length ? { ...others, [id]: next } : others;
     yield* thenable(() =>
       vscode.workspace
-        .getConfiguration("codeAcp")
+        .getConfiguration("kdCode")
         .update("providers", Object.keys(value).length ? value : undefined, vscode.ConfigurationTarget.Global),
     );
   });

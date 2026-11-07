@@ -85,7 +85,7 @@ export const followTarget = (call: FollowedCall, path: string, text: string | un
   return { path, startLine: line, endLine: line, highlight: false };
 };
 
-/** codeAcp.followAgent: opens where the active tab's agent reads and edits, and highlights what it changed. */
+/** kdCode.followAgent: opens where the active tab's agent reads and edits, and highlights what it changed. */
 export class Follower implements vscode.Disposable {
   private readonly calls = new Map<string, FollowedCall>();
   /** Last target shown, so repeated updates of a tool call don't reveal it again. */

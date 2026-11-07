@@ -56,7 +56,7 @@ describe("statusBarView", () => {
   });
 
   it("follows the language setting", () => {
-    __test.setSetting("codeAcp.language", "vi");
+    __test.setSetting("kdCode.language", "vi");
     const view = statusBarView({ ...idle, waiting: 1 });
     assert.include(view.tooltip, "Đang chờ bạn: 1");
   });

@@ -313,14 +313,14 @@ const TIMEOUT = Duration.minutes(3);
 
 /**
  * Token usage and estimated cost from the local logs of coding agents (Claude Code, Codex, …), read by the ccusage
- * CLI: the one set in `codeAcp.ccusagePath`, or a pinned release through `npx -y`. Reports are kept until refreshed.
+ * CLI: the one set in `kdCode.ccusagePath`, or a pinned release through `npx -y`. Reports are kept until refreshed.
  */
 export class Ccusage extends Context.Service<
   Ccusage,
   {
     report(source: CcusageSource, refresh: boolean): Effect.Effect<CcusageView, CcusageError>;
   }
->()("code-acp/Ccusage") {
+>()("kd-code/Ccusage") {
   static readonly layer = Layer.effect(
     Ccusage,
     Effect.gen(function* () {

@@ -26,7 +26,7 @@ export function usageStatusView(tab: Totals | undefined, today: Totals): UsageSt
 
 /** The status bar item with the active tab's tokens and turns; clicking it runs `command`, which opens the usage page. */
 export class UsageStatusBar implements vscode.Disposable {
-  private readonly item = vscode.window.createStatusBarItem("codeAcp.usage", vscode.StatusBarAlignment.Right, 99);
+  private readonly item = vscode.window.createStatusBarItem("kdCode.usage", vscode.StatusBarAlignment.Right, 99);
 
   constructor(command: string) {
     this.item.command = command;

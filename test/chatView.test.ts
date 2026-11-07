@@ -55,7 +55,7 @@ const updates = {
 /** The chat view in a fake webview, on a real mock agent process, with the real services and a workspace in a temp folder. */
 const openChat = Effect.acquireRelease(
   Effect.promise(async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "code-acp-chat-"));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "kd-code-chat-"));
     const folder = path.join(root, "workspace");
     await fs.mkdir(folder);
     workspace.workspaceFolders = [{ name: "workspace", uri: Uri.file(folder) }];
@@ -187,7 +187,7 @@ describe("ChatViewProvider", () => {
 
   describe("saving tabs", () => {
     const savedText = (context: vscode.ExtensionContext) =>
-      JSON.stringify(context.workspaceState.get("codeAcp.tabs") ?? null);
+      JSON.stringify(context.workspaceState.get("kdCode.tabs") ?? null);
 
     it.live("writes a draft right away, as a window reload drops what isn't written yet", () =>
       Effect.scoped(
@@ -248,7 +248,7 @@ describe("ChatViewProvider", () => {
     it.live("answers what they allow without asking, naming it in the conversation", () =>
       Effect.scoped(
         Effect.gen(function* () {
-          __test.setSetting("codeAcp.autoApprove", { execute: "allow" });
+          __test.setSetting("kdCode.autoApprove", { execute: "allow" });
           const { ofType, say, replyOf, idle, tab } = yield* startChat;
           say(tab, "approvable execute");
           yield* until(() => replyOf(tab).includes("selected"), "the agent's answer");
@@ -267,7 +267,7 @@ describe("ChatViewProvider", () => {
     it.live("asks about what they don't, such as a read outside the tab's folder", () =>
       Effect.scoped(
         Effect.gen(function* () {
-          __test.setSetting("codeAcp.autoApprove", { read: "allow" });
+          __test.setSetting("kdCode.autoApprove", { read: "allow" });
           const { ofType, say, send, replyOf, idle, tab } = yield* startChat;
           say(tab, `approvable read ${path.join(os.tmpdir(), "elsewhere.txt")}`);
           yield* until(() => ofType("permissionRequest", tab).length === 1, "the permission request");
@@ -289,7 +289,7 @@ describe("ChatViewProvider", () => {
           yield* until(() => replyOf(tab).includes("selected"), "the agent's answer");
           yield* idle(tab);
 
-          yield* Effect.promise(async () => context.workspaceState.update("codeAcp.autoApprove", { execute: "allow" }));
+          yield* Effect.promise(async () => context.workspaceState.update("kdCode.autoApprove", { execute: "allow" }));
           say(tab, "approvable execute");
           yield* until(() => ofType("notice", tab).some((m) => m.key === "chat.autoApproved"), "the rule to answer");
           yield* idle(tab);
@@ -309,9 +309,9 @@ describe("ChatViewProvider", () => {
         const changes = () => ofType("changes", tab).at(-1);
         yield* until(() => changes()?.files.length === 1, "the changed file");
         assert.deepStrictEqual(changes()!.turns, []);
-        __test.setSetting("codeAcp.showRestore", true);
+        __test.setSetting("kdCode.showRestore", true);
         yield* until(() => changes()!.turns.length === 1, "the checkpoint");
-        __test.setSetting("codeAcp.showRestore", false);
+        __test.setSetting("kdCode.showRestore", false);
         yield* until(() => changes()!.turns.length === 0, "the checkpoint to go");
       }),
     ),
@@ -322,10 +322,10 @@ describe("ChatViewProvider", () => {
       Effect.gen(function* () {
         const { ofType } = yield* startChat;
         assert.deepStrictEqual(ofType("display").at(-1), { type: "display", fontSize: 0, codeFontSize: 0 });
-        __test.setSetting("codeAcp.fontSize", 16);
+        __test.setSetting("kdCode.fontSize", 16);
         yield* until(() => ofType("display").at(-1)?.fontSize === 16, "the text size");
-        __test.setSetting("codeAcp.codeFontSize", 99);
-        __test.setSetting("codeAcp.codeFontSize", 14);
+        __test.setSetting("kdCode.codeFontSize", 99);
+        __test.setSetting("kdCode.codeFontSize", 14);
         yield* until(() => ofType("display").at(-1)?.codeFontSize === 14, "the code size");
       }),
     ),
@@ -336,7 +336,7 @@ describe("ChatViewProvider", () => {
       Effect.gen(function* () {
         const { ofType } = yield* startChat;
         assert.deepStrictEqual(ofType("showRestore").at(-1), { type: "showRestore", enabled: false });
-        __test.setSetting("codeAcp.showRestore", true);
+        __test.setSetting("kdCode.showRestore", true);
         yield* until(() => ofType("showRestore").at(-1)?.enabled === true, "the setting");
       }),
     ),
@@ -345,7 +345,7 @@ describe("ChatViewProvider", () => {
   it.live("with tracing on, shows a turn's numbers after it ends, with the wait for the user", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        __test.setSetting("codeAcp.tracing", true);
+        __test.setSetting("kdCode.tracing", true);
         const { ofType, say, send, idle, tab } = yield* startChat;
         assert.deepStrictEqual(ofType("tracing").at(-1), { type: "tracing", enabled: true });
         say(tab, "permission");
@@ -414,7 +414,7 @@ describe("ChatViewProvider", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const { ofType, say, send, tabsNow, idle } = yield* startChat;
-        __test.setSetting("codeAcp.worktreeForNewTabs", true);
+        __test.setSetting("kdCode.worktreeForNewTabs", true);
         send({ type: "newTab" });
         yield* until(() => tabsNow().tabs.length === 2, "the new tab");
         const added = tabsNow().active;
@@ -1020,7 +1020,7 @@ describe("ChatViewProvider", () => {
 
     it.live("asks about an http link once the user listed its host", () =>
       Effect.gen(function* () {
-        __test.setSetting("codeAcp.allowedHttpHosts", ["example.com"]);
+        __test.setSetting("kdCode.allowedHttpHosts", ["example.com"]);
         const { ofType, say, send, tab } = yield* startChat;
         say(tab, "elicit unsafe");
         yield* until(() => ofType("elicitationRequest", tab).length === 1, "the question");
@@ -1166,8 +1166,8 @@ describe("ChatViewProvider", () => {
         assert.isDefined(first!.worktree);
         assert.isDefined(second!.worktree);
         assert.notStrictEqual(first!.worktree!.root, second!.worktree!.root);
-        assert.strictEqual(first!.worktree!.branch, "code-acp/compare/updates-first-mock");
-        assert.strictEqual(second!.worktree!.branch, "code-acp/compare/updates-first-other");
+        assert.strictEqual(first!.worktree!.branch, "kd-code/compare/updates-first-mock");
+        assert.strictEqual(second!.worktree!.branch, "kd-code/compare/updates-first-other");
         assert.notStrictEqual(first!.cwd, folder);
         assert.isNotEmpty(replyOf(first!.id));
         assert.isNotEmpty(replyOf(second!.id));
@@ -1319,12 +1319,12 @@ describe("ChatViewProvider", () => {
         // Still so after a reload, for the sessions to reopen with.
         yield* until(
           () =>
-            (
-              context.workspaceState.get("codeAcp.tabs") as { tabs: Array<{ wanted?: unknown }> } | undefined
-            )?.tabs.some((each) => each.wanted) === true,
+            (context.workspaceState.get("kdCode.tabs") as { tabs: Array<{ wanted?: unknown }> } | undefined)?.tabs.some(
+              (each) => each.wanted,
+            ) === true,
           "the tabs to be saved",
         );
-        const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
+        const restored = new TabList(context.workspaceState.get("kdCode.tabs"), () => "/d");
         const saved = restored.all.find((each) => each.group !== undefined);
         assert.deepStrictEqual(saved!.wanted, { model: "big", effort: "high" });
         assert.strictEqual(saved!.attemptLabel, "Big · High");
@@ -1372,7 +1372,7 @@ describe("ChatViewProvider", () => {
         assert.isUndefined(info().worktree);
         // Still ticked after a reload.
         yield* until(
-          () => new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d").all[0]?.worktreeOnSend === true,
+          () => new TabList(context.workspaceState.get("kdCode.tabs"), () => "/d").all[0]?.worktreeOnSend === true,
           "the tick to be saved",
         );
         say(tab, "updates đăng nhập");
@@ -1381,7 +1381,7 @@ describe("ChatViewProvider", () => {
         // One session where the tab was and one in the worktree, which has its name from the start.
         assert.strictEqual(ofType("session", tab).length, 2);
         assert.strictEqual(info().worktree!.base, folder);
-        assert.strictEqual(info().worktree!.branch, "code-acp/updates-dang-nhap");
+        assert.strictEqual(info().worktree!.branch, "kd-code/updates-dang-nhap");
         assert.isNotOk(info().worktreeOnSend);
         assert.strictEqual(ofType("userMessage", tab).length, 1);
         assert.strictEqual(worktreeCount(), 2);
@@ -1461,7 +1461,7 @@ describe("ChatViewProvider", () => {
     it.live("names the branch of a new tab's worktree after its first prompt only", () =>
       Effect.gen(function* () {
         const { folder, ofType, say, send, tabsNow, idle } = yield* startInRepo;
-        __test.setSetting("codeAcp.worktreeForNewTabs", true);
+        __test.setSetting("kdCode.worktreeForNewTabs", true);
         send({ type: "newTab" });
         yield* until(() => tabsNow().tabs.length === 2, "the new tab");
         const added = tabsNow().active;
@@ -1473,19 +1473,19 @@ describe("ChatViewProvider", () => {
         say(added, "updates sửa lỗi đăng");
         yield* until(() => ofType("turnEnd", added).length === 1, "the turn");
         yield* idle(added);
-        assert.strictEqual(info().worktree!.branch, "code-acp/updates-sua-loi-dang");
-        assert.include(git(folder, "branch"), "code-acp/updates-sua-loi-dang");
+        assert.strictEqual(info().worktree!.branch, "kd-code/updates-sua-loi-dang");
+        assert.include(git(folder, "branch"), "kd-code/updates-sua-loi-dang");
         say(added, "updates something else");
         yield* until(() => ofType("turnEnd", added).length === 2, "the second turn");
         yield* idle(added);
-        assert.strictEqual(info().worktree!.branch, "code-acp/updates-sua-loi-dang");
+        assert.strictEqual(info().worktree!.branch, "kd-code/updates-sua-loi-dang");
       }).pipe(Effect.scoped),
     );
 
     it.live("offers to finish a worktree with work in it, and has its agent draft the pull request", () =>
       Effect.gen(function* () {
         const { folder, root, ofType, say, send, tabsNow, idle } = yield* startInRepo;
-        __test.setSetting("codeAcp.worktreeForNewTabs", true);
+        __test.setSetting("kdCode.worktreeForNewTabs", true);
         send({ type: "newTab" });
         yield* until(() => tabsNow().tabs.length === 2, "the new tab");
         const added = tabsNow().active;
@@ -1612,11 +1612,11 @@ describe("ChatViewProvider", () => {
         yield* until(() => tabsNow().groups[0]?.title === "Named", "the name");
         yield* until(
           () =>
-            (context.workspaceState.get("codeAcp.tabs") as { groups?: Array<{ name?: string }> } | undefined)
+            (context.workspaceState.get("kdCode.tabs") as { groups?: Array<{ name?: string }> } | undefined)
               ?.groups?.[0]?.name === "Named",
           "the tabs to be saved",
         );
-        const restored = new TabList(context.workspaceState.get("codeAcp.tabs"), () => "/d");
+        const restored = new TabList(context.workspaceState.get("kdCode.tabs"), () => "/d");
         assert.strictEqual(restored.groups.length, 1);
         assert.strictEqual(restored.groups[0]!.name, "Named");
         assert.strictEqual(restored.shownGroup, restored.groups[0]);

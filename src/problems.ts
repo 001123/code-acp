@@ -74,7 +74,7 @@ function entryOf(uri: vscode.Uri, diagnostic: vscode.Diagnostic): ProblemEntry {
 /** Errors and warnings; infos and hints are mostly noise for an agent. */
 const relevant = (d: vscode.Diagnostic) => d.severity <= vscode.DiagnosticSeverity.Warning;
 
-/** The Problems panel as composer attachments: "@" picks and the "Fix with Code ACP" quick fix. */
+/** The Problems panel as composer attachments: "@" picks and the "Fix with KD Code" quick fix. */
 export class Problems extends Context.Service<
   Problems,
   {
@@ -87,7 +87,7 @@ export class Problems extends Context.Service<
       diagnostics: ReadonlyArray<vscode.Diagnostic>,
     ) => Effect.Effect<Attachment[]>;
   }
->()("code-acp/Problems") {
+>()("kd-code/Problems") {
   static readonly layer = Layer.succeed(
     Problems,
     (() => {
@@ -184,7 +184,7 @@ export class Problems extends Context.Service<
   );
 }
 
-/** Offers "Fix with Code ACP" on the problems under the cursor. */
+/** Offers "Fix with KD Code" on the problems under the cursor. */
 export class FixProblemsActions implements vscode.CodeActionProvider {
   static readonly kinds = [vscode.CodeActionKind.QuickFix];
 
@@ -198,7 +198,7 @@ export class FixProblemsActions implements vscode.CodeActionProvider {
     }
     const action = new vscode.CodeAction(t("problems.fix"), vscode.CodeActionKind.QuickFix);
     action.command = {
-      command: "codeAcp.fixProblems",
+      command: "kdCode.fixProblems",
       title: t("problems.fix"),
       arguments: [document.uri, [...context.diagnostics]],
     };

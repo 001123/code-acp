@@ -44,7 +44,7 @@ export class ClaudeSettings extends Context.Service<
     /** The auto-compact window set for `model` in a session at `cwd`; none when unset or "auto". */
     readonly autoCompactWindow: (model: string, cwd: string) => Effect.Effect<Option.Option<number>>;
   }
->()("code-acp/ClaudeSettings") {
+>()("kd-code/ClaudeSettings") {
   static readonly layer = Layer.effect(
     ClaudeSettings,
     Effect.gen(function* () {

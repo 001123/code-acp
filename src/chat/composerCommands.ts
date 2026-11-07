@@ -41,7 +41,7 @@ export class ComposerCommands {
     yield* this.queueAndFocus(selectionAttachments(editor));
   });
 
-  /** Adds `prompt` and the editor's non-empty selections to the composer ("Ask Code ACP" menu and code actions). */
+  /** Adds `prompt` and the editor's non-empty selections to the composer ("Ask KD Code" menu and code actions). */
   readonly askAboutSelection = Effect.fn("ComposerCommands.askAboutSelection")(function* (
     this: ComposerCommands,
     editor: vscode.TextEditor,
@@ -104,7 +104,7 @@ export class ComposerCommands {
     yield* this.queueAndFocus([attachment.value]);
   });
 
-  /** Adds problems and the code around them to the composer ("Fix with Code ACP" quick fix). */
+  /** Adds problems and the code around them to the composer ("Fix with KD Code" quick fix). */
   readonly fixProblems = Effect.fn("ComposerCommands.fixProblems")(function* (
     this: ComposerCommands,
     uri: vscode.Uri,

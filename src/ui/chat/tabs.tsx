@@ -140,7 +140,7 @@ export function tabStates(state: Record<number, TabState>, action: TabsAction): 
 }
 
 /** Drag data type of a tab being reordered; the view's file drop ignores it. */
-export const TAB_DRAG_TYPE = "application/x-code-acp-tab";
+export const TAB_DRAG_TYPE = "application/x-kd-code-tab";
 
 export const isTabDrag = (e: { dataTransfer: DataTransfer | null }) =>
   e.dataTransfer?.types.includes(TAB_DRAG_TYPE) ?? false;
@@ -197,7 +197,7 @@ export function TabSidebar({
   /** The group whose comparison is shown, instead of the active tab. */
   shownGroup: number | undefined;
   agents: AgentChoices["agents"];
-  /** codeAcp.showChanges: counts the files awaiting review too. */
+  /** kdCode.showChanges: counts the files awaiting review too. */
   showChanges: boolean;
   onSelect: (id: number) => void;
   onSelectGroup: (id: number) => void;

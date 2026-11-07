@@ -1,9 +1,9 @@
 {
-  "name": "code-acp",
-  "displayName": "Code ACP",
+  "name": "kd-code",
+  "displayName": "KD Code",
   "description": "%description%",
   "version": "0.0.1",
-  "publisher": "001123",
+  "publisher": "kd-labs",
   "icon": "media/extension-icon.png",
   "license": "MIT",
   "repository": {
@@ -29,32 +29,32 @@
   },
   "activationEvents": [
     "onStartupFinished",
-    "onWebviewPanel:codeAcp.settings",
-    "onWebviewPanel:codeAcp.diagram"
+    "onWebviewPanel:kdCode.settings",
+    "onWebviewPanel:kdCode.diagram"
   ],
   "contributes": {
     "viewsContainers": {
       "secondarySidebar": [
         {
-          "id": "codeAcp",
-          "title": "Code ACP",
+          "id": "kdCode",
+          "title": "KD Code",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "codeAcp": [
+      "kdCode": [
         {
           "type": "webview",
-          "id": "codeAcp.chat",
+          "id": "kdCode.chat",
           "name": "%view.chat%",
           "icon": "media/icon.svg",
           "initialSize": 10
         },
         {
-          "id": "codeAcp.drop",
+          "id": "kdCode.drop",
           "name": "%view.drop%",
-          "when": "codeAcp.hasAgent",
+          "when": "kdCode.hasAgent",
           "icon": "media/icon.svg",
           "initialSize": 1
         }
@@ -62,463 +62,463 @@
     },
     "commands": [
       {
-        "command": "codeAcp.manageAgents",
+        "command": "kdCode.manageAgents",
         "title": "%command.manageAgents%",
         "category": "%command.category%",
         "icon": "$(extensions)"
       },
       {
-        "command": "codeAcp.selectAgent",
+        "command": "kdCode.selectAgent",
         "title": "%command.selectAgent%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.newSession",
+        "command": "kdCode.newSession",
         "title": "%command.newSession%",
         "icon": "$(add)"
       },
       {
-        "command": "codeAcp.history",
+        "command": "kdCode.history",
         "title": "%command.history%",
         "category": "%command.category%",
         "icon": "$(history)"
       },
       {
-        "command": "codeAcp.findInConversation",
+        "command": "kdCode.findInConversation",
         "title": "%command.findInConversation%",
         "category": "%command.category%",
         "icon": "$(search)"
       },
       {
-        "command": "codeAcp.exportConversation",
+        "command": "kdCode.exportConversation",
         "title": "%command.exportConversation%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.exportTab",
+        "command": "kdCode.exportTab",
         "title": "%command.exportTab%"
       },
       {
-        "command": "codeAcp.cancel",
+        "command": "kdCode.cancel",
         "title": "%command.cancel%",
         "icon": "$(debug-stop)"
       },
       {
-        "command": "codeAcp.worktree",
+        "command": "kdCode.worktree",
         "title": "%command.worktree%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.cleanWorktrees",
+        "command": "kdCode.cleanWorktrees",
         "title": "%command.cleanWorktrees%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.tabWorktree",
+        "command": "kdCode.tabWorktree",
         "title": "%command.tabWorktree%"
       },
       {
-        "command": "codeAcp.login",
+        "command": "kdCode.login",
         "title": "%command.login%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.logout",
+        "command": "kdCode.logout",
         "title": "%command.logout%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.restart",
+        "command": "kdCode.restart",
         "title": "%command.restart%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.showLog",
+        "command": "kdCode.showLog",
         "title": "%command.showLog%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.showTrace",
+        "command": "kdCode.showTrace",
         "title": "%command.showTrace%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.doctor",
+        "command": "kdCode.doctor",
         "title": "%command.doctor%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.openWalkthrough",
+        "command": "kdCode.openWalkthrough",
         "title": "%command.openWalkthrough%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.attach",
+        "command": "kdCode.attach",
         "title": "%command.attach%",
         "icon": "$(attach)"
       },
       {
-        "command": "codeAcp.openSettings",
+        "command": "kdCode.openSettings",
         "title": "%command.openSettings%",
         "category": "%command.category%",
         "icon": "$(gear)"
       },
       {
-        "command": "codeAcp.generateCommitMessage",
+        "command": "kdCode.generateCommitMessage",
         "title": "%command.generateCommitMessage%",
         "icon": "$(sparkle)",
-        "enablement": "!codeAcp.generatingCommitMessage"
+        "enablement": "!kdCode.generatingCommitMessage"
       },
       {
-        "command": "codeAcp.cancelCommitMessage",
+        "command": "kdCode.cancelCommitMessage",
         "title": "%command.cancelCommitMessage%",
         "icon": "$(debug-stop)"
       },
       {
-        "command": "codeAcp.commitAndPush",
+        "command": "kdCode.commitAndPush",
         "title": "%command.commitAndPush%",
         "icon": "$(cloud-upload)",
-        "enablement": "!codeAcp.generatingCommitMessage"
+        "enablement": "!kdCode.generatingCommitMessage"
       },
       {
-        "command": "codeAcp.addSelection",
+        "command": "kdCode.addSelection",
         "title": "%command.addSelection%"
       },
       {
-        "command": "codeAcp.addTerminalSelection",
+        "command": "kdCode.addTerminalSelection",
         "title": "%command.addTerminalSelection%"
       },
       {
-        "command": "codeAcp.addTerminalOutput",
+        "command": "kdCode.addTerminalOutput",
         "title": "%command.addTerminalOutput%"
       },
       {
-        "command": "codeAcp.addTerminalFailure",
+        "command": "kdCode.addTerminalFailure",
         "title": "%command.addTerminalFailure%"
       },
       {
-        "command": "codeAcp.quoteSelection",
+        "command": "kdCode.quoteSelection",
         "title": "%command.quoteSelection%"
       },
       {
-        "command": "codeAcp.pinTab",
+        "command": "kdCode.pinTab",
         "title": "%command.pinTab%"
       },
       {
-        "command": "codeAcp.unpinTab",
+        "command": "kdCode.unpinTab",
         "title": "%command.unpinTab%"
       },
       {
-        "command": "codeAcp.renameTab",
+        "command": "kdCode.renameTab",
         "title": "%command.renameTab%"
       },
       {
-        "command": "codeAcp.closeTab",
+        "command": "kdCode.closeTab",
         "title": "%command.closeTab%"
       },
       {
-        "command": "codeAcp.closeOtherTabs",
+        "command": "kdCode.closeOtherTabs",
         "title": "%command.closeOtherTabs%"
       },
       {
-        "command": "codeAcp.closeTabsBelow",
+        "command": "kdCode.closeTabsBelow",
         "title": "%command.closeTabsBelow%"
       },
       {
-        "command": "codeAcp.forkTab",
+        "command": "kdCode.forkTab",
         "title": "%command.forkTab%"
       },
       {
-        "command": "codeAcp.addProblems",
+        "command": "kdCode.addProblems",
         "title": "%command.addProblems%"
       },
       {
-        "command": "codeAcp.showUsage",
+        "command": "kdCode.showUsage",
         "title": "%command.showUsage%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.showAttention",
+        "command": "kdCode.showAttention",
         "title": "%command.showAttention%"
       },
       {
-        "command": "codeAcp.addWorkspaceProblems",
+        "command": "kdCode.addWorkspaceProblems",
         "title": "%command.addWorkspaceProblems%"
       },
       {
-        "command": "codeAcp.fixProblems",
+        "command": "kdCode.fixProblems",
         "title": "%command.fixProblems%"
       },
       {
-        "command": "codeAcp.explainSelection",
+        "command": "kdCode.explainSelection",
         "title": "%command.explainSelection%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.refactorSelection",
+        "command": "kdCode.refactorSelection",
         "title": "%command.refactorSelection%",
         "category": "%command.category%"
       },
       {
-        "command": "codeAcp.testSelection",
+        "command": "kdCode.testSelection",
         "title": "%command.testSelection%",
         "category": "%command.category%"
       }
     ],
     "submenus": [
       {
-        "id": "codeAcp.ask",
+        "id": "kdCode.ask",
         "label": "%submenu.ask%"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "codeAcp.findInConversation",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.findInConversation",
+          "when": "view == kdCode.chat",
           "group": "navigation@0"
         },
         {
-          "command": "codeAcp.history",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.history",
+          "when": "view == kdCode.chat",
           "group": "navigation@1"
         },
         {
-          "command": "codeAcp.manageAgents",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.manageAgents",
+          "when": "view == kdCode.chat",
           "group": "navigation@2"
         },
         {
-          "command": "codeAcp.login",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.login",
+          "when": "view == kdCode.chat",
           "group": "1_agent@1"
         },
         {
-          "command": "codeAcp.logout",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.logout",
+          "when": "view == kdCode.chat",
           "group": "1_agent@2"
         },
         {
-          "command": "codeAcp.restart",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.restart",
+          "when": "view == kdCode.chat",
           "group": "1_agent@3"
         },
         {
-          "command": "codeAcp.exportConversation",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.exportConversation",
+          "when": "view == kdCode.chat",
           "group": "2_tools@0"
         },
         {
-          "command": "codeAcp.showLog",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.showLog",
+          "when": "view == kdCode.chat",
           "group": "2_tools@1"
         },
         {
-          "command": "codeAcp.openSettings",
-          "when": "view == codeAcp.chat",
+          "command": "kdCode.openSettings",
+          "when": "view == kdCode.chat",
           "group": "3_settings@1"
         }
       ],
       "explorer/context": [
         {
-          "command": "codeAcp.attach",
-          "group": "codeAcp@1"
+          "command": "kdCode.attach",
+          "group": "kdCode@1"
         }
       ],
       "editor/title/context": [
         {
-          "command": "codeAcp.attach",
+          "command": "kdCode.attach",
           "when": "resourceScheme == file",
-          "group": "codeAcp@1"
+          "group": "kdCode@1"
         }
       ],
       "editor/context": [
         {
-          "command": "codeAcp.addSelection",
+          "command": "kdCode.addSelection",
           "when": "editorHasSelection",
-          "group": "codeAcp@0"
+          "group": "kdCode@0"
         },
         {
-          "submenu": "codeAcp.ask",
+          "submenu": "kdCode.ask",
           "when": "editorHasSelection",
-          "group": "codeAcp@0"
+          "group": "kdCode@0"
         },
         {
-          "command": "codeAcp.attach",
+          "command": "kdCode.attach",
           "when": "resourceScheme == file",
-          "group": "codeAcp@1"
+          "group": "kdCode@1"
         },
         {
-          "command": "codeAcp.addProblems",
+          "command": "kdCode.addProblems",
           "when": "resourceScheme == file",
-          "group": "codeAcp@2"
+          "group": "kdCode@2"
         }
       ],
       "terminal/context": [
         {
-          "command": "codeAcp.addTerminalSelection",
+          "command": "kdCode.addTerminalSelection",
           "when": "terminalTextSelected",
-          "group": "codeAcp@0"
+          "group": "kdCode@0"
         },
         {
-          "command": "codeAcp.addTerminalOutput",
-          "group": "codeAcp@1"
+          "command": "kdCode.addTerminalOutput",
+          "group": "kdCode@1"
         },
         {
-          "command": "codeAcp.addTerminalFailure",
-          "group": "codeAcp@2"
+          "command": "kdCode.addTerminalFailure",
+          "group": "kdCode@2"
         }
       ],
       "scm/title": [
         {
-          "command": "codeAcp.generateCommitMessage",
-          "when": "scmProvider == git && !codeAcp.generatingCommitMessage",
+          "command": "kdCode.generateCommitMessage",
+          "when": "scmProvider == git && !kdCode.generatingCommitMessage",
           "group": "navigation@1"
         },
         {
-          "command": "codeAcp.cancelCommitMessage",
-          "when": "scmProvider == git && codeAcp.generatingCommitMessage",
+          "command": "kdCode.cancelCommitMessage",
+          "when": "scmProvider == git && kdCode.generatingCommitMessage",
           "group": "navigation@1"
         },
         {
-          "command": "codeAcp.commitAndPush",
+          "command": "kdCode.commitAndPush",
           "when": "scmProvider == git",
           "group": "navigation@2"
         }
       ],
       "commandPalette": [
         {
-          "command": "codeAcp.cancelCommitMessage",
-          "when": "codeAcp.generatingCommitMessage"
+          "command": "kdCode.cancelCommitMessage",
+          "when": "kdCode.generatingCommitMessage"
         },
         {
-          "command": "codeAcp.quoteSelection",
+          "command": "kdCode.quoteSelection",
           "when": "false"
         },
         {
-          "command": "codeAcp.pinTab",
+          "command": "kdCode.pinTab",
           "when": "false"
         },
         {
-          "command": "codeAcp.unpinTab",
+          "command": "kdCode.unpinTab",
           "when": "false"
         },
         {
-          "command": "codeAcp.renameTab",
+          "command": "kdCode.renameTab",
           "when": "false"
         },
         {
-          "command": "codeAcp.closeTab",
+          "command": "kdCode.closeTab",
           "when": "false"
         },
         {
-          "command": "codeAcp.closeOtherTabs",
+          "command": "kdCode.closeOtherTabs",
           "when": "false"
         },
         {
-          "command": "codeAcp.closeTabsBelow",
+          "command": "kdCode.closeTabsBelow",
           "when": "false"
         },
         {
-          "command": "codeAcp.exportTab",
+          "command": "kdCode.exportTab",
           "when": "false"
         },
         {
-          "command": "codeAcp.forkTab",
+          "command": "kdCode.forkTab",
           "when": "false"
         },
         {
-          "command": "codeAcp.tabWorktree",
+          "command": "kdCode.tabWorktree",
           "when": "false"
         },
         {
-          "command": "codeAcp.fixProblems",
+          "command": "kdCode.fixProblems",
           "when": "false"
         },
         {
-          "command": "codeAcp.explainSelection",
+          "command": "kdCode.explainSelection",
           "when": "editorHasSelection"
         },
         {
-          "command": "codeAcp.refactorSelection",
+          "command": "kdCode.refactorSelection",
           "when": "editorHasSelection"
         },
         {
-          "command": "codeAcp.testSelection",
+          "command": "kdCode.testSelection",
           "when": "editorHasSelection"
         }
       ],
-      "codeAcp.ask": [
+      "kdCode.ask": [
         {
-          "command": "codeAcp.explainSelection",
+          "command": "kdCode.explainSelection",
           "group": "ask@0"
         },
         {
-          "command": "codeAcp.refactorSelection",
+          "command": "kdCode.refactorSelection",
           "group": "ask@1"
         },
         {
-          "command": "codeAcp.testSelection",
+          "command": "kdCode.testSelection",
           "group": "ask@2"
         }
       ],
       "webview/context": [
         {
-          "command": "codeAcp.quoteSelection",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'messages' && selectedText",
-          "group": "codeAcp@1"
+          "command": "kdCode.quoteSelection",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'messages' && selectedText",
+          "group": "kdCode@1"
         },
         {
-          "command": "codeAcp.pinTab",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && !tabPinned",
+          "command": "kdCode.pinTab",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab' && !tabPinned",
           "group": "1_pin@1"
         },
         {
-          "command": "codeAcp.unpinTab",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && tabPinned",
+          "command": "kdCode.unpinTab",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab' && tabPinned",
           "group": "1_pin@1"
         },
         {
-          "command": "codeAcp.renameTab",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "command": "kdCode.renameTab",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab'",
           "group": "1_pin@3"
         },
         {
-          "command": "codeAcp.closeTab",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && !tabPinned",
+          "command": "kdCode.closeTab",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab' && !tabPinned",
           "group": "2_close@1"
         },
         {
-          "command": "codeAcp.closeOtherTabs",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "command": "kdCode.closeOtherTabs",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab'",
           "group": "2_close@2"
         },
         {
-          "command": "codeAcp.closeTabsBelow",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "command": "kdCode.closeTabsBelow",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab'",
           "group": "2_close@3"
         },
         {
-          "command": "codeAcp.forkTab",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab' && tabCanFork",
+          "command": "kdCode.forkTab",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab' && tabCanFork",
           "group": "1_pin@2"
         },
         {
-          "command": "codeAcp.tabWorktree",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "command": "kdCode.tabWorktree",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab'",
           "group": "1_pin@4"
         },
         {
-          "command": "codeAcp.exportTab",
-          "when": "webviewId == 'codeAcp.chat' && webviewSection == 'tab'",
+          "command": "kdCode.exportTab",
+          "when": "webviewId == 'kdCode.chat' && webviewSection == 'tab'",
           "group": "1_pin@5"
         }
       ]
     },
     "configuration": {
-      "title": "Code ACP",
+      "title": "KD Code",
       "properties": {
-        "codeAcp.language": {
+        "kdCode.language": {
           "type": "string",
           "enum": [
             "auto",
@@ -533,7 +533,7 @@
           "default": "auto",
           "description": "%config.language%"
         },
-        "codeAcp.customAgents": {
+        "kdCode.customAgents": {
           "scope": "machine",
           "type": "object",
           "additionalProperties": {
@@ -562,7 +562,7 @@
           "default": {},
           "description": "%config.customAgents%"
         },
-        "codeAcp.env": {
+        "kdCode.env": {
           "scope": "machine",
           "type": "object",
           "additionalProperties": {
@@ -571,7 +571,7 @@
           "default": {},
           "description": "%config.env%"
         },
-        "codeAcp.providers": {
+        "kdCode.providers": {
           "scope": "machine",
           "type": "object",
           "additionalProperties": {
@@ -627,73 +627,73 @@
           "default": {},
           "description": "%config.providers%"
         },
-        "codeAcp.nodePath": {
+        "kdCode.nodePath": {
           "scope": "machine",
           "type": "string",
           "default": "node",
           "description": "%config.nodePath%"
         },
-        "codeAcp.ccusagePath": {
+        "kdCode.ccusagePath": {
           "scope": "machine",
           "type": "string",
           "default": "",
           "description": "%config.ccusagePath%"
         },
-        "codeAcp.checkAgentUpdates": {
+        "kdCode.checkAgentUpdates": {
           "type": "boolean",
           "default": true,
           "description": "%config.checkAgentUpdates%"
         },
-        "codeAcp.followAgent": {
+        "kdCode.followAgent": {
           "type": "boolean",
           "default": false,
           "description": "%config.followAgent%"
         },
-        "codeAcp.autoScroll": {
+        "kdCode.autoScroll": {
           "type": "boolean",
           "default": true,
           "description": "%config.autoScroll%"
         },
-        "codeAcp.showChanges": {
+        "kdCode.showChanges": {
           "type": "boolean",
           "default": true,
           "description": "%config.showChanges%"
         },
-        "codeAcp.showRestore": {
+        "kdCode.showRestore": {
           "type": "boolean",
           "default": false,
           "description": "%config.showRestore%"
         },
-        "codeAcp.fontSize": {
+        "kdCode.fontSize": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "maximum": 32,
           "description": "%config.fontSize%"
         },
-        "codeAcp.codeFontSize": {
+        "kdCode.codeFontSize": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "maximum": 32,
           "description": "%config.codeFontSize%"
         },
-        "codeAcp.tracing": {
+        "kdCode.tracing": {
           "type": "boolean",
           "default": false,
           "description": "%config.tracing%"
         },
-        "codeAcp.notifications": {
+        "kdCode.notifications": {
           "type": "boolean",
           "default": true,
           "description": "%config.notifications%"
         },
-        "codeAcp.notifyFinished": {
+        "kdCode.notifyFinished": {
           "type": "boolean",
           "default": true,
           "description": "%config.notifyFinished%"
         },
-        "codeAcp.sessionDefaults": {
+        "kdCode.sessionDefaults": {
           "type": "object",
           "default": {},
           "additionalProperties": {
@@ -718,12 +718,12 @@
           },
           "description": "%config.sessionDefaults%"
         },
-        "codeAcp.worktreeForNewTabs": {
+        "kdCode.worktreeForNewTabs": {
           "type": "boolean",
           "default": false,
           "description": "%config.worktreeForNewTabs%"
         },
-        "codeAcp.worktreeCopyFiles": {
+        "kdCode.worktreeCopyFiles": {
           "type": "array",
           "items": {
             "type": "string"
@@ -731,34 +731,34 @@
           "default": [],
           "description": "%config.worktreeCopyFiles%"
         },
-        "codeAcp.worktreeSetupCommand": {
+        "kdCode.worktreeSetupCommand": {
           "scope": "machine",
           "type": "string",
           "default": "",
           "description": "%config.worktreeSetupCommand%"
         },
-        "codeAcp.worktreeProjectSetupCommand": {
+        "kdCode.worktreeProjectSetupCommand": {
           "scope": "resource",
           "type": "string",
           "default": "",
           "description": "%config.worktreeProjectSetupCommand%"
         },
-        "codeAcp.commitMessage.agent": {
+        "kdCode.commitMessage.agent": {
           "type": "string",
           "default": "",
           "description": "%config.commitMessage.agent%"
         },
-        "codeAcp.commitMessage.model": {
+        "kdCode.commitMessage.model": {
           "type": "string",
           "default": "",
           "description": "%config.commitMessage.model%"
         },
-        "codeAcp.commitMessage.effort": {
+        "kdCode.commitMessage.effort": {
           "type": "string",
           "default": "lowest",
           "description": "%config.commitMessage.effort%"
         },
-        "codeAcp.commitMessage.fastMode": {
+        "kdCode.commitMessage.fastMode": {
           "type": "string",
           "enum": [
             "default",
@@ -768,13 +768,13 @@
           "default": "default",
           "description": "%config.commitMessage.fastMode%"
         },
-        "codeAcp.commitMessage.instructions": {
+        "kdCode.commitMessage.instructions": {
           "type": "string",
           "default": "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Write a single subject line only, no body.",
           "editPresentation": "multilineText",
           "description": "%config.commitMessage.instructions%"
         },
-        "codeAcp.allowedHttpHosts": {
+        "kdCode.allowedHttpHosts": {
           "scope": "machine",
           "type": "array",
           "items": {
@@ -783,7 +783,7 @@
           "default": [],
           "description": "%config.allowedHttpHosts%"
         },
-        "codeAcp.autoApprove": {
+        "kdCode.autoApprove": {
           "scope": "machine",
           "type": "object",
           "default": {},
@@ -832,7 +832,7 @@
             }
           }
         },
-        "codeAcp.mcpServers": {
+        "kdCode.mcpServers": {
           "scope": "machine",
           "type": "object",
           "default": {},
@@ -893,7 +893,7 @@
               "altText": "%walkthrough.install.alt%"
             },
             "completionEvents": [
-              "onContext:codeAcp.hasAgent"
+              "onContext:kdCode.hasAgent"
             ]
           },
           {
@@ -905,7 +905,7 @@
               "altText": "%walkthrough.doctor.alt%"
             },
             "completionEvents": [
-              "onCommand:codeAcp.doctor"
+              "onCommand:kdCode.doctor"
             ]
           },
           {
@@ -917,7 +917,7 @@
               "altText": "%walkthrough.chat.alt%"
             },
             "completionEvents": [
-              "onView:codeAcp.chat"
+              "onView:kdCode.chat"
             ]
           },
           {
@@ -929,7 +929,7 @@
               "altText": "%walkthrough.parallel.alt%"
             },
             "completionEvents": [
-              "onCommand:codeAcp.openSettings"
+              "onCommand:kdCode.openSettings"
             ]
           }
         ]
@@ -937,42 +937,42 @@
     ],
     "keybindings": [
       {
-        "command": "codeAcp.chat.focus",
+        "command": "kdCode.chat.focus",
         "key": "ctrl+alt+a",
         "mac": "cmd+alt+a"
       },
       {
-        "command": "codeAcp.newSession",
+        "command": "kdCode.newSession",
         "key": "ctrl+alt+n",
         "mac": "cmd+alt+n",
-        "when": "focusedView == 'codeAcp.chat'"
+        "when": "focusedView == 'kdCode.chat'"
       },
       {
-        "command": "codeAcp.findInConversation",
+        "command": "kdCode.findInConversation",
         "key": "ctrl+f",
         "mac": "cmd+f",
-        "when": "focusedView == 'codeAcp.chat'"
+        "when": "focusedView == 'kdCode.chat'"
       },
       {
-        "command": "codeAcp.cancel",
+        "command": "kdCode.cancel",
         "key": "ctrl+.",
         "mac": "cmd+.",
-        "when": "focusedView == 'codeAcp.chat'"
+        "when": "focusedView == 'kdCode.chat'"
       },
       {
-        "command": "codeAcp.addSelection",
+        "command": "kdCode.addSelection",
         "key": "ctrl+alt+l",
         "mac": "cmd+alt+l",
         "when": "editorTextFocus && editorHasSelection"
       },
       {
-        "command": "codeAcp.addTerminalSelection",
+        "command": "kdCode.addTerminalSelection",
         "key": "ctrl+alt+l",
         "mac": "cmd+alt+l",
         "when": "terminalFocus && terminalTextSelected"
       },
       {
-        "command": "codeAcp.addProblems",
+        "command": "kdCode.addProblems",
         "key": "ctrl+alt+p",
         "mac": "cmd+alt+p",
         "when": "editorTextFocus"
@@ -988,7 +988,7 @@
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm run typecheck && npm test",
     "package": "node esbuild.mjs --production && vsce package --out release/",
-    "reinstall": "npm run package && for cli in code codium; do if command -v $cli >/dev/null; then $cli --install-extension release/code-acp-$npm_package_version.vsix --force; fi; done",
+    "reinstall": "npm run package && for cli in code codium; do if command -v $cli >/dev/null; then $cli --install-extension release/kd-code-$npm_package_version.vsix --force; fi; done",
     "prepare": "effect-tsgo patch --typescript --no-oxlint"
   },
   "devDependencies": {

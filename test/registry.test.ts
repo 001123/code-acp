@@ -171,7 +171,7 @@ describe("AcpRegistry", () => {
             }),
           ),
         ),
-        Layer.provide(Layer.succeed(ExtensionCtx, makeExtensionCtx("/tmp/code-acp-test-url"))),
+        Layer.provide(Layer.succeed(ExtensionCtx, makeExtensionCtx("/tmp/kd-code-test-url"))),
       );
       yield* AcpRegistry.use((r) => r.fetch).pipe(Effect.provide(layer));
       assert.strictEqual(url, REGISTRY_URL);

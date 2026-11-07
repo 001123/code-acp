@@ -130,7 +130,7 @@ export interface Tab extends DraftHolder {
   wantsWorktree?: boolean;
   /** The name of that worktree's branch, when it is known by then. */
   worktreeName?: string;
-  /** Its Worktree box is ticked, by the user or codeAcp.worktreeForNewTabs: the next message moves it to a new worktree. */
+  /** Its Worktree box is ticked, by the user or kdCode.worktreeForNewTabs: the next message moves it to a new worktree. */
   worktreeOnSend?: boolean;
   /** The agent picked for the tab, installed or custom. */
   agentId?: string;
@@ -153,9 +153,9 @@ export interface Tab extends DraftHolder {
   changes: ChangeSet;
   /** The turn being run; its user message carries the id. */
   turn?: number;
-  /** What the running turn did so far, for codeAcp.tracing. */
+  /** What the running turn did so far, for kdCode.tracing. */
   turnStats?: TurnStats;
-  /** The numbers of the session's finished turns, for codeAcp.tracing. */
+  /** The numbers of the session's finished turns, for kdCode.tracing. */
   traces: TurnTraces;
   /** Messages sent while a turn ran, sent in order as each turn ends. */
   queue: QueuedMessage[];

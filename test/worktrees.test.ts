@@ -30,8 +30,8 @@ import {
 import { makeExtensionCtx } from "./helpers";
 import { __test, Uri, workspace } from "./stubs/vscode";
 
-const PROJECT_COMMAND = "codeAcp.worktreeProjectSetupCommand";
-const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "code-acp-worktrees-")));
+const PROJECT_COMMAND = "kdCode.worktreeProjectSetupCommand";
+const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "kd-code-worktrees-")));
 const realHome = process.env.HOME;
 
 const platform = NodeChildProcessSpawner.layer.pipe(
@@ -67,8 +67,8 @@ beforeAll(() => {
   fs.mkdirSync(process.env.HOME);
 });
 afterEach(() => {
-  __test.setSetting("codeAcp.worktreeCopyFiles", []);
-  __test.setSetting("codeAcp.worktreeSetupCommand", "");
+  __test.setSetting("kdCode.worktreeCopyFiles", []);
+  __test.setSetting("kdCode.worktreeSetupCommand", "");
   __test.setWorkspaceSetting(PROJECT_COMMAND, undefined);
 });
 afterAll(() => {
@@ -103,12 +103,12 @@ describe("worktree helpers", () => {
   });
 
   it("only counts worktrees in its own folder as managed", () => {
-    assert.isTrue(isManaged("/home/u/.code-acp/worktrees/r-1/abc"));
+    assert.isTrue(isManaged("/home/u/.kd-code/worktrees/r-1/abc"));
     assert.isFalse(isManaged("/home/u/projects/worktree"));
   });
 
   it("keeps a tab's worktree across a reload", () => {
-    const worktree = { root: "/home/u/.code-acp/worktrees/r/abc", branch: "code-acp/abc", base: "/r" };
+    const worktree = { root: "/home/u/.kd-code/worktrees/r/abc", branch: "kd-code/abc", base: "/r" };
     const list = new TabList(undefined, () => "/r");
     list.active.cwd = worktree.root;
     list.active.worktree = worktree;
@@ -155,9 +155,9 @@ describe("Worktrees", () => {
     Effect.gen(function* () {
       const dir = makeRepo();
       const { worktree, cwd } = yield* created(dir);
-      assert.match(worktree.branch!, /^code-acp\/[0-9a-f]{6}$/);
+      assert.match(worktree.branch!, /^kd-code\/[0-9a-f]{6}$/);
       const named = yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "Sửa lỗi đăng nhập", true));
-      assert.strictEqual(named.branch, "code-acp/sua-loi-dang-nhap");
+      assert.strictEqual(named.branch, "kd-code/sua-loi-dang-nhap");
       assert.strictEqual(path.basename(named.root), "sua-loi-dang-nhap");
       assert.isFalse(fs.existsSync(cwd));
       assert.strictEqual(git(named.root, "symbolic-ref", "--short", "HEAD").trim(), named.branch);
@@ -179,8 +179,8 @@ describe("Worktrees", () => {
       );
       const first = yield* nameNew;
       const second = yield* nameNew;
-      assert.strictEqual(first.branch, "code-acp/fix-it");
-      assert.strictEqual(second.branch, "code-acp/fix-it-2");
+      assert.strictEqual(first.branch, "kd-code/fix-it");
+      assert.strictEqual(second.branch, "kd-code/fix-it-2");
       assert.strictEqual(path.basename(second.root), "fix-it-2");
     }).pipe(Effect.provide(layer)),
   );
@@ -190,18 +190,18 @@ describe("Worktrees", () => {
       const dir = makeRepo();
       const { worktree } = yield* created(dir);
       const shared = yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", false));
-      assert.strictEqual(shared.branch, "code-acp/fix-it");
+      assert.strictEqual(shared.branch, "kd-code/fix-it");
       assert.strictEqual(shared.root, worktree.root);
       const other = (yield* created(dir)).worktree;
       yield* Effect.acquireUseRelease(
-        Effect.sync(() => __test.setSetting("codeAcp.worktreeSetupCommand", "true")),
+        Effect.sync(() => __test.setSetting("kdCode.worktreeSetupCommand", "true")),
         () =>
           Effect.gen(function* () {
             const named = yield* Worktrees.use((worktrees) => worktrees.nameAfter(other, "fix more", true));
-            assert.strictEqual(named.branch, "code-acp/fix-more");
+            assert.strictEqual(named.branch, "kd-code/fix-more");
             assert.strictEqual(named.root, other.root);
           }),
-        () => Effect.sync(() => __test.setSetting("codeAcp.worktreeSetupCommand", "")),
+        () => Effect.sync(() => __test.setSetting("kdCode.worktreeSetupCommand", "")),
       );
     }).pipe(Effect.provide(layer)),
   );
@@ -235,8 +235,8 @@ describe("Worktrees", () => {
     Effect.gen(function* () {
       const dir = makeRepo();
       const root = path.join(scratch, `own-${count++}`);
-      git(dir, "worktree", "add", "--quiet", "-b", "code-acp/abc123", root);
-      const worktree = { root: fs.realpathSync(root), branch: "code-acp/abc123", base: dir };
+      git(dir, "worktree", "add", "--quiet", "-b", "kd-code/abc123", root);
+      const worktree = { root: fs.realpathSync(root), branch: "kd-code/abc123", base: dir };
       assert.deepStrictEqual(
         yield* Worktrees.use((worktrees) => worktrees.nameAfter(worktree, "fix it", true)),
         worktree,
@@ -252,11 +252,11 @@ describe("Worktrees", () => {
       );
       const first = yield* create;
       const second = yield* create;
-      assert.strictEqual(first.worktree.branch, "code-acp/compare/fix-gemini");
-      assert.strictEqual(second.worktree.branch, "code-acp/compare/fix-gemini-2");
+      assert.strictEqual(first.worktree.branch, "kd-code/compare/fix-gemini");
+      assert.strictEqual(second.worktree.branch, "kd-code/compare/fix-gemini-2");
       assert.notStrictEqual(first.worktree.root, second.worktree.root);
       yield* Worktrees.use((worktrees) => worktrees.remove(first.worktree));
-      assert.notInclude(git(dir, "branch"), "code-acp/compare/fix-gemini\n");
+      assert.notInclude(git(dir, "branch"), "kd-code/compare/fix-gemini\n");
     }).pipe(Effect.provide(layer)),
   );
 
@@ -277,7 +277,7 @@ describe("Worktrees", () => {
       assert.strictEqual(cwd, worktree.root);
       assert.isTrue(isManaged(worktree.root));
       assert.isTrue(fs.existsSync(path.join(worktree.root, "a.txt")));
-      assert.match(worktree.branch!, /^code-acp\//);
+      assert.match(worktree.branch!, /^kd-code\//);
       assert.strictEqual(git(worktree.root, "rev-parse", "--abbrev-ref", "HEAD").trim(), worktree.branch);
       // The base folder is untouched.
       assert.strictEqual(git(repo, "status", "--porcelain"), "");
@@ -467,7 +467,7 @@ describe("Worktrees", () => {
       fs.mkdirSync(path.join(repo, "ignored"));
       fs.writeFileSync(path.join(repo, "ignored", "unnamed.txt"), "x\n");
       fs.writeFileSync(path.join(repo, "untracked.txt"), "x\n");
-      __test.setSetting("codeAcp.worktreeCopyFiles", [".env", "node_modules", "untracked.txt", "../outside"]);
+      __test.setSetting("kdCode.worktreeCopyFiles", [".env", "node_modules", "untracked.txt", "../outside"]);
       const { worktree } = yield* created(repo);
       const worktrees = yield* Worktrees;
       yield* worktrees.setup(worktree);
@@ -485,7 +485,7 @@ describe("Worktrees", () => {
       const repo = makeRepo();
       fs.appendFileSync(path.join(repo, ".gitignore"), "local.txt\n");
       fs.writeFileSync(path.join(repo, "local.txt"), "x\n");
-      __test.setSetting("codeAcp.worktreeCopyFiles", ["local.txt"]);
+      __test.setSetting("kdCode.worktreeCopyFiles", ["local.txt"]);
       const { worktree } = yield* created(repo);
       yield* (yield* Worktrees).setup(worktree);
       assert.isFalse(fs.existsSync(path.join(worktree.root, "local.txt")));
@@ -495,7 +495,7 @@ describe("Worktrees", () => {
   it.effect("runs the setup command in a shell at the top of the worktree, even from a subfolder", () =>
     Effect.gen(function* () {
       const repo = makeRepo();
-      __test.setSetting("codeAcp.worktreeSetupCommand", "pwd > where.txt && echo done >> where.txt");
+      __test.setSetting("kdCode.worktreeSetupCommand", "pwd > where.txt && echo done >> where.txt");
       const { worktree } = yield* created(path.join(repo, "sub"));
       yield* (yield* Worktrees).setup(worktree);
       assert.strictEqual(fs.readFileSync(path.join(worktree.root, "where.txt"), "utf8"), `${worktree.root}\ndone\n`);
@@ -507,8 +507,8 @@ describe("Worktrees", () => {
       const repo = makeRepo();
       fs.mkdirSync(path.join(repo, "ignored"));
       fs.writeFileSync(path.join(repo, "ignored", "f.txt"), "x\n");
-      __test.setSetting("codeAcp.worktreeCopyFiles", ["ignored"]);
-      __test.setSetting("codeAcp.worktreeSetupCommand", "echo oh no >&2; exit 3");
+      __test.setSetting("kdCode.worktreeCopyFiles", ["ignored"]);
+      __test.setSetting("kdCode.worktreeSetupCommand", "echo oh no >&2; exit 3");
       const { worktree } = yield* created(repo);
       const err = yield* (yield* Worktrees).setup(worktree).pipe(Effect.flip);
       assert.include(err.message, "3");
@@ -520,7 +520,7 @@ describe("Worktrees", () => {
   it.live("doesn't wait for a process the setup command leaves behind", () =>
     Effect.gen(function* () {
       const repo = makeRepo();
-      __test.setSetting("codeAcp.worktreeSetupCommand", "sleep 30 & echo started");
+      __test.setSetting("kdCode.worktreeSetupCommand", "sleep 30 & echo started");
       const { worktree } = yield* created(repo);
       const result = yield* (yield* Worktrees).setup(worktree).pipe(Effect.timeoutOption("10 seconds"));
       assert.isTrue(Option.isSome(result));
@@ -530,7 +530,7 @@ describe("Worktrees", () => {
   it.live("stops the setup command when interrupted", () =>
     Effect.gen(function* () {
       const repo = makeRepo();
-      __test.setSetting("codeAcp.worktreeSetupCommand", "sleep 30; touch finished.txt");
+      __test.setSetting("kdCode.worktreeSetupCommand", "sleep 30; touch finished.txt");
       const { worktree } = yield* created(repo);
       const result = yield* (yield* Worktrees)
         .setup(worktree)
@@ -543,7 +543,7 @@ describe("Worktrees", () => {
   it.effect("runs a project's command instead of the user's, only when allowed", () =>
     Effect.gen(function* () {
       const repo = makeRepo();
-      __test.setSetting("codeAcp.worktreeSetupCommand", "touch user.txt");
+      __test.setSetting("kdCode.worktreeSetupCommand", "touch user.txt");
       __test.setWorkspaceSetting(PROJECT_COMMAND, "touch project.txt");
       const worktrees = yield* Worktrees;
       const ran = (worktree: { root: string }) =>
@@ -600,7 +600,7 @@ describe("Worktrees", () => {
       assert.notStrictEqual(yield* fingerprint(script), first);
 
       // A script that reaches the worktree by being copied counts too.
-      __test.setSetting("codeAcp.worktreeCopyFiles", ["local.sh"]);
+      __test.setSetting("kdCode.worktreeCopyFiles", ["local.sh"]);
       fs.writeFileSync(path.join(repo, "local.sh"), "echo one\n");
       const copied = yield* fingerprint("sh local.sh");
       fs.writeFileSync(path.join(repo, "local.sh"), "echo two\n");
@@ -696,14 +696,14 @@ describe("TabWorktrees", () => {
       tab.branch = worktree.branch;
       fork.worktree = worktree;
       yield* nameAfter(controller, tab, "fix it");
-      assert.strictEqual(tab.worktree.branch, "code-acp/fix-it");
-      assert.strictEqual(tab.branch, "code-acp/fix-it");
-      assert.strictEqual(fork.worktree.branch, "code-acp/fix-it");
+      assert.strictEqual(tab.worktree.branch, "kd-code/fix-it");
+      assert.strictEqual(tab.branch, "kd-code/fix-it");
+      assert.strictEqual(fork.worktree.branch, "kd-code/fix-it");
       assert.isUndefined(other.worktree);
 
       const lost = {
-        root: path.join(os.homedir(), ".code-acp", "worktrees", "gone", "abc123"),
-        branch: "code-acp/abc123",
+        root: path.join(os.homedir(), ".kd-code", "worktrees", "gone", "abc123"),
+        branch: "kd-code/abc123",
         base: path.join(scratch, "gone"),
       };
       tab.worktree = lost;
@@ -763,7 +763,7 @@ describe("TabWorktrees", () => {
     Effect.gen(function* () {
       const repo = makeRepo();
       workspace.workspaceFolders = [{ name: "repo", uri: Uri.file(repo) }];
-      __test.setSetting("codeAcp.worktreeSetupCommand", "touch ready.txt; exit 1");
+      __test.setSetting("kdCode.worktreeSetupCommand", "touch ready.txt; exit 1");
       const { controller, posted, tab } = makeController();
       tab.cwd = repo;
       tab.wantsWorktree = true;
@@ -778,7 +778,7 @@ describe("TabWorktrees", () => {
   it.effect("sets up a worktree that came back, but not one that is still there", () =>
     Effect.gen(function* () {
       const repo = makeRepo();
-      __test.setSetting("codeAcp.worktreeSetupCommand", "touch ready.txt");
+      __test.setSetting("kdCode.worktreeSetupCommand", "touch ready.txt");
       const { worktree, cwd } = yield* created(repo);
       const { controller, tab } = makeController();
       tab.worktree = worktree;

@@ -20,11 +20,11 @@ First public version; nothing has been released yet.
 - Compact a conversation from the context window panel, for agents that offer `/compact`.
 - Log out of an agent.
 - A first-run panel in the chat: it checks the tools agents need, then offers suggested agents or more, and the chat box appears once one is installed.
-- A getting-started walkthrough, and a Doctor page in Settings (`Code ACP: Doctor`), which checks Node.js, npm, uv and git, starts each agent and offers to fix what it finds, such as a missing login.
+- A getting-started walkthrough, and a Doctor page in Settings (`KD Code: Doctor`), which checks Node.js, npm, uv and git, starts each agent and offers to fix what it finds, such as a missing login.
 - Attach files, folders, images, problems, terminals and selections as context, and annotate images.
-- **Explain**, **Refactor**, **Write Tests** and **Fix with Code ACP** actions.
+- **Explain**, **Refactor**, **Write Tests** and **Fix with KD Code** actions.
 - Review the agent's changes with Keep and Undo, restore checkpoints, and follow the agent in the editor.
-- Run a tab in its own git worktree and apply its changes to your checkout. Its branch is named after the first prompt, and those of Best of N go under `code-acp/compare/`.
+- Run a tab in its own git worktree and apply its changes to your checkout. Its branch is named after the first prompt, and those of Best of N go under `kd-code/compare/`.
 - Best of N: tick Compare in the composer to send one prompt to several agents, models and efforts, each in its own worktree, grouped under one tab; compare their diffs and apply the best one, or discard them all.
 - Copy ignored files and run a setup command when a worktree is created. A project can have its own command, which runs only after you allow it.
 - Switch the Settings page between user and workspace settings.

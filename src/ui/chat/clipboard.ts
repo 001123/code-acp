@@ -3,7 +3,7 @@ import { splitTokens } from "../markdown";
 import type { Token } from "./tokens";
 
 /** Marks HTML copied from a chat message, so pasting it in the composer brings its images back. */
-export const COPIED_ATTR = "data-code-acp-message";
+export const COPIED_ATTR = "data-kd-code-message";
 
 /** An image token in copied HTML. */
 export interface CopiedImage {

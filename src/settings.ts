@@ -2,7 +2,7 @@ import { Option, Schema } from "effect";
 import * as vscode from "vscode";
 import { LOWEST_EFFORT } from "./sessionOptions";
 
-/** One entry of codeAcp.mcpServers, in the `.mcp.json` shape: stdio when `url` is absent. */
+/** One entry of kdCode.mcpServers, in the `.mcp.json` shape: stdio when `url` is absent. */
 export const McpServerEntry = Schema.Union([
   Schema.Struct({
     type: Schema.optional(Schema.Literal("stdio")),
@@ -18,7 +18,7 @@ export const McpServerEntry = Schema.Union([
 ]);
 export type McpServerEntry = typeof McpServerEntry.Type;
 
-/** One entry of codeAcp.customAgents: an ACP agent run from a local command. */
+/** One entry of kdCode.customAgents: an ACP agent run from a local command. */
 export const CustomAgentEntry = Schema.Struct({
   command: Schema.String,
   args: Schema.optional(Schema.Array(Schema.String)),
@@ -30,13 +30,13 @@ export type CustomAgentEntry = typeof CustomAgentEntry.Type;
 export const FavoriteModel = Schema.Struct({ value: Schema.String, name: Schema.String });
 export type FavoriteModel = typeof FavoriteModel.Type;
 
-/** One entry of codeAcp.providers: how an agent (installed or custom) runs and what its model picker shows; what is left out keeps the defaults. */
+/** One entry of kdCode.providers: how an agent (installed or custom) runs and what its model picker shows; what is left out keeps the defaults. */
 export const ProviderPrefs = Schema.Struct({
   /** False hides the agent from the chat and keeps it from being the default. */
   enabled: Schema.optional(Schema.Boolean),
   /** Arguments added after the agent's own on every start. */
   args: Schema.optional(Schema.Array(Schema.String)),
-  /** Variables set for this agent alone, over codeAcp.env. */
+  /** Variables set for this agent alone, over kdCode.env. */
   env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   /** Model values left out of the chat's model picker. */
   hiddenModels: Schema.optional(Schema.Array(Schema.String)),
@@ -63,7 +63,7 @@ export type ApprovalRules = typeof ApprovalRules.Type;
 
 const FastModeSetting = Schema.Literals(["default", "on", "off"]);
 
-/** One entry of codeAcp.sessionDefaults: what new sessions of an agent start with; what is left out stays open. */
+/** One entry of kdCode.sessionDefaults: what new sessions of an agent start with; what is left out stays open. */
 export const SessionDefaults = Schema.Struct({
   model: Schema.optional(Schema.String),
   effort: Schema.optional(Schema.String),
@@ -74,7 +74,7 @@ export type SessionDefaults = typeof SessionDefaults.Type;
 /** A font size in pixels, where 0 means VS Code's own. */
 const FontSize = Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 32 }));
 
-/** Schemas of the codeAcp.* settings; keep in sync with `contributes.configuration` in package.json. */
+/** Schemas of the kdCode.* settings; keep in sync with `contributes.configuration` in package.json. */
 export const Settings = Schema.Struct({
   language: Schema.Literals(["auto", "en", "vi"]),
   /** Agents run from local commands, by name; listed next to the installed ones. */
@@ -166,7 +166,7 @@ export const SETTING_KEYS = [
   "autoApprove",
 ] as const satisfies ReadonlyArray<SettingKey>;
 
-/** Default of codeAcp.commitMessage.instructions; keep in sync with package.json. */
+/** Default of kdCode.commitMessage.instructions; keep in sync with package.json. */
 export const DEFAULT_COMMIT_INSTRUCTIONS =
   "Use Conventional Commits: type(scope): subject, where type is feat, fix, docs, style, refactor, perf, test, build, ci or chore and the scope is optional. Write a single subject line only, no body.";
 
@@ -205,9 +205,9 @@ const DEFAULTS: Settings = {
 
 const decodeSettings = Schema.decodeUnknownOption(Settings);
 
-/** Current value of every codeAcp.* setting; an invalid value falls back to its default. */
+/** Current value of every kdCode.* setting; an invalid value falls back to its default. */
 export function readSettings(): Settings {
-  const config = vscode.workspace.getConfiguration("codeAcp");
+  const config = vscode.workspace.getConfiguration("kdCode");
   const read = <K extends SettingKey>(key: K): Settings[K] => {
     const value = config.get(key);
     return Option.match(decodeSettings({ ...DEFAULTS, [key]: value }), {
@@ -274,7 +274,7 @@ export const lockedSettings = (scope: SettingsScope): ReadonlyArray<SettingKey> 
 /** The setup command the project of `folder` asks for, from its folder or workspace settings; a user value doesn't count. */
 export function projectSetupCommand(folder: string): string {
   const info = vscode.workspace
-    .getConfiguration("codeAcp", vscode.Uri.file(folder))
+    .getConfiguration("kdCode", vscode.Uri.file(folder))
     .inspect("worktreeProjectSetupCommand");
   const command = Schema.decodeUnknownOption(Schema.String)(info?.workspaceFolderValue ?? info?.workspaceValue);
   return Option.getOrElse(command, () => "").trim();

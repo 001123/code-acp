@@ -8,7 +8,7 @@ export type Locale = "en" | "vi";
 
 const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, vi };
 
-/** UI language: the codeAcp.language setting, or VS Code's display language when "auto". */
+/** UI language: the kdCode.language setting, or VS Code's display language when "auto". */
 export function locale(): Locale {
   const setting = readSettings().language;
   if (setting !== "auto") {
@@ -23,7 +23,7 @@ export function t(key: MessageKey, ...args: unknown[]): string {
 
 export function onDidChangeLocale(listener: () => void): vscode.Disposable {
   return vscode.workspace.onDidChangeConfiguration((e) => {
-    if (e.affectsConfiguration("codeAcp.language")) {
+    if (e.affectsConfiguration("kdCode.language")) {
       listener();
     }
   });

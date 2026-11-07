@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { ExtensionCtx, thenable } from "./runtime";
 
 /** Where earlier versions kept the whole ledger; split into month files on first use. */
-const LEGACY_KEY = "codeAcp.usage";
+const LEGACY_KEY = "kdCode.usage";
 const LEGACY_FILE = "usage.json";
 /** The ledger's folder in the global storage: one file a month, `YYYY/MM.json`. */
 const LEDGER_DIR = "usage";
@@ -295,7 +295,7 @@ export class UsageLedger extends Context.Service<
     summary(query: SessionQuery, searchText?: (session: SessionEntry) => string): Effect.Effect<UsageSummary>;
     readonly clear: Effect.Effect<void>;
   }
->()("code-acp/UsageLedger") {
+>()("kd-code/UsageLedger") {
   static readonly layer = Layer.effect(
     UsageLedger,
     Effect.gen(function* () {

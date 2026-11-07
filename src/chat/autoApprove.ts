@@ -5,7 +5,7 @@ import { ExtensionCtx, thenable, type VscodeError } from "../runtime";
 import { ApprovalRules, readSettings } from "../settings";
 import { mergeCall, type FollowedCall } from "./follow";
 
-const KEY = "codeAcp.autoApprove";
+const KEY = "kdCode.autoApprove";
 
 /** The rule that covers each kind of tool call; a kind left out is always asked about. */
 const RULE_OF_KIND: Partial<Record<acp.ToolKind, "read" | "edit" | "execute" | "fetch">> = {
@@ -112,7 +112,7 @@ export class AutoApprove extends Context.Service<
       context: ApprovalContext,
     ): Effect.Effect<Option.Option<AutoApproval>>;
   }
->()("code-acp/AutoApprove") {
+>()("kd-code/AutoApprove") {
   static readonly layer = Layer.effect(
     AutoApprove,
     Effect.gen(function* () {

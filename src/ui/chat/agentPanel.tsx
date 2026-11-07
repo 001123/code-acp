@@ -16,10 +16,10 @@ import { configKind, type SelectOption } from "./sessionConfig";
 export { AgentIcon };
 
 export interface AgentChoices {
-  /** `update`: the newer registry version the agent can be updated to; the rest is what codeAcp.providers says of its models. */
+  /** `update`: the newer registry version the agent can be updated to; the rest is what kdCode.providers says of its models. */
   agents: ReadonlyArray<{ id: string; name: string; icon?: string; update?: string } & ModelPrefs>;
   activeId?: string;
-  /** The starred models, kept in codeAcp.providers. */
+  /** The starred models, kept in kdCode.providers. */
   favorites?: ReadonlyArray<FavoriteModel>;
 }
 

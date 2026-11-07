@@ -17,7 +17,7 @@ export class AgentUpdates extends Context.Service<
   AgentUpdates,
   {
     /**
-     * Looks for updates in the registry, unless checks are off (codeAcp.checkAgentUpdates). Returns the ones to
+     * Looks for updates in the registry, unless checks are off (kdCode.checkAgentUpdates). Returns the ones to
      * notify about: those not yet offered since the window opened; empty when the registry cannot be loaded.
      */
     readonly due: Effect.Effect<ReadonlyArray<AgentUpdate>>;
@@ -28,7 +28,7 @@ export class AgentUpdates extends Context.Service<
     /** Installs the updates one by one behind a progress notification, reports failures and returns the agents updated. */
     install(updates: ReadonlyArray<AgentUpdate>): Effect.Effect<ReadonlyArray<RegistryAgent>>;
   }
->()("code-acp/AgentUpdates") {
+>()("kd-code/AgentUpdates") {
   static readonly layer = Layer.effect(
     AgentUpdates,
     Effect.gen(function* () {

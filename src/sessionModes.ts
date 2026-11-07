@@ -2,7 +2,7 @@ import type * as acp from "@agentclientprotocol/sdk";
 import { t } from "./i18n";
 
 /** The config option standing for an agent's modes; the agent never sees this id. */
-export const MODE_OPTION = "_code-acp/mode";
+export const MODE_OPTION = "_kd-code/mode";
 
 type Options = ReadonlyArray<acp.SessionConfigOption> | null | undefined;
 

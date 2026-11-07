@@ -48,7 +48,7 @@ import { conversationMarkdown } from "./chat/exportMarkdown";
 import { TranscriptSearch } from "./chat/transcriptSearch";
 
 /** The transcript only lives here, so an entry that fails to render must not take the rest down with it. */
-/** codeAcp.fontSize and codeAcp.codeFontSize: sizes in pixels for the chat's CSS, where 0 keeps VS Code's. */
+/** kdCode.fontSize and kdCode.codeFontSize: sizes in pixels for the chat's CSS, where 0 keeps VS Code's. */
 function applyDisplay(fontSize: unknown, codeFontSize: unknown): void {
   const root = document.documentElement.style;
   const apply = (variable: string, size: unknown) =>
@@ -141,15 +141,15 @@ function App() {
     backgroundTasks,
   } = current;
   const [followAgent, setFollowAgent] = useState(false);
-  /** codeAcp.autoScroll: new content scrolls the messages to the end. */
+  /** kdCode.autoScroll: new content scrolls the messages to the end. */
   const [autoScroll, setAutoScroll] = useState(true);
   const autoScrollRef = useRef(autoScroll);
   autoScrollRef.current = autoScroll;
-  /** codeAcp.showChanges: the files changed bar above the composer. */
+  /** kdCode.showChanges: the files changed bar above the composer. */
   const [showChanges, setShowChanges] = useState(true);
-  /** codeAcp.tracing: the numbers below each turn. */
+  /** kdCode.tracing: the numbers below each turn. */
   const [tracing, setTracing] = useState(false);
-  /** codeAcp.showRestore: only for the gear's menu; the host applies it. */
+  /** kdCode.showRestore: only for the gear's menu; the host applies it. */
   const [showRestore, setShowRestore] = useState(false);
   const checkpointTurns = changes?.turns;
   const canFork = tabs.find((x) => x.id === active)?.canFork ?? false;

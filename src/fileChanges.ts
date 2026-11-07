@@ -392,7 +392,7 @@ export const writeFile = Effect.fn("writeFile")(function* (file: string, content
 });
 
 /** Scheme of the read-only documents on the left of the diffs: what a file held before the agent changed it. */
-const DIFF_SCHEME = "code-acp-before";
+const DIFF_SCHEME = "kd-code-before";
 
 /** Documents shown at most at once; older ones are dropped, and their diff tab shows nothing. */
 const MAX_DIFF_DOCUMENTS = 50;

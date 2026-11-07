@@ -50,7 +50,7 @@ export class ChatStatusBar implements vscode.Disposable {
   private readonly item: vscode.StatusBarItem;
 
   constructor(command: string) {
-    this.item = vscode.window.createStatusBarItem("codeAcp.status", vscode.StatusBarAlignment.Right, 100);
+    this.item = vscode.window.createStatusBarItem("kdCode.status", vscode.StatusBarAlignment.Right, 100);
     this.item.name = t("statusBar.name");
     this.item.command = command;
   }

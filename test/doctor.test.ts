@@ -25,7 +25,7 @@ const MOCK_AGENT = fileURLToPath(new URL("./fixtures/mock-agent.mjs", import.met
 
 /** Makes `names` the only commands on PATH, each printing its version. */
 const onPath = (...names: ReadonlyArray<string>) => {
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "code-acp-doctor-bin-"));
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), "kd-code-doctor-bin-"));
   for (const name of names) {
     fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} 1.2.3"\necho second line\n`, { mode: 0o755 });
   }
@@ -91,7 +91,7 @@ describe("tools", () => {
   it.live("uses the Node path from the settings", () =>
     Effect.gen(function* () {
       onPath();
-      __test.setSetting("codeAcp.nodePath", process.execPath);
+      __test.setSetting("kdCode.nodePath", process.execPath);
       const node = (yield* runChecks(managerWith([]))).get("node");
       assert.strictEqual(node?.status, "ok");
       assert.strictEqual(node?.description, process.version);
@@ -142,7 +142,7 @@ describe("agents", () => {
   it.live("starts the agent and opens a session outside the project, then deletes it", () =>
     Effect.gen(function* () {
       onPath();
-      const record = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "code-acp-doctor-record-")), "record");
+      const record = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "kd-code-doctor-record-")), "record");
       const results = yield* runChecks(managerWith([mock], [], { MOCK_HISTORY: "1", MOCK_RECORD: record }));
       assert.deepStrictEqual(results.get("agent:mock"), {
         status: "ok",
@@ -151,7 +151,7 @@ describe("agents", () => {
       });
       const [created, deleted] = fs.readFileSync(record, "utf8").trim().split("\n");
       const folder = created!.split(" ").slice(2).join(" ");
-      assert.include(path.basename(folder), "code-acp-doctor-");
+      assert.include(path.basename(folder), "kd-code-doctor-");
       assert.isFalse(fs.existsSync(folder));
       assert.strictEqual(deleted, "delete s1");
     }),
@@ -351,8 +351,8 @@ describe("the Doctor tab of the settings page", () => {
     Effect.acquireRelease(
       Effect.sync(() => {
         onPath();
-        __test.setSetting("codeAcp.customAgents", customAgents);
-        const root = fs.mkdtempSync(path.join(os.tmpdir(), "code-acp-doctor-page-"));
+        __test.setSetting("kdCode.customAgents", customAgents);
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "kd-code-doctor-page-"));
         const store = new Map<string, unknown>();
         const memento = {
           get: (key: string) => store.get(key),
@@ -363,7 +363,7 @@ describe("the Doctor tab of the settings page", () => {
           globalStorageUri: Uri.file(path.join(root, "global")),
           workspaceState: memento,
           globalState: memento,
-          extension: { id: "test.code-acp", packageJSON: { version: "1.2.3" } },
+          extension: { id: "test.kd-code", packageJSON: { version: "1.2.3" } },
         } as unknown as vscode.ExtensionContext;
         const runtime = makeRuntime(context, makeOutput());
         const manager = {

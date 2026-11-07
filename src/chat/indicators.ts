@@ -125,7 +125,7 @@ export class ChatIndicators implements vscode.Disposable {
     }
   }
 
-  /** Announces a tab that wants the user (codeAcp.notifications, codeAcp.notifyFinished); "Show" brings it up. */
+  /** Announces a tab that wants the user (kdCode.notifications, kdCode.notifyFinished); "Show" brings it up. */
   notify(tab: Tab, reason: AttentionReason): void {
     if (!shouldNotify(reason, readSettings())) {
       return;

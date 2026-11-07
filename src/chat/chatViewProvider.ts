@@ -38,16 +38,16 @@ import { TabWorktrees } from "./worktrees";
 import { defaultCwd, workspaceFolders } from "../workspace";
 import { showDiagram } from "../diagramPanel";
 
-const TABS_KEY = "codeAcp.tabs";
+const TABS_KEY = "kdCode.tabs";
 
 /** Tabs are written to workspaceState at most this often; usage updates arrive many times per turn. */
 const SAVE_TABS_INTERVAL_MS = 100;
 
 /** The chat view: tabs of ACP sessions, each on the process of its agent. */
 export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
-  static readonly viewId = "codeAcp.chat";
+  static readonly viewId = "kdCode.chat";
   /** Run by the status bar item: shows the tab that needs the user. */
-  static readonly showAttentionCommand = "codeAcp.showAttention";
+  static readonly showAttentionCommand = "kdCode.showAttention";
 
   private view?: vscode.WebviewView;
   private readonly agents = new AgentPool();
@@ -176,7 +176,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
   /** Pending `writeTabs`; flushed on dispose, which is too late to be kept when the window reloads. */
   private saveTimer?: ReturnType<typeof setTimeout>;
   private lastTabsWrite = 0;
-  /** codeAcp.followAgent: the active tab's agent's tool locations are opened in the editor. */
+  /** kdCode.followAgent: the active tab's agent's tool locations are opened in the editor. */
   private followAgent = readSettings().followAgent;
   private readonly follower = new Follower(this.followAgent, {
     activeTab: () => this.tabs.active,
@@ -207,7 +207,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       usage: this.usage,
       backgroundTasks: this.backgroundTasks,
       showAttentionCommand: ChatViewProvider.showAttentionCommand,
-      showUsageCommand: "codeAcp.showUsage",
+      showUsageCommand: "kdCode.showUsage",
       view: () => this.view,
       agentIdOf: (tab) => this.tabAgents.agentIdOf(tab),
       reveal: (tab) => this.run(this.tabActions.reveal(tab), tab),
@@ -305,25 +305,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
       this.changes,
       this.follower,
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("codeAcp.followAgent")) {
+        if (e.affectsConfiguration("kdCode.followAgent")) {
           this.followAgent = readSettings().followAgent;
           this.follower.setEnabled(this.followAgent);
           this.post({ type: "followAgent", enabled: this.followAgent });
         }
-        if (e.affectsConfiguration("codeAcp.autoScroll")) {
+        if (e.affectsConfiguration("kdCode.autoScroll")) {
           this.post({ type: "autoScroll", enabled: readSettings().autoScroll });
         }
-        if (e.affectsConfiguration("codeAcp.tracing")) {
+        if (e.affectsConfiguration("kdCode.tracing")) {
           this.post({ type: "tracing", enabled: readSettings().tracing });
         }
-        if (e.affectsConfiguration("codeAcp.showChanges")) {
+        if (e.affectsConfiguration("kdCode.showChanges")) {
           this.post({ type: "showChanges", enabled: readSettings().showChanges });
           this.changes.refreshLenses();
         }
-        if (e.affectsConfiguration("codeAcp.fontSize") || e.affectsConfiguration("codeAcp.codeFontSize")) {
+        if (e.affectsConfiguration("kdCode.fontSize") || e.affectsConfiguration("kdCode.codeFontSize")) {
           this.postDisplay();
         }
-        if (e.affectsConfiguration("codeAcp.showRestore")) {
+        if (e.affectsConfiguration("kdCode.showRestore")) {
           this.post({ type: "showRestore", enabled: readSettings().showRestore });
           for (const tab of this.tabs.all) {
             this.changes.postIfTracked(tab);
@@ -398,7 +398,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
   }
 
-  /** codeAcp.fontSize and codeAcp.codeFontSize, in pixels; 0 follows VS Code. */
+  /** kdCode.fontSize and kdCode.codeFontSize, in pixels; 0 follows VS Code. */
   private postDisplay(): void {
     const { fontSize, codeFontSize } = readSettings();
     this.post({ type: "display", fontSize, codeFontSize });

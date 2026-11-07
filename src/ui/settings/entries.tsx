@@ -187,7 +187,7 @@ function EntryEditor(props: {
   );
 }
 
-/** The entries of codeAcp.mcpServers or, with `agents`, of codeAcp.customAgents. */
+/** The entries of kdCode.mcpServers or, with `agents`, of kdCode.customAgents. */
 export function EntryList(props: { agents?: boolean; value: unknown; overridden: boolean; locked: boolean }) {
   const { t } = useL10n();
   const key = props.agents ? "customAgents" : "mcpServers";

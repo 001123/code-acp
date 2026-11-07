@@ -1,4 +1,4 @@
-/** What codeAcp.providers says about an agent's models, as the webviews get it. */
+/** What kdCode.providers says about an agent's models, as the webviews get it. */
 export interface ModelPrefs {
   readonly hiddenModels?: ReadonlyArray<string>;
   readonly modelOrder?: ReadonlyArray<string>;

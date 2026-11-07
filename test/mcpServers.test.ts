@@ -14,7 +14,7 @@ describe("mcpServersFor", () => {
 
   it.effect("converts stdio servers, with and without a type", () =>
     Effect.gen(function* () {
-      __test.setSetting("codeAcp.mcpServers", {
+      __test.setSetting("kdCode.mcpServers", {
         a: { command: "node", args: ["s.js"], env: { K: "v" } },
         b: { type: "stdio", command: "bin" },
       });
@@ -27,7 +27,7 @@ describe("mcpServersFor", () => {
 
   it.effect("converts http and sse servers when the agent supports them", () =>
     Effect.gen(function* () {
-      __test.setSetting("codeAcp.mcpServers", {
+      __test.setSetting("kdCode.mcpServers", {
         h: { type: "http", url: "https://h", headers: { Authorization: "x" } },
         s: { type: "sse", url: "https://s" },
       });
@@ -40,7 +40,7 @@ describe("mcpServersFor", () => {
 
   it.effect("drops http/sse when the capability is missing", () =>
     Effect.gen(function* () {
-      __test.setSetting("codeAcp.mcpServers", {
+      __test.setSetting("kdCode.mcpServers", {
         h: { type: "http", url: "https://h" },
         s: { type: "sse", url: "https://s" },
         c: { command: "x" },
@@ -62,7 +62,7 @@ describe("mcpServersFor", () => {
 
   it.effect("skips invalid entries but keeps the valid ones", () =>
     Effect.gen(function* () {
-      __test.setSetting("codeAcp.mcpServers", {
+      __test.setSetting("kdCode.mcpServers", {
         bad1: { type: "http" },
         bad2: "nope",
         bad3: { command: 1 },
@@ -77,9 +77,9 @@ describe("mcpServersFor", () => {
 
   it.effect("returns nothing when the setting is not an object", () =>
     Effect.gen(function* () {
-      __test.setSetting("codeAcp.mcpServers", ["x"]);
+      __test.setSetting("kdCode.mcpServers", ["x"]);
       assert.deepStrictEqual(yield* mcpServersFor(undefined), []);
-      __test.setSetting("codeAcp.mcpServers", "x");
+      __test.setSetting("kdCode.mcpServers", "x");
       assert.deepStrictEqual(yield* mcpServersFor(undefined), []);
     }),
   );

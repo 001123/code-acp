@@ -91,7 +91,7 @@ export class AcpRegistry extends Context.Service<
   {
     readonly fetch: Effect.Effect<Registry, RegistryError>;
   }
->()("code-acp/AcpRegistry") {
+>()("kd-code/AcpRegistry") {
   static readonly layer = Layer.effect(
     AcpRegistry,
     Effect.gen(function* () {

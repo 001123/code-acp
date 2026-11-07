@@ -208,7 +208,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
       const { onAsyncTask } = handlers;
       const stream = onAsyncTask ? takeAsyncTasks(traced, onAsyncTask) : traced;
       const connection = acp
-        .client({ name: "code-acp" })
+        .client({ name: "kd-code" })
         .onNotification(acp.methods.client.session.update, ({ params }) => handlers.onUpdate(modes.translate(params)))
         .onRequest(acp.methods.client.session.requestPermission, ({ params, signal }) =>
           runPromise(handlers.requestPermission(params, signal)),
@@ -291,7 +291,7 @@ export const spawnAgent = Effect.fn("spawnAgent")(function* (
   const initializeResponse = yield* request("initialize", (agent) =>
     agent.request(acp.methods.agent.initialize, {
       protocolVersion: acp.PROTOCOL_VERSION,
-      clientInfo: { name: "code-acp", version },
+      clientInfo: { name: "kd-code", version },
       clientCapabilities: {
         fs: { readTextFile: true, writeTextFile: true },
         terminal: handlers.onTerminal !== undefined,

@@ -44,8 +44,8 @@ describe("readSettings", () => {
   it("reads font sizes, and falls back to VS Code's on sizes out of range", () => {
     assert.strictEqual(readSettings().fontSize, 0);
     assert.strictEqual(readSettings().codeFontSize, 0);
-    __test.setSetting("codeAcp.fontSize", 16);
-    __test.setSetting("codeAcp.codeFontSize", 99);
+    __test.setSetting("kdCode.fontSize", 16);
+    __test.setSetting("kdCode.codeFontSize", 99);
     assert.strictEqual(readSettings().fontSize, 16);
     assert.strictEqual(readSettings().codeFontSize, 0);
     assert.isUndefined(valueToStore("user", "fontSize", 0, { defaultValue: 0 }));
@@ -53,23 +53,23 @@ describe("readSettings", () => {
   });
 
   it("reads session defaults by agent, and falls back on invalid ones", () => {
-    __test.setSetting("codeAcp.sessionDefaults", { claude: { model: "opus", effort: "high", fastMode: "on" } });
+    __test.setSetting("kdCode.sessionDefaults", { claude: { model: "opus", effort: "high", fastMode: "on" } });
     assert.deepStrictEqual(readSettings().sessionDefaults, {
       claude: { model: "opus", effort: "high", fastMode: "on" },
     });
-    __test.setSetting("codeAcp.sessionDefaults", { claude: { fastMode: "maybe" } });
+    __test.setSetting("kdCode.sessionDefaults", { claude: { fastMode: "maybe" } });
     assert.deepStrictEqual(readSettings().sessionDefaults, {});
   });
 
   it("reads valid values", () => {
-    __test.setSetting("codeAcp.language", "vi");
-    __test.setSetting("codeAcp.followAgent", true);
-    __test.setSetting("codeAcp.autoScroll", false);
-    __test.setSetting("codeAcp.showChanges", false);
-    __test.setSetting("codeAcp.showRestore", true);
-    __test.setSetting("codeAcp.notifyFinished", false);
-    __test.setSetting("codeAcp.env", { A: "1" });
-    __test.setSetting("codeAcp.customAgents", { mine: { command: "x", args: ["a"] } });
+    __test.setSetting("kdCode.language", "vi");
+    __test.setSetting("kdCode.followAgent", true);
+    __test.setSetting("kdCode.autoScroll", false);
+    __test.setSetting("kdCode.showChanges", false);
+    __test.setSetting("kdCode.showRestore", true);
+    __test.setSetting("kdCode.notifyFinished", false);
+    __test.setSetting("kdCode.env", { A: "1" });
+    __test.setSetting("kdCode.customAgents", { mine: { command: "x", args: ["a"] } });
     const s = readSettings();
     assert.strictEqual(s.language, "vi");
     assert.isTrue(s.followAgent);
@@ -82,10 +82,10 @@ describe("readSettings", () => {
   });
 
   it("falls back to the default of only the invalid setting", () => {
-    __test.setSetting("codeAcp.language", "fr");
-    __test.setSetting("codeAcp.followAgent", "yes");
-    __test.setSetting("codeAcp.env", { A: 1 });
-    __test.setSetting("codeAcp.nodePath", "/usr/bin/node");
+    __test.setSetting("kdCode.language", "fr");
+    __test.setSetting("kdCode.followAgent", "yes");
+    __test.setSetting("kdCode.env", { A: 1 });
+    __test.setSetting("kdCode.nodePath", "/usr/bin/node");
     const s = readSettings();
     assert.strictEqual(s.language, "auto");
     assert.isFalse(s.followAgent);
@@ -94,8 +94,8 @@ describe("readSettings", () => {
   });
 
   it("falls back when a custom agent or MCP server entry is malformed", () => {
-    __test.setSetting("codeAcp.customAgents", { bad: { args: [] } });
-    __test.setSetting("codeAcp.mcpServers", { bad: { type: "http" } });
+    __test.setSetting("kdCode.customAgents", { bad: { args: [] } });
+    __test.setSetting("kdCode.mcpServers", { bad: { type: "http" } });
     const s = readSettings();
     assert.deepStrictEqual(s.customAgents, {});
     assert.deepStrictEqual(s.mcpServers, {});
@@ -181,26 +181,26 @@ describe("settings that decide what gets executed", () => {
   ).contributes.configuration.properties;
 
   for (const key of ["customAgents", "env", "nodePath", "ccusagePath", "mcpServers", "worktreeSetupCommand"]) {
-    it(`codeAcp.${key} cannot be set by a workspace`, () => {
-      assert.strictEqual(properties[`codeAcp.${key}`]?.scope, "machine");
+    it(`kdCode.${key} cannot be set by a workspace`, () => {
+      assert.strictEqual(properties[`kdCode.${key}`]?.scope, "machine");
     });
   }
 
   it("the Settings page locks exactly the settings a workspace can't set", () => {
     const machine = Object.entries(properties)
       .filter(([, property]) => property.scope === "machine")
-      .map(([key]) => key.replace("codeAcp.", ""));
+      .map(([key]) => key.replace("kdCode.", ""));
     assert.sameMembers([...USER_ONLY_SETTINGS], machine);
     assert.sameMembers([...lockedSettings("workspace")], machine);
   });
 
   it("a project's setup command can differ per folder of a workspace", () => {
-    assert.strictEqual(properties["codeAcp.worktreeProjectSetupCommand"]?.scope, "resource");
+    assert.strictEqual(properties["kdCode.worktreeProjectSetupCommand"]?.scope, "resource");
   });
 });
 
 describe("projectSetupCommand", () => {
-  const KEY = "codeAcp.worktreeProjectSetupCommand";
+  const KEY = "kdCode.worktreeProjectSetupCommand";
 
   it("comes from the folder's settings, then the workspace's, and never the user's", () => {
     __test.setSetting(KEY, "user");

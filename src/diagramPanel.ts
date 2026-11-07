@@ -12,9 +12,9 @@ export type DiagramToWebview = { type: "diagram"; code: string; hover: boolean }
 export const DiagramState = Schema.Struct({ code: Schema.String });
 export type DiagramState = typeof DiagramState.Type;
 
-const VIEW_TYPE = "codeAcp.diagram";
+const VIEW_TYPE = "kdCode.diagram";
 /** Whether hover highlighting is on, shared by every diagram tab (on unless turned off). */
-const HOVER_KEY = "codeAcp.diagram.hover";
+const HOVER_KEY = "kdCode.diagram.hover";
 
 const hoverOn = (state: vscode.Memento) =>
   Option.getOrElse(Schema.decodeUnknownOption(Schema.Boolean)(state.get(HOVER_KEY)), () => true);

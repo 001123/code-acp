@@ -26,7 +26,7 @@ export type Item =
   | ElicitationItem
   | CompactionItem
   | { kind: "notice" | "error"; id: number; text: Text }
-  /** The numbers of a finished turn; shown while codeAcp.tracing is on. */
+  /** The numbers of a finished turn; shown while kdCode.tracing is on. */
   | { kind: "trace"; id: number; trace: TurnTrace };
 
 interface ElicitationBase {

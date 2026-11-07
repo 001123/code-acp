@@ -1,4 +1,4 @@
-# Code ACP
+# KD Code
 
 [![Version](https://img.shields.io/github/package-json/v/001123/code-acp?label=version)](package.json)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%E2%89%A51.123-007ACC)](https://code.visualstudio.com)
@@ -9,17 +9,17 @@ Chat with coding agents in VS Code over the [Agent Client Protocol](https://agen
 
 ## Getting started
 
-Code ACP needs VS Code ≥ 1.123. There is no release yet, so build it from source with `npm install && npm run reinstall`.
+KD Code needs VS Code ≥ 1.123. There is no release yet, so build it from source with `npm install && npm run reinstall`.
 
-The walkthrough (`Code ACP: Get Started`) takes you through these steps:
+The walkthrough (`KD Code: Get Started`) takes you through these steps:
 
-1. Run `Code ACP: Manage Agents` and install an agent.
-2. Run `Code ACP: Doctor` to check your setup.
+1. Run `KD Code: Manage Agents` and install an agent.
+2. Run `KD Code: Doctor` to check your setup.
 3. Open the chat in the secondary side bar with `Ctrl+Alt+A` (`Cmd+Alt+A` on macOS).
 4. If the agent asks you to sign in, use the **Log in** button.
 5. Start chatting.
 
-`npx` agents need Node.js, `uvx` agents need [uv](https://docs.astral.sh/uv/). Settings are under `Code ACP: Open Settings`, for your user or the current workspace. Known limitations: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+`npx` agents need Node.js, `uvx` agents need [uv](https://docs.astral.sh/uv/). Settings are under `KD Code: Open Settings`, for your user or the current workspace. Known limitations: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Features
 
@@ -38,13 +38,13 @@ The walkthrough (`Code ACP: Get Started`) takes you through these steps:
 
 - Attach files, folders, images, problems and terminals with `@`, by pasting, or from the drop view. Optionally include the open file in every message.
 - Add editor selections, terminal selections, the last command output or the last failed command with a command or shortcut.
-- Run **Explain**, **Refactor** and **Write Tests** on a selection, or **Fix with Code ACP** on a problem.
+- Run **Explain**, **Refactor** and **Write Tests** on a selection, or **Fix with KD Code** on a problem.
 - Preview images, draw on them with pen, arrow, rectangle and text, and open them in a separate window.
 
 ### Changes
 
 - Review the agent's changes per file or per change, with Keep and Undo in the chat and in the editor.
-- Restore the files to a checkpoint from before any message (turn on `codeAcp.showRestore`).
+- Restore the files to a checkpoint from before any message (turn on `kdCode.showRestore`).
 - Follow the agent in the editor: open the files it reads and edits, and highlight the lines it changes.
 
 ### Worktrees

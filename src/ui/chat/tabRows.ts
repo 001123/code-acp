@@ -194,7 +194,7 @@ export interface TabChanges {
 
 /**
  * What a tab changed: its worktree's diff when it belongs to a group, else the files awaiting review, which
- * codeAcp.showChanges can hide. `undefined` when there is nothing to show.
+ * kdCode.showChanges can hide. `undefined` when there is nothing to show.
  */
 export function tabChanges(state: TabState | undefined, showChanges: boolean): TabChanges | undefined {
   const diff = state?.worktreeDiff;

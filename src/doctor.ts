@@ -22,7 +22,7 @@ const UV_URL = "https://docs.astral.sh/uv/getting-started/installation/";
 const GIT_URL = "https://git-scm.com/downloads";
 
 /** Logs in to the agent id it is given, from a page outside the chat view. */
-export const LOGIN_AGENT_COMMAND = "codeAcp.loginAgent";
+export const LOGIN_AGENT_COMMAND = "kdCode.loginAgent";
 
 export type DoctorStatus = "ok" | "warning" | "error";
 
@@ -69,7 +69,7 @@ export class Doctor extends Context.Service<
     /** The tools alone, for the first run, when there is no agent to start yet. */
     readonly setupChecks: Effect.Effect<ReadonlyArray<DoctorCheck>>;
   }
->()("code-acp/Doctor") {
+>()("kd-code/Doctor") {
   static readonly layer = Layer.effect(
     Doctor,
     Effect.gen(function* () {
@@ -129,7 +129,7 @@ export class Doctor extends Context.Service<
       /** Starts the agent and opens a session, in a folder of its own so it stays out of the project's history. */
       const probe = (choice: AgentChoice, command: Parameters<typeof spawnAgent>[0]) =>
         Effect.gen(function* () {
-          const folder = yield* fs.makeTempDirectoryScoped({ prefix: "code-acp-doctor-" });
+          const folder = yield* fs.makeTempDirectoryScoped({ prefix: "kd-code-doctor-" });
           const agent = yield* spawnAgent(command, {
             onUpdate: () => {},
             requestPermission: () => Effect.succeed(CANCELLED),

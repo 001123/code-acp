@@ -72,7 +72,7 @@ function statusOf(doctor: DoctorState, id: string): { status: Status; result?: D
   return { status: result.status, result };
 }
 
-/** The codeAcp.providers entries the page shows. */
+/** The kdCode.providers entries the page shows. */
 const prefsOf = (state: State) => (state.values.providers ?? {}) as Readonly<Record<string, ProviderPrefs>>;
 
 /** Writes `patch` over the prefs of provider `id`; what is back to its default is dropped, and an entry left empty. */

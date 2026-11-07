@@ -158,7 +158,7 @@ export function tapStream<M>(stream: { readable: ReadableStream<M>; writable: Wr
   };
 }
 
-/** The log of the messages exchanged with agents, kept while codeAcp.tracing is on. */
+/** The log of the messages exchanged with agents, kept while kdCode.tracing is on. */
 export class AcpTrace extends Context.Service<
   AcpTrace,
   {
@@ -166,7 +166,7 @@ export class AcpTrace extends Context.Service<
     tap<M>(stream: { readable: ReadableStream<M>; writable: WritableStream<M> }, label: string): typeof stream;
     readonly show: Effect.Effect<void>;
   }
->()("code-acp/AcpTrace") {
+>()("kd-code/AcpTrace") {
   static readonly layer = Layer.effect(
     AcpTrace,
     Effect.gen(function* () {
@@ -174,7 +174,7 @@ export class AcpTrace extends Context.Service<
       yield* Effect.acquireRelease(
         Effect.sync(() =>
           vscode.workspace.onDidChangeConfiguration((e) => {
-            if (e.affectsConfiguration("codeAcp.tracing")) {
+            if (e.affectsConfiguration("kdCode.tracing")) {
               enabled = readSettings().tracing;
             }
           }),

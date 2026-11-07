@@ -20,10 +20,10 @@ import { TerminalContext } from "./terminalContext";
 import { UsageLedger } from "./usageLedger";
 import { Worktrees } from "./worktrees";
 
-export class ExtensionCtx extends Context.Service<ExtensionCtx, vscode.ExtensionContext>()("code-acp/ExtensionCtx") {}
+export class ExtensionCtx extends Context.Service<ExtensionCtx, vscode.ExtensionContext>()("kd-code/ExtensionCtx") {}
 
-/** The "Code ACP" output channel; raw process output goes here, Effect logs too. */
-export class Output extends Context.Service<Output, vscode.OutputChannel>()("code-acp/Output") {}
+/** The "KD Code" output channel; raw process output goes here, Effect logs too. */
+export class Output extends Context.Service<Output, vscode.OutputChannel>()("kd-code/Output") {}
 
 /** A rejected VS Code API call (file system, settings, UI). */
 export class VscodeError extends Schema.TaggedError<VscodeError>()("VscodeError", {

@@ -11,14 +11,14 @@ const closeListeners = new Set<(terminal: unknown) => void>();
 
 /** Test hooks; not part of the real vscode API. */
 export const __test = {
-  /** Sets `codeAcp.<key>` (or any full key like `codeAcp.language`). */
+  /** Sets `kdCode.<key>` (or any full key like `kdCode.language`). */
   setSetting(key: string, value: unknown) {
     settings.set(key, value);
     for (const listener of listeners) {
       listener({ affectsConfiguration: (section) => key === section || key.startsWith(`${section}.`) });
     }
   },
-  /** Sets a full key like `codeAcp.language` in the workspace's settings; undefined removes it. */
+  /** Sets a full key like `kdCode.language` in the workspace's settings; undefined removes it. */
   setWorkspaceSetting(key: string, value: unknown) {
     workspaceSettings.set(key, value);
   },

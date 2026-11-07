@@ -465,12 +465,12 @@ describe("TabList", () => {
 });
 
 describe("history search", () => {
-  const session = { sessionId: "s", cwd: "/work/code-acp", title: "Tìm kiếm trong lịch sử" };
+  const session = { sessionId: "s", cwd: "/work/kd-code", title: "Tìm kiếm trong lịch sử" };
 
   it("matches every word, ignoring case and diacritics", () => {
     assert.isTrue(matchesSession(session, ""));
     assert.isTrue(matchesSession(session, "tim LICH"));
-    assert.isTrue(matchesSession(session, "lịch code-acp"));
+    assert.isTrue(matchesSession(session, "lịch kd-code"));
     assert.isFalse(matchesSession(session, "tim tab"));
     assert.isTrue(matchesSession({ sessionId: "d", cwd: "/w", title: "Đổi tên" }, "doi"));
   });
@@ -523,7 +523,7 @@ describe("sidebar history", () => {
   });
 
   it("names a folder by its last segment", () => {
-    assert.strictEqual(folderName("/work/code-acp/"), "code-acp");
+    assert.strictEqual(folderName("/work/kd-code/"), "kd-code");
     assert.strictEqual(folderName("C:\\work\\code"), "code");
   });
 });

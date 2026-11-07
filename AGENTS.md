@@ -1,6 +1,6 @@
 # AGENTS.md
 
-VS Code extension "Code ACP": chat with coding agents over ACP, install agents from the ACP Registry.
+VS Code extension "KD Code": chat with coding agents over ACP, install agents from the ACP Registry.
 
 ## Rules
 

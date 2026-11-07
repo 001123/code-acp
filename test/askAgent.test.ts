@@ -13,12 +13,12 @@ describe("AskAgentActions", () => {
     assert.deepStrictEqual(
       actions.map((a) => [a.title, a.command?.command]),
       [
-        ["Explain with Code ACP", "codeAcp.explainSelection"],
-        ["Refactor with Code ACP", "codeAcp.refactorSelection"],
-        ["Write tests with Code ACP", "codeAcp.testSelection"],
+        ["Explain with KD Code", "kdCode.explainSelection"],
+        ["Refactor with KD Code", "kdCode.refactorSelection"],
+        ["Write tests with KD Code", "kdCode.testSelection"],
       ],
     );
-    assert.strictEqual(actions[0]!.kind?.value, "codeAcp");
+    assert.strictEqual(actions[0]!.kind?.value, "kdCode");
     assert.strictEqual(ASKS.length, actions.length);
   });
 

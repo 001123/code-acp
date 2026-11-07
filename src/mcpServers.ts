@@ -18,17 +18,17 @@ function toAcp(name: string, entry: McpServerEntry): acp.McpServer {
 }
 
 /**
- * The servers from codeAcp.mcpServers to pass to a new or reopened session. Entries are decoded one by
+ * The servers from kdCode.mcpServers to pass to a new or reopened session. Entries are decoded one by
  * one, unlike readSettings, so one bad entry does not drop the others. Invalid entries and transports
  * the agent does not support are skipped with a warning in the output channel.
  */
 export const mcpServersFor = Effect.fn("mcpServersFor")(function* (
   capabilities: acp.McpCapabilities | undefined,
 ): Effect.fn.Return<Array<acp.McpServer>> {
-  const raw = vscode.workspace.getConfiguration("codeAcp").get("mcpServers");
+  const raw = vscode.workspace.getConfiguration("kdCode").get("mcpServers");
   const entries = decodeEntries(raw ?? {});
   if (Exit.isFailure(entries)) {
-    yield* Effect.logWarning("[mcp] codeAcp.mcpServers must be an object of servers by name");
+    yield* Effect.logWarning("[mcp] kdCode.mcpServers must be an object of servers by name");
     return [];
   }
   const servers: Array<acp.McpServer> = [];

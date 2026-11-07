@@ -127,7 +127,7 @@ export function scopedSetting(
 /** Webview page for the extension's settings, of the user or the open workspace, with a link to the native Settings UI. */
 export class SettingsPanel {
   private static current?: SettingsPanel;
-  private static readonly viewType = "codeAcp.settings";
+  private static readonly viewType = "kdCode.settings";
 
   private readonly disposables: vscode.Disposable[] = [];
   private readonly catalog: AgentCatalog;
@@ -213,7 +213,7 @@ export class SettingsPanel {
     this.disposables.push(
       panel.webview.onDidReceiveMessage((msg: FromWebview) => this.run(this.onMessage(msg))),
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("codeAcp")) this.run(this.render);
+        if (e.affectsConfiguration("kdCode")) this.run(this.render);
       }),
       onDidChangeLocale(() => {
         panel.title = t("settings.title");
@@ -240,7 +240,7 @@ export class SettingsPanel {
   }
 
   private run<E>(effect: Effect.Effect<void, E, AppServices>): void {
-    void runIn(this.runtime, effect, (message) => void vscode.window.showErrorMessage(`Code ACP: ${message}`));
+    void runIn(this.runtime, effect, (message) => void vscode.window.showErrorMessage(`KD Code: ${message}`));
   }
 
   private readonly onMessage = Effect.fn("SettingsPanel.onMessage")(function* (this: SettingsPanel, msg: FromWebview) {
@@ -290,7 +290,7 @@ export class SettingsPanel {
           !lockedSettings(scope).includes(msg.key) &&
           isValidSetting(msg.key, msg.value)
         ) {
-          const config = vscode.workspace.getConfiguration("codeAcp");
+          const config = vscode.workspace.getConfiguration("kdCode");
           const value = valueToStore(scope, msg.key, msg.value, config.inspect(msg.key));
           const target =
             scope === "workspace" ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
@@ -337,7 +337,7 @@ export class SettingsPanel {
             yield* thenable(() => vscode.commands.executeCommand(LOGIN_AGENT_COMMAND, fix.agentId));
             break;
           case "showLog":
-            yield* thenable(() => vscode.commands.executeCommand("codeAcp.showLog"));
+            yield* thenable(() => vscode.commands.executeCommand("kdCode.showLog"));
             break;
         }
         break;
@@ -360,7 +360,7 @@ export class SettingsPanel {
 
   private get render(): Effect.Effect<void, never, AutoApprove> {
     return Effect.gen({ self: this }, function* () {
-      const config = vscode.workspace.getConfiguration("codeAcp");
+      const config = vscode.workspace.getConfiguration("kdCode");
       const values: Record<string, unknown> = {};
       const overridden: SettingKey[] = [];
       const scope = this.scope;

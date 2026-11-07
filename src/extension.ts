@@ -17,10 +17,10 @@ import { SettingsPanel } from "./settingsPanel";
 const UPDATE_POLL_MS = 60 * 60 * 1000;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const log = vscode.window.createOutputChannel("Code ACP");
+  const log = vscode.window.createOutputChannel("KD Code");
   const runtime = makeRuntime(context, log);
   const manager = await runtime.runPromise(AgentManager.use(Effect.succeed));
-  const showError = (message: string) => void vscode.window.showErrorMessage(`Code ACP: ${message}`);
+  const showError = (message: string) => void vscode.window.showErrorMessage(`KD Code: ${message}`);
   const run =
     <A extends Array<unknown>, E>(command: (...args: A) => Effect.Effect<void, E, AppServices>) =>
     (...args: A) =>
@@ -58,7 +58,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   /** Completes the walkthrough's install step. */
   const updateHasAgent = Effect.fn("updateHasAgent")(function* () {
     const agents = yield* manager.agents;
-    yield* thenable(() => vscode.commands.executeCommand("setContext", "codeAcp.hasAgent", agents.length > 0));
+    yield* thenable(() => vscode.commands.executeCommand("setContext", "kdCode.hasAgent", agents.length > 0));
   });
   void run(updateHasAgent)();
 
@@ -80,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     } else if (picked === disable) {
       yield* thenable(() =>
         vscode.workspace
-          .getConfiguration("codeAcp")
+          .getConfiguration("kdCode")
           .update("checkAgentUpdates", false, vscode.ConfigurationTarget.Global),
       );
     }
@@ -104,28 +104,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     SettingsPanel.registerSerializer(context, runtime, manager),
     registerDiagramSerializer(context),
-    vscode.commands.registerCommand("codeAcp.manageAgents", manageAgents),
-    vscode.commands.registerCommand("codeAcp.selectAgent", run(selectAgent)),
-    vscode.commands.registerCommand("codeAcp.openSettings", () => SettingsPanel.show(context, runtime, manager)),
-    vscode.commands.registerCommand("codeAcp.showUsage", () => SettingsPanel.show(context, runtime, manager, "usage")),
+    vscode.commands.registerCommand("kdCode.manageAgents", manageAgents),
+    vscode.commands.registerCommand("kdCode.selectAgent", run(selectAgent)),
+    vscode.commands.registerCommand("kdCode.openSettings", () => SettingsPanel.show(context, runtime, manager)),
+    vscode.commands.registerCommand("kdCode.showUsage", () => SettingsPanel.show(context, runtime, manager, "usage")),
     vscode.commands.registerCommand(
-      "codeAcp.newSession",
+      "kdCode.newSession",
       run(() => provider.newSession()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.history",
+      "kdCode.history",
       run(() => provider.showConversations),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.cancel",
+      "kdCode.cancel",
       run(() => provider.cancel()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.findInConversation",
+      "kdCode.findInConversation",
       run(() => provider.findInConversation),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.exportConversation",
+      "kdCode.exportConversation",
       run(() => provider.exportConversation),
     ),
     vscode.commands.registerCommand(
@@ -133,32 +133,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       run(() => provider.showAttention()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.worktree",
+      "kdCode.worktree",
       run(() => provider.pickWorktree()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.cleanWorktrees",
+      "kdCode.cleanWorktrees",
       run(() => provider.cleanWorktrees()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.login",
+      "kdCode.login",
       run(() => provider.login()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.logout",
+      "kdCode.logout",
       run(() => provider.logout()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.restart",
+      "kdCode.restart",
       run(() => provider.restart()),
     ),
-    vscode.commands.registerCommand("codeAcp.showLog", () => log.show()),
+    vscode.commands.registerCommand("kdCode.showLog", () => log.show()),
     vscode.commands.registerCommand(
-      "codeAcp.showTrace",
+      "kdCode.showTrace",
       run(() => AcpTrace.use((trace) => trace.show)),
     ),
     // "run": a command asks for the checks; merely opening the tab does not start the agents.
-    vscode.commands.registerCommand("codeAcp.doctor", () =>
+    vscode.commands.registerCommand("kdCode.doctor", () =>
       SettingsPanel.show(context, runtime, manager, "debug", "doctor"),
     ),
     vscode.commands.registerCommand(
@@ -166,7 +166,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       run((agentId: string) => provider.loginTo(agentId)),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.openWalkthrough",
+      "kdCode.openWalkthrough",
       run(() =>
         thenable(() =>
           vscode.commands.executeCommand("workbench.action.openWalkthrough", `${context.extension.id}#gettingStarted`),
@@ -175,20 +175,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ),
     // scm/title passes the SourceControl; the palette passes nothing.
     vscode.commands.registerCommand(
-      "codeAcp.generateCommitMessage",
+      "kdCode.generateCommitMessage",
       run((sourceControl?: unknown) => CommitMessage.use((commit) => commit.generate(sourceControl))),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.commitAndPush",
+      "kdCode.commitAndPush",
       run((sourceControl?: unknown) => CommitMessage.use((commit) => commit.commitAndPush(sourceControl))),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.cancelCommitMessage",
+      "kdCode.cancelCommitMessage",
       run(() => CommitMessage.use((commit) => commit.cancel)),
     ),
     // Explorer passes (clicked, selected[]); editor title/tab passes the tab's uri; palette passes nothing.
     vscode.commands.registerCommand(
-      "codeAcp.attach",
+      "kdCode.attach",
       run((uri?: vscode.Uri, selected?: Array<vscode.Uri>) => {
         const target = vscode.window.activeTextEditor?.document.uri;
         const uris = selected?.length ? selected : uri instanceof vscode.Uri ? [uri] : target ? [target] : [];
@@ -196,13 +196,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.addSelection",
+      "kdCode.addSelection",
       run(() => {
         const editor = vscode.window.activeTextEditor;
         return editor ? provider.composer.attachSelection(editor) : Effect.void;
       }),
     ),
-    // "Ask Code ACP": the editor context submenu, the palette and the lightbulb.
+    // "Ask KD Code": the editor context submenu, the palette and the lightbulb.
     ...ASKS.map(({ command, prompt }) =>
       vscode.commands.registerCommand(
         command,
@@ -218,16 +218,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       providedCodeActionKinds: AskAgentActions.kinds,
     }),
     vscode.commands.registerCommand(
-      "codeAcp.addProblems",
+      "kdCode.addProblems",
       run(() => provider.composer.attachProblems("file")),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.addWorkspaceProblems",
+      "kdCode.addWorkspaceProblems",
       run(() => provider.composer.attachProblems("workspace")),
     ),
-    // The "Fix with Code ACP" quick fix passes the document's uri and the diagnostics under the cursor.
+    // The "Fix with KD Code" quick fix passes the document's uri and the diagnostics under the cursor.
     vscode.commands.registerCommand(
-      "codeAcp.fixProblems",
+      "kdCode.fixProblems",
       run((uri?: unknown, diagnostics?: unknown) =>
         uri instanceof vscode.Uri && Array.isArray(diagnostics)
           ? provider.composer.fixProblems(uri, diagnostics)
@@ -238,34 +238,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       providedCodeActionKinds: FixProblemsActions.kinds,
     }),
     vscode.commands.registerCommand(
-      "codeAcp.addTerminalSelection",
+      "kdCode.addTerminalSelection",
       run(() => provider.composer.attachTerminalSelection()),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.addTerminalOutput",
+      "kdCode.addTerminalOutput",
       run(() => provider.composer.attachTerminalOutput(false)),
     ),
     vscode.commands.registerCommand(
-      "codeAcp.addTerminalFailure",
+      "kdCode.addTerminalFailure",
       run(() => provider.composer.attachTerminalOutput(true)),
     ),
     // webview/context passes the merged `data-vscode-context` of the clicked element (see src/ui/chat.tsx).
-    vscode.commands.registerCommand("codeAcp.quoteSelection", (context?: { selectedText?: unknown }) => {
+    vscode.commands.registerCommand("kdCode.quoteSelection", (context?: { selectedText?: unknown }) => {
       if (typeof context?.selectedText === "string") {
         provider.quote(context.selectedText);
       }
     }),
     ...(
       [
-        ["codeAcp.pinTab", "pin"],
-        ["codeAcp.unpinTab", "unpin"],
-        ["codeAcp.renameTab", "rename"],
-        ["codeAcp.closeTab", "close"],
-        ["codeAcp.closeOtherTabs", "closeOthers"],
-        ["codeAcp.closeTabsBelow", "closeBelow"],
-        ["codeAcp.forkTab", "fork"],
-        ["codeAcp.tabWorktree", "worktree"],
-        ["codeAcp.exportTab", "export"],
+        ["kdCode.pinTab", "pin"],
+        ["kdCode.unpinTab", "unpin"],
+        ["kdCode.renameTab", "rename"],
+        ["kdCode.closeTab", "close"],
+        ["kdCode.closeOtherTabs", "closeOthers"],
+        ["kdCode.closeTabsBelow", "closeBelow"],
+        ["kdCode.forkTab", "fork"],
+        ["kdCode.tabWorktree", "worktree"],
+        ["kdCode.exportTab", "export"],
       ] as const
     ).map(([command, action]) =>
       // The tab's `data-vscode-context` (see TabSidebar in src/ui/chat/tabs.tsx).

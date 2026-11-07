@@ -43,7 +43,7 @@ export class CommitMessageError extends Schema.TaggedError<CommitMessageError>()
 }) {}
 
 /** Context key that swaps the SCM title button to "stop" while a message is being generated. */
-const GENERATING_KEY = "codeAcp.generatingCommitMessage";
+const GENERATING_KEY = "kdCode.generatingCommitMessage";
 /** Keeps the prompt within what agents accept comfortably. */
 const MAX_DIFF_CHARS = 80_000;
 /**
@@ -88,7 +88,7 @@ export class CommitMessage extends Context.Service<
      */
     options(agentId: string, model: string): Effect.Effect<AgentOptions, CommitMessageError>;
   }
->()("code-acp/CommitMessage") {
+>()("kd-code/CommitMessage") {
   static readonly layer = Layer.effect(
     CommitMessage,
     Effect.gen(function* () {
@@ -159,7 +159,7 @@ export class CommitMessage extends Context.Service<
         return { staged, status, diff: truncated, log };
       });
 
-      /** The codeAcp.commitMessage.agent agent while it exists, else the chat's default. */
+      /** The kdCode.commitMessage.agent agent while it exists, else the chat's default. */
       const commandFor = Effect.fn("CommitMessage.commandFor")(function* (agentId: string) {
         const command = (agentId ? yield* manager.command(agentId) : undefined) ?? (yield* manager.selectedCommand);
         if (!command) {

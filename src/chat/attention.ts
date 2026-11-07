@@ -3,7 +3,7 @@ import type { Settings } from "../settings";
 /** Why a tab wants the user: a permission request, a question from the agent, or a turn that ended. */
 export type AttentionReason = "permission" | "question" | "finished";
 
-/** Whether `reason` gets a notification: codeAcp.notifications covers all of them, codeAcp.notifyFinished the finished ones. */
+/** Whether `reason` gets a notification: kdCode.notifications covers all of them, kdCode.notifyFinished the finished ones. */
 export function shouldNotify(
   reason: AttentionReason,
   settings: Pick<Settings, "notifications" | "notifyFinished">,

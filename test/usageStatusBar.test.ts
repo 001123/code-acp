@@ -31,7 +31,7 @@ describe("usageStatusView", () => {
   });
 
   it("follows the language setting", () => {
-    __test.setSetting("codeAcp.language", "vi");
+    __test.setSetting("kdCode.language", "vi");
     const view = usageStatusView(totals(1500, 2), totals(1500, 2));
     assert.include(view.tooltip, "Tab này: 1.500 token · 2 lượt");
     assert.include(view.tooltip, "Hôm nay: 1.500 token · 2 lượt");
@@ -73,20 +73,20 @@ describe("ChatIndicators usage", () => {
       usage,
       backgroundTasks: { of: () => [] },
       showAttentionCommand: "show.attention",
-      showUsageCommand: "codeAcp.showUsage",
+      showUsageCommand: "kdCode.showUsage",
       view: () => undefined,
       agentIdOf: () => Effect.succeed("claude"),
       reveal: () => {},
       run: (effect: Effect.Effect<void, never, UsageLedger>) =>
         Effect.runSync(effect.pipe(Effect.provideService(UsageLedger, ledger))),
     } as unknown as IndicatorsHost);
-    const item = items.get("codeAcp.usage")!;
+    const item = items.get("kdCode.usage")!;
     const flush = async () => {
       indicators.update();
       await Promise.resolve();
     };
 
-    assert.strictEqual(item.command, "codeAcp.showUsage");
+    assert.strictEqual(item.command, "kdCode.showUsage");
     await flush();
     assert.strictEqual(item.text, "$(graph) 100 tokens · 1 turns");
 

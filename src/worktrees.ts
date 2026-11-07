@@ -10,7 +10,7 @@ import { messageOf } from "./runtime";
 import { projectSetupCommand, readSettings } from "./settings";
 
 /** Branches of the worktrees the extension creates. */
-const BRANCH_PREFIX = "code-acp/";
+const BRANCH_PREFIX = "kd-code/";
 /** A branch still on the random name it was created with. */
 const UNNAMED_BRANCH = new RegExp(`^${BRANCH_PREFIX}[0-9a-f]{6}$`);
 /** Under the prefix, the branches of the attempts of a comparison. No other branch may take this name: git couldn't have both. */
@@ -21,7 +21,7 @@ const MAX_SLUG_LENGTH = 40;
 const MAX_ATTEMPT_SLUG_LENGTH = 24;
 
 /** Where the extension's worktrees live, outside the repository so that they never show up in it. */
-const MANAGED_DIR = path.join(".code-acp", "worktrees");
+const MANAGED_DIR = path.join(".kd-code", "worktrees");
 /** How long a worktree's setup command may run; a dev server would otherwise keep the tab waiting for good. */
 const SETUP_TIMEOUT_MINUTES = 10;
 /** How much of a failed setup command's output its error shows, from the end. */
@@ -296,7 +296,7 @@ export class Worktrees extends Context.Service<
     /** Deletes a worktree the extension created, and its branch; others are left alone. */
     remove(worktree: TabWorktree): Effect.Effect<void, WorktreeError>;
   }
->()("code-acp/Worktrees") {
+>()("kd-code/Worktrees") {
   static readonly layer = Layer.effect(
     Worktrees,
     Effect.gen(function* () {

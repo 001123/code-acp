@@ -81,11 +81,11 @@ const prompt = (agent: AcpAgent, value: string) => agent.prompt("s1", text(value
 describe("spawnAgent", () => {
   it.live("logs the messages exchanged with the agent while tracing is on", () =>
     Effect.gen(function* () {
-      __test.setSetting("codeAcp.tracing", true);
+      __test.setSetting("kdCode.tracing", true);
       yield* withAgent({}, allow, (agent) =>
         Effect.gen(function* () {
           yield* prompt(agent, "updates");
-          const lines = __test.outputChannels.get("Code ACP Trace") ?? [];
+          const lines = __test.outputChannels.get("KD Code Trace") ?? [];
           assert.isTrue(lines.some((line) => line.includes(" → ") && line.includes('"initialize"')));
           assert.isTrue(lines.some((line) => line.includes(" ← ") && line.includes('"end_turn"')));
           assert.isTrue(lines.some((line) => line.includes(" ← ×2 ") && line.includes("hello world")));
@@ -99,7 +99,7 @@ describe("spawnAgent", () => {
     Effect.gen(function* () {
       __test.reset();
       yield* withAgent({}, allow, (agent) => prompt(agent, "updates"));
-      assert.isFalse(__test.outputChannels.has("Code ACP Trace"));
+      assert.isFalse(__test.outputChannels.has("KD Code Trace"));
     }),
   );
 
@@ -119,7 +119,7 @@ describe("spawnAgent", () => {
           clientInfo: { name: string; version: string };
           clientCapabilities: acp.ClientCapabilities;
         };
-        assert.deepStrictEqual(meta.clientInfo, { name: "code-acp", version: "1.2.3" });
+        assert.deepStrictEqual(meta.clientInfo, { name: "kd-code", version: "1.2.3" });
         assert.deepStrictEqual(meta.clientCapabilities.fs, { readTextFile: true, writeTextFile: true });
         assert.deepStrictEqual(meta.clientCapabilities.session, { notices: {}, compaction: {} });
         // No onTerminal handler: no terminal capability; no elicit handler: no elicitations.
@@ -149,7 +149,7 @@ describe("spawnAgent", () => {
 
   it.live("newSession passes cwd and mcpServers through", () => {
     __test.reset();
-    __test.setSetting("codeAcp.mcpServers", {
+    __test.setSetting("kdCode.mcpServers", {
       local: { command: "node", args: ["srv.js"], env: { K: "v" } },
       remote: { type: "http", url: "https://example.test/mcp" },
     });
@@ -169,7 +169,7 @@ describe("spawnAgent", () => {
 
   it.live("forks a session when the agent advertises session/fork", () => {
     __test.reset();
-    __test.setSetting("codeAcp.mcpServers", { local: { command: "node", args: ["srv.js"] } });
+    __test.setSetting("kdCode.mcpServers", { local: { command: "node", args: ["srv.js"] } });
     return Effect.gen(function* () {
       yield* withAgent({}, allow, (agent) => Effect.sync(() => assert.isFalse(canFork(agent))));
       yield* withAgent({ MOCK_FORK: "1" }, allow, (agent) =>
@@ -187,7 +187,7 @@ describe("spawnAgent", () => {
 
   it.live("newSession passes http servers when the agent supports them", () => {
     __test.reset();
-    __test.setSetting("codeAcp.mcpServers", { remote: { type: "http", url: "https://example.test/mcp" } });
+    __test.setSetting("kdCode.mcpServers", { remote: { type: "http", url: "https://example.test/mcp" } });
     return withAgent({ MOCK_HTTP: "1" }, allow, (agent) =>
       Effect.gen(function* () {
         const res = yield* agent.newSession("/c");
