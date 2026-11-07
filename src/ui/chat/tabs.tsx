@@ -59,6 +59,7 @@ import {
   type ShownRow,
   type TabChanges,
 } from "./tabRows";
+import { useReorderMotion, useTabMotion, withLeaving } from "./tabMotion";
 import { EMPTY, type Transcript } from "./transcript";
 
 export interface Status {
@@ -239,6 +240,8 @@ export function TabSidebar({
   const restTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const workingKeys = useRef<ReadonlySet<string>>(new Set());
   const waitingKeys = useRef<ReadonlySet<string>>(new Set());
+  const motion = useTabMotion(tabs);
+  const leavingIds = new Set(motion.leaving.map((each) => each.tab.id));
   const searching = query.trim() !== "";
   /** Dragging sets the manual order, which another order hides. */
   const reorderable = !searching && prefs.tabSort === "manual";
@@ -352,6 +355,7 @@ export function TabSidebar({
         key={key}
         className="tab"
         role="tab"
+        data-row={key}
         draggable={reorderable && tab.id !== renaming}
         aria-selected={tab.id === active && shownGroup === undefined}
         data-member={member || undefined}
@@ -361,6 +365,10 @@ export function TabSidebar({
         data-pinned={tab.pinned || undefined}
         data-dragging={dragged?.ids.includes(tab.id) || undefined}
         data-drop={dropOf(key)}
+        data-entering={motion.entering.has(tab.id) || undefined}
+        data-leaving={leavingIds.has(tab.id) || undefined}
+        // Closed already: only animates out.
+        inert={leavingIds.has(tab.id)}
         title={tooltip}
         // Native context menu: the `webview/context` tab commands in package.json.
         data-vscode-context={JSON.stringify({
@@ -448,7 +456,7 @@ export function TabSidebar({
     const toggleLabel = t(group.collapsed ? "bestOf.expand" : "bestOf.collapse");
     const progress = t("bestOf.progress", members.length - running, members.length);
     return (
-      <div key={key} className="tab-group" role="group">
+      <div key={key} className="tab-group" role="group" data-row={key}>
         <div
           className="tab"
           role="tab"
@@ -548,7 +556,7 @@ export function TabSidebar({
   };
 
   const rows = sortRows(
-    tabRows(tabs, groups),
+    tabRows(withLeaving(tabs, motion.leaving), groups),
     prefs.tabSort,
     (row) => (row.kind === "tab" ? (row.tab.title ?? "") : row.group.title),
     lang,
@@ -569,6 +577,9 @@ export function TabSidebar({
     row.kind === "tab"
       ? row.tab.id === active
       : row.group.id === shownGroup || row.members.some((tab) => tab.id === active);
+  const mainRows = shownRows.filter((row) => !isWorkingRow(row) && !isWaitingRow(row));
+  const list = useRef<HTMLDivElement>(null);
+  useReorderMotion(list, mainRows.map(rowKey));
   const shownRow = (row: ShownRow) =>
     row.kind === "tab" ? tabRow(row.tab, false) : groupRow(row.group, row.members, row.shown);
   useEffect(() => {
@@ -665,8 +676,8 @@ export function TabSidebar({
         )}
         <div id="tab-main">
           <div id="tab-scroll" ref={scroller}>
-            <div id="tab-list" role="tablist">
-              {shownRows.filter((row) => !isWorkingRow(row) && !isWaitingRow(row)).map(shownRow)}
+            <div id="tab-list" role="tablist" ref={list}>
+              {mainRows.map(shownRow)}
             </div>
             {searching && historySection}
             {noMatch && (
